@@ -1,0 +1,383 @@
+import React, { useEffect } from 'react';
+import { View, ScrollView, StyleSheet, Share } from 'react-native';
+import { Text, useTheme, IconButton, Chip, Divider, ActivityIndicator } from 'react-native-paper';
+import { useLocalSearchParams, router } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Markdown from 'react-native-markdown-display';
+import { useReportStore } from '@/stores/reportStore';
+import AudioPlayer from '@/components/AudioPlayer';
+
+export default function ReportDetailScreen() {
+  const theme = useTheme();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { currentReport, todayReport, isLoading, fetchReport } = useReportStore();
+
+  // 优先使用todayReport，如果ID匹配的话
+  const report = currentReport?.id === id ? currentReport : 
+                 todayReport?.id === id ? todayReport : 
+                 currentReport;
+
+  useEffect(() => {
+    if (id && (!report || report.id !== id)) {
+      fetchReport(id);
+    }
+  }, [id]);
+
+  const handleShare = async () => {
+    if (report) {
+      try {
+        await Share.share({
+          title: report.title,
+          message: `${report.title}\n\n${report.summary}\n\n来自财经日报App`,
+        });
+      } catch (error) {
+        console.error('分享失败:', error);
+      }
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long',
+    });
+  };
+
+  const markdownStyles = {
+    body: {
+      color: theme.colors.onSurface,
+      fontSize: 16,
+      lineHeight: 26,
+    },
+    heading1: {
+      color: theme.colors.onSurface,
+      fontSize: 24,
+      fontWeight: '700' as const,
+      marginTop: 24,
+      marginBottom: 12,
+    },
+    heading2: {
+      color: theme.colors.onSurface,
+      fontSize: 20,
+      fontWeight: '600' as const,
+      marginTop: 20,
+      marginBottom: 10,
+    },
+    heading3: {
+      color: theme.colors.onSurface,
+      fontSize: 18,
+      fontWeight: '600' as const,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    paragraph: {
+      marginBottom: 12,
+    },
+    bullet_list: {
+      marginBottom: 12,
+    },
+    ordered_list: {
+      marginBottom: 12,
+    },
+    list_item: {
+      marginBottom: 4,
+    },
+    blockquote: {
+      backgroundColor: theme.colors.surfaceVariant,
+      borderLeftColor: theme.colors.primary,
+      borderLeftWidth: 4,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      marginVertical: 12,
+    },
+    code_inline: {
+      backgroundColor: theme.colors.surfaceVariant,
+      color: theme.colors.primary,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+      fontFamily: 'monospace',
+    },
+    fence: {
+      backgroundColor: theme.colors.surfaceVariant,
+      borderRadius: 8,
+      padding: 12,
+      marginVertical: 12,
+    },
+    strong: {
+      fontWeight: '700' as const,
+    },
+    em: {
+      fontStyle: 'italic' as const,
+    },
+    hr: {
+      backgroundColor: theme.colors.outline,
+      height: 1,
+      marginVertical: 16,
+    },
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={{ marginTop: 16, color: theme.colors.outline }}>
+          正在加载报告...
+        </Text>
+      </View>
+    );
+  }
+
+  if (!report) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <MaterialCommunityIcons name="file-document-outline" size={64} color={theme.colors.outline} />
+        <Text variant="titleMedium" style={{ marginTop: 16, color: theme.colors.outline }}>
+          报告不存在
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* 顶部操作栏 */}
+      <View style={[styles.toolbar, { backgroundColor: theme.colors.surface }]}>
+        <IconButton
+          icon="arrow-left"
+          iconColor={theme.colors.onSurface}
+          onPress={() => router.back()}
+        />
+        <View style={styles.toolbarActions}>
+          {report.podcast_status === 'ready' && (
+            <IconButton
+              icon="podcast"
+              iconColor={theme.colors.secondary}
+              onPress={() => router.push('/podcast')}
+            />
+          )}
+          <IconButton
+            icon="share-variant"
+            iconColor={theme.colors.onSurface}
+            onPress={handleShare}
+          />
+        </View>
+      </View>
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* 报告头部 */}
+        <View style={styles.header}>
+          <Text variant="headlineSmall" style={styles.title}>
+            {report.title}
+          </Text>
+          <View style={styles.metaRow}>
+            <Text variant="bodyMedium" style={{ color: theme.colors.outline }}>
+              {formatDate(report.report_date)}
+            </Text>
+          </View>
+          <View style={styles.statsRow}>
+            <Chip icon="clock-outline" compact style={styles.statChip}>
+              {report.reading_time || 10} 分钟阅读
+            </Chip>
+            <Chip icon="newspaper" compact style={styles.statChip}>
+              {report.news_count || 0} 条新闻
+            </Chip>
+            <Chip icon="text" compact style={styles.statChip}>
+              {report.word_count || 0} 字
+            </Chip>
+          </View>
+        </View>
+
+        {/* 播客播放器 */}
+        {report.podcast_status === 'ready' && report.podcast_url && (
+          <View style={styles.playerSection}>
+            <AudioPlayer
+              reportId={report.id}
+              reportTitle={report.title}
+              audioUrl={report.podcast_url}
+              duration={report.podcast_duration || 0}
+            />
+          </View>
+        )}
+
+        {/* 摘要 */}
+        <View style={[styles.summarySection, { backgroundColor: theme.colors.surfaceVariant }]}>
+          <Text variant="titleSmall" style={styles.sectionLabel}>
+            📋 摘要
+          </Text>
+          <Text variant="bodyMedium" style={styles.summaryText}>
+            {report.summary}
+          </Text>
+        </View>
+
+        <Divider style={styles.divider} />
+
+        {/* 正文内容 */}
+        <View style={styles.contentSection}>
+          <Markdown style={markdownStyles}>{report.content}</Markdown>
+        </View>
+
+        {/* 市场分析 */}
+        {report.analysis && (
+          <View style={styles.analysisSection}>
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              📊 市场分析
+            </Text>
+            
+            <View style={[styles.analysisCard, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.analysisRow}>
+                <Text variant="bodyMedium">整体情绪：</Text>
+                <Chip
+                  style={{
+                    backgroundColor:
+                      report.analysis.overall_sentiment === 'positive'
+                        ? '#1B5E20'
+                        : report.analysis.overall_sentiment === 'negative'
+                        ? '#B71C1C'
+                        : theme.colors.outline,
+                  }}
+                  textStyle={{ color: '#fff', fontSize: 12 }}
+                >
+                  {report.analysis.overall_sentiment === 'positive'
+                    ? '乐观'
+                    : report.analysis.overall_sentiment === 'negative'
+                    ? '悲观'
+                    : '中性'}
+                </Chip>
+              </View>
+
+              {report.analysis.opportunities.length > 0 && (
+                <View style={styles.analysisItem}>
+                  <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
+                    投资机会
+                  </Text>
+                  <View style={styles.tagContainer}>
+                    {report.analysis.opportunities.map((opp, i) => (
+                      <Chip key={i} compact style={styles.tag}>
+                        {opp}
+                      </Chip>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {report.analysis.risks.length > 0 && (
+                <View style={styles.analysisItem}>
+                  <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
+                    风险提示
+                  </Text>
+                  <View style={styles.tagContainer}>
+                    {report.analysis.risks.map((risk, i) => (
+                      <Chip key={i} compact style={[styles.tag, { backgroundColor: '#B71C1C' }]}>
+                        {risk}
+                      </Chip>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        <View style={{ height: 48 }} />
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  toolbarActions: {
+    flexDirection: 'row',
+  },
+  scrollView: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  header: {
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  title: {
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  metaRow: {
+    marginBottom: 12,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statChip: {
+    height: 28,
+  },
+  playerSection: {
+    marginBottom: 16,
+  },
+  summarySection: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  sectionLabel: {
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  summaryText: {
+    lineHeight: 24,
+  },
+  divider: {
+    marginBottom: 16,
+  },
+  contentSection: {
+    paddingBottom: 24,
+  },
+  analysisSection: {
+    marginTop: 16,
+  },
+  sectionTitle: {
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  analysisCard: {
+    padding: 16,
+    borderRadius: 12,
+  },
+  analysisRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  analysisItem: {
+    marginBottom: 12,
+  },
+  tagContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  tag: {
+    height: 28,
+  },
+});

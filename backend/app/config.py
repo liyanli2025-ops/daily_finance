@@ -1,0 +1,80 @@
+"""
+应用配置管理模块
+使用 pydantic-settings 进行配置验证和类型安全
+"""
+from pydantic_settings import BaseSettings
+from pydantic import Field
+from typing import Optional, List
+from pathlib import Path
+
+
+class Settings(BaseSettings):
+    """应用配置类"""
+    
+    # 基础配置
+    app_name: str = Field(default="FinanceDaily", description="应用名称")
+    debug: bool = Field(default=True, description="调试模式")
+    host: str = Field(default="0.0.0.0", description="服务监听地址")
+    port: int = Field(default=8000, description="服务端口")
+    
+    # 推送时间配置
+    daily_report_hour: int = Field(default=6, ge=0, le=23, description="每日报告推送小时")
+    daily_report_minute: int = Field(default=0, ge=0, le=59, description="每日报告推送分钟")
+    
+    # 新闻采集提前时间（提前多少分钟开始采集）
+    collection_lead_time: int = Field(default=60, description="采集提前时间（分钟）")
+    
+    # AI 服务配置
+    anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API Key")
+    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API Key")
+    openai_base_url: Optional[str] = Field(default=None, description="OpenAI 兼容服务 Base URL")
+    ai_model: str = Field(default="claude-3-opus-20240229", description="默认AI模型")
+    
+    # 语音合成配置
+    tts_voice: str = Field(default="zh-CN-YunxiNeural", description="TTS语音角色")
+    tts_rate: str = Field(default="+0%", description="TTS语速")
+    tts_volume: str = Field(default="+0%", description="TTS音量")
+    
+    # 股票数据配置
+    tushare_token: Optional[str] = Field(default=None, description="Tushare Token")
+    
+    # 数据库配置
+    database_url: str = Field(
+        default="sqlite:///./data/database.db",
+        description="数据库连接字符串"
+    )
+    
+    # 数据存储路径
+    data_dir: Path = Field(default=Path("./data"), description="数据目录")
+    reports_dir: Path = Field(default=Path("./data/reports"), description="报告存储目录")
+    podcasts_dir: Path = Field(default=Path("./data/podcasts"), description="播客存储目录")
+    
+    # 新闻源配置
+    rss_feeds: List[str] = Field(
+        default=[
+            "https://feedx.net/rss/wallstreetcn.xml",  # 华尔街见闻
+            "https://rsshub.app/cls/telegraph",        # 财联社电报
+            "https://rsshub.app/eastmoney/report",     # 东方财富研报
+            "https://rsshub.app/caixin/latest",        # 财新网
+        ],
+        description="RSS新闻源列表"
+    )
+    
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = False
+    
+    def ensure_directories(self):
+        """确保所有数据目录存在"""
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.reports_dir.mkdir(parents=True, exist_ok=True)
+        self.podcasts_dir.mkdir(parents=True, exist_ok=True)
+
+
+# 全局配置实例
+settings = Settings()
+
+
+# 确保目录存在
+settings.ensure_directories()

@@ -1,0 +1,488 @@
+INFO:     Started server process [15136]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:63980 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64001 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64061 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64062 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "POST /api/trigger-report HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+[启动] 正在启动 FinanceDaily...
+[OK] 数据库初始化完成
+[SCHEDULER] 调度器已启动
+   - 每日报告生成时间: 05:00
+   - 报告推送时间: 06:00
+[OK] 定时调度器启动完成
+[OK] FinanceDaily 启动成功！
+[INFO] 每日报告推送时间: 06:00
+
+==================================================
+[START] 开始生成每日报告 - 2026-03-12 16:54:03
+==================================================
+
+[Step 1] 采集新闻...
+[FAIL] 新华网财经 采集失败: [Errno 11001] getaddrinfo failed
+[OK] 百度股票焦点: 获取 20 条
+[OK] 百度财经焦点: 获取 20 条
+[FAIL] 东方财富研报 采集失败: 
+[FAIL] 金十数据 采集失败: 
+[FAIL] 财联社电报 采集失败: 
+[NEWS] 共采集到 40 条新闻（原始 40 条，去重后 40 条）
+   筛选出 18 条中国相关新闻
+
+[Step 2] AI 分析生成报告...
+[OK] Anthropic 客户端初始化成功
+[OK] OpenAI 客户端初始化成功
+Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuSwSFxAzgHBbkrP9oY'}
+OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuT3rU1jydtZgBbEZeT'}
+OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuT5iaiqbjc6vWnDDFe'}
+OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuT7cwAo6y5aoUVRCYK'}
+OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuT9iwJVLXAFKmeAJny'}
+OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuTBpSYNVJ9sGTMQwkF'}
+OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuTDsUNbrNs7MqjzcGs'}
+OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuTFh7PGRpGGT6RsgNM'}
+OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuTHhfKaxkuADGo1w4W'}
+OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuTKfyQrtNwyv9ZLjvf'}
+OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuTMd3yzccGpm49N3nd'}
+OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+   报告生成完成: 2026年03月12日 (周四) 财经深度日报
+   字数: 1363, 预计阅读时间: 3 分钟
+
+[Step 3] 生成播客音频...
+✅ 播客生成完成: cc73943e-fc91-4034-aaaf-e023466f9bb8.mp3, 时长约 20 分钟
+   播客生成完成: 时长 20 分钟
+
+[Step 4] 保存到数据库...
+
+[ERROR] 报告生成失败: (sqlite3.IntegrityError) UNIQUE constraint failed: reports.report_date
+[SQL: INSERT INTO reports (id, title, summary, content, report_date, highlights, analysis, podcast_url, podcast_duration, podcast_status, word_count, reading_time, news_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('cc73943e-fc91-4034-aaaf-e023466f9bb8', '2026年03月12日 (周四) 财经深度日报', '今日A股市场上涨，上证指数+1.37%。人工智能板块表现活跃，央行维持流动性合理充裕。建议投资者保持积极态度，关注政策动向和行业轮动机会。', '# 2026年03月12日 (周四) 财经深度日报\n\n## 📊 今日市场概览\n\n今日 A 股市场上涨，三大指数分化明显：\n\n| 指数 | 涨跌幅 | 走势 |\n|------|--------|------|\n| 上证指数 | +1.37% | 📈 上涨 |\n| 深证成指 | + ... (1182 characters truncated) ... 场表现和消息面分析，预计明日：\n\n- **大盘走势**：延续震荡格局，关注支撑位有效性\n- **热点方向**：人工智能、医药生物 可能继续活跃\n- **操作策略**：建议积极配置，关注低位优质标的\n\n---\n\n*免责声明：以上分析仅供参考，不构成投资建议。投资有风险，入市需谨慎。*', '2026-03-12', '[{"title": "\\u592e\\u884c\\u516c\\u5f00\\u5e02\\u573a\\u64cd\\u4f5c\\u7ef4\\u62a4\\u6d41\\u52a8\\u6027", "source": "\\u592e\\u884c\\u5b98\\u7f51", " ... (791 characters truncated) ... "sentiment": "positive", "related_stocks": [], "historical_context": "\\u677f\\u5757\\u8f6e\\u52a8\\u884c\\u60c5\\u5ef6\\u7eed", "source_url": null}]', '{"overall_sentiment": "positive", "trend": "bullish", "key_factors": ["\\u592e\\u884c\\u653f\\u7b56", "\\u677f\\u5757\\u8f6e\\u52a8", "\\u5916\\u56f4 ... (136 characters truncated) ... "], "risks": ["\\u5916\\u56f4\\u5e02\\u573a\\u6ce2\\u52a8\\u52a0\\u5267", "\\u673a\\u6784\\u6301\\u4ed3\\u8c03\\u6574\\u9891\\u7e41"], "indices": []}', '/podcasts/cc73943e-fc91-4034-aaaf-e023466f9bb8.mp3', 1200, 'ready', 1363, 3, 18, '2026-03-12 16:54:44.391013', None)]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)Traceback (most recent call last):
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 182, in execute
+    self._adapt_connection._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 342, in _handle_exception
+    raise error
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 164, in execute
+    self.await_(_cursor.execute(operation, parameters))
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 40, in execute
+    await self._execute(self._cursor.execute, sql, parameters)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 32, in _execute
+    return await self._conn._execute(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 160, in _execute
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 63, in _connection_worker_thread
+    result = function()
+sqlite3.IntegrityError: UNIQUE constraint failed: reports.report_date
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\scheduler.py", line 197, in generate_daily_report
+    await self._save_report(report)
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\scheduler.py", line 278, in _save_report
+    await session.commit()
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\ext\asyncio\session.py", line 1000, in commit
+    await greenlet_spawn(self.sync_session.commit)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 203, in greenlet_spawn
+    result = context.switch(value)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "<string>", line 2, in commit
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "<string>", line 2, in _prepare_impl
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+    ~~~~~~~~~~~^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.mapper,
+        ^^^^^^^^^^^^
+        uow.states_for_mapper_hierarchy(self.mapper, False, False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        uow,
+        ^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        base_mapper,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        insert,
+        ^^^^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1048, in _emit_insert_statements
+    result = connection.execute(
+        statement, multiparams, execution_options=execution_options
+    )
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+INFO:     127.0.0.1:64556 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64557 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64557 - "POST /api/podcasts/53371af1-3ac6-40f8-8ad2-dbca5750d7b6/regenerate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64557 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64558 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64558 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64558 - "POST /api/trigger-report HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64558 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64558 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64558 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64558 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64558 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 182, in execute
+    self._adapt_connection._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 342, in _handle_exception
+    raise error
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 164, in execute
+    self.await_(_cursor.execute(operation, parameters))
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 40, in execute
+    await self._execute(self._cursor.execute, sql, parameters)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 32, in _execute
+    return await self._conn._execute(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 160, in _execute
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 63, in _connection_worker_thread
+    result = function()
+sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) UNIQUE constraint failed: reports.report_date
+[SQL: INSERT INTO reports (id, title, summary, content, report_date, highlights, analysis, podcast_url, podcast_duration, podcast_status, word_count, reading_time, news_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('cc73943e-fc91-4034-aaaf-e023466f9bb8', '2026年03月12日 (周四) 财经深度日报', '今日A股市场上涨，上证指数+1.37%。人工智能板块表现活跃，央行维持流动性合理充裕。建议投资者保持积极态度，关注政策动向和行业轮动机会。', '# 2026年03月12日 (周四) 财经深度日报\n\n## 📊 今日市场概览\n\n今日 A 股市场上涨，三大指数分化明显：\n\n| 指数 | 涨跌幅 | 走势 |\n|------|--------|------|\n| 上证指数 | +1.37% | 📈 上涨 |\n| 深证成指 | + ... (1182 characters truncated) ... 场表现和消息面分析，预计明日：\n\n- **大盘走势**：延续震荡格局，关注支撑位有效性\n- **热点方向**：人工智能、医药生物 可能继续活跃\n- **操作策略**：建议积极配置，关注低位优质标的\n\n---\n\n*免责声明：以上分析仅供参考，不构成投资建议。投资有风险，入市需谨慎。*', '2026-03-12', '[{"title": "\\u592e\\u884c\\u516c\\u5f00\\u5e02\\u573a\\u64cd\\u4f5c\\u7ef4\\u62a4\\u6d41\\u52a8\\u6027", "source": "\\u592e\\u884c\\u5b98\\u7f51", " ... (791 characters truncated) ... "sentiment": "positive", "related_stocks": [], "historical_context": "\\u677f\\u5757\\u8f6e\\u52a8\\u884c\\u60c5\\u5ef6\\u7eed", "source_url": null}]', '{"overall_sentiment": "positive", "trend": "bullish", "key_factors": ["\\u592e\\u884c\\u653f\\u7b56", "\\u677f\\u5757\\u8f6e\\u52a8", "\\u5916\\u56f4 ... (136 characters truncated) ... "], "risks": ["\\u5916\\u56f4\\u5e02\\u573a\\u6ce2\\u52a8\\u52a0\\u5267", "\\u673a\\u6784\\u6301\\u4ed3\\u8c03\\u6574\\u9891\\u7e41"], "indices": []}', '/podcasts/cc73943e-fc91-4034-aaaf-e023466f9bb8.mp3', 1200, 'ready', 1363, 3, 18, '2026-03-12 16:54:44.391013', None)]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 182, in execute
+    self._adapt_connection._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 342, in _handle_exception
+    raise error
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 164, in execute
+    self.await_(_cursor.execute(operation, parameters))
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 40, in execute
+    await self._execute(self._cursor.execute, sql, parameters)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 32, in _execute
+    return await self._conn._execute(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 160, in _execute
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 63, in _connection_worker_thread
+    result = function()
+sqlite3.IntegrityError: UNIQUE constraint failed: reports.report_date
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\scheduler.py", line 197, in generate_daily_report
+    await self._save_report(report)
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\scheduler.py", line 278, in _save_report
+    await session.commit()
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\ext\asyncio\session.py", line 1000, in commit
+    await greenlet_spawn(self.sync_session.commit)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 203, in greenlet_spawn
+    result = context.switch(value)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "<string>", line 2, in commit
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "<string>", line 2, in _prepare_impl
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+    ~~~~~~~~~~~^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.mapper,
+        ^^^^^^^^^^^^
+        uow.states_for_mapper_hierarchy(self.mapper, False, False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        uow,
+        ^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        base_mapper,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        insert,
+        ^^^^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1048, in _emit_insert_statements
+    result = connection.execute(
+        statement, multiparams, execution_options=execution_options
+    )
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 182, in execute
+    self._adapt_connection._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 342, in _handle_exception
+    raise error
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 164, in execute
+    self.await_(_cursor.execute(operation, parameters))
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 40, in execute
+    await self._execute(self._cursor.execute, sql, parameters)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 32, in _execute
+    return await self._conn._execute(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 160, in _execute
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 63, in _connection_worker_thread
+    result = function()
+sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) UNIQUE constraint failed: reports.report_date
+[SQL: INSERT INTO reports (id, title, summary, content, report_date, highlights, analysis, podcast_url, podcast_duration, podcast_status, word_count, reading_time, news_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('ca367b23-5a1e-4dc4-8249-b168fec6b40c', '2026年03月12日 (周四) 财经深度日报', '今日A股市场下跌，上证指数-0.71%。银行板块表现活跃，央行维持流动性合理充裕。建议投资者保持观望态度，关注政策动向和行业轮动机会。', '# 2026年03月12日 (周四) 财经深度日报\n\n## 📊 今日市场概览\n\n今日 A 股市场下跌，三大指数分化明显：\n\n| 指数 | 涨跌幅 | 走势 |\n|------|--------|------|\n| 上证指数 | -0.71% | 📉 下跌 |\n| 深证成指 | + ... (1176 characters truncated) ... 于今日市场表现和消息面分析，预计明日：\n\n- **大盘走势**：延续震荡格局，关注支撑位有效性\n- **热点方向**：银行、基建 可能继续活跃\n- **操作策略**：建议观望配置，关注低位优质标的\n\n---\n\n*免责声明：以上分析仅供参考，不构成投资建议。投资有风险，入市需谨慎。*', '2026-03-12', '[{"title": "\\u592e\\u884c\\u516c\\u5f00\\u5e02\\u573a\\u64cd\\u4f5c\\u7ef4\\u62a4\\u6d41\\u52a8\\u6027", "source": "\\u592e\\u884c\\u5b98\\u7f51", " ... (763 characters truncated) ... "sentiment": "positive", "related_stocks": [], "historical_context": "\\u677f\\u5757\\u8f6e\\u52a8\\u884c\\u60c5\\u5ef6\\u7eed", "source_url": null}]', '{"overall_sentiment": "negative", "trend": "bearish", "key_factors": ["\\u592e\\u884c\\u653f\\u7b56", "\\u677f\\u5757\\u8f6e\\u52a8", "\\u5916\\u56f4 ... (122 characters truncated) ... "\\u673a\\u6784\\u6301\\u4ed3\\u8c03\\u6574\\u9891\\u7e41", "\\u5730\\u7f18\\u653f\\u6cbb\\u4e0d\\u786e\\u5b9a\\u6027\\u4e0a\\u5347"], "indices": []}', '/podcasts/ca367b23-5a1e-4dc4-8249-b168fec6b40c.mp3', 1200, 'ready', 1357, 3, 4, '2026-03-12 16:56:15.917945', None)]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
