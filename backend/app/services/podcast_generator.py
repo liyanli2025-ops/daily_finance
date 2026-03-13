@@ -77,90 +77,191 @@ class PodcastGeneratorService:
     
     def _prepare_podcast_text(self, report: Report) -> str:
         """
-        准备播客文本
-        将 Markdown 报告转换为适合朗读的文本
+        准备播客文本 - 差异化风格（观点输出 + 财经脱口秀）
+        不是念报告，而是提炼核心观点，加入主播个人判断
         """
-        # 开场白
+        # 开场白（轻松活泼风格）
         opening = f"""
-各位听众朋友，大家好！欢迎收听今天的财经深度日报。
-今天是{report.report_date.strftime('%Y年%m月%d日')}，我是您的AI财经主播。
-接下来我将为您播报今日的财经要闻和深度分析。
+各位听众朋友，大家好！欢迎收听今天的财经脱口秀。
+今天是{report.report_date.strftime('%Y年%m月%d日')}，我是老李。
+废话不多说，直接上干货！
 
-今日报告的标题是：{report.title}
+今天的报告标题是：{report.title}
 
-首先，让我为您简要概述一下今天的核心内容：
-{report.summary}
-
-好的，接下来让我们进入详细内容。
 """
         
-        # 处理报告正文
-        content = self._clean_for_tts(report.content)
+        # 核心观点（如果有）- 开门见山
+        core_opinions_text = ""
+        if hasattr(report, 'core_opinions') and report.core_opinions:
+            core_opinions_text = """
+先说今天我的三个核心判断，听好了：
+
+"""
+            for i, opinion in enumerate(report.core_opinions, 1):
+                core_opinions_text += f"第{i}个判断：{opinion}\n\n"
+            core_opinions_text += """
+这三条判断，你可以不信，但我建议你记下来，一周后回来对照看看我说得准不准。
+
+"""
+        else:
+            # 使用摘要作为核心内容
+            core_opinions_text = f"""
+今天的核心内容是：{report.summary}
+
+接下来我展开聊聊。
+
+"""
         
-        # 重点新闻
+        # 跨界热点分析（如果有）- 这是差异化的重点
+        cross_border_text = ""
+        if hasattr(report, 'cross_border_events') and report.cross_border_events:
+            cross_border_text = """
+
+说完财经新闻，我们聊聊今天的跨界热点。
+很多人只盯着财经频道，其实很多影响股市的大事，都发生在财经圈外面。
+
+"""
+            for event in report.cross_border_events:
+                category_name = {
+                    "geopolitical": "地缘政治",
+                    "tech": "科技圈",
+                    "social": "社会热点",
+                    "disaster": "自然灾害"
+                }.get(event.category.value, "其他")
+                
+                cross_border_text += f"""
+来看一个{category_name}的事件：{event.title}
+
+简单说就是：{event.summary}
+
+这对股市有什么影响？我跟你说：
+直接影响是：{event.market_impact_direct}
+间接影响是：{event.market_impact_indirect}
+
+历史上类似情况：{event.historical_reference}
+
+所以受益的可能是：{', '.join(event.beneficiaries) if event.beneficiaries else '暂无明确受益方'}
+受损的可能是：{', '.join(event.losers) if event.losers else '暂无明确受损方'}
+
+我的建议是：{event.follow_up_advice}
+
+"""
+        
+        # 重点新闻 + 我的看法
         highlights_text = ""
         if report.highlights:
-            highlights_text = "\n\n接下来是今日重点新闻：\n\n"
-            for i, h in enumerate(report.highlights, 1):
-                sentiment_text = {
-                    "positive": "这是一条利好消息",
-                    "negative": "这是一条需要关注的风险信息",
-                    "neutral": "这是一条中性消息"
+            highlights_text = """
+
+好，接下来聊聊今天的几条重要新闻，以及我的个人看法。
+
+"""
+            for i, h in enumerate(report.highlights[:3], 1):  # 只取前3条重点说
+                sentiment_opinion = {
+                    "positive": "我觉得这是个好消息",
+                    "negative": "这条消息需要警惕",
+                    "neutral": "这条消息影响不大"
                 }.get(h.sentiment.value, "")
                 
                 highlights_text += f"""
 第{i}条：{h.title}
-来源：{h.source}
+
 {h.summary}
-{sentiment_text}。
+
+{sentiment_opinion}。
 """
                 if h.historical_context:
-                    highlights_text += f"背景信息：{h.historical_context}\n"
+                    highlights_text += f"从历史经验看：{h.historical_context}\n"
+                
+                highlights_text += "\n"
         
-        # 市场分析
+        # 市场分析 + 操作建议
         analysis_text = ""
         if report.analysis:
-            trend_text = {
-                "bullish": "整体偏向看多",
-                "bearish": "整体偏向谨慎",
-                "neutral": "保持中性观望"
+            trend_opinion = {
+                "bullish": "我个人倾向于看多",
+                "bearish": "我觉得需要谨慎一些",
+                "neutral": "目前我保持观望"
             }.get(report.analysis.trend.value, "")
             
             analysis_text = f"""
 
-接下来是今日市场分析：
+说说我对整体市场的看法。
 
-当前市场整体情绪为{report.analysis.overall_sentiment.value}，{trend_text}。
+{trend_opinion}。原因很简单：
 
-关键影响因素包括：{', '.join(report.analysis.key_factors)}
+关键因素就这几个：{', '.join(report.analysis.key_factors)}
 
-值得关注的投资机会：{', '.join(report.analysis.opportunities)}
+如果你问我现在该买什么？我觉得机会在：{', '.join(report.analysis.opportunities)}
 
-需要注意的风险点：{', '.join(report.analysis.risks)}
+但也要注意这些风险：{', '.join(report.analysis.risks)}
+
+记住，投资没有绝对的对错，关键是你要有自己的判断逻辑。
+
 """
         
-        # 结束语
+        # 处理报告正文的关键段落
+        key_content = self._extract_key_paragraphs(report.content)
+        
+        # 结束语（有态度的风格）
         closing = """
 
-好的，以上就是今天财经深度日报的全部内容。
+好了，今天的财经脱口秀就到这里。
 
-感谢您的收听！如果您觉得今天的内容对您有帮助，欢迎分享给您的朋友。
+总结一下今天的核心观点：
+第一，关注政策面的变化；
+第二，重点板块可以逢低布局；
+第三，风险管理永远是第一位的。
 
-我们明天同一时间再见！祝您投资顺利，财源广进！
+最后送给大家一句话：投资不是赌博，是认知的变现。
+知道自己为什么买、为什么卖，比知道买什么更重要。
+
+感谢收听，我们明天再见！
 """
         
         # 组合完整文本
-        full_text = opening + content + highlights_text + analysis_text + closing
+        full_text = opening + core_opinions_text + key_content + cross_border_text + highlights_text + analysis_text + closing
         
         # 控制字数在合理范围（5000-7500字，对应20-30分钟）
         if len(full_text) > 7500:
-            full_text = full_text[:7500] + "\n\n由于时间关系，今天的详细内容就播报到这里。完整报告请在App内查看。\n" + closing
-        elif len(full_text) < 5000:
-            # 内容不足时，可以添加一些填充语
-            padding = "\n\n让我们稍微总结一下今天的要点...\n" + report.summary + "\n"
+            # 截断并添加总结
+            full_text = full_text[:7000] + """
+
+由于时间关系，今天就先聊到这里。
+更详细的分析可以在App里看完整报告。
+
+""" + closing
+        elif len(full_text) < 4000:
+            # 内容不足时，添加更多观点
+            padding = f"""
+
+让我再补充几点个人看法。
+
+关于当前市场，我认为最重要的是把握节奏。
+不要急于追涨，也不要盲目恐惧。
+记住：别人恐惧时贪婪，别人贪婪时恐惧。
+
+今天的市场情况：{report.summary}
+
+"""
             full_text = full_text.replace(closing, padding + closing)
         
         return full_text
+    
+    def _extract_key_paragraphs(self, content: str) -> str:
+        """从报告内容中提取关键段落用于播客"""
+        # 清理Markdown格式
+        text = self._clean_for_tts(content)
+        
+        # 只保留前2000字的核心内容
+        if len(text) > 2000:
+            # 尝试找到自然断点
+            cutoff = text.find('。', 1800)
+            if cutoff > 0:
+                text = text[:cutoff + 1]
+            else:
+                text = text[:2000] + "..."
+        
+        return text
     
     def _clean_for_tts(self, markdown_text: str) -> str:
         """

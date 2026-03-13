@@ -6,6 +6,7 @@ import asyncio
 import sys
 import io
 from contextlib import asynccontextmanager
+from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -125,9 +126,41 @@ async def trigger_report_generation():
     """
     手动触发报告生成（用于测试）
     """
+    print(f"\n[API] /api/trigger-report 被调用！时间: {datetime.now()}")
     if scheduler_service:
-        asyncio.create_task(scheduler_service.generate_daily_report())
+        print("[API] 创建报告生成任务...")
+        
+        # 使用包装函数来捕获异常
+        async def generate_with_error_handling():
+            try:
+                await scheduler_service.generate_daily_report()
+                print("[API] 报告生成任务完成！")
+            except Exception as e:
+                print(f"[API] ❌ 报告生成任务失败: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        asyncio.create_task(generate_with_error_handling())
+        print("[API] 任务已创建，立即返回")
         return {"status": "started", "message": "报告生成任务已启动"}
+    print("[API] 调度器未运行！")
+    return {"status": "error", "message": "调度器未运行"}
+
+
+@app.post("/api/generate-report-sync")
+async def generate_report_sync():
+    """
+    同步生成报告（等待完成后返回）
+    """
+    print(f"\n[API] /api/generate-report-sync 被调用！时间: {datetime.now()}")
+    if scheduler_service:
+        try:
+            await scheduler_service.generate_daily_report()
+            return {"status": "success", "message": "报告生成完成"}
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {"status": "error", "message": str(e)}
     return {"status": "error", "message": "调度器未运行"}
 
 

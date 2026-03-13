@@ -55,7 +55,7 @@ async def get_today_report(db: AsyncSession = Depends(get_db)):
     获取今日报告
     """
     today = date.today()
-    query = select(ReportModel).where(ReportModel.report_date == today)
+    query = select(ReportModel).where(ReportModel.report_date == today).order_by(desc(ReportModel.created_at)).limit(1)
     result = await db.execute(query)
     report = result.scalar_one_or_none()
     
@@ -68,7 +68,10 @@ async def get_today_report(db: AsyncSession = Depends(get_db)):
         summary=report.summary,
         content=report.content,
         report_date=report.report_date,
+        core_opinions=report.core_opinions or [],
+        sections=[],
         highlights=report.highlights or [],
+        cross_border_events=report.cross_border_events or [],
         analysis=report.analysis,
         podcast_url=report.podcast_url,
         podcast_duration=report.podcast_duration,
@@ -76,6 +79,7 @@ async def get_today_report(db: AsyncSession = Depends(get_db)):
         word_count=report.word_count,
         reading_time=report.reading_time,
         news_count=report.news_count,
+        cross_border_count=report.cross_border_count or 0,
         created_at=report.created_at,
         updated_at=report.updated_at
     )
@@ -102,7 +106,10 @@ async def get_report_by_date(
         summary=report.summary,
         content=report.content,
         report_date=report.report_date,
+        core_opinions=report.core_opinions or [],
+        sections=[],
         highlights=report.highlights or [],
+        cross_border_events=report.cross_border_events or [],
         analysis=report.analysis,
         podcast_url=report.podcast_url,
         podcast_duration=report.podcast_duration,
@@ -110,6 +117,7 @@ async def get_report_by_date(
         word_count=report.word_count,
         reading_time=report.reading_time,
         news_count=report.news_count,
+        cross_border_count=report.cross_border_count or 0,
         created_at=report.created_at,
         updated_at=report.updated_at
     )
@@ -136,7 +144,10 @@ async def get_report(
         summary=report.summary,
         content=report.content,
         report_date=report.report_date,
+        core_opinions=report.core_opinions or [],
+        sections=[],
         highlights=report.highlights or [],
+        cross_border_events=report.cross_border_events or [],
         analysis=report.analysis,
         podcast_url=report.podcast_url,
         podcast_duration=report.podcast_duration,
@@ -144,6 +155,7 @@ async def get_report(
         word_count=report.word_count,
         reading_time=report.reading_time,
         news_count=report.news_count,
+        cross_border_count=report.cross_border_count or 0,
         created_at=report.created_at,
         updated_at=report.updated_at
     )
@@ -191,7 +203,10 @@ async def create_report(
         summary=report.summary,
         content=report.content,
         report_date=report.report_date,
+        core_opinions=[],
+        sections=[],
         highlights=report.highlights or [],
+        cross_border_events=[],
         analysis=report.analysis,
         podcast_url=report.podcast_url,
         podcast_duration=report.podcast_duration,
@@ -199,6 +214,7 @@ async def create_report(
         word_count=report.word_count,
         reading_time=report.reading_time,
         news_count=report.news_count,
+        cross_border_count=0,
         created_at=report.created_at,
         updated_at=report.updated_at
     )

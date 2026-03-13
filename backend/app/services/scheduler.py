@@ -93,14 +93,16 @@ class SchedulerService:
     async def generate_daily_report(self):
         """
         生成每日报告的完整流程：
-        1. 采集新闻
-        2. AI 分析生成报告
-        3. 生成播客音频
+        1. 采集新闻（财经 + 跨界）
+        2. AI 分析生成报告（7模块 + 五要素）
+        3. 生成播客音频（差异化风格）
         4. 保存到数据库
         """
-        print("\n" + "="*50)
-        print(f"[START] 开始生成每日报告 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("="*50)
+        import sys
+        print("\n" + "="*50, flush=True)
+        print(f"[START] 开始生成每日报告 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+        print("="*50, flush=True)
+        sys.stdout.flush()
         
         try:
             # Step 1: 采集新闻
@@ -108,14 +110,25 @@ class SchedulerService:
             collector = get_news_collector()
             all_news = await collector.collect_all(hours=24)
             
-            # 筛选中国相关新闻
-            china_news = collector.filter_china_related(all_news)
-            print(f"   筛选出 {len(china_news)} 条中国相关新闻")
+            # 分离财经新闻和跨界新闻
+            news_by_type = collector.get_news_by_type(all_news)
+            finance_news = news_by_type.get('finance', [])
+            
+            # 筛选中国相关财经新闻
+            china_news = collector.filter_china_related(finance_news)
+            print(f"   筛选出 {len(china_news)} 条中国相关财经新闻")
+            
+            # 筛选跨界新闻
+            cross_border_news = collector.filter_cross_border_news(all_news)
+            print(f"   筛选出 {len(cross_border_news)} 条跨界热点新闻")
+            if cross_border_news:
+                for news in cross_border_news[:5]:
+                    print(f"      - [{news.news_type.value}] {news.title[:40]}...")
             
             if not all_news:
                 print("[WARN] 未能从 RSS 源采集到新闻，将使用模拟数据生成报告")
-                # 生成模拟新闻数据，确保报告能够生成
-                from ..models.news import News, SentimentType
+                # 生成模拟新闻数据
+                from ..models.news import News, SentimentType, NewsType
                 import uuid
                 
                 mock_news = [
@@ -131,6 +144,7 @@ class SchedulerService:
                         importance_score=0.8,
                         keywords=["A股", "科技", "新能源"],
                         related_stocks=["000001"],
+                        news_type=NewsType.FINANCE,
                         created_at=datetime.now()
                     ),
                     News(
@@ -145,41 +159,52 @@ class SchedulerService:
                         importance_score=0.9,
                         keywords=["央行", "货币政策", "流动性"],
                         related_stocks=[],
+                        news_type=NewsType.FINANCE,
                         created_at=datetime.now()
                     ),
+                    # 模拟跨界新闻
                     News(
                         id=str(uuid.uuid4()),
-                        title="新能源汽车销量持续增长，行业前景向好",
-                        content="最新数据显示，新能源汽车销量同比大幅增长，市场渗透率再创新高。分析人士看好新能源产业链长期发展。",
-                        summary="新能源车销量增长，行业向好",
-                        source="行业动态",
+                        title="国际局势紧张，地缘政治风险上升",
+                        content="近期国际局势出现新变化，地缘政治风险有所上升。分析人士认为这可能影响全球资本市场风险偏好。",
+                        summary="地缘政治风险上升",
+                        source="国际新闻",
                         source_url="",
                         published_at=datetime.now(),
-                        sentiment=SentimentType.POSITIVE,
-                        importance_score=0.75,
-                        keywords=["新能源", "汽车", "销量"],
-                        related_stocks=["002594", "300750"],
+                        sentiment=SentimentType.NEGATIVE,
+                        importance_score=0.85,
+                        keywords=["地缘", "风险", "国际"],
+                        related_stocks=[],
+                        news_type=NewsType.GEOPOLITICAL,
+                        beneficiary_sectors=["黄金", "军工"],
+                        affected_sectors=["航空", "旅游"],
                         created_at=datetime.now()
                     )
                 ]
-                all_news = mock_news
-                china_news = mock_news
+                china_news = [n for n in mock_news if n.news_type == NewsType.FINANCE]
+                cross_border_news = [n for n in mock_news if n.news_type != NewsType.FINANCE]
             
-            # Step 2: AI 分析生成报告
+            # Step 2: AI 分析生成报告（新版 7 模块 + 五要素）
             print("\n[Step 2] AI 分析生成报告...")
-            analyzer = get_ai_analyzer()
+            # 强制重新初始化，确保使用最新配置
+            analyzer = get_ai_analyzer(force_reinit=True)
             
             # 对重要新闻进行情绪分析
             for news in china_news[:10]:
                 news.sentiment = await analyzer.analyze_news_sentiment(news)
             
-            # 生成报告
-            report = await analyzer.generate_daily_report(china_news if china_news else all_news)
+            # 生成报告（传入跨界新闻）
+            report = await analyzer.generate_daily_report(
+                china_news if china_news else finance_news,
+                cross_border_news
+            )
             print(f"   报告生成完成: {report.title}")
             print(f"   字数: {report.word_count}, 预计阅读时间: {report.reading_time} 分钟")
+            print(f"   核心观点: {len(report.core_opinions)} 条")
+            print(f"   跨界事件: {len(report.cross_border_events)} 条")
             
-            # Step 3: 生成播客
-            print("\n[Step 3] 生成播客音频...")
+            # Step 3: 生成播客（差异化风格）
+            print("\n[Step 3] 生成播客音频（观点输出风格）...")
             podcast_gen = get_podcast_generator()
             
             try:
@@ -263,7 +288,10 @@ class SchedulerService:
                 summary=report.summary,
                 content=report.content,
                 report_date=report.report_date,
+                # 新增字段
+                core_opinions=report.core_opinions if hasattr(report, 'core_opinions') else [],
                 highlights=[h.model_dump() for h in report.highlights],
+                cross_border_events=[e.model_dump() for e in report.cross_border_events] if hasattr(report, 'cross_border_events') else [],
                 analysis=report.analysis.model_dump() if report.analysis else None,
                 podcast_url=report.podcast_url,
                 podcast_duration=report.podcast_duration,
@@ -271,6 +299,7 @@ class SchedulerService:
                 word_count=report.word_count,
                 reading_time=report.reading_time,
                 news_count=report.news_count,
+                cross_border_count=report.cross_border_count if hasattr(report, 'cross_border_count') else 0,
                 created_at=report.created_at
             )
             

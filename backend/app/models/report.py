@@ -21,6 +21,61 @@ class MarketTrend(str, Enum):
     NEUTRAL = "neutral"      # 中性
 
 
+class ReportSectionType(str, Enum):
+    """报告模块类型（7大模块）"""
+    CORE_OPINIONS = "core_opinions"       # 今日核心观点
+    MACRO_POLICY = "macro_policy"         # 宏观政策解读
+    SECTOR_ROTATION = "sector_rotation"   # 行业轮动分析
+    STOCK_PICKS = "stock_picks"           # 个股机会挖掘
+    EVENT_DRIVEN = "event_driven"         # 事件驱动机会
+    CROSS_BORDER = "cross_border"         # 跨界热点扫描
+    RISK_RADAR = "risk_radar"             # 风险雷达
+
+
+class CrossBorderCategory(str, Enum):
+    """跨界事件类别"""
+    GEOPOLITICAL = "geopolitical"   # 国际政治/地缘冲突
+    TECH = "tech"                   # 科技突破/AI/新能源
+    SOCIAL = "social"               # 社会舆论/明星事件/品牌危机
+    DISASTER = "disaster"           # 自然灾害/气候事件
+
+
+class AnalysisHighlight(BaseModel):
+    """分析亮点（五要素结构）"""
+    event: str = Field(..., description="事件/机会描述")
+    historical_case: str = Field(..., description="历史案例对比")
+    data_evidence: str = Field(..., description="数据佐证")
+    logic_chain: str = Field(..., description="投资逻辑链条（因为A→所以B→因此C）")
+    action_advice: str = Field(..., description="操作建议（买入/卖出/持有）")
+    risk_warning: str = Field(..., description="风险提示")
+    related_stocks: List[str] = Field(default_factory=list, description="关联股票代码")
+    target_price: Optional[float] = Field(default=None, description="目标价")
+    stop_loss: Optional[float] = Field(default=None, description="止损位")
+
+
+class CrossBorderEvent(BaseModel):
+    """跨界热点事件"""
+    title: str = Field(..., description="事件标题")
+    category: CrossBorderCategory = Field(..., description="事件类别")
+    summary: str = Field(..., description="事件简述")
+    market_impact_direct: str = Field(..., description="直接影响")
+    market_impact_indirect: str = Field(..., description="间接影响")
+    historical_reference: str = Field(..., description="历史参照")
+    beneficiaries: List[str] = Field(default_factory=list, description="受益标的/板块")
+    losers: List[str] = Field(default_factory=list, description="受损标的/板块")
+    follow_up_advice: str = Field(..., description="持续跟踪建议")
+
+
+class ReportSection(BaseModel):
+    """报告模块"""
+    id: str = Field(..., description="模块ID")
+    title: str = Field(..., description="模块标题")
+    section_type: ReportSectionType = Field(..., description="模块类型")
+    content: str = Field(..., description="Markdown内容")
+    highlights: List[AnalysisHighlight] = Field(default_factory=list, description="分析亮点（五要素）")
+    cross_border_events: List[CrossBorderEvent] = Field(default_factory=list, description="跨界事件（仅跨界模块）")
+
+
 class NewsHighlight(BaseModel):
     """重点新闻摘要"""
     title: str = Field(..., description="新闻标题")
@@ -68,7 +123,18 @@ class ReportCreate(ReportBase):
 class Report(ReportBase):
     """完整报告模型"""
     id: str = Field(..., description="报告ID")
+    
+    # 核心观点（3句话版）
+    core_opinions: List[str] = Field(default_factory=list, description="今日核心观点（3条）")
+    
+    # 7大模块结构化内容
+    sections: List[ReportSection] = Field(default_factory=list, description="7大模块结构化内容")
+    
+    # 重点新闻和跨界事件
     highlights: List[NewsHighlight] = Field(default_factory=list, description="重点新闻")
+    cross_border_events: List[CrossBorderEvent] = Field(default_factory=list, description="跨界热点事件")
+    
+    # 市场分析
     analysis: Optional[MarketAnalysis] = Field(default=None, description="市场分析")
     
     # 播客相关
@@ -80,6 +146,7 @@ class Report(ReportBase):
     word_count: int = Field(default=0, description="报告字数")
     reading_time: int = Field(default=0, description="预计阅读时间（分钟）")
     news_count: int = Field(default=0, description="涉及新闻数量")
+    cross_border_count: int = Field(default=0, description="跨界新闻数量")
     
     created_at: dt = Field(default_factory=dt.now, description="创建时间")
     updated_at: Optional[dt] = Field(default=None, description="更新时间")

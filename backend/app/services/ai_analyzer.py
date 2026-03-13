@@ -1,6 +1,8 @@
 """
 AI 分析服务
 使用 Claude API 进行新闻分析、报告生成和投资建议
+
+增强版：集成 AKShare 真实市场数据，让 AI 基于真实数据进行分析
 """
 import json
 from datetime import datetime, date
@@ -8,12 +10,15 @@ from typing import List, Optional, Dict, Any
 import uuid
 
 from ..config import settings
-from ..models.news import News, SentimentType
+from ..models.news import News, SentimentType, NewsType
 from ..models.report import (
     Report, ReportCreate, NewsHighlight, MarketAnalysis,
-    IndexSnapshot, MarketTrend, SentimentType as ReportSentiment
+    IndexSnapshot, MarketTrend, SentimentType as ReportSentiment,
+    ReportSection, ReportSectionType, AnalysisHighlight,
+    CrossBorderEvent, CrossBorderCategory
 )
 from ..models.stock import StockPrediction, PredictionType
+from .market_data_service import get_market_data_service, MarketOverview
 
 
 class AIAnalyzerService:
@@ -82,83 +87,140 @@ class AIAnalyzerService:
         else:
             return SentimentType.NEUTRAL
     
-    async def generate_daily_report(self, news_list: List[News]) -> Report:
+    async def generate_daily_report(self, news_list: List[News], cross_border_news: List[News] = None) -> Report:
         """
-        生成每日财经深度报告
+        生成每日财经深度报告（7模块 + 五要素结构）
+        
+        增强版：集成 AKShare 真实市场数据
         
         Args:
-            news_list: 今日新闻列表
+            news_list: 财经新闻列表
+            cross_border_news: 跨界新闻列表
             
         Returns:
             生成的报告对象
         """
         today = date.today()
         
-        # 准备新闻摘要
-        news_summary = self._prepare_news_summary(news_list)
+        # 【新增】获取真实市场数据
+        print("[AI] 正在获取真实市场数据...")
+        market_service = get_market_data_service()
+        market_data: MarketOverview = await market_service.get_market_overview(today)
+        market_data_text = market_data.to_prompt_text()
+        print(f"[AI] 市场数据获取完成：{len(market_data.indices)} 个指数，{len(market_data.top_sectors)} 个热门板块")
         
-        # 生成报告内容
-        report_prompt = f"""你是一位专业的财经分析师，请根据今日（{today.strftime('%Y年%m月%d日')}）的财经新闻，撰写一份深度分析报告。
+        # 准备新闻摘要
+        finance_summary = self._prepare_news_summary(news_list)
+        cross_border_summary = self._prepare_cross_border_summary(cross_border_news or [])
+        
+        # 【优化】新的 prompt 设计：明确数据来源，不要求 AI 编造
+        report_prompt = f"""你是一位资深财经分析师，拥有20年A股和港股投资经验。
+你的分析风格是：通俗易懂但不失专业，像和朋友聊天一样解释复杂问题。
 
-## 今日重要新闻
+## 重要说明
+以下是我提供给你的**真实市场数据**和**今日新闻**，请基于这些数据进行分析。
+- 所有分析必须基于我提供的数据，不要编造数据
+- 如果数据不足以支撑某个判断，请直接说明"数据有限，需进一步观察"
+- 不要凭空给出具体的目标价、止损位等，除非数据中有支撑
 
-{news_summary}
+---
 
-## 报告要求
+{market_data_text}
 
-请撰写一份 5000-7000 字的深度财经日报，要求：
+---
 
-1. **标题**：一个吸引眼球、概括今日核心主题的标题
+## 今日财经新闻
+{finance_summary}
 
-2. **内容结构**（使用 Markdown 格式）：
-   - **今日市场概览**：简要概述今日市场整体表现
-   - **重点事件深度分析**：选取 3-5 个最重要的事件，每个事件包括：
-     - 事件概述
-     - 背景回溯（这个事件的前因是什么，之前发生过什么）
-     - 历史类似案例（如果有的话）
-     - 对市场的影响分析
-     - 投资启示
-   - **行业观察**：重点关注的 2-3 个行业动态
-   - **政策解读**：如有重要政策，进行详细解读
-   - **风险提示**：当前需要注意的风险点
-   - **明日展望**：对明日市场的预判
+## 今日跨界热点（可能影响股市的非财经新闻）
+{cross_border_summary if cross_border_summary else "暂无重大跨界热点"}
 
-3. **分析风格**：
-   - 专业但通俗易懂
-   - 结合宏观经济背景
-   - 给出具体的、可操作的投资参考
-   - 避免模糊的套话，要有干货
+---
 
-4. **额外输出**（JSON 格式）：
-   在报告末尾，用 ```json 包裹，输出以下结构化数据：
-   {{
-     "title": "报告标题",
-     "summary": "200字以内的报告摘要",
-     "highlights": [
-       {{
-         "title": "新闻标题",
-         "source": "来源",
-         "summary": "100字摘要",
-         "sentiment": "positive/negative/neutral",
-         "related_stocks": ["代码1", "代码2"],
-         "historical_context": "历史背景（可选）"
-       }}
-     ],
-     "market_analysis": {{
-       "overall_sentiment": "positive/negative/neutral",
-       "trend": "bullish/bearish/neutral",
-       "key_factors": ["因素1", "因素2"],
-       "opportunities": ["机会1", "机会2"],
-       "risks": ["风险1", "风险2"]
-     }}
-   }}
+## 报告结构要求（7大模块，使用 Markdown 格式）
+
+### 模块1：🎯 今日核心观点
+基于上述市场数据，用3句话概括今日最重要的市场特征和投资判断：
+- 开门见山，引用具体数据
+- 每句话都要有数据支撑
+
+### 模块2：📈 宏观市场解读
+基于我提供的指数数据和资金流向，分析今日大盘走势：
+1. **市场表现**：结合上证、深证、创业板的涨跌幅进行解读
+2. **资金动向**：主力资金流入/流出说明什么
+3. **市场情绪**：涨跌家数比例反映什么
+4. **后市展望**：基于当前数据的短期判断
+
+### 模块3：🔄 行业轮动分析
+基于我提供的板块涨跌排行数据，分析今日行业轮动：
+- 领涨板块分析：为什么这些板块领涨？（结合新闻找原因）
+- 领跌板块分析：为什么这些板块下跌？
+- 板块轮动规律：近期热点切换的逻辑
+
+### 模块4：💎 热门个股分析
+基于我提供的涨停股、龙虎榜数据，分析今日热点个股：
+- 涨停股特征：共性是什么？
+- 龙虎榜信号：机构和游资的动向
+- **注意**：不要凭空推荐股票，只分析数据中出现的个股
+
+### 模块5：⚡ 事件驱动机会
+结合新闻，分析未来一周值得关注的事件：
+- 时间节点
+- 可能的市场影响
+- 应对思路
+
+### 模块6：🌍 跨界热点扫描
+{f"分析以下跨界热点对股市的潜在影响：" if cross_border_summary else "今日无重大跨界热点"}
+
+### 模块7：⚠️ 风险提示
+基于当前数据，列出需要警惕的风险点：
+- 资金流出明显的板块
+- 跌停股的共性
+- 其他市场信号
+
+---
+
+## 写作风格要求
+- **数据说话**：每个观点都引用我提供的具体数字
+- **实事求是**：数据不足就说不足，不要编造
+- **通俗易懂**：像财经自媒体，解释专业术语
+- **有理有据**：分析要有逻辑链条
+
+## 额外输出（JSON 格式）
+在报告末尾，用 ```json 包裹输出以下结构化数据：
+```json
+{{
+  "title": "报告标题（结合今日市场特征）",
+  "summary": "200字以内的报告摘要（引用关键数据）",
+  "core_opinions": ["核心观点1", "核心观点2", "核心观点3"],
+  "highlights": [
+    {{
+      "title": "重要新闻标题",
+      "source": "来源",
+      "summary": "100字摘要",
+      "sentiment": "positive/negative/neutral",
+      "related_stocks": ["相关股票代码"],
+      "historical_context": "背景说明"
+    }}
+  ],
+  "market_analysis": {{
+    "overall_sentiment": "positive/negative/neutral",
+    "trend": "bullish/bearish/neutral",
+    "key_factors": ["影响因素1", "影响因素2"],
+    "opportunities": ["机会板块1", "机会板块2"],
+    "risks": ["风险点1", "风险点2"]
+  }},
+  "hot_sectors": ["今日热门板块1", "今日热门板块2", "今日热门板块3"],
+  "risk_sectors": ["需警惕板块1", "需警惕板块2"]
+}}
+```
 
 请开始撰写报告："""
 
         response = await self._call_ai(report_prompt, max_tokens=8000)
         
         # 解析响应
-        report = self._parse_report_response(response, today, news_list)
+        report = self._parse_enhanced_report_response(response, today, news_list, cross_border_news or [])
         
         return report
     
@@ -255,11 +317,18 @@ class AIAnalyzerService:
         """
         import asyncio
         
+        print(f"[AI DEBUG] 准备调用 AI，客户端状态:")
+        print(f"   - Anthropic: {'已初始化' if self.anthropic_client else '未初始化'}")
+        print(f"   - OpenAI: {'已初始化' if self.openai_client else '未初始化'}")
+        print(f"   - 使用免费服务: {self.using_free_service}")
+        print(f"   - 配置的模型: {settings.ai_model}")
+        print(f"   - 配置的 Base URL: {settings.openai_base_url}")
+        
         # 尝试 Anthropic
         if self.anthropic_client:
             try:
                 message = self.anthropic_client.messages.create(
-                    model="claude-3-opus-20240229",
+                    model=settings.ai_model,  # 使用配置文件中的模型
                     max_tokens=max_tokens,
                     messages=[
                         {"role": "user", "content": prompt}
@@ -272,18 +341,28 @@ class AIAnalyzerService:
         # 尝试 OpenAI/兼容服务
         if self.openai_client:
             # 免费服务可能不稳定，添加重试机制
-            max_retries = 3 if self.using_free_service else 1
+            max_retries = 3 if self.using_free_service else 2
             
             for attempt in range(max_retries):
                 try:
-                    # 选择模型：免费服务使用 deepseek-r1，否则使用配置的模型
+                    # 智能选择模型
                     if self.using_free_service:
                         model = "openai"  # Pollinations 默认使用 openai
                     elif settings.openai_base_url:
-                        # 使用兼容服务时的模型名称
-                        model = settings.ai_model if settings.ai_model != "claude-3-opus-20240229" else "deepseek-ai/DeepSeek-V3"
+                        # 使用兼容服务时，优先使用配置的模型
+                        if settings.ai_model and "claude" not in settings.ai_model.lower():
+                            model = settings.ai_model
+                        else:
+                            # 根据 base_url 智能推断模型
+                            if "deepseek" in settings.openai_base_url.lower():
+                                model = "deepseek-chat"
+                            elif "siliconflow" in settings.openai_base_url.lower():
+                                model = "deepseek-ai/DeepSeek-V3"
+                            else:
+                                model = "gpt-4-turbo"
                     else:
-                        model = "gpt-4-turbo-preview"
+                        # OpenAI 官方服务
+                        model = settings.ai_model if "gpt" in settings.ai_model.lower() else "gpt-4-turbo"
                     
                     print(f"[AI] 调用模型: {model} (尝试 {attempt + 1}/{max_retries})")
                     
@@ -314,18 +393,60 @@ class AIAnalyzerService:
         sorted_news = sorted(news_list, key=lambda x: x.importance_score, reverse=True)[:20]
         
         for i, news in enumerate(sorted_news, 1):
+            # 增加内容截取长度到500字，提供更多上下文
+            content_preview = news.content[:500] if len(news.content) > 500 else news.content
             summary_parts.append(f"""
 ### {i}. {news.title}
 - 来源：{news.source}
 - 时间：{news.published_at.strftime('%H:%M')}
-- 摘要：{news.content[:200]}...
+- 摘要：{content_preview}
+""")
+        
+        return "\n".join(summary_parts)
+    
+    def _prepare_cross_border_summary(self, cross_border_news: List[News]) -> str:
+        """准备跨界新闻摘要文本"""
+        if not cross_border_news:
+            return ""
+        
+        # 按类型分组
+        by_type = {}
+        for news in cross_border_news:
+            type_name = {
+                NewsType.GEOPOLITICAL: "🌍 国际政治/地缘冲突",
+                NewsType.TECH: "🔬 科技突破",
+                NewsType.SOCIAL: "📢 社会舆论",
+                NewsType.DISASTER: "🌪️ 自然灾害"
+            }.get(news.news_type, "其他")
+            
+            if type_name not in by_type:
+                by_type[type_name] = []
+            by_type[type_name].append(news)
+        
+        summary_parts = []
+        for type_name, news_items in by_type.items():
+            summary_parts.append(f"\n### {type_name}")
+            for i, news in enumerate(news_items[:3], 1):  # 每类最多3条
+                impact_info = ""
+                if news.beneficiary_sectors or news.affected_sectors:
+                    impact_info = f"\n- 潜在影响：受益板块[{', '.join(news.beneficiary_sectors)}]，受损板块[{', '.join(news.affected_sectors)}]"
+                summary_parts.append(f"""
+{i}. **{news.title}**
+- 来源：{news.source}
+- 时间：{news.published_at.strftime('%H:%M')}
+- 内容：{news.content[:150]}...{impact_info}
 """)
         
         return "\n".join(summary_parts)
     
     def _parse_report_response(self, response: str, report_date: date, 
                                news_list: List[News]) -> Report:
-        """解析 AI 响应，构建报告对象"""
+        """解析 AI 响应，构建报告对象（旧版兼容）"""
+        return self._parse_enhanced_report_response(response, report_date, news_list, [])
+    
+    def _parse_enhanced_report_response(self, response: str, report_date: date,
+                                        news_list: List[News], cross_border_news: List[News]) -> Report:
+        """解析增强版 AI 响应，构建7模块报告对象"""
         # 尝试提取 JSON 数据
         json_data = self._extract_json(response)
         
@@ -334,9 +455,10 @@ class AIAnalyzerService:
         if "```json" in response:
             content = response.split("```json")[0].strip()
         
-        # 构建报告
-        title = json_data.get("title", f"{report_date.strftime('%Y年%m月%d日')} 财经日报")
+        # 构建报告基础信息
+        title = json_data.get("title", f"{report_date.strftime('%Y年%m月%d日')} 财经深度日报")
         summary = json_data.get("summary", content[:200])
+        core_opinions = json_data.get("core_opinions", [])
         
         # 构建 highlights
         highlights = []
@@ -361,6 +483,27 @@ class AIAnalyzerService:
                     related_stocks=news.related_stocks
                 ))
         
+        # 构建跨界事件
+        cross_border_events = []
+        for cb in json_data.get("cross_border_events", []):
+            category_str = cb.get("category", "tech")
+            try:
+                category = CrossBorderCategory(category_str)
+            except:
+                category = CrossBorderCategory.TECH
+            
+            cross_border_events.append(CrossBorderEvent(
+                title=cb.get("title", ""),
+                category=category,
+                summary=cb.get("summary", ""),
+                market_impact_direct=cb.get("market_impact_direct", ""),
+                market_impact_indirect=cb.get("market_impact_indirect", ""),
+                historical_reference=cb.get("historical_reference", ""),
+                beneficiaries=cb.get("beneficiaries", []),
+                losers=cb.get("losers", []),
+                follow_up_advice=cb.get("follow_up_advice", "")
+            ))
+        
         # 构建市场分析
         analysis_data = json_data.get("market_analysis", {})
         analysis = MarketAnalysis(
@@ -369,7 +512,7 @@ class AIAnalyzerService:
             key_factors=analysis_data.get("key_factors", []),
             opportunities=analysis_data.get("opportunities", []),
             risks=analysis_data.get("risks", []),
-            indices=[]  # 需要从其他数据源获取
+            indices=[]
         )
         
         # 计算统计信息
@@ -380,14 +523,18 @@ class AIAnalyzerService:
             id=str(uuid.uuid4()),
             title=title,
             summary=summary,
+            core_opinions=core_opinions,
             content=content,
             report_date=report_date,
+            sections=[],  # 可以后续从 content 中解析出各模块
             highlights=highlights,
+            cross_border_events=cross_border_events,
             analysis=analysis,
             podcast_status="pending",
             word_count=word_count,
             reading_time=reading_time,
             news_count=len(news_list),
+            cross_border_count=len(cross_border_news),
             created_at=datetime.now()
         )
     
@@ -407,7 +554,7 @@ class AIAnalyzerService:
             return {}
     
     def _generate_mock_report(self) -> str:
-        """生成模拟报告（用于测试或 API 不可用时）"""
+        """生成模拟报告（用于测试或 API 不可用时）- 7模块结构"""
         from datetime import datetime
         import random
         
@@ -423,6 +570,7 @@ class AIAnalyzerService:
         
         shanghai_trend = "上涨" if shanghai_change > 0 else "下跌"
         market_sentiment = "积极" if shanghai_change > 0.5 else "谨慎" if shanghai_change > -0.5 else "观望"
+        action = "买入" if shanghai_change > 0.5 else "持有" if shanghai_change > -0.5 else "减仓"
         
         # 随机选择热点板块
         hot_sectors = random.sample([
@@ -437,122 +585,178 @@ class AIAnalyzerService:
             "部分板块估值偏高需警惕",
             "资金面边际收紧",
             "机构持仓调整频繁"
-        ], 2)
+        ], 3)
         
         return f"""# {today} ({weekday}) 财经深度日报
 
-## 📊 今日市场概览
+## 🎯 今日核心观点
 
-今日 A 股市场{shanghai_trend}，三大指数分化明显：
+1. **央行维持流动性宽松，建议{action}金融板块**：今日央行开展逆回购操作，银行间利率维持低位，流动性充裕利好估值修复。
 
-| 指数 | 涨跌幅 | 走势 |
-|------|--------|------|
-| 上证指数 | {'+' if shanghai_change > 0 else ''}{shanghai_change}% | {'📈 上涨' if shanghai_change > 0 else '📉 下跌'} |
-| 深证成指 | {'+' if shenzhen_change > 0 else ''}{shenzhen_change}% | {'📈 上涨' if shenzhen_change > 0 else '📉 下跌'} |
-| 创业板指 | {'+' if chuangye_change > 0 else ''}{chuangye_change}% | {'📈 上涨' if chuangye_change > 0 else '📉 下跌'} |
-| 恒生指数 | {'+' if hangseng_change > 0 else ''}{hangseng_change}% | {'📈 上涨' if hangseng_change > 0 else '📉 下跌'} |
+2. **{hot_sectors[0]}板块持续走强，龙头个股目标价上调15%**：政策催化+业绩兑现，板块估值仍有空间，建议逢低布局龙头。
 
-今日两市成交额约 9000 亿元，市场整体交投活跃度{market_sentiment}。北向资金今日净{'买入' if random.random() > 0.5 else '卖出'} {random.randint(10, 80)} 亿元。
+3. **警惕{risk_points[0]}，控制仓位在6成以下**：当前市场情绪偏{market_sentiment}，建议保持灵活，等待更明确的方向信号。
 
 ---
 
-## 🔥 重点事件深度分析
+## 📈 宏观政策解读
 
-### 1. 央行货币政策动向
+### 央行逆回购操作释放积极信号
 
-**事件概述**：央行今日开展逆回购操作，维护银行体系流动性合理充裕。
+**事件概述**：央行今日开展2000亿元7天期逆回购操作，利率维持1.8%不变。
 
-**背景回溯**：
-- 近期央行持续通过公开市场操作调节流动性
-- 当前银行间市场利率维持在合理区间
-- 市场对货币政策预期保持稳定
+**历史案例对比**：
+- 2024年9月，央行同样在市场低迷时加大逆回购力度，随后一个月上证指数上涨12.3%
+- 2023年6月类似操作后，银行板块一周内反弹8.7%
 
-**历史类似案例**：
-回顾 2023-2024 年，央行在经济恢复期采取了灵活适度的货币政策，有效支撑了实体经济发展。
+**数据佐证**：
+- 当前DR007报1.75%，处于近6个月低位
+- 北向资金本周净流入87亿元
+- 银行板块PE仅5.2倍，处于历史10%分位
 
-**对市场的影响**：
-- 短期：流动性充裕利好股债两市
-- 中期：为经济平稳运行提供支撑
-- 长期：货币政策框架持续完善
+**投资逻辑链条**：
+流动性宽松 → 无风险利率下行 → 高股息资产吸引力上升 → 银行、保险等金融板块受益
 
-**投资启示**：
-关注受益于低利率环境的成长股，以及估值具有安全边际的蓝筹股。
+**操作建议**：建议{action}银行ETF（512800），目标涨幅10-15%
 
----
-
-### 2. {hot_sectors[0]}板块异动
-
-**事件概述**：{hot_sectors[0]}板块今日表现活跃，多只个股涨停。
-
-**背景分析**：
-- 政策端持续发力，行业利好不断
-- 产业链景气度维持高位
-- 机构资金持续加仓
-
-**投资建议**：
-- 关注行业龙头企业
-- 注意估值与业绩的匹配度
-- 设置好止盈止损位
+**风险提示**：若通胀数据超预期或美联储鹰派表态，可能导致政策转向
 
 ---
 
-### 3. 国际市场联动
+## 🔄 行业轮动分析
 
-**隔夜美股**：道琼斯指数{'+' if random.random() > 0.5 else '-'}{round(random.uniform(0.1, 1.5), 2)}%，纳斯达克指数{'+' if random.random() > 0.5 else '-'}{round(random.uniform(0.2, 2), 2)}%
+### {hot_sectors[0]}板块：强势领涨，仍有空间
 
-**影响分析**：
-- 美联储政策预期变化影响全球风险偏好
-- 国际资金流向对 A 股北向资金有一定指引作用
-- 科技股走势对 A 股相关板块有参考意义
+**板块表现**：
+- 今日涨幅：+{round(random.uniform(2, 5), 2)}%
+- 本周涨幅：+{round(random.uniform(5, 12), 2)}%
+- 资金流向：主力净流入{random.randint(20, 80)}亿元
 
----
+**驱动因素**：
+1. 政策端：国家发改委发布产业支持政策
+2. 业绩端：龙头公司Q3业绩预增30-50%
+3. 资金端：北向资金连续5日加仓
 
-## 📈 行业观察
+**龙头标的**：
+- 标的A（600xxx）：行业绝对龙头，市占率35%
+- 标的B（300xxx）：技术领先，毛利率最高
 
-### {hot_sectors[0]}
-今日领涨两市，主要受益于：
-1. 政策支持力度加大
-2. 行业需求持续增长
-3. 产业链利润向龙头集中
+**技术面分析**：
+- 板块指数突破年线，MACD金叉
+- 短期支撑位：xxxx点，阻力位：xxxx点
 
-### {hot_sectors[1]}
-表现相对活跃，关注：
-1. 技术突破带来的投资机会
-2. 下游需求复苏进度
-3. 国产替代加速推进
-
-### {hot_sectors[2]}
-震荡整理中，建议：
-1. 等待更明确的信号
-2. 关注龙头公司财报
-3. 注意板块轮动节奏
+**操作建议**：建议买入，仓位控制在15%以内
 
 ---
 
-## ⚠️ 风险提示
+## 💎 个股机会挖掘
 
-1. **{risk_points[0]}**
-   - 需密切关注外部环境变化
-   - 做好资产配置的再平衡
+### 推荐股票：XXX科技（688xxx）
 
-2. **{risk_points[1]}**
-   - 建议保持适度仓位
-   - 分散投资降低风险
+**近期催化**：
+- 下周发布Q3业绩预告，预计同比增长40-60%
+- 新产品下月量产，打开第二增长曲线
 
-3. **操作建议**
-   - 不追高，不杀跌
-   - 严格执行投资纪律
-   - 关注政策边际变化
+**基本面数据**：
+| 指标 | 数值 | 行业排名 |
+|------|------|----------|
+| PE(TTM) | 28倍 | 中位数 |
+| PEG | 0.8 | 偏低 |
+| ROE | 18% | 前20% |
+| 毛利率 | 42% | 前10% |
+
+**技术面判断**：
+- 周线站上MA20，量能放大
+- MACD底背离后金叉
+
+**AI预判**：看多（置信度78%）
+
+**目标价**：150元（当前价120元，空间25%）
+
+**止损位**：108元（跌破即止损，幅度-10%）
 
 ---
 
-## 🔮 明日展望
+## ⚡ 事件驱动机会
 
-基于今日市场表现和消息面分析，预计明日：
+### 下周关注：美联储议息会议（3/18-19）
 
-- **大盘走势**：延续震荡格局，关注支撑位有效性
-- **热点方向**：{hot_sectors[0]}、{hot_sectors[1]} 可能继续活跃
-- **操作策略**：建议{market_sentiment}配置，关注低位优质标的
+**时间节点**：北京时间3月20日凌晨2:00公布结果
+
+**市场预期**：
+- CME利率期货显示：维持利率不变概率88%
+- 市场关注点：点阵图是否暗示年内降息次数
+
+**不同情景应对**：
+
+| 情景 | 概率 | 市场反应 | 操作建议 |
+|------|------|----------|----------|
+| 符合预期（维持） | 88% | 小幅反弹 | 持有，等待突破 |
+| 鸽派表态 | 8% | 强势上涨 | 加仓科技股 |
+| 鹰派意外 | 4% | 短期承压 | 减仓，等待企稳 |
+
+**历史参考**：
+- 去年6月议息后一周，纳指+3.2%，A股科技板块+5.1%
+- 去年12月鸽派表态后，全球风险资产普涨
+
+---
+
+## 🌍 跨界热点扫描
+
+### 热点一：中东局势紧张升级
+
+**事件简述**：中东某地区冲突持续，国际油价应声上涨3%。
+
+**市场关联分析**：
+- **直接影响**：原油、天然气等能源股直接受益；航空、物流成本承压
+- **间接影响**：避险情绪升温，黄金、国债受追捧；出口企业汇率风险上升
+
+**历史参照**：
+2022年俄乌冲突初期，中石油一个月涨幅25%，航空股普跌15%
+
+**受益标的**：中石油（601857）、中海油（600938）、黄金ETF（518880）
+
+**受损标的**：南方航空（600029）、中国国航（601111）
+
+**持续跟踪建议**：关注每日原油价格和地区局势变化，若冲突持续超过2周，能源股可能有第二波行情
+
+### 热点二：某知名品牌代言人翻车
+
+**事件简述**：某流量明星因负面事件导致多个品牌连夜解约。
+
+**市场关联分析**：
+- **直接影响**：相关代言品牌股价承压，短期情绪冲击
+- **间接影响**：消费者信心波动，品牌商可能增加营销费用
+
+**历史参照**：
+2021年类似事件后，相关消费品公司股价平均下跌8%，但一个月后基本收复失地
+
+**受损标的**：暂不点名，建议回避近期有明星代言争议的消费股
+
+**持续跟踪建议**：这类事件通常是短期情绪冲击，若基本面未受实质影响，反而可能是逢低买入机会
+
+---
+
+## ⚠️ 风险雷达
+
+### 风险一：{risk_points[0]}
+- **风险等级**：🟡 中等
+- **影响范围**：全市场
+- **应对建议**：控制整体仓位，分散配置
+
+### 风险二：{risk_points[1]}
+- **风险等级**：🟠 偏高
+- **影响范围**：部分板块
+- **应对建议**：回避相关板块，等待风险释放
+
+### 风险三：{risk_points[2]}
+- **风险等级**：🟡 中等
+- **影响范围**：高估值成长股
+- **应对建议**：关注业绩能否兑现，设好止损位
+
+### 本周财报爆雷预警
+- XX公司（300xxx）：业绩预告下修，警惕
+- YY公司（600xxx）：商誉减值风险，规避
 
 ---
 
@@ -561,31 +765,71 @@ class AIAnalyzerService:
 ```json
 {{
   "title": "{today} ({weekday}) 财经深度日报",
-  "summary": "今日A股市场{shanghai_trend}，上证指数{'+' if shanghai_change > 0 else ''}{shanghai_change}%。{hot_sectors[0]}板块表现活跃，央行维持流动性合理充裕。建议投资者保持{market_sentiment}态度，关注政策动向和行业轮动机会。",
+  "summary": "今日A股市场{shanghai_trend}，上证指数{'+' if shanghai_change > 0 else ''}{shanghai_change}%。{hot_sectors[0]}板块表现活跃，央行维持流动性宽松。建议投资者保持{market_sentiment}态度，重点关注金融和{hot_sectors[0]}板块机会。",
+  "core_opinions": [
+    "央行维持流动性宽松，建议{action}金融板块",
+    "{hot_sectors[0]}板块持续走强，龙头个股目标价上调15%",
+    "警惕{risk_points[0]}，控制仓位在6成以下"
+  ],
   "highlights": [
     {{
       "title": "央行公开市场操作维护流动性",
       "source": "央行官网",
-      "summary": "央行今日开展逆回购操作，维护银行体系流动性合理充裕，货币政策保持稳健基调。",
-      "sentiment": "neutral",
-      "related_stocks": ["601398", "601288"],
-      "historical_context": "延续近期流动性调控节奏"
+      "summary": "央行今日开展2000亿元逆回购操作，利率维持1.8%不变，维护银行体系流动性合理充裕。",
+      "sentiment": "positive",
+      "related_stocks": ["601398", "601288", "512800"],
+      "historical_context": "2024年9月类似操作后，上证一个月涨12.3%"
     }},
     {{
       "title": "{hot_sectors[0]}板块集体走强",
       "source": "市场观察",
-      "summary": "{hot_sectors[0]}板块今日表现活跃，多只个股涨停，资金持续流入。",
+      "summary": "{hot_sectors[0]}板块今日领涨两市，多只个股涨停，主力资金持续流入。",
       "sentiment": "positive",
       "related_stocks": [],
-      "historical_context": "板块轮动行情延续"
+      "historical_context": "政策催化+业绩兑现双重驱动"
+    }}
+  ],
+  "cross_border_events": [
+    {{
+      "title": "中东局势紧张升级",
+      "category": "geopolitical",
+      "summary": "中东地区冲突持续，国际油价应声上涨3%",
+      "market_impact_direct": "能源股直接受益，航空物流成本承压",
+      "market_impact_indirect": "避险情绪升温，黄金国债受追捧",
+      "historical_reference": "2022年俄乌冲突初期，中石油一月涨25%",
+      "beneficiaries": ["中石油", "中海油", "黄金ETF"],
+      "losers": ["航空股", "物流股"],
+      "follow_up_advice": "关注油价和局势变化，冲突持续则能源股有第二波"
+    }},
+    {{
+      "title": "知名品牌代言人翻车",
+      "category": "social",
+      "summary": "某流量明星负面事件导致多品牌连夜解约",
+      "market_impact_direct": "相关代言品牌股价短期承压",
+      "market_impact_indirect": "消费者信心波动，品牌营销费用可能增加",
+      "historical_reference": "2021年类似事件后相关股票平均跌8%，一月后收复",
+      "beneficiaries": [],
+      "losers": ["相关代言品牌"],
+      "follow_up_advice": "短期情绪冲击，基本面未变则是逢低买入机会"
+    }}
+  ],
+  "stock_picks": [
+    {{
+      "code": "688xxx",
+      "name": "XXX科技",
+      "action": "买入",
+      "target_price": 150.00,
+      "stop_loss": 108.00,
+      "confidence": 78,
+      "reasoning": "Q3业绩预增40-60%，新产品下月量产，PE28倍PEG0.8偏低"
     }}
   ],
   "market_analysis": {{
     "overall_sentiment": "{'positive' if shanghai_change > 0.3 else 'negative' if shanghai_change < -0.3 else 'neutral'}",
     "trend": "{'bullish' if shanghai_change > 0.5 else 'bearish' if shanghai_change < -0.5 else 'neutral'}",
-    "key_factors": ["央行政策", "板块轮动", "外围市场"],
-    "opportunities": ["{hot_sectors[0]}", "{hot_sectors[1]}", "低估值蓝筹"],
-    "risks": ["{risk_points[0]}", "{risk_points[1]}"]
+    "key_factors": ["央行流动性", "板块轮动", "地缘政治", "美联储议息"],
+    "opportunities": ["{hot_sectors[0]}", "金融板块", "黄金避险"],
+    "risks": ["{risk_points[0]}", "{risk_points[1]}", "{risk_points[2]}"]
   }}
 }}
 ```"""
@@ -595,9 +839,20 @@ class AIAnalyzerService:
 _analyzer_instance: Optional[AIAnalyzerService] = None
 
 
-def get_ai_analyzer() -> AIAnalyzerService:
-    """获取 AI 分析服务实例"""
+def get_ai_analyzer(force_reinit: bool = False) -> AIAnalyzerService:
+    """
+    获取 AI 分析服务实例
+    
+    Args:
+        force_reinit: 是否强制重新初始化（用于配置变更后）
+    """
     global _analyzer_instance
-    if _analyzer_instance is None:
+    if _analyzer_instance is None or force_reinit:
         _analyzer_instance = AIAnalyzerService()
     return _analyzer_instance
+
+
+def reset_ai_analyzer():
+    """重置 AI 分析器实例（配置变更后调用）"""
+    global _analyzer_instance
+    _analyzer_instance = None

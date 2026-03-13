@@ -47,6 +47,16 @@ class NewsModel(Base):
     keywords = Column(JSON, default=list)
     related_stocks = Column(JSON, default=list)
     
+    # 新闻类型（财经/跨界）
+    news_type = Column(String(20), default="finance")
+    category = Column(String(50))
+    
+    # 跨界新闻的市场影响
+    market_impact = Column(Text)
+    beneficiary_sectors = Column(JSON, default=list)
+    affected_sectors = Column(JSON, default=list)
+    
+    # 事件追踪
     event_id = Column(String(36))
     is_follow_up = Column(Boolean, default=False)
     
@@ -63,16 +73,26 @@ class ReportModel(Base):
     content = Column(Text, nullable=False)
     report_date = Column(Date, nullable=False)  # 允许同一天生成多条报告
     
+    # 核心观点（3条）
+    core_opinions = Column(JSON, default=list)
+    
+    # 重点新闻和跨界事件
     highlights = Column(JSON, default=list)
+    cross_border_events = Column(JSON, default=list)
+    
+    # 市场分析
     analysis = Column(JSON)
     
+    # 播客相关
     podcast_url = Column(String(1000))
     podcast_duration = Column(Integer)
     podcast_status = Column(String(20), default="pending")
     
+    # 统计信息
     word_count = Column(Integer, default=0)
     reading_time = Column(Integer, default=0)
     news_count = Column(Integer, default=0)
+    cross_border_count = Column(Integer, default=0)
     
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime)

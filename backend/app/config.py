@@ -25,10 +25,20 @@ class Settings(BaseSettings):
     collection_lead_time: int = Field(default=60, description="采集提前时间（分钟）")
     
     # AI 服务配置
-    anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API Key")
-    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API Key")
-    openai_base_url: Optional[str] = Field(default=None, description="OpenAI 兼容服务 Base URL")
-    ai_model: str = Field(default="claude-3-opus-20240229", description="默认AI模型")
+    # 优先级：Anthropic > OpenAI > 免费服务 (Pollinations.AI)
+    # 
+    # 推荐配置方式：
+    # 1. 使用 Claude（最佳效果）: 设置 ANTHROPIC_API_KEY
+    # 2. 使用 GPT-4: 设置 OPENAI_API_KEY
+    # 3. 使用 DeepSeek（高性价比）: 设置 OPENAI_API_KEY 和 OPENAI_BASE_URL=https://api.deepseek.com
+    # 4. 不配置任何 key：自动使用免费的 Pollinations.AI（不稳定，仅用于测试）
+    anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API Key（推荐使用 Claude）")
+    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API Key 或兼容服务的 Key")
+    openai_base_url: Optional[str] = Field(default=None, description="OpenAI 兼容服务 Base URL（如 DeepSeek）")
+    ai_model: str = Field(
+        default="claude-3-opus-20240229", 
+        description="AI 模型名称。Claude: claude-3-opus-20240229 / claude-3-5-sonnet-20241022; OpenAI: gpt-4-turbo / gpt-4o; DeepSeek: deepseek-chat"
+    )
     
     # 语音合成配置
     tts_voice: str = Field(default="zh-CN-YunxiNeural", description="TTS语音角色")

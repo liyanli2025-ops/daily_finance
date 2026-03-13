@@ -26,8 +26,9 @@ async def get_today_podcast(db: AsyncSession = Depends(get_db)):
     """
     获取今日播客信息
     """
+    from sqlalchemy import desc
     today = date.today()
-    query = select(ReportModel).where(ReportModel.report_date == today)
+    query = select(ReportModel).where(ReportModel.report_date == today).order_by(desc(ReportModel.created_at)).limit(1)
     result = await db.execute(query)
     report = result.scalar_one_or_none()
     
@@ -150,7 +151,7 @@ async def list_podcasts(
     
     query = (
         select(ReportModel)
-        .where(ReportModel.podcast_status == "ready")
+        .where(ReportModel.podcast_duration != None)
         .order_by(desc(ReportModel.report_date))
         .offset(skip)
         .limit(limit)

@@ -213,6 +213,62 @@ export default function ReportDetailScreen() {
           </Text>
         </View>
 
+        {/* 核心观点 */}
+        {report.core_opinions && report.core_opinions.length > 0 && (
+          <View style={[styles.coreOpinionsSection, { backgroundColor: theme.colors.primary + '15' }]}>
+            <Text variant="titleSmall" style={styles.sectionLabel}>
+              🎯 今日核心观点
+            </Text>
+            {report.core_opinions.map((opinion: string, index: number) => (
+              <View key={index} style={styles.opinionItem}>
+                <Text variant="titleSmall" style={{ color: theme.colors.primary }}>
+                  {index + 1}.
+                </Text>
+                <Text variant="bodyMedium" style={styles.opinionText}>
+                  {opinion}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* 跨界热点 */}
+        {report.cross_border_events && report.cross_border_events.length > 0 && (
+          <View style={styles.crossBorderSection}>
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              🌍 跨界热点扫描
+            </Text>
+            {report.cross_border_events.map((event: any, index: number) => (
+              <View key={index} style={[styles.crossBorderCard, { backgroundColor: theme.colors.surface }]}>
+                <View style={styles.crossBorderHeader}>
+                  <Chip compact style={styles.categoryChip}>
+                    {event.category === 'geopolitical' ? '地缘政治' :
+                     event.category === 'tech' ? '科技' :
+                     event.category === 'social' ? '社会舆论' :
+                     event.category === 'disaster' ? '自然灾害' : '其他'}
+                  </Chip>
+                  <Text variant="titleSmall" style={{ flex: 1, marginLeft: 8 }}>
+                    {event.title}
+                  </Text>
+                </View>
+                <Text variant="bodySmall" style={styles.crossBorderSummary}>
+                  {event.summary}
+                </Text>
+                <View style={styles.impactRow}>
+                  <View style={styles.impactItem}>
+                    <Text variant="labelSmall" style={{ color: '#22C55E' }}>受益</Text>
+                    <Text variant="bodySmall">{event.beneficiaries?.join('、') || '暂无'}</Text>
+                  </View>
+                  <View style={styles.impactItem}>
+                    <Text variant="labelSmall" style={{ color: '#EF4444' }}>受损</Text>
+                    <Text variant="bodySmall">{event.losers?.join('、') || '暂无'}</Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
         <Divider style={styles.divider} />
 
         {/* 正文内容 */}
@@ -344,6 +400,61 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     lineHeight: 24,
+  },
+  // 核心观点样式
+  coreOpinionsSection: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  opinionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    gap: 8,
+  },
+  opinionText: {
+    flex: 1,
+    lineHeight: 22,
+    fontWeight: '500',
+  },
+  // 跨界热点样式
+  crossBorderSection: {
+    marginBottom: 16,
+  },
+  crossBorderCard: {
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  crossBorderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  categoryChip: {
+    height: 26,
+  },
+  crossBorderSummary: {
+    lineHeight: 20,
+    marginBottom: 12,
+    opacity: 0.85,
+  },
+  impactRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  impactItem: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
   divider: {
     marginBottom: 16,

@@ -14,6 +14,15 @@ class SentimentType(str, Enum):
     NEUTRAL = "neutral"
 
 
+class NewsType(str, Enum):
+    """新闻类型（区分财经和跨界）"""
+    FINANCE = "finance"           # 财经类
+    GEOPOLITICAL = "geopolitical" # 国际政治/地缘冲突
+    TECH = "tech"                 # 科技突破/AI/新能源
+    SOCIAL = "social"             # 社会舆论/明星事件/品牌危机
+    DISASTER = "disaster"         # 自然灾害/气候事件
+
+
 class NewsBase(BaseModel):
     """新闻基础模型"""
     title: str = Field(..., description="新闻标题")
@@ -37,6 +46,15 @@ class News(NewsBase):
     keywords: List[str] = Field(default_factory=list, description="关键词列表")
     related_stocks: List[str] = Field(default_factory=list, description="关联股票代码")
     created_at: dt = Field(default_factory=dt.now, description="入库时间")
+    
+    # 新闻类型（财经/跨界）
+    news_type: NewsType = Field(default=NewsType.FINANCE, description="新闻类型")
+    category: Optional[str] = Field(default=None, description="新闻分类（如：国际政治、科技突破等）")
+    
+    # 跨界新闻的市场影响分析
+    market_impact: Optional[str] = Field(default=None, description="对市场的潜在影响分析")
+    beneficiary_sectors: List[str] = Field(default_factory=list, description="受益板块")
+    affected_sectors: List[str] = Field(default_factory=list, description="受损板块")
     
     # 事件追踪相关
     event_id: Optional[str] = Field(default=None, description="关联事件ID（用于新闻聚类）")

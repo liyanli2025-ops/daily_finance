@@ -93,6 +93,18 @@ export default function HomeScreen() {
               {todayReport.summary}
             </Text>
 
+            {/* 今日核心观点预览 */}
+            {todayReport.core_opinions && todayReport.core_opinions.length > 0 && (
+              <View style={styles.coreOpinionsPreview}>
+                <Text variant="labelMedium" style={{ color: theme.colors.primary, fontWeight: '600', marginBottom: 8 }}>
+                  🎯 今日核心观点
+                </Text>
+                <Text variant="bodySmall" style={{ opacity: 0.9, lineHeight: 18 }} numberOfLines={2}>
+                  {todayReport.core_opinions[0]}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.reportMeta}>
               <View style={styles.metaItem}>
                 <MaterialCommunityIcons name="clock-outline" size={16} color={theme.colors.outline} />
@@ -106,6 +118,14 @@ export default function HomeScreen() {
                   {todayReport.news_count || 0} 条新闻
                 </Text>
               </View>
+              {todayReport.cross_border_count && todayReport.cross_border_count > 0 && (
+                <View style={styles.metaItem}>
+                  <MaterialCommunityIcons name="earth" size={16} color={theme.colors.secondary} />
+                  <Text style={[styles.metaText, { color: theme.colors.secondary }]}>
+                    {todayReport.cross_border_count} 跨界热点
+                  </Text>
+                </View>
+              )}
             </View>
 
             <Button
@@ -129,6 +149,55 @@ export default function HomeScreen() {
             </Text>
           </Card.Content>
         </Card>
+      )}
+
+      {/* 跨界热点预览 */}
+      {todayReport?.cross_border_events && todayReport.cross_border_events.length > 0 && (
+        <View style={styles.section}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            🌍 跨界热点
+          </Text>
+          {todayReport.cross_border_events.slice(0, 2).map((event: any, index: number) => (
+            <Card
+              key={index}
+              style={[styles.crossBorderCard, { backgroundColor: theme.colors.surface }]}
+              onPress={() => router.push(`/report/${todayReport.id}`)}
+            >
+              <Card.Content>
+                <View style={styles.crossBorderHeader}>
+                  <Chip
+                    compact
+                    style={{ 
+                      backgroundColor: 
+                        event.category === 'geopolitical' ? '#6366F1' :
+                        event.category === 'tech' ? '#22C55E' :
+                        event.category === 'social' ? '#F59E0B' :
+                        '#EF4444'
+                    }}
+                    textStyle={{ color: '#fff', fontSize: 10 }}
+                  >
+                    {event.category === 'geopolitical' ? '地缘政治' :
+                     event.category === 'tech' ? '科技' :
+                     event.category === 'social' ? '社会舆论' : '自然灾害'}
+                  </Chip>
+                </View>
+                <Text variant="titleSmall" style={{ marginTop: 8, fontWeight: '600' }}>
+                  {event.title}
+                </Text>
+                <Text variant="bodySmall" style={{ marginTop: 4, color: theme.colors.outline }} numberOfLines={2}>
+                  {event.summary}
+                </Text>
+                {event.beneficiaries && event.beneficiaries.length > 0 && (
+                  <View style={styles.beneficiariesRow}>
+                    <Text variant="labelSmall" style={{ color: '#22C55E' }}>
+                      受益：{event.beneficiaries.slice(0, 3).join('、')}
+                    </Text>
+                  </View>
+                )}
+              </Card.Content>
+            </Card>
+          ))}
+        </View>
       )}
 
       {/* 重点新闻 */}
@@ -266,5 +335,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  coreOpinionsPreview: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2563EB',
+  },
+  crossBorderCard: {
+    marginBottom: 12,
+    borderRadius: 12,
+  },
+  crossBorderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  beneficiariesRow: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
 });
