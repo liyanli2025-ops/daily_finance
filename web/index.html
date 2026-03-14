@@ -533,7 +533,10 @@
     </div>
     
     <script>
-        const API_BASE = 'http://localhost:9090/api';
+        // 自动识别环境：本地开发 vs 服务器部署
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const API_BASE = isLocal ? 'http://localhost:9090/api' : '/api';
+        const AUDIO_BASE = isLocal ? 'http://localhost:9090' : '';
         
         // 标记播客是否已加载过（避免切换Tab时重复加载导致播放中断）
         let podcastLoaded = false;
@@ -1101,7 +1104,7 @@
                             </div>
                             ${data.podcast_url ? `
                                 <audio controls preload="metadata" style="width: 100%; margin-top: 15px;">
-                                    <source src="http://localhost:9090${data.podcast_url}?t=${Date.now()}" type="audio/mpeg">
+                                    <source src="${AUDIO_BASE}${data.podcast_url}?t=${Date.now()}" type="audio/mpeg">
                                     您的浏览器不支持音频播放
                                 </audio>
                             ` : '<p style="margin-top: 15px; color: rgba(255,255,255,0.5);">播客音频生成中...</p>'}
@@ -1222,7 +1225,7 @@
                         </div>
                         ${data.podcast_url ? `
                             <audio controls preload="metadata" style="width: 100%; margin-top: 15px;" autoplay>
-                                <source src="http://localhost:9090${data.podcast_url}?t=${Date.now()}" type="audio/mpeg">
+                                <source src="${AUDIO_BASE}${data.podcast_url}?t=${Date.now()}" type="audio/mpeg">
                                 您的浏览器不支持音频播放
                             </audio>
                         ` : '<p style="margin-top: 15px; color: rgba(255,255,255,0.5);">播客音频不可用</p>'}
