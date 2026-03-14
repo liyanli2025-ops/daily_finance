@@ -13,6 +13,8 @@ from ..models.stock import (
     KlineData, MarketType, PredictionType
 )
 from ..models.database import StockModel, StockPredictionModel
+from ..services.watchlist_service import get_watchlist_service, WatchlistStock
+from ..config import settings
 
 router = APIRouter()
 
@@ -308,4 +310,167 @@ async def refresh_watchlist(
     return {
         "status": "started",
         "message": f"正在刷新 {len(stocks)} 只股票的数据"
+    }
+
+
+@router.get("/watchlist/merged")
+async def get_merged_watchlist(db: AsyncSession = Depends(get_db)):
+    """
+    获取合并后的自选股列表（配置文件 + 数据库）
+    
+    返回去重后的完整自选股列表，包含所属行业信息
+    """
+    watchlist_service = get_watchlist_service()
+    
+    # 从配置加载
+    watchlist_service.load_from_config(settings.watchlist_stocks)
+    
+    # 从数据库加载
+    query = select(StockModel)
+    result = await db.execute(query)
+    db_stocks = result.scalars().all()
+    
+    if db_stocks:
+        db_stock_list = [
+            {"code": s.code, "name": s.name, "market": s.market}
+            for s in db_stocks
+        ]
+        watchlist_service.load_from_database(db_stock_list)
+    
+    # 获取合并后的数据
+    all_stocks = watchlist_service.get_all_stocks()
+    unique_sectors = watchlist_service.get_unique_sectors()
+    
+    return {
+        "stocks": [
+            {
+                "code": s.code,
+                "name": s.name,
+                "market": s.market,
+                "sector": s.sector,
+                "source": s.source
+            }
+            for s in all_stocks
+        ],
+        "sectors": unique_sectors,
+        "total_count": len(all_stocks),
+        "config_count": sum(1 for s in all_stocks if s.source == "config"),
+        "database_count": sum(1 for s in all_stocks if s.source == "database")
+    }
+
+
+@router.delete("/watchlist/config/{stock_code}")
+async def remove_from_config_watchlist(stock_code: str):
+    """
+    从配置文件中移除自选股
+    
+    修改 .env 文件中的 WATCHLIST_STOCKS 配置
+    """
+    import os
+    from pathlib import Path
+    
+    # 找到 .env 文件
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    
+    if not env_path.exists():
+        raise HTTPException(status_code=404, detail=".env 文件不存在")
+    
+    # 读取 .env 文件内容
+    with open(env_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    
+    # 找到并修改 WATCHLIST_STOCKS 行
+    new_lines = []
+    found = False
+    for line in lines:
+        if line.strip().startswith("WATCHLIST_STOCKS="):
+            found = True
+            # 解析现有的自选股
+            _, value = line.split("=", 1)
+            value = value.strip()
+            
+            stocks = []
+            if value:
+                for item in value.split(","):
+                    item = item.strip()
+                    if ":" in item:
+                        parts = item.split(":")
+                        code = parts[0].strip()
+                        # 跳过要删除的股票
+                        if code != stock_code:
+                            stocks.append(item)
+            
+            # 重新构建配置行
+            new_value = ",".join(stocks)
+            new_lines.append(f"WATCHLIST_STOCKS={new_value}\n")
+        else:
+            new_lines.append(line)
+    
+    if not found:
+        raise HTTPException(status_code=404, detail="配置文件中没有找到 WATCHLIST_STOCKS 配置")
+    
+    # 写回 .env 文件
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.writelines(new_lines)
+    
+    # 重新加载配置（更新内存中的设置）
+    from ..config import settings
+    
+    # 重新读取 .env 并更新 settings
+    new_watchlist = ""
+    for line in new_lines:
+        if line.strip().startswith("WATCHLIST_STOCKS="):
+            _, new_watchlist = line.split("=", 1)
+            new_watchlist = new_watchlist.strip()
+            break
+    
+    # 更新 settings 对象
+    settings.watchlist_stocks = new_watchlist
+    
+    # 重置自选股服务缓存
+    from ..services.watchlist_service import reset_watchlist_service
+    reset_watchlist_service()
+    
+    return {"status": "success", "message": f"已从配置文件中移除 {stock_code}"}
+
+
+@router.get("/watchlist/sectors")
+async def get_watchlist_sectors(db: AsyncSession = Depends(get_db)):
+    """
+    获取自选股覆盖的行业列表
+    
+    用于展示用户关注的行业分布
+    """
+    watchlist_service = get_watchlist_service()
+    
+    # 从配置加载
+    watchlist_service.load_from_config(settings.watchlist_stocks)
+    
+    # 从数据库加载
+    query = select(StockModel)
+    result = await db.execute(query)
+    db_stocks = result.scalars().all()
+    
+    if db_stocks:
+        db_stock_list = [
+            {"code": s.code, "name": s.name, "market": s.market}
+            for s in db_stocks
+        ]
+        watchlist_service.load_from_database(db_stock_list)
+    
+    unique_sectors = watchlist_service.get_unique_sectors()
+    
+    # 获取每个行业的股票
+    sector_details = {}
+    for sector in unique_sectors:
+        stocks_in_sector = watchlist_service.get_stocks_by_sector(sector)
+        sector_details[sector] = {
+            "count": len(stocks_in_sector),
+            "stocks": [{"code": s.code, "name": s.name} for s in stocks_in_sector],
+            "keywords": watchlist_service.get_sector_keywords(sector)
+        }
+    
+    return {
+        "sectors": unique_sectors,
+        "details": sector_details
     }

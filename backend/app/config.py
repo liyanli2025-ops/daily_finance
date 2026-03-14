@@ -48,6 +48,25 @@ class Settings(BaseSettings):
     # 股票数据配置
     tushare_token: Optional[str] = Field(default=None, description="Tushare Token")
     
+    # 【新增】用户个性化配置
+    user_nickname: str = Field(default="卢卡", description="用户昵称，播客中会使用")
+    
+    # 【新增】自选股配置 - 你关注的股票，会在报告中特别追踪分析
+    # 格式: "代码:名称:市场" 多个用逗号分隔
+    # 市场: A=A股, HK=港股
+    # 示例: "600519:贵州茅台:A,00700:腾讯控股:HK,300750:宁德时代:A"
+    watchlist_stocks: str = Field(
+        default="",
+        description="自选股列表，格式: 代码:名称:市场,代码:名称:市场"
+    )
+    
+    # 【新增】投资风格偏好（影响分析角度）
+    # conservative=保守型, balanced=平衡型, aggressive=激进型
+    investment_style: str = Field(
+        default="balanced",
+        description="投资风格：conservative/balanced/aggressive"
+    )
+    
     # 数据库配置
     database_url: str = Field(
         default="sqlite:///./data/database.db",

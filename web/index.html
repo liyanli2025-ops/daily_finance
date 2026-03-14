@@ -425,8 +425,8 @@
             
             <div class="card">
                 <h3>🔧 操作</h3>
-                <button class="btn btn-primary" onclick="generateReport()">🔄 生成新报告</button>
-                <button class="btn btn-secondary" onclick="loadTodayReport()">📥 刷新报告</button>
+                <button class="btn btn-primary" onclick="generateReport()" id="generate-btn">🔄 生成今日报告</button>
+                <span style="color: rgba(255,255,255,0.5); margin-left: 15px; font-size: 0.9rem;">点击后将采集最新新闻并生成分析报告</span>
             </div>
             
             <div class="card">
@@ -442,24 +442,49 @@
         
         <!-- 自选股模块 -->
         <div id="stocks" class="tab-content">
+            <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <h3 style="color: white;">💡 自选股说明</h3>
+                <p style="margin: 0; opacity: 0.9; font-size: 0.95rem;">
+                    你在这里添加的自选股会<strong>自动同步到每日报告和播客</strong>中进行分析。<br>
+                    系统会自动采集这些股票的相关新闻和所属行业动态。
+                </p>
+            </div>
+            
             <div class="card">
                 <h3>➕ 添加自选股</h3>
                 <div class="add-stock-form">
                     <input type="text" id="stock-code" placeholder="股票代码，如 600519">
                     <input type="text" id="stock-name" placeholder="股票名称，如 贵州茅台">
+                    <select id="stock-market" style="padding: 10px; border-radius: 8px; border: 1px solid #e0e0e0;">
+                        <option value="A">A股</option>
+                        <option value="HK">港股</option>
+                    </select>
                     <button class="btn btn-success" onclick="addStock()">添加</button>
                 </div>
             </div>
             
+            <!-- 合并自选股统计 -->
             <div class="card">
-                <h3>📈 我的自选股</h3>
-                <div id="watchlist">
+                <h3>📊 自选股统计</h3>
+                <div id="watchlist-stats">
                     <div class="empty-state">
-                        <div class="icon">📊</div>
+                        <div class="icon">📈</div>
                         <p>加载中...</p>
                     </div>
                 </div>
             </div>
+            
+            <!-- 行业分布 -->
+            <div class="card">
+                <h3>🏭 行业分布</h3>
+                <div id="sector-distribution">
+                    <div class="empty-state">
+                        <div class="icon">🔄</div>
+                        <p>加载中...</p>
+                    </div>
+                </div>
+            </div>
+            
         </div>
         
         <!-- 播客模块 -->
@@ -487,7 +512,7 @@
     </div>
     
     <script>
-        const API_BASE = 'http://localhost:8000/api';
+        const API_BASE = 'http://localhost:9090/api';
         
         // 切换标签
         function switchTab(tabId) {
@@ -557,11 +582,14 @@
                     <div class="empty-state">
                         <div class="icon">⚠️</div>
                         <p>加载失败：${err.message}</p>
-                        <p style="margin-top: 10px; font-size: 0.9rem;">请确保后端服务正在运行 (localhost:8000)</p>
+                        <p style="margin-top: 10px; font-size: 0.9rem;">请确保后端服务正在运行 (localhost:9090)</p>
                     </div>
                 `;
             }
         }
+        
+        // 存储所有报告数据，用于查看历史报告
+        let allReports = [];
         
         async function loadReportsList() {
             const container = document.getElementById('reports-list');
@@ -573,6 +601,9 @@
                 const text = await res.text();
                 const data = text ? JSON.parse(text) : [];
                 
+                // 保存完整数据
+                allReports = data;
+                
                 if (!data || data.length === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
@@ -581,6 +612,10 @@
                         </div>
                     `;
                 } else {
+                    // 只显示最近5个报告
+                    const recentReports = data.slice(0, 5);
+                    const hasMore = data.length > 5;
+                    
                     container.innerHTML = `
                         <table class="data-table">
                             <thead>
@@ -588,10 +623,11 @@
                                     <th>日期</th>
                                     <th>标题</th>
                                     <th>状态</th>
+                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${data.map(report => {
+                                ${recentReports.map(report => {
                                     // 兼容后端字段名：report_date -> date
                                     const reportDate = report.report_date || report.date || '-';
                                     const reportStatus = report.status || 'pending';
@@ -600,14 +636,59 @@
                                         <td>${reportDate}</td>
                                         <td>${report.title || '每日财经简报'}</td>
                                         <td><span class="status status-${reportStatus === 'completed' ? 'completed' : 'pending'}">${reportStatus}</span></td>
+                                        <td><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="viewReport('${report.id}')">📖 查看</button></td>
                                     </tr>
                                 `}).join('')}
                             </tbody>
                         </table>
+                        ${hasMore ? `<p style="text-align: center; color: rgba(255,255,255,0.5); margin-top: 15px; font-size: 0.9rem;">仅显示最近 5 份报告（共 ${data.length} 份）</p>` : ''}
                     `;
                 }
             } catch (err) {
                 container.innerHTML = `<p style="color: rgba(255,255,255,0.5);">加载失败</p>`;
+            }
+        }
+        
+        // 查看历史报告
+        async function viewReport(reportId) {
+            const container = document.getElementById('today-report');
+            
+            // 先显示加载状态
+            container.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <div class="loading"></div>
+                    <span>加载报告中...</span>
+                </div>
+            `;
+            
+            try {
+                const res = await fetch(`${API_BASE}/reports/${reportId}`);
+                if (!res.ok) {
+                    throw new Error(`加载失败 (${res.status})`);
+                }
+                const data = await res.json();
+                
+                const reportDate = data.report_date || data.date || '-';
+                const reportStatus = data.status || 'pending';
+                
+                container.innerHTML = `
+                    <div class="report-meta">
+                        <span>📅 ${reportDate}</span>
+                        <span class="status status-${reportStatus === 'completed' ? 'completed' : 'pending'}">${reportStatus}</span>
+                        <span style="color: #ffc107;">📚 历史报告</span>
+                    </div>
+                    <h4 style="margin-bottom: 15px; font-size: 1.2rem;">${data.title || '每日财经简报'}</h4>
+                    <div class="report-content">${data.content || '报告内容为空'}</div>
+                    <button class="btn btn-secondary" style="margin-top: 20px;" onclick="loadTodayReport()">← 返回今日报告</button>
+                `;
+            } catch (err) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">⚠️</div>
+                        <p>加载失败：${err.message}</p>
+                        <button class="btn btn-secondary" style="margin-top: 15px;" onclick="loadTodayReport()">← 返回今日报告</button>
+                    </div>
+                `;
             }
         }
         
@@ -718,38 +799,105 @@
         // ========== 自选股模块 ==========
         
         async function loadWatchlist() {
-            const container = document.getElementById('watchlist');
+            // 加载合并统计和行业分布
+            loadMergedWatchlistStats();
+            loadSectorDistribution();
+        }
+        
+        async function loadMergedWatchlistStats() {
+            const container = document.getElementById('watchlist-stats');
             try {
-                const res = await fetch(`${API_BASE}/stocks/watchlist`);
+                const res = await fetch(`${API_BASE}/stocks/watchlist/merged`);
                 const data = await res.json();
                 
-                if (!data || data.length === 0) {
+                container.innerHTML = `
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 120px; text-align: center; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; color: white;">
+                            <div style="font-size: 2rem; font-weight: bold;">${data.total_count}</div>
+                            <div style="opacity: 0.9;">总自选股</div>
+                        </div>
+                        <div style="flex: 1; min-width: 120px; text-align: center; padding: 15px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 10px; color: white;">
+                            <div style="font-size: 2rem; font-weight: bold;">${data.config_count}</div>
+                            <div style="opacity: 0.9;">配置文件</div>
+                        </div>
+                        <div style="flex: 1; min-width: 120px; text-align: center; padding: 15px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 10px; color: white;">
+                            <div style="font-size: 2rem; font-weight: bold;">${data.database_count}</div>
+                            <div style="opacity: 0.9;">网页添加</div>
+                        </div>
+                        <div style="flex: 1; min-width: 120px; text-align: center; padding: 15px; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: 10px; color: white;">
+                            <div style="font-size: 2rem; font-weight: bold;">${data.sectors.length}</div>
+                            <div style="opacity: 0.9;">覆盖行业</div>
+                        </div>
+                    </div>
+                    ${data.stocks.length > 0 ? `
+                    <div style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                        <div style="font-weight: bold; margin-bottom: 8px; color: #00d4ff;">📋 全部自选股：</div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            ${data.stocks.map(s => `
+                                <span style="padding: 6px 10px; background: rgba(255,255,255,0.1); border-radius: 15px; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
+                                    ${s.name}
+                                    <span style="color: rgba(255,255,255,0.6); font-size: 0.75rem;">(${s.code})</span>
+                                    ${s.sector ? `<span style="color: #a855f7; font-size: 0.7rem;">${s.sector}</span>` : ''}
+                                    ${s.source === 'config' ? '<span style="background: rgba(34,197,94,0.2); color: #22c55e; font-size: 0.65rem; padding: 1px 4px; border-radius: 3px;">配置</span>' : '<span style="background: rgba(59,130,246,0.2); color: #3b82f6; font-size: 0.65rem; padding: 1px 4px; border-radius: 3px;">网页</span>'}
+                                    <button onclick="${s.source === 'config' ? `removeConfigStock('${s.code}', '${s.name}')` : `removeStockByCode('${s.code}')`}" style="background: rgba(239,68,68,0.2); color: #ef4444; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; margin-left: 2px;" title="删除">×</button>
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+                `;
+            } catch (err) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">⚠️</div>
+                        <p>统计加载失败：${err.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        async function loadSectorDistribution() {
+            const container = document.getElementById('sector-distribution');
+            try {
+                const res = await fetch(`${API_BASE}/stocks/watchlist/sectors`);
+                const data = await res.json();
+                
+                if (!data.sectors || data.sectors.length === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
-                            <div class="icon">📊</div>
-                            <p>还没有自选股，添加一些吧！</p>
+                            <div class="icon">🏭</div>
+                            <p>暂无行业数据</p>
+                            <p style="font-size: 0.85rem; opacity: 0.7;">添加自选股后会自动识别所属行业</p>
                         </div>
                     `;
                 } else {
                     container.innerHTML = `
-                        <div class="grid">
-                            ${data.map(stock => `
-                                <div class="card stock-card" style="margin-bottom: 0;">
-                                    <div class="stock-info">
-                                        <h4>${stock.name || '未知'}</h4>
-                                        <span class="code">${stock.code || stock.symbol || '-'}</span>
-                                    </div>
-                                    <div class="stock-price">
-                                        <div class="price ${stock.change_percent > 0 ? 'price-up' : stock.change_percent < 0 ? 'price-down' : ''}">
-                                            ¥${stock.current_price || '--'}
+                        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                            ${data.sectors.map(sector => {
+                                const detail = data.details[sector];
+                                const colors = {
+                                    '白酒': '#f44336', '新能源': '#4caf50', '光伏': '#ff9800',
+                                    '半导体': '#2196f3', '医药': '#9c27b0', '银行': '#607d8b',
+                                    '保险': '#795548', '证券': '#00bcd4', '地产': '#ff5722',
+                                    '互联网': '#673ab7', '汽车': '#3f51b5', '家电': '#009688',
+                                    '食品饮料': '#e91e63', '军工': '#455a64', 'AI软件': '#8bc34a'
+                                };
+                                const color = colors[sector] || '#9e9e9e';
+                                return `
+                                    <div style="padding: 12px 16px; background: linear-gradient(135deg, ${color}22, ${color}11); border-left: 3px solid ${color}; border-radius: 8px; min-width: 150px;">
+                                        <div style="font-weight: bold; color: ${color}; margin-bottom: 5px;">${sector}</div>
+                                        <div style="font-size: 0.85rem; color: #666;">
+                                            ${detail.count} 只股票
                                         </div>
-                                        <div class="change ${stock.change_percent > 0 ? 'price-up' : stock.change_percent < 0 ? 'price-down' : ''}">
-                                            ${stock.change_percent ? (stock.change_percent > 0 ? '+' : '') + stock.change_percent.toFixed(2) + '%' : '--'}
+                                        <div style="font-size: 0.75rem; color: #999; margin-top: 3px;">
+                                            ${detail.stocks.map(s => s.name).join('、')}
                                         </div>
                                     </div>
-                                    <button class="btn btn-danger" style="margin-left: 15px;" onclick="removeStock('${stock.id}')">删除</button>
-                                </div>
-                            `).join('')}
+                                `;
+                            }).join('')}
+                        </div>
+                        <div style="margin-top: 15px; padding: 10px; background: #fff3e0; border-radius: 8px; font-size: 0.85rem; color: #e65100;">
+                            💡 <strong>提示</strong>：系统会自动采集这些行业的相关新闻，并在每日报告中进行分析。
                         </div>
                     `;
                 }
@@ -757,7 +905,7 @@
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="icon">⚠️</div>
-                        <p>加载失败：${err.message}</p>
+                        <p>行业数据加载失败：${err.message}</p>
                     </div>
                 `;
             }
@@ -766,6 +914,7 @@
         async function addStock() {
             const code = document.getElementById('stock-code').value.trim();
             const name = document.getElementById('stock-name').value.trim();
+            const market = document.getElementById('stock-market').value;
             
             if (!code || !name) {
                 showToast('请填写股票代码和名称', 'error');
@@ -776,7 +925,7 @@
                 const res = await fetch(`${API_BASE}/stocks/watchlist`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbol: code, name: name })
+                    body: JSON.stringify({ code: code, name: name, market: market })
                 });
                 
                 if (res.ok) {
@@ -785,16 +934,55 @@
                     document.getElementById('stock-name').value = '';
                     loadWatchlist();
                 } else {
-                    showToast('添加失败', 'error');
+                    const errData = await res.json().catch(() => ({}));
+                    showToast('添加失败：' + (errData.detail || '未知错误'), 'error');
                 }
             } catch (err) {
                 showToast('添加失败：' + err.message, 'error');
             }
         }
         
-        async function removeStock(stockId) {
+        // 删除配置文件中的自选股
+        async function removeConfigStock(stockCode, stockName) {
+            if (!confirm(`确定要从配置文件中删除 ${stockName}(${stockCode}) 吗？`)) {
+                return;
+            }
+            
             try {
-                const res = await fetch(`${API_BASE}/stocks/watchlist/${stockId}`, {
+                const res = await fetch(`${API_BASE}/stocks/watchlist/config/${stockCode}`, {
+                    method: 'DELETE'
+                });
+                
+                if (res.ok) {
+                    showToast(`已从配置文件删除 ${stockName}`, 'success');
+                    loadWatchlist();
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    showToast('删除失败：' + (errData.detail || '未知错误'), 'error');
+                }
+            } catch (err) {
+                showToast('删除失败：' + err.message, 'error');
+            }
+        }
+        
+        // 通过股票代码删除网页添加的自选股
+        async function removeStockByCode(stockCode) {
+            if (!confirm(`确定要删除这只股票吗？`)) {
+                return;
+            }
+            
+            try {
+                // 先获取数据库中的股票列表，找到对应的ID
+                const listRes = await fetch(`${API_BASE}/stocks/watchlist`);
+                const stocks = await listRes.json();
+                const stock = stocks.find(s => s.code === stockCode);
+                
+                if (!stock) {
+                    showToast('未找到该股票', 'error');
+                    return;
+                }
+                
+                const res = await fetch(`${API_BASE}/stocks/watchlist/${stock.id}`, {
                     method: 'DELETE'
                 });
                 
@@ -841,17 +1029,19 @@
                     // 兼容后端字段名：report_date -> date
                     const podcastDate = data.report_date || data.date || '今天';
                     const podcastStatus = data.podcast_status || 'pending';
+                    const statusDisplay = podcastStatus === 'ready' ? '已就绪' : podcastStatus === 'generating' ? '生成中' : podcastStatus;
+                    const statusClass = podcastStatus === 'ready' ? 'completed' : 'pending';
                     container.innerHTML = `
                         <div class="podcast-player">
                             <h4>${data.title || '每日财经播客'}</h4>
                             <div class="report-meta">
                                 <span>📅 ${podcastDate}</span>
-                                <span class="status status-${podcastStatus === 'completed' ? 'completed' : 'pending'}">${podcastStatus}</span>
+                                <span class="status status-${statusClass}">${statusDisplay}</span>
                                 ${data.podcast_duration ? `<span>⏱️ ${Math.floor(data.podcast_duration / 60)}分${data.podcast_duration % 60}秒</span>` : ''}
                             </div>
                             ${data.podcast_url ? `
                                 <audio controls style="width: 100%; margin-top: 15px;">
-                                    <source src="http://localhost:8000${data.podcast_url}" type="audio/mpeg">
+                                    <source src="http://localhost:9091${data.podcast_url}" type="audio/mpeg">
                                     您的浏览器不支持音频播放
                                 </audio>
                             ` : '<p style="margin-top: 15px; color: rgba(255,255,255,0.5);">播客音频生成中...</p>'}
@@ -869,6 +1059,9 @@
             }
         }
         
+        // 存储所有播客数据
+        let allPodcasts = [];
+        
         async function loadPodcastHistory() {
             const container = document.getElementById('podcast-history');
             try {
@@ -879,6 +1072,9 @@
                 const text = await res.text();
                 const data = text ? JSON.parse(text) : [];
                 
+                // 保存完整数据
+                allPodcasts = data;
+                
                 if (!data || data.length === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
@@ -887,6 +1083,10 @@
                         </div>
                     `;
                 } else {
+                    // 只显示最近5个播客
+                    const recentPodcasts = data.slice(0, 5);
+                    const hasMore = data.length > 5;
+                    
                     container.innerHTML = `
                         <table class="data-table">
                             <thead>
@@ -895,28 +1095,88 @@
                                     <th>标题</th>
                                     <th>时长</th>
                                     <th>状态</th>
+                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${data.map(podcast => {
+                                ${recentPodcasts.map(podcast => {
                                     // 兼容后端字段名：report_date -> date, podcast_status -> status
                                     const podcastDate = podcast.report_date || podcast.date || '-';
                                     const podcastDuration = podcast.podcast_duration || podcast.duration;
                                     const podcastStatus = podcast.podcast_status || podcast.status || 'pending';
+                                    // 后端状态是 'ready' 表示已完成
+                                    const hasAudio = podcast.podcast_url && (podcastStatus === 'ready' || podcastStatus === 'completed');
+                                    const statusDisplay = podcastStatus === 'ready' ? '已就绪' : podcastStatus === 'generating' ? '生成中' : podcastStatus;
+                                    const statusClass = (podcastStatus === 'ready' || podcastStatus === 'completed') ? 'completed' : 'pending';
                                     return `
                                     <tr>
                                         <td>${podcastDate}</td>
                                         <td>${podcast.title || '每日播客'}</td>
                                         <td>${podcastDuration ? Math.floor(podcastDuration / 60) + '分' + podcastDuration % 60 + '秒' : '-'}</td>
-                                        <td><span class="status status-${podcastStatus === 'completed' ? 'completed' : 'pending'}">${podcastStatus}</span></td>
+                                        <td><span class="status status-${statusClass}">${statusDisplay}</span></td>
+                                        <td>${hasAudio ? `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="playPodcast('${podcast.report_id}')">▶️ 播放</button>` : '<span style="color: rgba(255,255,255,0.4);">暂无</span>'}</td>
                                     </tr>
                                 `}).join('')}
                             </tbody>
                         </table>
+                        ${hasMore ? `<p style="text-align: center; color: rgba(255,255,255,0.5); margin-top: 15px; font-size: 0.9rem;">仅显示最近 5 份播客（共 ${data.length} 份）</p>` : ''}
                     `;
                 }
             } catch (err) {
                 container.innerHTML = `<p style="color: rgba(255,255,255,0.5);">加载失败</p>`;
+            }
+        }
+        
+        // 播放历史播客
+        async function playPodcast(reportId) {
+            const container = document.getElementById('today-podcast');
+            
+            // 先显示加载状态
+            container.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <div class="loading"></div>
+                    <span>加载播客中...</span>
+                </div>
+            `;
+            
+            try {
+                const res = await fetch(`${API_BASE}/podcasts/${reportId}`);
+                if (!res.ok) {
+                    throw new Error(`加载失败 (${res.status})`);
+                }
+                const data = await res.json();
+                
+                const podcastDate = data.report_date || data.date || '-';
+                const podcastStatus = data.podcast_status || 'pending';
+                const statusDisplay = podcastStatus === 'ready' ? '已就绪' : podcastStatus === 'generating' ? '生成中' : podcastStatus;
+                const statusClass = (podcastStatus === 'ready' || podcastStatus === 'completed') ? 'completed' : 'pending';
+                
+                container.innerHTML = `
+                    <div class="podcast-player">
+                        <h4>${data.title || '每日财经播客'}</h4>
+                        <div class="report-meta">
+                            <span>📅 ${podcastDate}</span>
+                            <span class="status status-${statusClass}">${statusDisplay}</span>
+                            ${data.podcast_duration ? `<span>⏱️ ${Math.floor(data.podcast_duration / 60)}分${data.podcast_duration % 60}秒</span>` : ''}
+                            <span style="color: #ffc107;">📚 历史播客</span>
+                        </div>
+                        ${data.podcast_url ? `
+                            <audio controls style="width: 100%; margin-top: 15px;" autoplay>
+                                <source src="http://localhost:9091${data.podcast_url}" type="audio/mpeg">
+                                您的浏览器不支持音频播放
+                            </audio>
+                        ` : '<p style="margin-top: 15px; color: rgba(255,255,255,0.5);">播客音频不可用</p>'}
+                    </div>
+                    <button class="btn btn-secondary" style="margin-top: 15px;" onclick="loadTodayPodcast()">← 返回今日播客</button>
+                `;
+            } catch (err) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">⚠️</div>
+                        <p>加载失败：${err.message}</p>
+                        <button class="btn btn-secondary" style="margin-top: 15px;" onclick="loadTodayPodcast()">← 返回今日播客</button>
+                    </div>
+                `;
             }
         }
         

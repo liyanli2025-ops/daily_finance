@@ -2,7 +2,10 @@
 AI 分析服务
 使用 Claude API 进行新闻分析、报告生成和投资建议
 
-增强版：集成 AKShare 真实市场数据，让 AI 基于真实数据进行分析
+增强版：
+- 集成 AKShare 真实市场数据，让 AI 基于真实数据进行分析
+- 集成 FinBERT 深度情感分析，提供更精准的市场情绪判断
+- 统一自选股管理（配置文件 + 数据库）
 """
 import json
 from datetime import datetime, date
@@ -10,7 +13,7 @@ from typing import List, Optional, Dict, Any
 import uuid
 
 from ..config import settings
-from ..models.news import News, SentimentType, NewsType
+from ..models.news import News, SentimentType, NewsType, SentimentStrength
 from ..models.report import (
     Report, ReportCreate, NewsHighlight, MarketAnalysis,
     IndexSnapshot, MarketTrend, SentimentType as ReportSentiment,
@@ -19,6 +22,7 @@ from ..models.report import (
 )
 from ..models.stock import StockPrediction, PredictionType
 from .market_data_service import get_market_data_service, MarketOverview
+from .watchlist_service import get_watchlist_service
 
 
 class AIAnalyzerService:
@@ -89,9 +93,13 @@ class AIAnalyzerService:
     
     async def generate_daily_report(self, news_list: List[News], cross_border_news: List[News] = None) -> Report:
         """
-        生成每日财经深度报告（7模块 + 五要素结构）
+        生成每日财经深度报告（7模块 + 五要素结构 + 自选股追踪 + 情感分析）
         
-        增强版：集成 AKShare 真实市场数据
+        增强版：
+        - 集成 AKShare 真实市场数据
+        - 集成 FinBERT 深度情感分析，提供市场情绪指数
+        - 自选股个性化追踪分析
+        - 更有深度的分析框架
         
         Args:
             news_list: 财经新闻列表
@@ -101,6 +109,13 @@ class AIAnalyzerService:
             生成的报告对象
         """
         today = date.today()
+        is_weekend = today.weekday() >= 5  # 判断是否是周末（周六=5，周日=6）
+        weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        weekday_name = weekday_names[today.weekday()]
+        
+        # 【新增】获取自选股配置
+        watchlist_text = self._prepare_watchlist_analysis()
+        investment_style_desc = self._get_investment_style_description()
         
         # 【新增】获取真实市场数据
         print("[AI] 正在获取真实市场数据...")
@@ -109,109 +124,210 @@ class AIAnalyzerService:
         market_data_text = market_data.to_prompt_text()
         print(f"[AI] 市场数据获取完成：{len(market_data.indices)} 个指数，{len(market_data.top_sectors)} 个热门板块")
         
-        # 准备新闻摘要
-        finance_summary = self._prepare_news_summary(news_list)
+        # 【新增】计算市场情绪指数（基于 FinBERT 情感分析）
+        sentiment_index_text = self._prepare_sentiment_index(news_list, cross_border_news or [])
+        
+        # 准备新闻摘要（增强版：包含情感标签）
+        finance_summary = self._prepare_news_summary_with_sentiment(news_list)
         cross_border_summary = self._prepare_cross_border_summary(cross_border_news or [])
         
-        # 【优化】新的 prompt 设计：明确数据来源，不要求 AI 编造
-        report_prompt = f"""你是一位资深财经分析师，拥有20年A股和港股投资经验。
-你的分析风格是：通俗易懂但不失专业，像和朋友聊天一样解释复杂问题。
+        # 周末特别说明
+        weekend_notice = ""
+        if is_weekend:
+            weekend_notice = """
+## ⚠️ 重要提示：今天是周末
+- A股和港股今日休市，没有实时交易数据
+- 本报告以【周回顾】和【下周展望】为主
+- 市场数据为上一个交易日（周五）的数据
+- 请注意区分"本周"和"下周"的表述
 
-## 重要说明
-以下是我提供给你的**真实市场数据**和**今日新闻**，请基于这些数据进行分析。
-- 所有分析必须基于我提供的数据，不要编造数据
-- 如果数据不足以支撑某个判断，请直接说明"数据有限，需进一步观察"
-- 不要凭空给出具体的目标价、止损位等，除非数据中有支撑
+"""
+        
+        # 【大幅优化】新的深度分析 prompt（集成情感分析）
+        report_prompt = f"""你是一位资深财经分析师，拥有20年A股和港股投资实战经验，曾在头部券商研究所任职。
+你的分析风格是：
+- 通俗易懂但见解深刻
+- 敢于亮明观点，不含糊其辞
+- 善于用生活化的比喻解释复杂问题
+- 重视风险，但不因噎废食
+
+## 🎯 今日分析任务
+
+今天是{today.strftime('%Y年%m月%d日')} {weekday_name}。
+{weekend_notice}
+
+### 用户画像
+- 用户昵称：{settings.user_nickname}
+- 投资风格：{investment_style_desc}
+- 分析时请考虑用户的风险偏好，给出匹配的建议
+
+{watchlist_text}
 
 ---
+
+## 📊 真实市场数据（基于 AKShare）
+
+以下数据来自真实市场，请基于这些数据进行分析，不要编造：
 
 {market_data_text}
 
 ---
 
-## 今日财经新闻
+{sentiment_index_text}
+
+---
+
+## 📰 {'本周' if is_weekend else '今日'}财经新闻（已按重要性排序，含情感标签）
+
 {finance_summary}
 
-## 今日跨界热点（可能影响股市的非财经新闻）
+## 🌍 {'本周' if is_weekend else '今日'}跨界热点
+
 {cross_border_summary if cross_border_summary else "暂无重大跨界热点"}
 
 ---
 
-## 报告结构要求（7大模块，使用 Markdown 格式）
+## 📝 报告结构要求
 
-### 模块1：🎯 今日核心观点
-基于上述市场数据，用3句话概括今日最重要的市场特征和投资判断：
-- 开门见山，引用具体数据
-- 每句话都要有数据支撑
+请按照以下7大模块撰写深度分析报告，使用 Markdown 格式：
 
-### 模块2：📈 宏观市场解读
-基于我提供的指数数据和资金流向，分析今日大盘走势：
-1. **市场表现**：结合上证、深证、创业板的涨跌幅进行解读
-2. **资金动向**：主力资金流入/流出说明什么
-3. **市场情绪**：涨跌家数比例反映什么
-4. **后市展望**：基于当前数据的短期判断
+### 模块1：🎯 {'本周核心复盘' if is_weekend else '今日三个核心判断'}
 
-### 模块3：🔄 行业轮动分析
-基于我提供的板块涨跌排行数据，分析今日行业轮动：
-- 领涨板块分析：为什么这些板块领涨？（结合新闻找原因）
-- 领跌板块分析：为什么这些板块下跌？
-- 板块轮动规律：近期热点切换的逻辑
+**要求**：开门见山，直接亮明你的观点
 
-### 模块4：💎 热门个股分析
-基于我提供的涨停股、龙虎榜数据，分析今日热点个股：
-- 涨停股特征：共性是什么？
-- 龙虎榜信号：机构和游资的动向
-- **注意**：不要凭空推荐股票，只分析数据中出现的个股
+{"回顾本周最重要的3个市场特征，并给出下周的核心判断" if is_weekend else "用3句话概括今日最重要的市场信号和投资判断"}：
+- 每个判断必须有具体数据支撑（引用上面的市场数据）
+- 参考市场情绪指数，判断当前情绪状态
+- 敢于给出明确方向（看多/看空/观望）
+- 给出置信度（高/中/低）
 
-### 模块5：⚡ 事件驱动机会
-结合新闻，分析未来一周值得关注的事件：
-- 时间节点
-- 可能的市场影响
-- 应对思路
+示例格式：
+> **判断一（置信度：高）**：创业板今日放量上涨2.3%，突破20日均线，市场情绪指数+0.35偏多，建议加仓科技成长股。理由是...
 
-### 模块6：🌍 跨界热点扫描
-{f"分析以下跨界热点对股市的潜在影响：" if cross_border_summary else "今日无重大跨界热点"}
+### 模块2：📈 {'本周大盘复盘' if is_weekend else '大盘深度解读'}
 
-### 模块7：⚠️ 风险提示
-基于当前数据，列出需要警惕的风险点：
-- 资金流出明显的板块
-- 跌停股的共性
-- 其他市场信号
+**要求**：不只是描述涨跌，要分析背后的逻辑，结合市场情绪指数
+
+1. **表象**：指数涨跌、成交量变化
+2. **资金面**：北向资金、主力资金流向说明什么？
+3. **情绪面**：
+   - 涨跌家数比、涨停跌停数量反映什么？
+   - 【重点】结合市场情绪指数（+0.xx/-0.xx）分析当前市场心理
+   - 情绪热词透露了什么信号？
+4. **技术面**：关键支撑位/阻力位在哪？
+5. **结论**：{'下周' if is_weekend else '明日'}大盘怎么看？给出具体点位预判
+
+### 模块3：🔄 行业轮动深度分析
+
+**要求**：找到板块轮动背后的逻辑链条，结合板块情绪热力图
+
+1. **领涨板块**：为什么涨？是政策驱动、业绩驱动还是资金炒作？
+2. **领跌板块**：为什么跌？是利空消息、获利回吐还是趋势反转？
+3. **板块情绪对比**：
+   - 哪些板块情绪最热（看多情绪强）？
+   - 哪些板块情绪最冷（看空情绪强）？
+4. **轮动规律**：
+   - 近期热点切换的逻辑是什么？
+   - 下一个可能的热点方向在哪？
+5. **操作建议**：哪些板块可以布局？哪些需要回避？
+
+### 模块4：💎 热门个股深度剖析
+
+**要求**：分析涨停股、龙虎榜背后的资金意图
+
+1. **涨停股分析**：
+   - 涨停股的共性是什么？（题材/业绩/资金）
+   - 哪些是真突破，哪些是假拉升？
+2. **龙虎榜解读**：
+   - 机构席位在买什么？卖什么？
+   - 游资大佬的动向如何？
+3. **风险提示**：哪些高位股需要警惕？
+
+### 模块5：⭐ 自选股专属分析
+
+**要求**：针对用户关注的股票进行个性化分析
+
+{self._get_watchlist_analysis_prompt()}
+
+### 模块6：⚡ {'下周重要日历' if is_weekend else '事件驱动机会'}
+
+**要求**：梳理未来一周的重要事件和投资机会
+
+1. **重要事件时间表**
+2. **每个事件的市场影响分析**
+3. **不同情景下的应对策略**
+
+### 模块7：⚠️ 风险雷达
+
+**要求**：帮助用户规避风险
+
+1. **系统性风险**：宏观层面需要警惕什么？
+2. **板块风险**：哪些板块有调整压力？（参考板块情绪数据）
+3. **个股风险**：财报爆雷、减持、解禁预警
+4. **仓位建议**：
+   - 当前建议总体仓位多少？
+   - 参考市场情绪强度给出仓位调整建议
 
 ---
 
-## 写作风格要求
-- **数据说话**：每个观点都引用我提供的具体数字
-- **实事求是**：数据不足就说不足，不要编造
-- **通俗易懂**：像财经自媒体，解释专业术语
-- **有理有据**：分析要有逻辑链条
+## ✍️ 写作风格要求
 
-## 额外输出（JSON 格式）
-在报告末尾，用 ```json 包裹输出以下结构化数据：
+1. **数据说话**：每个观点都要引用具体数字
+2. **情绪为锚**：充分利用市场情绪指数和板块情绪数据，这是独家优势
+3. **敢于亮剑**：给出明确的看多/看空判断，不要模棱两可
+4. **通俗易懂**：用生活化的比喻解释专业术语
+5. **有理有据**：分析要有清晰的逻辑链条
+6. **风险意识**：任何建议都要提示相应风险
+7. **专业洞察**：分析要有深度，可以适当幽默但保持专业
+
+## 📤 结构化输出
+
+在报告末尾，用 ```json 包裹输出以下数据：
+
 ```json
 {{
-  "title": "报告标题（结合今日市场特征）",
-  "summary": "200字以内的报告摘要（引用关键数据）",
-  "core_opinions": ["核心观点1", "核心观点2", "核心观点3"],
+  "title": "{'周末复盘版' if is_weekend else '结合今日特征'}的标题",
+  "summary": "200字精华摘要（引用关键数据和情绪指数）",
+  "core_opinions": [
+    "核心判断1（含置信度和理由）",
+    "核心判断2",
+    "核心判断3"
+  ],
+  "market_score": 65,  // 市场情绪评分 0-100（参考情绪指数转换）
+  "position_advice": "6成",  // 建议仓位
   "highlights": [
     {{
       "title": "重要新闻标题",
       "source": "来源",
       "summary": "100字摘要",
       "sentiment": "positive/negative/neutral",
+      "sentiment_confidence": 0.85,
       "related_stocks": ["相关股票代码"],
-      "historical_context": "背景说明"
+      "historical_context": "历史参考"
+    }}
+  ],
+  "watchlist_analysis": [
+    {{
+      "code": "股票代码",
+      "name": "股票名称",
+      "signal": "买入/持有/减仓/观望",
+      "reason": "具体理由",
+      "key_price": "关键价位"
     }}
   ],
   "market_analysis": {{
     "overall_sentiment": "positive/negative/neutral",
+    "sentiment_score": 0.35,
     "trend": "bullish/bearish/neutral",
     "key_factors": ["影响因素1", "影响因素2"],
     "opportunities": ["机会板块1", "机会板块2"],
-    "risks": ["风险点1", "风险点2"]
+    "risks": ["风险点1", "风险点2"],
+    "support_level": "支撑位",
+    "resistance_level": "阻力位"
   }},
-  "hot_sectors": ["今日热门板块1", "今日热门板块2", "今日热门板块3"],
-  "risk_sectors": ["需警惕板块1", "需警惕板块2"]
+  "hot_sectors": ["热门板块1", "板块2", "板块3"],
+  "risk_sectors": ["风险板块1", "风险板块2"],
+  "next_week_focus": ["下周关注点1", "关注点2"]
 }}
 ```
 
@@ -223,6 +339,67 @@ class AIAnalyzerService:
         report = self._parse_enhanced_report_response(response, today, news_list, cross_border_news or [])
         
         return report
+    
+    def _prepare_watchlist_analysis(self) -> str:
+        """
+        准备自选股分析文本
+        
+        统一从配置文件和数据库加载自选股
+        """
+        watchlist_service = get_watchlist_service()
+        
+        # 从配置加载
+        watchlist_service.load_from_config(settings.watchlist_stocks)
+        
+        # 尝试从数据库加载（同步方式读取）
+        try:
+            import sqlite3
+            from pathlib import Path
+            
+            db_path = Path(settings.database_url.replace("sqlite:///", ""))
+            if db_path.exists():
+                conn = sqlite3.connect(str(db_path))
+                cursor = conn.cursor()
+                cursor.execute("SELECT code, name, market FROM stocks")
+                rows = cursor.fetchall()
+                conn.close()
+                
+                if rows:
+                    db_stocks = [{"code": row[0], "name": row[1], "market": row[2]} for row in rows]
+                    watchlist_service.load_from_database(db_stocks)
+                    print(f"[AI] 从数据库加载了 {len(db_stocks)} 只自选股")
+        except Exception as e:
+            print(f"[AI] 数据库自选股加载失败: {e}")
+        
+        return watchlist_service.format_for_prompt()
+    
+    def _get_watchlist_analysis_prompt(self) -> str:
+        """
+        生成自选股分析提示
+        
+        使用统一的自选股服务
+        """
+        watchlist_service = get_watchlist_service()
+        
+        # 确保已加载（_prepare_watchlist_analysis 应该先被调用）
+        all_stocks = watchlist_service.get_all_stocks()
+        
+        if not all_stocks:
+            # 尝试重新加载
+            watchlist_service.load_from_config(settings.watchlist_stocks)
+            all_stocks = watchlist_service.get_all_stocks()
+        
+        return watchlist_service.format_analysis_prompt()
+    
+    def _get_investment_style_description(self) -> str:
+        """获取投资风格描述"""
+        style = settings.investment_style.lower()
+        descriptions = {
+            "conservative": "保守型（偏好低风险、稳健收益、高股息股票）",
+            "balanced": "平衡型（风险收益均衡，接受适度波动）",
+            "aggressive": "激进型（追求高收益，能承受较大波动）"
+        }
+        return descriptions.get(style, descriptions["balanced"])
     
     async def analyze_stock(self, code: str, name: str, market: str,
                            fundamentals: Dict, technicals: Dict, 
@@ -386,7 +563,11 @@ class AIAnalyzerService:
         return self._generate_mock_report()
     
     def _prepare_news_summary(self, news_list: List[News]) -> str:
-        """准备新闻摘要文本"""
+        """准备新闻摘要文本（旧版兼容）"""
+        return self._prepare_news_summary_with_sentiment(news_list)
+    
+    def _prepare_news_summary_with_sentiment(self, news_list: List[News]) -> str:
+        """准备新闻摘要文本（增强版：包含情感分析标签）"""
         summary_parts = []
         
         # 按重要性排序，取前20条
@@ -395,14 +576,188 @@ class AIAnalyzerService:
         for i, news in enumerate(sorted_news, 1):
             # 增加内容截取长度到500字，提供更多上下文
             content_preview = news.content[:500] if len(news.content) > 500 else news.content
+            
+            # 情感标签
+            sentiment_emoji = {
+                SentimentType.POSITIVE: "🟢",
+                SentimentType.NEGATIVE: "🔴",
+                SentimentType.NEUTRAL: "⚪"
+            }.get(news.sentiment, "⚪")
+            
+            sentiment_text = {
+                SentimentType.POSITIVE: "利好",
+                SentimentType.NEGATIVE: "利空",
+                SentimentType.NEUTRAL: "中性"
+            }.get(news.sentiment, "中性")
+            
+            # 情感置信度和强度
+            confidence_text = f"置信度{news.sentiment_confidence:.0%}" if hasattr(news, 'sentiment_confidence') and news.sentiment_confidence else ""
+            strength_text = ""
+            if hasattr(news, 'sentiment_strength') and news.sentiment_strength:
+                strength_map = {
+                    SentimentStrength.STRONG: "情感强烈",
+                    SentimentStrength.MODERATE: "情感适中",
+                    SentimentStrength.WEAK: "情感较弱"
+                }
+                strength_text = strength_map.get(news.sentiment_strength, "")
+            
+            # 情感关键词
+            keywords_text = ""
+            if hasattr(news, 'sentiment_keywords_positive') and news.sentiment_keywords_positive:
+                keywords_text += f"正面词: {', '.join(news.sentiment_keywords_positive[:3])} "
+            if hasattr(news, 'sentiment_keywords_negative') and news.sentiment_keywords_negative:
+                keywords_text += f"负面词: {', '.join(news.sentiment_keywords_negative[:3])}"
+            
             summary_parts.append(f"""
-### {i}. {news.title}
+### {i}. {sentiment_emoji} {news.title}
 - 来源：{news.source}
 - 时间：{news.published_at.strftime('%H:%M')}
+- **情感判断**：{sentiment_text} | {confidence_text} | {strength_text}
+- **情感触发词**：{keywords_text if keywords_text else "无明显情感词"}
 - 摘要：{content_preview}
 """)
         
         return "\n".join(summary_parts)
+    
+    def _prepare_sentiment_index(self, news_list: List[News], cross_border_news: List[News]) -> str:
+        """
+        准备市场情绪指数文本
+        
+        基于 FinBERT 情感分析结果，计算整体市场情绪
+        """
+        all_news = news_list + cross_border_news
+        
+        if not all_news:
+            return ""
+        
+        # 统计情感分布
+        positive_count = 0
+        negative_count = 0
+        neutral_count = 0
+        total_score = 0.0
+        
+        # 板块情绪统计
+        sector_sentiment: Dict[str, List[float]] = {}
+        sector_keywords = {
+            "科技": ["科技", "芯片", "半导体", "AI", "人工智能", "软件", "互联网"],
+            "金融": ["银行", "保险", "券商", "金融"],
+            "新能源": ["新能源", "光伏", "锂电", "储能", "风电"],
+            "消费": ["消费", "白酒", "食品", "零售", "餐饮", "旅游"],
+            "医药": ["医药", "医疗", "生物", "制药"],
+            "地产": ["地产", "房地产", "房企", "楼市"],
+            "军工": ["军工", "国防", "航空", "航天"],
+        }
+        
+        # 热词统计
+        positive_keywords: Dict[str, int] = {}
+        negative_keywords: Dict[str, int] = {}
+        
+        for news in all_news:
+            weight = news.importance_score
+            
+            if news.sentiment == SentimentType.POSITIVE:
+                positive_count += 1
+                confidence = getattr(news, 'sentiment_confidence', 0.7)
+                total_score += confidence * weight
+            elif news.sentiment == SentimentType.NEGATIVE:
+                negative_count += 1
+                confidence = getattr(news, 'sentiment_confidence', 0.7)
+                total_score -= confidence * weight
+            else:
+                neutral_count += 1
+            
+            # 统计板块情绪
+            text = news.title + " " + news.content[:200]
+            for sector, keywords in sector_keywords.items():
+                if any(kw in text for kw in keywords):
+                    if sector not in sector_sentiment:
+                        sector_sentiment[sector] = []
+                    
+                    if news.sentiment == SentimentType.POSITIVE:
+                        sector_sentiment[sector].append(getattr(news, 'sentiment_confidence', 0.7))
+                    elif news.sentiment == SentimentType.NEGATIVE:
+                        sector_sentiment[sector].append(-getattr(news, 'sentiment_confidence', 0.7))
+                    else:
+                        sector_sentiment[sector].append(0)
+            
+            # 统计热词
+            if hasattr(news, 'sentiment_keywords_positive'):
+                for kw in news.sentiment_keywords_positive:
+                    positive_keywords[kw] = positive_keywords.get(kw, 0) + 1
+            if hasattr(news, 'sentiment_keywords_negative'):
+                for kw in news.sentiment_keywords_negative:
+                    negative_keywords[kw] = negative_keywords.get(kw, 0) + 1
+        
+        total_count = len(all_news)
+        if total_count == 0:
+            return ""
+        
+        # 计算指标
+        bullish_ratio = positive_count / total_count
+        bearish_ratio = negative_count / total_count
+        neutral_ratio = neutral_count / total_count
+        
+        # 归一化整体得分到 -1 ~ 1
+        overall_score = total_score / total_count
+        overall_score = max(-1.0, min(1.0, overall_score))
+        
+        # 计算板块平均情绪
+        sector_avg = {
+            sector: sum(scores) / len(scores) if scores else 0
+            for sector, scores in sector_sentiment.items()
+        }
+        
+        # 判断整体情感强度
+        if abs(overall_score) > 0.5 or bullish_ratio > 0.6 or bearish_ratio > 0.6:
+            strength = "强烈"
+        elif abs(overall_score) > 0.2 or bullish_ratio > 0.4 or bearish_ratio > 0.4:
+            strength = "适中"
+        else:
+            strength = "较弱"
+        
+        # 排序热词
+        hot_positive = sorted(positive_keywords.items(), key=lambda x: x[1], reverse=True)[:5]
+        hot_negative = sorted(negative_keywords.items(), key=lambda x: x[1], reverse=True)[:5]
+        
+        # 构建文本
+        sentiment_desc = "偏多" if overall_score > 0.1 else "偏空" if overall_score < -0.1 else "中性"
+        
+        text = f"""
+## 🎭 市场情绪指数（基于 {total_count} 条新闻的 FinBERT 深度情感分析）
+
+> 这是独家优势！通过 AI 情感分析引擎对每条新闻进行情感判断，量化市场情绪。
+
+| 指标 | 数值 | 解读 |
+|------|------|------|
+| **整体情绪得分** | **{overall_score:+.2f}** | **{sentiment_desc}** |
+| 看多新闻占比 | {bullish_ratio*100:.1f}% | 利好消息比例 |
+| 看空新闻占比 | {bearish_ratio*100:.1f}% | 利空消息比例 |
+| 中性新闻占比 | {neutral_ratio*100:.1f}% | 无明显倾向 |
+| 情感强度 | {strength} | 市场情绪波动程度 |
+"""
+        
+        # 板块情绪热力图
+        if sector_avg:
+            text += "\n### 📊 板块情绪热力图\n\n"
+            sorted_sectors = sorted(sector_avg.items(), key=lambda x: x[1], reverse=True)
+            for sector, score in sorted_sectors:
+                if score > 0.3:
+                    emoji = "🔥"
+                elif score > 0:
+                    emoji = "📈"
+                elif score > -0.3:
+                    emoji = "📉"
+                else:
+                    emoji = "❄️"
+                text += f"- {emoji} **{sector}**: {score:+.2f}\n"
+        
+        # 热词
+        if hot_positive:
+            text += f"\n### 🟢 正面情绪热词：{', '.join([kw for kw, _ in hot_positive])}\n"
+        if hot_negative:
+            text += f"\n### 🔴 负面情绪热词：{', '.join([kw for kw, _ in hot_negative])}\n"
+        
+        return text
     
     def _prepare_cross_border_summary(self, cross_border_news: List[News]) -> str:
         """准备跨界新闻摘要文本"""

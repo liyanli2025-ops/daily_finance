@@ -38,6 +38,13 @@ class NewsCreate(NewsBase):
     pass
 
 
+class SentimentStrength(str, Enum):
+    """情感强度"""
+    WEAK = "weak"        # 弱：轻微影响
+    MODERATE = "moderate"  # 中：明显影响
+    STRONG = "strong"    # 强：重大影响
+
+
 class News(NewsBase):
     """完整新闻模型（含数据库字段）"""
     id: str = Field(..., description="新闻ID")
@@ -59,6 +66,15 @@ class News(NewsBase):
     # 事件追踪相关
     event_id: Optional[str] = Field(default=None, description="关联事件ID（用于新闻聚类）")
     is_follow_up: bool = Field(default=False, description="是否为后续报道")
+    
+    # ============ 深度情感分析字段（FinBERT）============
+    sentiment_confidence: float = Field(default=0.5, ge=0, le=1, description="情感置信度")
+    sentiment_strength: SentimentStrength = Field(default=SentimentStrength.MODERATE, description="情感强度")
+    sentiment_scores: Optional[dict] = Field(default=None, description="各情感类别得分 {positive, negative, neutral}")
+    sentiment_keywords_positive: List[str] = Field(default_factory=list, description="触发正面情感的关键词")
+    sentiment_keywords_negative: List[str] = Field(default_factory=list, description="触发负面情感的关键词")
+    sentiment_analysis_method: str = Field(default="pending", description="分析方法：finbert/rule/pending")
+    is_china_related: bool = Field(default=False, description="是否中国相关")
     
     class Config:
         from_attributes = True

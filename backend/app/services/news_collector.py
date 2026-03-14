@@ -1,6 +1,10 @@
 """
 新闻采集服务
 支持多源 RSS 抓取、网页爬取、去重和聚类
+增强版：
+- 集成 FinBERT 深度情感分析
+- 支持自选股个股新闻采集
+- 支持自选股行业新闻采集
 """
 import asyncio
 import hashlib
@@ -15,7 +19,8 @@ import httpx
 from bs4 import BeautifulSoup
 
 from ..config import settings
-from ..models.news import News, NewsCreate, SentimentType, NewsType
+from ..models.news import News, NewsCreate, SentimentType, NewsType, SentimentStrength
+from .watchlist_service import get_watchlist_service, WatchlistStock
 
 
 @dataclass
@@ -176,6 +181,16 @@ class NewsCollectorService:
             print("[OK] NewsCollector: AKShare 可用，将作为补充新闻源")
         except ImportError:
             print("[WARN] NewsCollector: AKShare 不可用")
+        
+        # 初始化情感分析器
+        self.sentiment_analyzer = None
+        self.sentiment_analysis_enabled = True
+        try:
+            from .sentiment_analyzer import get_sentiment_analyzer
+            self.sentiment_analyzer = get_sentiment_analyzer()
+            print("[OK] NewsCollector: 情感分析服务已启用")
+        except Exception as e:
+            print(f"[WARN] NewsCollector: 情感分析服务初始化失败: {e}")
     
     async def collect_all(self, hours: int = 24) -> List[News]:
         """
@@ -235,6 +250,14 @@ class NewsCollectorService:
         except Exception as e:
             print(f"[同花顺] 快讯采集失败: {e}")
         
+        # 5. 【新增】采集自选股相关新闻（个股 + 行业）
+        try:
+            watchlist_news = await self._collect_watchlist_news()
+            all_news.extend(watchlist_news)
+            print(f"[自选股] 相关新闻补充 {len(watchlist_news)} 条")
+        except Exception as e:
+            print(f"[自选股] 新闻采集失败: {e}")
+        
         # 去重
         unique_news = self._deduplicate(all_news)
         
@@ -249,6 +272,15 @@ class NewsCollectorService:
         filtered_news.sort(key=lambda x: (x.importance_score, x.published_at), reverse=True)
         
         print(f"[NEWS] 共采集到 {len(filtered_news)} 条新闻（原始 {len(all_news)} 条，去重后 {len(unique_news)} 条）")
+        
+        # 5. 【新增】深度情感分析
+        if self.sentiment_analyzer and self.sentiment_analysis_enabled and filtered_news:
+            print(f"[SENTIMENT] 开始对 {len(filtered_news)} 条新闻进行深度情感分析...")
+            try:
+                filtered_news = await self._analyze_sentiment_batch(filtered_news)
+                print(f"[SENTIMENT] 情感分析完成")
+            except Exception as e:
+                print(f"[SENTIMENT] 情感分析失败: {e}")
         
         return filtered_news
     
@@ -362,6 +394,323 @@ class NewsCollectorService:
                     ))
         except Exception as e:
             print(f"  [同花顺] 快讯采集失败: {e}")
+        
+        return news_list
+    
+    async def _collect_watchlist_news(self) -> List[News]:
+        """
+        采集自选股相关新闻
+        
+        1. 针对每只自选股搜索个股新闻
+        2. 针对自选股所属行业搜索板块新闻（行业去重）
+        """
+        news_list = []
+        
+        # 获取自选股服务
+        watchlist_service = get_watchlist_service()
+        
+        # 从配置加载自选股
+        watchlist_service.load_from_config(settings.watchlist_stocks)
+        
+        # 尝试从数据库加载自选股
+        try:
+            db_stocks = await self._load_db_watchlist()
+            if db_stocks:
+                watchlist_service.load_from_database(db_stocks)
+                print(f"  [自选股] 从数据库加载了 {len(db_stocks)} 只股票")
+        except Exception as e:
+            print(f"  [自选股] 数据库加载失败: {e}")
+        
+        all_stocks = watchlist_service.get_all_stocks()
+        unique_sectors = watchlist_service.get_unique_sectors()
+        
+        if not all_stocks:
+            print("  [自选股] 未设置自选股，跳过采集")
+            return news_list
+        
+        print(f"  [自选股] 共 {len(all_stocks)} 只股票，涉及 {len(unique_sectors)} 个行业")
+        
+        # 1. 采集个股新闻（使用 AKShare）
+        if self.akshare_available:
+            stock_news = await self._collect_individual_stock_news(all_stocks)
+            news_list.extend(stock_news)
+            print(f"  [自选股] 个股新闻: {len(stock_news)} 条")
+        
+        # 2. 采集行业新闻（行业去重）
+        if self.akshare_available and unique_sectors:
+            sector_news = await self._collect_sector_news(unique_sectors)
+            news_list.extend(sector_news)
+            print(f"  [自选股] 行业新闻: {len(sector_news)} 条")
+        
+        # 3. 采集雪球个股讨论
+        xueqiu_news = await self._collect_xueqiu_stock_discussion(all_stocks)
+        news_list.extend(xueqiu_news)
+        if xueqiu_news:
+            print(f"  [自选股] 雪球讨论: {len(xueqiu_news)} 条")
+        
+        return news_list
+    
+    async def _load_db_watchlist(self) -> List[Dict]:
+        """
+        从数据库加载自选股列表
+        
+        Returns:
+            [{"code": "xxx", "name": "xxx", "market": "A"}, ...]
+        """
+        db_stocks = []
+        
+        try:
+            # 尝试直接读取 SQLite 数据库
+            import aiosqlite
+            from pathlib import Path
+            
+            db_path = Path(settings.database_url.replace("sqlite:///", ""))
+            if not db_path.exists():
+                return db_stocks
+            
+            async with aiosqlite.connect(str(db_path)) as db:
+                async with db.execute("SELECT code, name, market FROM stocks") as cursor:
+                    rows = await cursor.fetchall()
+                    for row in rows:
+                        db_stocks.append({
+                            "code": row[0],
+                            "name": row[1],
+                            "market": row[2]
+                        })
+        except Exception as e:
+            print(f"  [自选股] 读取数据库失败: {e}")
+        
+        return db_stocks
+    
+    async def _collect_individual_stock_news(self, stocks: List[WatchlistStock]) -> List[News]:
+        """
+        采集个股新闻
+        
+        使用东方财富个股新闻接口
+        """
+        import akshare as ak
+        news_list = []
+        
+        for stock in stocks[:10]:  # 限制最多采集10只股票，避免请求过多
+            try:
+                # 尝试获取个股新闻
+                # 注意：AKShare 的接口可能会变化，这里使用 stock_news_em
+                code = stock.code
+                
+                # A股需要处理代码格式
+                if stock.market == "A":
+                    # 东方财富接口需要完整代码
+                    if code.startswith("6"):
+                        full_code = f"{code}"
+                    else:
+                        full_code = f"{code}"
+                else:
+                    full_code = code
+                
+                try:
+                    # 尝试使用东方财富个股新闻
+                    df = ak.stock_news_em(symbol=full_code)
+                    if df is not None and not df.empty:
+                        for _, row in df.head(5).iterrows():  # 每只股票最多5条
+                            title = str(row.get('新闻标题', ''))
+                            content = str(row.get('新闻内容', title))
+                            
+                            if not title:
+                                continue
+                            
+                            # 解析时间
+                            try:
+                                time_str = str(row.get('发布时间', ''))
+                                if time_str:
+                                    published = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+                                else:
+                                    published = datetime.now()
+                            except:
+                                published = datetime.now()
+                            
+                            news_list.append(News(
+                                id=str(uuid.uuid4()),
+                                title=f"[{stock.name}] {title}",
+                                content=content,
+                                summary=content[:200] if len(content) > 200 else content,
+                                source=f"东方财富-{stock.name}",
+                                source_url=str(row.get('新闻链接', 'https://www.eastmoney.com')),
+                                published_at=published,
+                                news_type=NewsType.FINANCE,
+                                sentiment=SentimentType.NEUTRAL,
+                                importance_score=0.75,  # 自选股相关新闻权重较高
+                                is_china_related=True,
+                                category=f"自选股-{stock.name}",
+                                related_stocks=[stock.code]
+                            ))
+                except Exception as e:
+                    print(f"    [个股新闻] {stock.name}({stock.code}) 采集失败: {e}")
+                
+                # 避免请求过快
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                print(f"    [个股新闻] {stock.name} 异常: {e}")
+        
+        return news_list
+    
+    async def _collect_sector_news(self, sectors: List[str]) -> List[News]:
+        """
+        采集行业板块新闻
+        
+        行业已经去重，每个行业只采集一次
+        """
+        import akshare as ak
+        news_list = []
+        
+        # 行业板块名称映射（映射到东方财富板块名）
+        sector_name_map = {
+            "白酒": "白酒",
+            "新能源": "新能源汽车",
+            "光伏": "光伏设备",
+            "半导体": "半导体",
+            "消费电子": "消费电子",
+            "医药": "医药生物",
+            "银行": "银行",
+            "保险": "保险",
+            "证券": "证券",
+            "地产": "房地产",
+            "互联网": "互联网服务",
+            "汽车": "汽车整车",
+            "家电": "家用电器",
+            "食品饮料": "食品饮料",
+            "军工": "国防军工",
+            "煤炭": "煤炭开采",
+            "钢铁": "钢铁行业",
+            "石油化工": "石油行业",
+            "电力": "电力行业",
+            "AI软件": "软件开发",
+        }
+        
+        for sector in sectors:
+            try:
+                sector_name = sector_name_map.get(sector, sector)
+                
+                # 尝试获取板块新闻（通过板块相关的热门股票新闻）
+                # 这里使用板块涨幅榜来获取板块热度信息
+                try:
+                    # 获取概念板块涨幅
+                    df = ak.stock_board_concept_name_em()
+                    if df is not None and not df.empty:
+                        # 查找相关板块
+                        for _, row in df.iterrows():
+                            board_name = str(row.get('板块名称', ''))
+                            if sector in board_name or sector_name in board_name:
+                                change = row.get('涨跌幅', 0)
+                                leader_stock = str(row.get('领涨股票', ''))
+                                
+                                news_list.append(News(
+                                    id=str(uuid.uuid4()),
+                                    title=f"[{sector}板块] 今日涨跌幅 {change}%，领涨股 {leader_stock}",
+                                    content=f"{sector}板块今日涨跌幅为{change}%，领涨股票为{leader_stock}。板块整体表现{'强势' if float(change) > 1 else '弱势' if float(change) < -1 else '平稳'}。",
+                                    summary=f"{sector}板块涨跌幅{change}%",
+                                    source=f"东方财富-{sector}板块",
+                                    source_url="https://data.eastmoney.com/bkzj/BK0493.html",
+                                    published_at=datetime.now(),
+                                    news_type=NewsType.FINANCE,
+                                    sentiment=SentimentType.POSITIVE if float(change) > 0 else SentimentType.NEGATIVE if float(change) < 0 else SentimentType.NEUTRAL,
+                                    importance_score=0.7,
+                                    is_china_related=True,
+                                    category=f"行业板块-{sector}",
+                                    beneficiary_sectors=[sector] if float(change) > 0 else [],
+                                    affected_sectors=[sector] if float(change) < 0 else []
+                                ))
+                                break  # 找到就跳出
+                except Exception as e:
+                    print(f"    [板块新闻] {sector} 采集失败: {e}")
+                
+                # 避免请求过快
+                await asyncio.sleep(0.3)
+                
+            except Exception as e:
+                print(f"    [板块新闻] {sector} 异常: {e}")
+        
+        return news_list
+    
+    async def _collect_xueqiu_stock_discussion(self, stocks: List[WatchlistStock]) -> List[News]:
+        """
+        采集雪球个股讨论
+        
+        雪球是投资者社区，可以获取市场观点和小道消息
+        """
+        news_list = []
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+            "Referer": "https://xueqiu.com/",
+        }
+        
+        try:
+            # 先获取 cookie
+            await self.client.get("https://xueqiu.com/", headers=headers)
+        except:
+            return news_list
+        
+        for stock in stocks[:5]:  # 限制最多5只股票
+            try:
+                # 构造雪球股票代码
+                if stock.market == "A":
+                    if stock.code.startswith("6"):
+                        xq_symbol = f"SH{stock.code}"
+                    else:
+                        xq_symbol = f"SZ{stock.code}"
+                else:
+                    xq_symbol = stock.code
+                
+                # 获取个股讨论
+                url = f"https://xueqiu.com/query/v1/symbol/search/status.json?symbol={xq_symbol}&count=10&page=1"
+                
+                try:
+                    response = await self.client.get(url, headers=headers)
+                    if response.status_code == 200:
+                        data = response.json()
+                        items = data.get("list", [])
+                        
+                        for item in items[:3]:  # 每只股票最多3条
+                            text = item.get("text", "")
+                            text = self._clean_html(text)
+                            
+                            if len(text) < 20:  # 过短的跳过
+                                continue
+                            
+                            user = item.get("user", {})
+                            author = user.get("screen_name", "雪球用户")
+                            followers = user.get("followers_count", 0)
+                            
+                            # 大V的观点权重更高
+                            importance = 0.65 if followers > 10000 else 0.55
+                            
+                            title = text[:50] + "..." if len(text) > 50 else text
+                            
+                            news_list.append(News(
+                                id=str(uuid.uuid4()),
+                                title=f"[{stock.name}] {author}: {title}",
+                                content=text[:1000],
+                                summary=text[:200],
+                                source=f"雪球-{stock.name}",
+                                source_url=f"https://xueqiu.com/{user.get('id', '')}/post/{item.get('id', '')}",
+                                published_at=datetime.fromtimestamp(item.get("created_at", 0) / 1000) if item.get("created_at") else datetime.now(),
+                                news_type=NewsType.FINANCE,
+                                sentiment=SentimentType.NEUTRAL,
+                                importance_score=importance,
+                                is_china_related=True,
+                                category=f"雪球讨论-{stock.name}",
+                                related_stocks=[stock.code]
+                            ))
+                except Exception as e:
+                    print(f"    [雪球] {stock.name} 讨论采集失败: {e}")
+                
+                # 避免请求过快
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                print(f"    [雪球] {stock.name} 异常: {e}")
         
         return news_list
     
@@ -763,6 +1112,77 @@ class NewsCollectorService:
     async def close(self):
         """关闭 HTTP 客户端"""
         await self.client.aclose()
+    
+    async def _analyze_sentiment_batch(self, news_list: List[News]) -> List[News]:
+        """
+        批量进行深度情感分析
+        
+        使用 FinBERT 或规则引擎对新闻进行情感分析，
+        并将结果更新到新闻对象中
+        """
+        if not self.sentiment_analyzer:
+            return news_list
+        
+        # 批量分析
+        analyzed = await self.sentiment_analyzer.analyze_batch(news_list)
+        
+        # 更新新闻对象
+        updated_news = []
+        sentiment_stats = {"positive": 0, "negative": 0, "neutral": 0}
+        
+        for news, result in analyzed:
+            # 更新情感字段
+            news.sentiment = result.sentiment
+            news.sentiment_confidence = result.confidence
+            news.sentiment_strength = SentimentStrength(result.strength.value)
+            news.sentiment_scores = result.scores
+            news.sentiment_keywords_positive = result.keywords_positive
+            news.sentiment_keywords_negative = result.keywords_negative
+            news.sentiment_analysis_method = result.analysis_method
+            
+            # 统计
+            sentiment_stats[result.sentiment.value] += 1
+            
+            updated_news.append(news)
+        
+        # 打印统计信息
+        total = len(updated_news)
+        print(f"  [情感分析统计] 正面: {sentiment_stats['positive']} ({sentiment_stats['positive']/total*100:.1f}%) | "
+              f"负面: {sentiment_stats['negative']} ({sentiment_stats['negative']/total*100:.1f}%) | "
+              f"中性: {sentiment_stats['neutral']} ({sentiment_stats['neutral']/total*100:.1f}%)")
+        
+        return updated_news
+    
+    def get_market_sentiment_index(self, news_list: List[News]):
+        """
+        获取市场情绪指数
+        
+        Returns:
+            MarketSentimentIndex 对象，包含整体市场情绪分析
+        """
+        if not self.sentiment_analyzer:
+            return None
+        
+        # 构建 (news, result) 对
+        analyzed_pairs = []
+        for news in news_list:
+            if news.sentiment_analysis_method != "pending":
+                from .sentiment_analyzer import SentimentResult, SentimentStrength as SST
+                result = SentimentResult(
+                    sentiment=news.sentiment,
+                    confidence=news.sentiment_confidence,
+                    strength=SST(news.sentiment_strength.value),
+                    scores=news.sentiment_scores or {},
+                    keywords_positive=news.sentiment_keywords_positive,
+                    keywords_negative=news.sentiment_keywords_negative,
+                    analysis_method=news.sentiment_analysis_method
+                )
+                analyzed_pairs.append((news, result))
+        
+        if not analyzed_pairs:
+            return None
+        
+        return self.sentiment_analyzer.calculate_market_sentiment_index(analyzed_pairs)
 
 
 # 单例实例

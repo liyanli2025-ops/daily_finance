@@ -5,12 +5,14 @@
 import asyncio
 import os
 import re
-from datetime import datetime
+import random
+from datetime import datetime, date
 from pathlib import Path
 from typing import Optional, List
 import uuid
 
 import edge_tts
+import httpx
 
 from ..config import settings
 from ..models.report import Report
@@ -25,6 +27,9 @@ class PodcastGeneratorService:
         self.rate = settings.tts_rate     # 语速
         self.volume = settings.tts_volume # 音量
         
+        # 【优化】从配置读取用户昵称
+        self.user_nickname = settings.user_nickname or "朋友"
+        
         # 可用的中文语音角色
         self.available_voices = {
             "zh-CN-YunxiNeural": "云希（男声，年轻，适合新闻播报）",
@@ -36,6 +41,88 @@ class PodcastGeneratorService:
         # 输出目录
         self.output_dir = Path(settings.podcasts_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 初始化开场白模板（使用用户昵称）
+        self._init_openings()
+        
+        # HTTP客户端用于获取天气
+        self.http_client = None
+    
+    def _init_openings(self):
+        """初始化开场白模板，使用配置的用户昵称"""
+        name = self.user_nickname
+        
+        # 工作日多样化开场白模板
+        self.weekday_openings = [
+            f"{name}，早上好！新的一天开始了，让我们一起看看今天的财经大事。",
+            f"{name}你好呀！又是元气满满的一天，今天的市场有什么新动向呢？",
+            f"嗨，{name}！准备好了吗？今天的财经快报马上开始。",
+            f"{name}，早安！咖啡准备好了吗？边喝边听今天的市场分析吧。",
+            f"{name}，今天又是充满机会的一天！让我们看看市场在说什么。",
+            f"Hello{name}！通勤路上就让我来陪你，一起聊聊今天的财经热点。",
+            f"{name}早！新的一周，新的机会，今天的报告干货满满哦。",
+            f"{name}，起床啦！今天的市场消息已经为你整理好了。",
+        ]
+        
+        # 周末特别开场白
+        self.weekend_openings = [
+            f"{name}，周末愉快！虽然A股和港股今天休市，但我们可以趁机复盘本周，展望下周。",
+            f"{name}你好！难得的周末时光，让我们轻松聊聊这周的市场和下周的机会。",
+            f"嗨{name}，周末好！今天咱们不着急，慢慢聊聊这周发生的大事。",
+            f"{name}，休息日快乐！市场虽然休息了，但我们的思考不能停。",
+        ]
+    
+    async def _get_http_client(self):
+        """获取或创建HTTP客户端"""
+        if self.http_client is None:
+            self.http_client = httpx.AsyncClient(timeout=10.0)
+        return self.http_client
+    
+    async def get_beijing_weather(self) -> str:
+        """
+        获取北京当天的天气情况
+        使用免费的天气API
+        """
+        try:
+            client = await self._get_http_client()
+            
+            # 使用 wttr.in 免费天气服务
+            url = "https://wttr.in/Beijing?format=%C+%t+%h+%w&lang=zh-cn"
+            response = await client.get(url, headers={"User-Agent": "curl/7.68.0"})
+            
+            if response.status_code == 200:
+                weather_raw = response.text.strip()
+                # 格式化天气信息
+                return f"北京今天的天气：{weather_raw}。"
+            
+            # 备用方案：使用另一个API
+            backup_url = "https://api.seniverse.com/v3/weather/now.json?key=demo&location=beijing&language=zh-Hans"
+            response = await client.get(backup_url)
+            if response.status_code == 200:
+                data = response.json()
+                result = data.get("results", [{}])[0]
+                now = result.get("now", {})
+                weather_text = now.get("text", "晴")
+                temperature = now.get("temperature", "20")
+                return f"北京今天{weather_text}，气温{temperature}度。"
+                
+        except Exception as e:
+            print(f"[天气] 获取天气失败: {e}")
+        
+        # 获取失败时返回通用语句
+        return "今天北京天气不错。"
+    
+    def _is_weekend(self, check_date: date = None) -> bool:
+        """判断是否是周末"""
+        if check_date is None:
+            check_date = date.today()
+        return check_date.weekday() >= 5  # 5是周六，6是周日
+    
+    def _get_random_opening(self, is_weekend: bool = False) -> str:
+        """获取随机开场白"""
+        if is_weekend:
+            return random.choice(self.weekend_openings)
+        return random.choice(self.weekday_openings)
     
     async def generate_podcast(self, report: Report) -> tuple[str, int]:
         """
@@ -47,8 +134,11 @@ class PodcastGeneratorService:
         Returns:
             (音频文件路径, 时长秒数)
         """
-        # 准备播客文本
-        podcast_text = self._prepare_podcast_text(report)
+        # 获取北京天气
+        weather_info = await self.get_beijing_weather()
+        
+        # 准备播客文本（传入天气信息）
+        podcast_text = self._prepare_podcast_text(report, weather_info)
         
         # 生成音频文件名
         filename = f"{report.id}.mp3"
@@ -75,38 +165,81 @@ class PodcastGeneratorService:
         
         return str(output_path), duration_seconds
     
-    def _prepare_podcast_text(self, report: Report) -> str:
+    def _prepare_podcast_text(self, report: Report, weather_info: str = "") -> str:
         """
         准备播客文本 - 差异化风格（观点输出 + 财经脱口秀）
-        不是念报告，而是提炼核心观点，加入主播个人判断
+        
+        改进点：
+        1. 周末和工作日内容差异化
+        2. 多样化开场白，使用配置的用户昵称
+        3. 开场加入北京天气
+        4. "今日"表述更准确
         """
-        # 开场白（轻松活泼风格）
+        report_date = report.report_date
+        is_weekend = self._is_weekend(report_date)
+        weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        weekday_name = weekday_names[report_date.weekday()]
+        
+        # 用户昵称
+        name = self.user_nickname
+        
+        # 随机选择开场白
+        random_greeting = self._get_random_opening(is_weekend)
+        
+        # 开场白（包含天气和日期）
         opening = f"""
-各位听众朋友，大家好！欢迎收听今天的财经脱口秀。
-今天是{report.report_date.strftime('%Y年%m月%d日')}，我是老李。
-废话不多说，直接上干货！
+{random_greeting}
 
-今天的报告标题是：{report.title}
+{weather_info}
+
+今天是{report_date.strftime('%Y年%m月%d日')}，{weekday_name}。
+"""
+        
+        # 周末特别提示
+        if is_weekend:
+            opening += """
+温馨提示：今天是周末，A股和港股都休市哦。
+所以今天的内容主要是本周回顾和下周展望，帮你做好投资规划。
+
+"""
+        else:
+            opening += f"""
+{report.title}
+
+废话不多说，直接上干货！
 
 """
         
         # 核心观点（如果有）- 开门见山
         core_opinions_text = ""
         if hasattr(report, 'core_opinions') and report.core_opinions:
-            core_opinions_text = """
-先说今天我的三个核心判断，听好了：
+            if is_weekend:
+                core_opinions_text = """
+先说说本周我的几个核心判断：
+
+"""
+            else:
+                core_opinions_text = f"""
+{name}，先说说我今天的三个核心判断，听好了：
 
 """
             for i, opinion in enumerate(report.core_opinions, 1):
                 core_opinions_text += f"第{i}个判断：{opinion}\n\n"
-            core_opinions_text += """
-这三条判断，你可以不信，但我建议你记下来，一周后回来对照看看我说得准不准。
+            
+            if is_weekend:
+                core_opinions_text += """
+这些判断，你可以下周开盘后观察验证一下。
+
+"""
+            else:
+                core_opinions_text += """
+这几条判断，你可以不信，但我建议你记下来，过几天回来对照看看我说得准不准。
 
 """
         else:
             # 使用摘要作为核心内容
             core_opinions_text = f"""
-今天的核心内容是：{report.summary}
+{name}，今天的核心内容是：{report.summary}
 
 接下来我展开聊聊。
 
@@ -115,9 +248,9 @@ class PodcastGeneratorService:
         # 跨界热点分析（如果有）- 这是差异化的重点
         cross_border_text = ""
         if hasattr(report, 'cross_border_events') and report.cross_border_events:
-            cross_border_text = """
+            cross_border_text = f"""
 
-说完财经新闻，我们聊聊今天的跨界热点。
+{name}，说完财经新闻，我们聊聊跨界热点。
 很多人只盯着财经频道，其实很多影响股市的大事，都发生在财经圈外面。
 
 """
@@ -150,9 +283,17 @@ class PodcastGeneratorService:
         # 重点新闻 + 我的看法
         highlights_text = ""
         if report.highlights:
-            highlights_text = """
+            if is_weekend:
+                highlights_text = """
 
-好，接下来聊聊今天的几条重要新闻，以及我的个人看法。
+好，接下来聊聊本周的几条重要新闻，以及我的个人看法。
+
+"""
+            else:
+                highlights_text = f"""
+
+{name}，接下来聊聊今天的几条重要新闻，以及我的个人看法。
+这里说的"今天"，指的是最新的交易日和近期的重要消息。
 
 """
             for i, h in enumerate(report.highlights[:3], 1):  # 只取前3条重点说
@@ -183,9 +324,26 @@ class PodcastGeneratorService:
                 "neutral": "目前我保持观望"
             }.get(report.analysis.trend.value, "")
             
-            analysis_text = f"""
+            if is_weekend:
+                analysis_text = f"""
 
-说说我对整体市场的看法。
+{name}，说说我对下周市场的看法。
+
+{trend_opinion}。原因很简单：
+
+关键因素就这几个：{', '.join(report.analysis.key_factors)}
+
+如果你问我下周该关注什么？我觉得机会在：{', '.join(report.analysis.opportunities)}
+
+但也要注意这些风险：{', '.join(report.analysis.risks)}
+
+周末有时间的话，可以好好研究一下这些方向。
+
+"""
+            else:
+                analysis_text = f"""
+
+{name}，说说我对整体市场的看法。
 
 {trend_opinion}。原因很简单：
 
@@ -202,20 +360,36 @@ class PodcastGeneratorService:
         # 处理报告正文的关键段落
         key_content = self._extract_key_paragraphs(report.content)
         
-        # 结束语（有态度的风格）
-        closing = """
+        # 结束语（有态度的风格，周末和工作日不同）
+        if is_weekend:
+            closing = f"""
 
-好了，今天的财经脱口秀就到这里。
+好了{name}，今天的周末财经复盘就到这里。
+
+总结一下：
+第一，回顾本周的重要事件，理清逻辑；
+第二，为下周做好准备，心中有数；
+第三，周末好好休息，保持好状态。
+
+最后送给你一句话：投资是马拉松，不是百米冲刺。
+学会休息，才能走得更远。
+
+{name}，周末愉快！我们下周再见！
+"""
+        else:
+            closing = f"""
+
+好了{name}，今天的财经脱口秀就到这里。
 
 总结一下今天的核心观点：
 第一，关注政策面的变化；
 第二，重点板块可以逢低布局；
 第三，风险管理永远是第一位的。
 
-最后送给大家一句话：投资不是赌博，是认知的变现。
+最后送给你一句话：投资不是赌博，是认知的变现。
 知道自己为什么买、为什么卖，比知道买什么更重要。
 
-感谢收听，我们明天再见！
+{name}，今天就聊到这，我们明天再见！
 """
         
         # 组合完整文本
@@ -224,9 +398,9 @@ class PodcastGeneratorService:
         # 控制字数在合理范围（5000-7500字，对应20-30分钟）
         if len(full_text) > 7500:
             # 截断并添加总结
-            full_text = full_text[:7000] + """
+            full_text = full_text[:7000] + f"""
 
-由于时间关系，今天就先聊到这里。
+{name}，由于时间关系，今天就先聊到这里。
 更详细的分析可以在App里看完整报告。
 
 """ + closing
@@ -234,7 +408,7 @@ class PodcastGeneratorService:
             # 内容不足时，添加更多观点
             padding = f"""
 
-让我再补充几点个人看法。
+{name}，让我再补充几点个人看法。
 
 关于当前市场，我认为最重要的是把握节奏。
 不要急于追涨，也不要盲目恐惧。
@@ -300,7 +474,8 @@ class PodcastGeneratorService:
         
         # 替换一些符号为可朗读的文字
         text = text.replace('&', '和')
-        text = text.replace('%', '百分之')
+        # 将 "X%" 转换为 "百分之X"（正确的中文读法）
+        text = re.sub(r'(\d+(?:\.\d+)?)\s*%', r'百分之\1', text)
         text = text.replace('①', '第一')
         text = text.replace('②', '第二')
         text = text.replace('③', '第三')

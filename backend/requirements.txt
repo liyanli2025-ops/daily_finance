@@ -41,3 +41,12 @@ python-dateutil>=2.8.2
 beautifulsoup4>=4.12.3
 lxml>=5.1.0
 markdown>=3.5.2
+
+# ============ FinBERT 深度情感分析（可选，但推荐安装）============
+# 如果只想使用规则引擎，可以不安装以下依赖
+# 安装命令: pip install transformers torch
+transformers>=4.36.0
+# PyTorch - 请根据你的系统选择合适的版本
+# CPU 版本: pip install torch
+# GPU 版本: pip install torch --index-url https://download.pytorch.org/whl/cu118
+torch>=2.1.0

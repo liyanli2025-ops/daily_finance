@@ -1,6 +1,7 @@
 """
 播客相关 API 路由
 """
+
 from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
@@ -45,6 +46,40 @@ async def get_today_podcast(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.get("/history")
+async def list_podcasts(
+    skip: int = 0,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取播客历史列表
+    """
+    from sqlalchemy import desc
+    
+    query = (
+        select(ReportModel)
+        .where(ReportModel.podcast_duration != None)
+        .order_by(desc(ReportModel.report_date))
+        .offset(skip)
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    reports = result.scalars().all()
+    
+    return [
+        {
+            "report_id": r.id,
+            "title": r.title,
+            "report_date": str(r.report_date),
+            "podcast_status": r.podcast_status,
+            "podcast_url": r.podcast_url,
+            "podcast_duration": r.podcast_duration
+        }
+        for r in reports
+    ]
+
+
 @router.get("/{report_id}/status")
 async def get_podcast_status(
     report_id: str,
@@ -65,6 +100,31 @@ async def get_podcast_status(
         "status": report.podcast_status,
         "url": report.podcast_url,
         "duration": report.podcast_duration
+    }
+
+
+@router.get("/{report_id}")
+async def get_podcast_detail(
+    report_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取播客详情（用于播放历史播客）
+    """
+    query = select(ReportModel).where(ReportModel.id == report_id)
+    result = await db.execute(query)
+    report = result.scalar_one_or_none()
+    
+    if not report:
+        raise HTTPException(status_code=404, detail="播客不存在")
+    
+    return {
+        "report_id": report.id,
+        "title": report.title,
+        "report_date": str(report.report_date),
+        "podcast_status": report.podcast_status,
+        "podcast_url": report.podcast_url,
+        "podcast_duration": report.podcast_duration
     }
 
 
@@ -136,36 +196,3 @@ async def regenerate_podcast(
         "message": "播客重新生成已启动",
         "report_id": report_id
     }
-
-
-@router.get("/history")
-async def list_podcasts(
-    skip: int = 0,
-    limit: int = 20,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    获取播客历史列表
-    """
-    from sqlalchemy import desc
-    
-    query = (
-        select(ReportModel)
-        .where(ReportModel.podcast_duration != None)
-        .order_by(desc(ReportModel.report_date))
-        .offset(skip)
-        .limit(limit)
-    )
-    result = await db.execute(query)
-    reports = result.scalars().all()
-    
-    return [
-        {
-            "report_id": r.id,
-            "title": r.title,
-            "date": str(r.report_date),
-            "podcast_url": r.podcast_url,
-            "duration": r.podcast_duration
-        }
-        for r in reports
-    ]
