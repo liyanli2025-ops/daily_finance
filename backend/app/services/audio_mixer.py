@@ -4,57 +4,56 @@
 """
 import os
 import subprocess
+import shutil
 from pathlib import Path
 from typing import Optional
 
-# 配置 ffmpeg 路径
-import shutil
-from pydub import AudioSegment
+# ============================================
+# 关键：在导入 pydub 之前配置 ffmpeg 路径
+# ============================================
 
 # 常见的 ffmpeg/ffprobe 系统路径
 SYSTEM_FFMPEG_PATHS = ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg']
 SYSTEM_FFPROBE_PATHS = ['/usr/bin/ffprobe', '/usr/local/bin/ffprobe']
 
-def _find_ffmpeg():
-    """查找 ffmpeg 可执行文件路径"""
+def _find_executable(name: str, system_paths: list) -> str:
+    """查找可执行文件路径"""
     # 1. 先尝试 shutil.which
-    path = shutil.which('ffmpeg')
+    path = shutil.which(name)
     if path:
         return path
     # 2. 再尝试常见系统路径
-    import os
-    for p in SYSTEM_FFMPEG_PATHS:
+    for p in system_paths:
         if os.path.isfile(p) and os.access(p, os.X_OK):
             return p
     return None
 
-def _find_ffprobe():
-    """查找 ffprobe 可执行文件路径"""
-    # 1. 先尝试 shutil.which
-    path = shutil.which('ffprobe')
-    if path:
-        return path
-    # 2. 再尝试常见系统路径
-    import os
-    for p in SYSTEM_FFPROBE_PATHS:
-        if os.path.isfile(p) and os.access(p, os.X_OK):
-            return p
-    return None
+# 查找 ffmpeg 和 ffprobe
+_ffmpeg_path = _find_executable('ffmpeg', SYSTEM_FFMPEG_PATHS)
+_ffprobe_path = _find_executable('ffprobe', SYSTEM_FFPROBE_PATHS)
 
-# 配置 pydub 使用的 ffmpeg/ffprobe 路径
-ffmpeg_path = _find_ffmpeg()
-ffprobe_path = _find_ffprobe()
+# 设置环境变量（pydub 会检查这些）
+if _ffmpeg_path:
+    os.environ['FFMPEG_BINARY'] = _ffmpeg_path
+    print(f"[AudioMixer] 环境变量 FFMPEG_BINARY={_ffmpeg_path}")
+if _ffprobe_path:
+    os.environ['FFPROBE_BINARY'] = _ffprobe_path
+    print(f"[AudioMixer] 环境变量 FFPROBE_BINARY={_ffprobe_path}")
 
-if ffmpeg_path:
-    AudioSegment.converter = ffmpeg_path
-    AudioSegment.ffmpeg = ffmpeg_path
-    print(f"[AudioMixer] 已配置 ffmpeg: {ffmpeg_path}")
+# 现在安全导入 pydub
+from pydub import AudioSegment
+
+# 再次确保 AudioSegment 使用正确的路径
+if _ffmpeg_path:
+    AudioSegment.converter = _ffmpeg_path
+    AudioSegment.ffmpeg = _ffmpeg_path
+    print(f"[AudioMixer] 已配置 ffmpeg: {_ffmpeg_path}")
 else:
     print("[AudioMixer] 警告: 未找到 ffmpeg")
 
-if ffprobe_path:
-    AudioSegment.ffprobe = ffprobe_path
-    print(f"[AudioMixer] 已配置 ffprobe: {ffprobe_path}")
+if _ffprobe_path:
+    AudioSegment.ffprobe = _ffprobe_path
+    print(f"[AudioMixer] 已配置 ffprobe: {_ffprobe_path}")
 else:
     print("[AudioMixer] 警告: 未找到 ffprobe")
 
