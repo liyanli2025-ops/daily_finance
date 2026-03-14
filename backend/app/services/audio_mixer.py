@@ -7,29 +7,56 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-# 配置 ffmpeg 路径（使用 static-ffmpeg）
-try:
-    import static_ffmpeg
-    static_ffmpeg.add_paths()
-    
-    # 获取 static_ffmpeg 的实际路径并设置给 pydub
-    import shutil
-    ffmpeg_path = shutil.which('ffmpeg')
-    ffprobe_path = shutil.which('ffprobe')
-    
-    if ffmpeg_path and ffprobe_path:
-        # 直接设置 pydub 使用的转换器路径
-        from pydub import AudioSegment
-        AudioSegment.converter = ffmpeg_path
-        AudioSegment.ffmpeg = ffmpeg_path
-        AudioSegment.ffprobe = ffprobe_path
-        print(f"[AudioMixer] 已配置 ffmpeg: {ffmpeg_path}")
-    else:
-        print("[AudioMixer] 警告: static-ffmpeg 路径未找到")
-        from pydub import AudioSegment
-except ImportError:
-    print("[AudioMixer] static-ffmpeg 未安装，尝试使用系统 ffmpeg")
-    from pydub import AudioSegment
+# 配置 ffmpeg 路径
+import shutil
+from pydub import AudioSegment
+
+# 常见的 ffmpeg/ffprobe 系统路径
+SYSTEM_FFMPEG_PATHS = ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg']
+SYSTEM_FFPROBE_PATHS = ['/usr/bin/ffprobe', '/usr/local/bin/ffprobe']
+
+def _find_ffmpeg():
+    """查找 ffmpeg 可执行文件路径"""
+    # 1. 先尝试 shutil.which
+    path = shutil.which('ffmpeg')
+    if path:
+        return path
+    # 2. 再尝试常见系统路径
+    import os
+    for p in SYSTEM_FFMPEG_PATHS:
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    return None
+
+def _find_ffprobe():
+    """查找 ffprobe 可执行文件路径"""
+    # 1. 先尝试 shutil.which
+    path = shutil.which('ffprobe')
+    if path:
+        return path
+    # 2. 再尝试常见系统路径
+    import os
+    for p in SYSTEM_FFPROBE_PATHS:
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    return None
+
+# 配置 pydub 使用的 ffmpeg/ffprobe 路径
+ffmpeg_path = _find_ffmpeg()
+ffprobe_path = _find_ffprobe()
+
+if ffmpeg_path:
+    AudioSegment.converter = ffmpeg_path
+    AudioSegment.ffmpeg = ffmpeg_path
+    print(f"[AudioMixer] 已配置 ffmpeg: {ffmpeg_path}")
+else:
+    print("[AudioMixer] 警告: 未找到 ffmpeg")
+
+if ffprobe_path:
+    AudioSegment.ffprobe = ffprobe_path
+    print(f"[AudioMixer] 已配置 ffprobe: {ffprobe_path}")
+else:
+    print("[AudioMixer] 警告: 未找到 ffprobe")
 
 from ..config import settings
 
