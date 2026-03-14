@@ -545,6 +545,24 @@
             setTimeout(() => toast.remove(), 3000);
         }
         
+        // 格式化时间显示（精确到分钟）
+        function formatDateTime(dateStr, createdAt) {
+            // 优先使用 created_at（包含精确时间）
+            if (createdAt) {
+                const date = new Date(createdAt);
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hour = String(date.getHours()).padStart(2, '0');
+                const minute = String(date.getMinutes()).padStart(2, '0');
+                return `${month}-${day} ${hour}:${minute}`;
+            }
+            // 回退到日期字符串
+            if (dateStr) {
+                return dateStr;
+            }
+            return '-';
+        }
+        
         // ========== 报告模块 ==========
         
         async function loadTodayReport() {
@@ -566,11 +584,11 @@
                     `;
                 } else {
                     // 兼容后端字段名：report_date -> date, podcast_status -> status
-                    const reportDate = data.report_date || data.date || '今天';
+                    const reportDate = formatDateTime(data.report_date || data.date, data.created_at);
                     const reportStatus = data.status || 'pending';
                     container.innerHTML = `
                         <div class="report-meta">
-                            <span>📅 ${reportDate}</span>
+                            <span>📅 生成于 ${reportDate}</span>
                             <span class="status status-${reportStatus === 'completed' ? 'completed' : 'pending'}">${reportStatus}</span>
                         </div>
                         <h4 style="margin-bottom: 15px; font-size: 1.2rem;">${data.title || '每日财经简报'}</h4>
@@ -620,7 +638,7 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>日期</th>
+                                    <th>生成时间</th>
                                     <th>标题</th>
                                     <th>状态</th>
                                     <th>操作</th>
@@ -628,8 +646,8 @@
                             </thead>
                             <tbody>
                                 ${recentReports.map(report => {
-                                    // 兼容后端字段名：report_date -> date
-                                    const reportDate = report.report_date || report.date || '-';
+                                    // 使用精确时间格式化
+                                    const reportDate = formatDateTime(report.report_date || report.date, report.created_at);
                                     const reportStatus = report.status || 'pending';
                                     return `
                                     <tr>
@@ -668,12 +686,12 @@
                 }
                 const data = await res.json();
                 
-                const reportDate = data.report_date || data.date || '-';
+                const reportDate = formatDateTime(data.report_date || data.date, data.created_at);
                 const reportStatus = data.status || 'pending';
                 
                 container.innerHTML = `
                     <div class="report-meta">
-                        <span>📅 ${reportDate}</span>
+                        <span>📅 生成于 ${reportDate}</span>
                         <span class="status status-${reportStatus === 'completed' ? 'completed' : 'pending'}">${reportStatus}</span>
                         <span style="color: #ffc107;">📚 历史报告</span>
                     </div>
@@ -1002,7 +1020,7 @@
         async function loadTodayPodcast() {
             const container = document.getElementById('today-podcast');
             try {
-                const res = await fetch(`${API_BASE}/podcasts/today`);
+                const res = await fetch(`${API_BASE}/podcasts/today?_t=${Date.now()}`, { cache: 'no-store' });
                 if (!res.ok) {
                     throw new Error(`服务器错误 (${res.status})`);
                 }
@@ -1026,8 +1044,8 @@
                         </div>
                     `;
                 } else {
-                    // 兼容后端字段名：report_date -> date
-                    const podcastDate = data.report_date || data.date || '今天';
+                    // 使用精确时间格式化
+                    const podcastDate = formatDateTime(data.report_date || data.date, data.created_at);
                     const podcastStatus = data.podcast_status || 'pending';
                     const statusDisplay = podcastStatus === 'ready' ? '已就绪' : podcastStatus === 'generating' ? '生成中' : podcastStatus;
                     const statusClass = podcastStatus === 'ready' ? 'completed' : 'pending';
@@ -1035,13 +1053,13 @@
                         <div class="podcast-player">
                             <h4>${data.title || '每日财经播客'}</h4>
                             <div class="report-meta">
-                                <span>📅 ${podcastDate}</span>
+                                <span>📅 生成于 ${podcastDate}</span>
                                 <span class="status status-${statusClass}">${statusDisplay}</span>
                                 ${data.podcast_duration ? `<span>⏱️ ${Math.floor(data.podcast_duration / 60)}分${data.podcast_duration % 60}秒</span>` : ''}
                             </div>
                             ${data.podcast_url ? `
-                                <audio controls style="width: 100%; margin-top: 15px;">
-                                    <source src="http://localhost:9091${data.podcast_url}" type="audio/mpeg">
+                                <audio controls preload="metadata" style="width: 100%; margin-top: 15px;">
+                                    <source src="http://localhost:9090${data.podcast_url}" type="audio/mpeg">
                                     您的浏览器不支持音频播放
                                 </audio>
                             ` : '<p style="margin-top: 15px; color: rgba(255,255,255,0.5);">播客音频生成中...</p>'}
@@ -1065,7 +1083,7 @@
         async function loadPodcastHistory() {
             const container = document.getElementById('podcast-history');
             try {
-                const res = await fetch(`${API_BASE}/podcasts/history`);
+                const res = await fetch(`${API_BASE}/podcasts/history?_t=${Date.now()}`, { cache: 'no-store' });
                 if (!res.ok) {
                     throw new Error(`服务器错误 (${res.status})`);
                 }
@@ -1091,7 +1109,7 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>日期</th>
+                                    <th>生成时间</th>
                                     <th>标题</th>
                                     <th>时长</th>
                                     <th>状态</th>
@@ -1100,8 +1118,8 @@
                             </thead>
                             <tbody>
                                 ${recentPodcasts.map(podcast => {
-                                    // 兼容后端字段名：report_date -> date, podcast_status -> status
-                                    const podcastDate = podcast.report_date || podcast.date || '-';
+                                    // 使用精确时间格式化
+                                    const podcastDate = formatDateTime(podcast.report_date || podcast.date, podcast.created_at);
                                     const podcastDuration = podcast.podcast_duration || podcast.duration;
                                     const podcastStatus = podcast.podcast_status || podcast.status || 'pending';
                                     // 后端状态是 'ready' 表示已完成
@@ -1146,7 +1164,7 @@
                 }
                 const data = await res.json();
                 
-                const podcastDate = data.report_date || data.date || '-';
+                const podcastDate = formatDateTime(data.report_date || data.date, data.created_at);
                 const podcastStatus = data.podcast_status || 'pending';
                 const statusDisplay = podcastStatus === 'ready' ? '已就绪' : podcastStatus === 'generating' ? '生成中' : podcastStatus;
                 const statusClass = (podcastStatus === 'ready' || podcastStatus === 'completed') ? 'completed' : 'pending';
@@ -1155,14 +1173,14 @@
                     <div class="podcast-player">
                         <h4>${data.title || '每日财经播客'}</h4>
                         <div class="report-meta">
-                            <span>📅 ${podcastDate}</span>
+                            <span>📅 生成于 ${podcastDate}</span>
                             <span class="status status-${statusClass}">${statusDisplay}</span>
                             ${data.podcast_duration ? `<span>⏱️ ${Math.floor(data.podcast_duration / 60)}分${data.podcast_duration % 60}秒</span>` : ''}
                             <span style="color: #ffc107;">📚 历史播客</span>
                         </div>
                         ${data.podcast_url ? `
-                            <audio controls style="width: 100%; margin-top: 15px;" autoplay>
-                                <source src="http://localhost:9091${data.podcast_url}" type="audio/mpeg">
+                            <audio controls preload="metadata" style="width: 100%; margin-top: 15px;" autoplay>
+                                <source src="http://localhost:9090${data.podcast_url}" type="audio/mpeg">
                                 您的浏览器不支持音频播放
                             </audio>
                         ` : '<p style="margin-top: 15px; color: rgba(255,255,255,0.5);">播客音频不可用</p>'}
@@ -1181,14 +1199,94 @@
         }
         
         async function regeneratePodcast(reportId) {
-            showToast('正在生成播客...', 'success');
+            const container = document.getElementById('today-podcast');
+            
+            // 显示生成中状态
+            container.innerHTML = `
+                <div class="podcast-player">
+                    <div style="text-align: center; padding: 30px;">
+                        <div class="loading" style="width: 40px; height: 40px; border-width: 3px; margin: 0 auto 20px;"></div>
+                        <h4 style="margin-bottom: 10px;">🎙️ 正在重新生成播客...</h4>
+                        <p style="color: rgba(255,255,255,0.6);" id="podcast-gen-status">正在准备文本...</p>
+                        <p style="color: rgba(255,255,255,0.4); font-size: 0.85rem; margin-top: 10px;">预计需要 30-60 秒，请耐心等待...</p>
+                        <p style="color: rgba(255,255,255,0.4); font-size: 0.75rem; margin-top: 5px;" id="podcast-gen-timer">已等待: 0 秒</p>
+                    </div>
+                </div>
+            `;
+            
+            // 启动计时器
+            let seconds = 0;
+            const timerInterval = setInterval(() => {
+                seconds++;
+                const timerEl = document.getElementById('podcast-gen-timer');
+                if (timerEl) {
+                    timerEl.textContent = `已等待: ${seconds} 秒`;
+                }
+                // 更新状态提示
+                const statusEl = document.getElementById('podcast-gen-status');
+                if (statusEl) {
+                    if (seconds < 5) {
+                        statusEl.textContent = '正在准备播客文本...';
+                    } else if (seconds < 15) {
+                        statusEl.textContent = '正在调用 TTS 引擎...';
+                    } else if (seconds < 30) {
+                        statusEl.textContent = '正在合成语音...';
+                    } else if (seconds < 45) {
+                        statusEl.textContent = '正在处理音频文件...';
+                    } else {
+                        statusEl.textContent = '即将完成...';
+                    }
+                }
+            }, 1000);
+            
             try {
-                const res = await fetch(`${API_BASE}/podcasts/${reportId}/regenerate`, { method: 'POST' });
-                const data = await res.json();
-                showToast('播客生成已启动！', 'success');
-                setTimeout(loadTodayPodcast, 2000);
+                // 1. 先发起重新生成请求
+                const res = await fetch(`${API_BASE}/podcasts/${reportId}/regenerate`, { 
+                    method: 'POST'
+                });
+                
+                if (!res.ok) {
+                    throw new Error(`服务器错误 (${res.status})`);
+                }
+                
+                // 2. 轮询检查播客生成状态，直到完成或超时
+                const maxWaitSeconds = 180; // 最多等待3分钟
+                let isCompleted = false;
+                
+                while (seconds < maxWaitSeconds && !isCompleted) {
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // 每2秒检查一次
+                    
+                    try {
+                        const statusRes = await fetch(`${API_BASE}/podcasts/${reportId}/status`);
+                        if (statusRes.ok) {
+                            const statusData = await statusRes.json();
+                            if (statusData.status === 'ready') {
+                                isCompleted = true;
+                            } else if (statusData.status === 'error') {
+                                throw new Error('播客生成失败');
+                            }
+                        }
+                    } catch (pollErr) {
+                        console.log('轮询状态出错:', pollErr);
+                    }
+                }
+                
+                clearInterval(timerInterval);
+                
+                if (isCompleted) {
+                    showToast('✅ 播客生成完成！', 'success');
+                } else {
+                    showToast('⚠️ 播客生成仍在进行中，请稍后刷新', 'success');
+                }
+                
+                // 重新加载播客显示
+                loadTodayPodcast();
+                loadPodcastHistory();
+                
             } catch (err) {
-                showToast('生成失败：' + err.message, 'error');
+                clearInterval(timerInterval);
+                showToast('❌ 生成失败：' + err.message, 'error');
+                loadTodayPodcast();
             }
         }
         

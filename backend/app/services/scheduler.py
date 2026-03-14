@@ -235,18 +235,21 @@ class SchedulerService:
         """
         为指定报告重新生成播客
         """
-        print(f"[PODCAST] 重新生成播客: {report_id}")
+        import traceback
+        print(f"[PODCAST] 重新生成播客: {report_id}", flush=True)
         
         try:
             # 从数据库获取报告
             report = await self._get_report(report_id)
             if not report:
-                print(f"[WARN] 报告不存在: {report_id}")
+                print(f"[WARN] 报告不存在: {report_id}", flush=True)
                 return
             
             # 生成播客
             podcast_gen = get_podcast_generator()
             audio_path, duration = await podcast_gen.generate_podcast(report)
+            
+            print(f"[PODCAST] 生成完成，时长: {duration} 秒，路径: {audio_path}", flush=True)
             
             # 更新数据库
             await self._update_report_podcast(
@@ -256,11 +259,15 @@ class SchedulerService:
                 "ready"
             )
             
-            print(f"[OK] 播客重新生成完成: {report_id}")
+            print(f"[OK] 播客重新生成完成: {report_id}, 时长: {duration}秒", flush=True)
             
         except Exception as e:
-            print(f"[ERROR] 播客生成失败: {e}")
-            await self._update_report_podcast(report_id, None, None, "failed")
+            print(f"[ERROR] 播客生成失败: {e}", flush=True)
+            traceback.print_exc()
+            try:
+                await self._update_report_podcast(report_id, None, None, "failed")
+            except Exception as e2:
+                print(f"[ERROR] 更新失败状态也失败: {e2}", flush=True)
     
     async def update_watchlist_data(self):
         """

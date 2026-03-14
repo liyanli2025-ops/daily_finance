@@ -22,6 +22,27 @@ async def get_db(request: Request) -> AsyncSession:
         yield session
 
 
+def _get_actual_audio_duration(report_id: str) -> Optional[int]:
+    """从实际音频文件获取时长"""
+    try:
+        import static_ffmpeg
+        static_ffmpeg.add_paths()
+    except:
+        pass
+    try:
+        from pydub import AudioSegment
+        from pathlib import Path
+        # podcasts.py 在 app/routers/ 下，需要向上3级到 backend
+        backend_dir = Path(__file__).resolve().parent.parent.parent
+        audio_path = backend_dir / "data" / "podcasts" / f"{report_id}.mp3"
+        if audio_path.exists():
+            audio = AudioSegment.from_mp3(str(audio_path))
+            return len(audio) // 1000
+    except Exception as e:
+        print(f"[WARN] 无法读取音频时长: {e}")
+    return None
+
+
 @router.get("/today")
 async def get_today_podcast(db: AsyncSession = Depends(get_db)):
     """
@@ -36,13 +57,18 @@ async def get_today_podcast(db: AsyncSession = Depends(get_db)):
     if not report:
         return {"status": "not_found", "message": "今日报告尚未生成"}
     
+    # 尝试从实际音频文件获取时长
+    actual_duration = _get_actual_audio_duration(report.id) if report.podcast_url else None
+    duration = actual_duration if actual_duration else report.podcast_duration
+    
     return {
         "report_id": report.id,
         "title": report.title,
         "date": str(report.report_date),
+        "created_at": report.created_at.isoformat() if report.created_at else None,
         "podcast_status": report.podcast_status,
         "podcast_url": report.podcast_url,
-        "podcast_duration": report.podcast_duration
+        "podcast_duration": duration
     }
 
 
@@ -54,13 +80,20 @@ async def list_podcasts(
 ):
     """
     获取播客历史列表
+    修复：改为查询有播客URL或正在生成中的报告，按创建时间倒序
     """
-    from sqlalchemy import desc
+    from sqlalchemy import desc, or_
     
     query = (
         select(ReportModel)
-        .where(ReportModel.podcast_duration != None)
-        .order_by(desc(ReportModel.report_date))
+        .where(
+            or_(
+                ReportModel.podcast_url != None,
+                ReportModel.podcast_status == "generating",
+                ReportModel.podcast_status == "ready"
+            )
+        )
+        .order_by(desc(ReportModel.created_at))
         .offset(skip)
         .limit(limit)
     )
@@ -72,9 +105,10 @@ async def list_podcasts(
             "report_id": r.id,
             "title": r.title,
             "report_date": str(r.report_date),
+            "created_at": r.created_at.isoformat() if r.created_at else None,
             "podcast_status": r.podcast_status,
             "podcast_url": r.podcast_url,
-            "podcast_duration": r.podcast_duration
+            "podcast_duration": _get_actual_audio_duration(r.id) if r.podcast_url else r.podcast_duration
         }
         for r in reports
     ]
@@ -122,6 +156,7 @@ async def get_podcast_detail(
         "report_id": report.id,
         "title": report.title,
         "report_date": str(report.report_date),
+        "created_at": report.created_at.isoformat() if report.created_at else None,
         "podcast_status": report.podcast_status,
         "podcast_url": report.podcast_url,
         "podcast_duration": report.podcast_duration

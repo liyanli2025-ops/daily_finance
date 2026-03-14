@@ -1,43 +1,340 @@
-INFO:     Started server process [15136]
+INFO:     Will watch for changes in these directories: ['c:\\Users\\kelli\\Desktop\\daily\\finance-daily\\backend']
+INFO:     Uvicorn running on http://0.0.0.0:9090 (Press CTRL+C to quit)
+INFO:     Started reloader process [19736] using WatchFiles
+INFO:     Started server process [23984]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     127.0.0.1:63980 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64001 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64061 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64062 - "GET /api/reports/ HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "POST /api/trigger-report HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52176 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52186 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'test_bgm.py'. Reloading...
+ INFO:     127.0.0.1:53483 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53547 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53548 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53547 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53548 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "POST /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/regenerate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53551 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53774 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53804 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53805 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53805 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53804 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53892 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53896 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53807 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53807 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53807 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53919 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53919 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53807 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53807 - "GET /api/stocks/watchlist/merged HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53919 - "GET /api/stocks/watchlist/sectors HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54365 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54732 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54732 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "POST /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/regenerate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54733 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54733 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54733 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54898 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54899 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54995 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55111 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55112 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55112 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55111 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "POST /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/regenerate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55206 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55206 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55113 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55296 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55297 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55578 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55591 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55669 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55669 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "POST /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/regenerate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55670 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55670 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55670 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55670 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55670 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55910 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55911 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55911 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55910 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56023 - "HEAD /api/podcasts/history HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56037 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56203 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56204 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56204 - "GET /api/podcasts/today?_t=1773477220005 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56203 - "GET /api/podcasts/history?_t=1773477220006 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56267 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56529 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56545 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56595 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56596 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56596 - "GET /api/podcasts/today?_t=1773477395990 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56595 - "GET /api/podcasts/history?_t=1773477395990 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56595 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56595 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56595 - "GET /api/podcasts/today?_t=1773477400813 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56596 - "GET /api/podcasts/history?_t=1773477400813 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56739 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56741 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56764 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56765 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56766 - "GET /api/podcasts/today?_t=1773477479370 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56766 - "GET /api/podcasts/history?_t=1773477479371 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56984 - "POST /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/regenerate HTTP/1.1" 200 OK
+C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py:198: RuntimeWarning: Couldn't find ffprobe or avprobe - defaulting to ffprobe, but may not work
+  warn("Couldn't find ffprobe or avprobe - defaulting to ffprobe, but may not work", RuntimeWarning)
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    print("⚠️ 未找到背景音乐文件，跳过混音")
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 728, in from_file
+    info = mediainfo_json(orig_file, read_ahead_limit=read_ahead_limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py", line 274, in mediainfo_json
+    res = Popen(command, stdin=stdin_parameter, stdout=PIPE, stderr=PIPE)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1028, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1540, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    print("⚠️ 未找到背景音乐文件，跳过混音")
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 728, in from_file
+    info = mediainfo_json(orig_file, read_ahead_limit=read_ahead_limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py", line 274, in mediainfo_json
+    res = Popen(command, stdin=stdin_parameter, stdout=PIPE, stderr=PIPE)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1028, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1540, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    print("⚠️ 未找到背景音乐文件，跳过混音")
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 728, in from_file
+    info = mediainfo_json(orig_file, read_ahead_limit=read_ahead_limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py", line 274, in mediainfo_json
+    res = Popen(command, stdin=stdin_parameter, stdout=PIPE, stderr=PIPE)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1028, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1540, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    print("⚠️ 未找到背景音乐文件，跳过混音")
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 728, in from_file
+    info = mediainfo_json(orig_file, read_ahead_limit=read_ahead_limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py", line 274, in mediainfo_json
+    res = Popen(command, stdin=stdin_parameter, stdout=PIPE, stderr=PIPE)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1028, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1540, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    print("⚠️ 未找到背景音乐文件，跳过混音")
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 728, in from_file
+    info = mediainfo_json(orig_file, read_ahead_limit=read_ahead_limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py", line 274, in mediainfo_json
+    res = Popen(command, stdin=stdin_parameter, stdout=PIPE, stderr=PIPE)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1028, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1540, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INFO:     127.0.0.1:57697 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57726 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57726 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57726 - "GET /api/podcasts/today?_t=1773477853708 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57727 - "GET /api/podcasts/history?_t=1773477853708 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57727 - "POST /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/regenerate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57727 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57727 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57727 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57727 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57727 - "GET /api/podcasts/today?_t=1773477862853 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57730 - "GET /api/podcasts/history?_t=1773477862853 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57847 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57854 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57854 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57854 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57854 - "GET /api/podcasts/today?_t=1773477912813 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57874 - "GET /api/podcasts/history?_t=1773477912813 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57874 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57854 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57854 - "GET /api/podcasts/today?_t=1773477915532 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57874 - "GET /api/podcasts/history?_t=1773477915532 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58012 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58107 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58108 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58108 - "GET /api/podcasts/today?_t=1773478022983 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58107 - "GET /api/podcasts/history?_t=1773478022987 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58127 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58170 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58171 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58190 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58361 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58430 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58480 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58859 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58860 - "GET /api/podcasts/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59064 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59065 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59065 - "GET /api/podcasts/today?_t=1773478345325 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59064 - "GET /api/podcasts/history?_t=1773478345326 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59064 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59064 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59064 - "GET /api/podcasts/today?_t=1773478349652 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59065 - "GET /api/podcasts/history?_t=1773478349652 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59066 - "GET /api/podcasts/018bc30f-a64e-48b5-a74f-117bce0bdd46 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59066 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59066 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59066 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59066 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59066 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59131 - "GET /api/podcasts/today?_t=1773478378124 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59132 - "GET /api/podcasts/history?_t=1773478378124 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59132 - "GET /api/podcasts/018bc30f-a64e-48b5-a74f-117bce0bdd46 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59132 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59511 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59512 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50287 - "GET /api/podcasts/today?_t=1773478825405 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50288 - "GET /api/podcasts/history?_t=1773478825406 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50288 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50287 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50288 - "GET /api/podcasts/history?_t=1773478829870 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50287 - "GET /api/podcasts/today?_t=1773478829869 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50309 - "GET /podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934.mp3 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50314 - "GET /podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934.mp3 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50292 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50292 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50334 - "GET /api/podcasts/today?_t=1773478852315 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50334 - "GET /api/podcasts/history?_t=1773478852315 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50382 - "GET /podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934.mp3 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50378 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50378 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50391 - "GET /api/podcasts/today?_t=1773478886555 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50391 - "GET /api/podcasts/history?_t=1773478886555 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50383 - "GET /podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934.mp3 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50434 - "GET /podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934.mp3 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50436 - "GET /podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934.mp3 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50446 - "GET /podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934.mp3 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50910 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50911 - "GET /api/reports/ HTTP/1.1" 200 OK
 [启动] 正在启动 FinanceDaily...
 [OK] 数据库初始化完成
 [SCHEDULER] 调度器已启动
@@ -46,443 +343,106 @@ INFO:     127.0.0.1:64063 - "GET /api/reports/today HTTP/1.1" 200 OK
 [OK] 定时调度器启动完成
 [OK] FinanceDaily 启动成功！
 [INFO] 每日报告推送时间: 06:00
+[PODCAST] 重新生成播客: 4631ab8a-32cf-476a-a136-bdb399c6d934
+[AudioMixer] BGM目录: C:\Users\kelli\Desktop\daily\finance-daily\backend\data\bgm
+[AudioMixer] BGM文件: C:\Users\kelli\Desktop\daily\finance-daily\backend\data\bgm\background.mp3
+[AudioMixer] BGM存在: True
+🎵 检测到背景音乐，开始混音...
+🎵 开始混音处理...
+❌ 混音失败: [WinError 2] 系统找不到指定的文件。
+⚠️ 无法获取音频时长: [WinError 2] 系统找不到指定的文件。
+✅ 播客生成完成: 4631ab8a-32cf-476a-a136-bdb399c6d934.mp3, 时长约 12 分 39 秒
+[OK] 播客重新生成完成: 4631ab8a-32cf-476a-a136-bdb399c6d934
+[PODCAST] 重新生成播客: 4631ab8a-32cf-476a-a136-bdb399c6d934
+🎵 检测到背景音乐，开始混音...
+🎵 开始混音处理...
+❌ 混音失败: [WinError 2] 系统找不到指定的文件。
+⚠️ 无法获取音频时长: [WinError 2] 系统找不到指定的文件。
+✅ 播客生成完成: 4631ab8a-32cf-476a-a136-bdb399c6d934.mp3, 时长约 12 分 37 秒
+[OK] 播客重新生成完成: 4631ab8a-32cf-476a-a136-bdb399c6d934
+[PODCAST] 重新生成播客: 4631ab8a-32cf-476a-a136-bdb399c6d934
+🎵 检测到背景音乐，开始混音...
+🎵 开始混音处理...
+❌ 混音失败: [WinError 2] 系统找不到指定的文件。
+⚠️ 无法获取音频时长: [WinError 2] 系统找不到指定的文件。
+✅ 播客生成完成: 4631ab8a-32cf-476a-a136-bdb399c6d934.mp3, 时长约 12 分 37 秒
+[OK] 播客重新生成完成: 4631ab8a-32cf-476a-a136-bdb399c6d934
+[PODCAST] 重新生成播客: 4631ab8a-32cf-476a-a136-bdb399c6d934
+🎵 检测到背景音乐，开始混音...
+🎵 开始混音处理...
+❌ 混音失败: [WinError 2] 系统找不到指定的文件。
+⚠️ 无法获取音频时长: [WinError 2] 系统找不到指定的文件。
+✅ 播客生成完成: 4631ab8a-32cf-476a-a136-bdb399c6d934.mp3, 时长约 12 分 39 秒
+[OK] 播客重新生成完成: 4631ab8a-32cf-476a-a136-bdb399c6d934
+[PODCAST] 重新生成播客: 4631ab8a-32cf-476a-a136-bdb399c6d934
+🎵 检测到背景音乐，开始混音...
+🎵 开始混音处理...
+❌ 混音失败: [WinError 2] 系统找不到指定的文件。
+⚠️ 无法获取音频时长: [WinError 2] 系统找不到指定的文件。
+✅ 播客生成完成: 4631ab8a-32cf-476a-a136-bdb399c6d934.mp3, 时长约 12 分 38 秒
+[OK] 播客重新生成完成: 4631ab8a-32cf-476a-a136-bdb399c6d934
+[PODCAST] 重新生成播客: 4631ab8a-32cf-476a-a136-bdb399c6d934
+🎵 检测到背景音乐，开始混音...
+🎵 开始混音处理...
+❌ 混音失败: [WinError 2] 系统找不到指定的文件。
+⚠️ 无法获取音频时长: [WinError 2] 系统找不到指定的文件。
+✅ 播客生成完成: 4631ab8a-32cf-476a-a136-bdb399c6d934.mp3, 时长约 12 分 37 秒
+[OK] 播客重新生成完成: 4631ab8a-32cf-476a-a136-bdb399c6d934
+
+[API] /api/generate-report-sync 被调用！时间: 2026-03-14 17:05:02.041801
 
 ==================================================
-[START] 开始生成每日报告 - 2026-03-12 16:54:03
+[START] 开始生成每日报告 - 2026-03-14 17:05:02
 ==================================================
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    print("[WARN] 未找到背景音乐文件，跳过混音")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 728, in from_file
+    info = mediainfo_json(orig_file, read_ahead_limit=read_ahead_limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py", line 274, in mediainfo_json
+    res = Popen(command, stdin=stdin_parameter, stdout=PIPE, stderr=PIPE)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1028, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1540, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。
 
 [Step 1] 采集新闻...
-[FAIL] 新华网财经 采集失败: [Errno 11001] getaddrinfo failed
-[OK] 百度股票焦点: 获取 20 条
+[OK] NewsCollector: AKShare 可用，将作为补充新闻源
+[WARN] transformers 未安装，将使用规则引擎进行情感分析
+[TIP] 安装命令: pip install transformers torch
+[OK] NewsCollector: 情感分析服务已启用
+[OK] 百度科技焦点: 获取 20 条
+[OK] 百度国际新闻: 获取 20 条
+[OK] 财联社电报: 获取 20 条
+[OK] 36氪快讯: 获取 20 条
+[OK] 华尔街见闻-全球: 获取 31 条
+[OK] IT之家: 获取 10 条
+[OK] Finviz美股新闻: 获取 90 条
 [OK] 百度财经焦点: 获取 20 条
-[FAIL] 东方财富研报 采集失败: 
-[FAIL] 金十数据 采集失败: 
-[FAIL] 财联社电报 采集失败: 
-[NEWS] 共采集到 40 条新闻（原始 40 条，去重后 40 条）
-   筛选出 18 条中国相关新闻
-
-[Step 2] AI 分析生成报告...
-[OK] Anthropic 客户端初始化成功
-[OK] OpenAI 客户端初始化成功
-Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuSwSFxAzgHBbkrP9oY'}
-OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuT3rU1jydtZgBbEZeT'}
-OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuT5iaiqbjc6vWnDDFe'}
-OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuT7cwAo6y5aoUVRCYK'}
-OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuT9iwJVLXAFKmeAJny'}
-OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuTBpSYNVJ9sGTMQwkF'}
-OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuTDsUNbrNs7MqjzcGs'}
-OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuTFh7PGRpGGT6RsgNM'}
-OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuTHhfKaxkuADGo1w4W'}
-OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuTKfyQrtNwyv9ZLjvf'}
-OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-Anthropic 调用失败: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CYxuTMd3yzccGpm49N3nd'}
-OpenAI 调用失败: Error code: 401 - {'error': {'message': 'Incorrect API key provided: your_ope************here. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-   报告生成完成: 2026年03月12日 (周四) 财经深度日报
-   字数: 1363, 预计阅读时间: 3 分钟
-
-[Step 3] 生成播客音频...
-✅ 播客生成完成: cc73943e-fc91-4034-aaaf-e023466f9bb8.mp3, 时长约 20 分钟
-   播客生成完成: 时长 20 分钟
-
-[Step 4] 保存到数据库...
-
-[ERROR] 报告生成失败: (sqlite3.IntegrityError) UNIQUE constraint failed: reports.report_date
-[SQL: INSERT INTO reports (id, title, summary, content, report_date, highlights, analysis, podcast_url, podcast_duration, podcast_status, word_count, reading_time, news_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
-[parameters: ('cc73943e-fc91-4034-aaaf-e023466f9bb8', '2026年03月12日 (周四) 财经深度日报', '今日A股市场上涨，上证指数+1.37%。人工智能板块表现活跃，央行维持流动性合理充裕。建议投资者保持积极态度，关注政策动向和行业轮动机会。', '# 2026年03月12日 (周四) 财经深度日报\n\n## 📊 今日市场概览\n\n今日 A 股市场上涨，三大指数分化明显：\n\n| 指数 | 涨跌幅 | 走势 |\n|------|--------|------|\n| 上证指数 | +1.37% | 📈 上涨 |\n| 深证成指 | + ... (1182 characters truncated) ... 场表现和消息面分析，预计明日：\n\n- **大盘走势**：延续震荡格局，关注支撑位有效性\n- **热点方向**：人工智能、医药生物 可能继续活跃\n- **操作策略**：建议积极配置，关注低位优质标的\n\n---\n\n*免责声明：以上分析仅供参考，不构成投资建议。投资有风险，入市需谨慎。*', '2026-03-12', '[{"title": "\\u592e\\u884c\\u516c\\u5f00\\u5e02\\u573a\\u64cd\\u4f5c\\u7ef4\\u62a4\\u6d41\\u52a8\\u6027", "source": "\\u592e\\u884c\\u5b98\\u7f51", " ... (791 characters truncated) ... "sentiment": "positive", "related_stocks": [], "historical_context": "\\u677f\\u5757\\u8f6e\\u52a8\\u884c\\u60c5\\u5ef6\\u7eed", "source_url": null}]', '{"overall_sentiment": "positive", "trend": "bullish", "key_factors": ["\\u592e\\u884c\\u653f\\u7b56", "\\u677f\\u5757\\u8f6e\\u52a8", "\\u5916\\u56f4 ... (136 characters truncated) ... "], "risks": ["\\u5916\\u56f4\\u5e02\\u573a\\u6ce2\\u52a8\\u52a0\\u5267", "\\u673a\\u6784\\u6301\\u4ed3\\u8c03\\u6574\\u9891\\u7e41"], "indices": []}', '/podcasts/cc73943e-fc91-4034-aaaf-e023466f9bb8.mp3', 1200, 'ready', 1363, 3, 18, '2026-03-12 16:54:44.391013', None)]
-(Background on this error at: https://sqlalche.me/e/20/gkpj)Traceback (most recent call last):
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-    ~~~~~~~~~~~~~~~~~~~~~~~^
-        cursor, str_statement, effective_parameters, context
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
-    cursor.execute(statement, parameters)
-    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 182, in execute
-    self._adapt_connection._handle_exception(error)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 342, in _handle_exception
-    raise error
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 164, in execute
-    self.await_(_cursor.execute(operation, parameters))
-    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
-    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
-           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
-    value = await result
-            ^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 40, in execute
-    await self._execute(self._cursor.execute, sql, parameters)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 32, in _execute
-    return await self._conn._execute(fn, *args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 160, in _execute
-    return await future
-           ^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 63, in _connection_worker_thread
-    result = function()
-sqlite3.IntegrityError: UNIQUE constraint failed: reports.report_date
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\scheduler.py", line 197, in generate_daily_report
-    await self._save_report(report)
-  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\scheduler.py", line 278, in _save_report
-    await session.commit()
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\ext\asyncio\session.py", line 1000, in commit
-    await greenlet_spawn(self.sync_session.commit)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 203, in greenlet_spawn
-    result = context.switch(value)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
-    trans.commit(_to_root=True)
-    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
-  File "<string>", line 2, in commit
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
-    ret_value = fn(self, *arg, **kw)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
-    self._prepare_impl()
-    ~~~~~~~~~~~~~~~~~~^^
-  File "<string>", line 2, in _prepare_impl
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
-    ret_value = fn(self, *arg, **kw)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
-    self.session.flush()
-    ~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
-    self._flush(objects)
-    ~~~~~~~~~~~^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
-    with util.safe_reraise():
-         ~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
-    raise exc_value.with_traceback(exc_tb)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
-    flush_context.execute()
-    ~~~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
-    rec.execute(self)
-    ~~~~~~~~~~~^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
-    util.preloaded.orm_persistence.save_obj(
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
-        self.mapper,
-        ^^^^^^^^^^^^
-        uow.states_for_mapper_hierarchy(self.mapper, False, False),
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        uow,
-        ^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
-    _emit_insert_statements(
-    ~~~~~~~~~~~~~~~~~~~~~~~^
-        base_mapper,
-        ^^^^^^^^^^^^
-    ...<3 lines>...
-        insert,
-        ^^^^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1048, in _emit_insert_statements
-    result = connection.execute(
-        statement, multiparams, execution_options=execution_options
-    )
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
-    return meth(
-        self,
-        distilled_parameters,
-        execution_options or NO_OPTIONS,
-    )
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
-    return connection._execute_clauseelement(
-           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
-        self, distilled_params, execution_options
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
-    ret = self._execute_context(
-        dialect,
-    ...<8 lines>...
-        cache_hit=cache_hit,
-    )
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
-    return self._exec_single_context(
-           ~~~~~~~~~~~~~~~~~~~~~~~~~^
-        dialect, context, statement, parameters
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
-    self._handle_dbapi_exception(
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
-        e, str_statement, effective_parameters, cursor, context
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
-    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-    ~~~~~~~~~~~~~~~~~~~~~~~^
-        cursor, str_statement, effective_parameters, context
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-INFO:     127.0.0.1:64556 - "GET /api/podcasts/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64557 - "GET /api/podcasts/history HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64557 - "POST /api/podcasts/53371af1-3ac6-40f8-8ad2-dbca5750d7b6/regenerate HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64557 - "GET /api/podcasts/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64558 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64558 - "GET /api/reports/ HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64558 - "POST /api/trigger-report HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64558 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64558 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64558 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64558 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64558 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
-    cursor.execute(statement, parameters)
-    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 182, in execute
-    self._adapt_connection._handle_exception(error)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 342, in _handle_exception
-    raise error
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 164, in execute
-    self.await_(_cursor.execute(operation, parameters))
-    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
-    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
-           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
-    value = await result
-            ^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 40, in execute
-    await self._execute(self._cursor.execute, sql, parameters)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 32, in _execute
-    return await self._conn._execute(fn, *args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 160, in _execute
-    return await future
-           ^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 63, in _connection_worker_thread
-    result = function()
-sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) UNIQUE constraint failed: reports.report_date
-[SQL: INSERT INTO reports (id, title, summary, content, report_date, highlights, analysis, podcast_url, podcast_duration, podcast_status, word_count, reading_time, news_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
-[parameters: ('cc73943e-fc91-4034-aaaf-e023466f9bb8', '2026年03月12日 (周四) 财经深度日报', '今日A股市场上涨，上证指数+1.37%。人工智能板块表现活跃，央行维持流动性合理充裕。建议投资者保持积极态度，关注政策动向和行业轮动机会。', '# 2026年03月12日 (周四) 财经深度日报\n\n## 📊 今日市场概览\n\n今日 A 股市场上涨，三大指数分化明显：\n\n| 指数 | 涨跌幅 | 走势 |\n|------|--------|------|\n| 上证指数 | +1.37% | 📈 上涨 |\n| 深证成指 | + ... (1182 characters truncated) ... 场表现和消息面分析，预计明日：\n\n- **大盘走势**：延续震荡格局，关注支撑位有效性\n- **热点方向**：人工智能、医药生物 可能继续活跃\n- **操作策略**：建议积极配置，关注低位优质标的\n\n---\n\n*免责声明：以上分析仅供参考，不构成投资建议。投资有风险，入市需谨慎。*', '2026-03-12', '[{"title": "\\u592e\\u884c\\u516c\\u5f00\\u5e02\\u573a\\u64cd\\u4f5c\\u7ef4\\u62a4\\u6d41\\u52a8\\u6027", "source": "\\u592e\\u884c\\u5b98\\u7f51", " ... (791 characters truncated) ... "sentiment": "positive", "related_stocks": [], "historical_context": "\\u677f\\u5757\\u8f6e\\u52a8\\u884c\\u60c5\\u5ef6\\u7eed", "source_url": null}]', '{"overall_sentiment": "positive", "trend": "bullish", "key_factors": ["\\u592e\\u884c\\u653f\\u7b56", "\\u677f\\u5757\\u8f6e\\u52a8", "\\u5916\\u56f4 ... (136 characters truncated) ... "], "risks": ["\\u5916\\u56f4\\u5e02\\u573a\\u6ce2\\u52a8\\u52a0\\u5267", "\\u673a\\u6784\\u6301\\u4ed3\\u8c03\\u6574\\u9891\\u7e41"], "indices": []}', '/podcasts/cc73943e-fc91-4034-aaaf-e023466f9bb8.mp3', 1200, 'ready', 1363, 3, 18, '2026-03-12 16:54:44.391013', None)]
-(Background on this error at: https://sqlalche.me/e/20/gkpj)
-Traceback (most recent call last):
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-    ~~~~~~~~~~~~~~~~~~~~~~~^
-        cursor, str_statement, effective_parameters, context
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
-    cursor.execute(statement, parameters)
-    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 182, in execute
-    self._adapt_connection._handle_exception(error)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 342, in _handle_exception
-    raise error
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 164, in execute
-    self.await_(_cursor.execute(operation, parameters))
-    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
-    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
-           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
-    value = await result
-            ^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 40, in execute
-    await self._execute(self._cursor.execute, sql, parameters)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 32, in _execute
-    return await self._conn._execute(fn, *args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 160, in _execute
-    return await future
-           ^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 63, in _connection_worker_thread
-    result = function()
-sqlite3.IntegrityError: UNIQUE constraint failed: reports.report_date
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\scheduler.py", line 197, in generate_daily_report
-    await self._save_report(report)
-  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\scheduler.py", line 278, in _save_report
-    await session.commit()
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\ext\asyncio\session.py", line 1000, in commit
-    await greenlet_spawn(self.sync_session.commit)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 203, in greenlet_spawn
-    result = context.switch(value)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
-    trans.commit(_to_root=True)
-    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
-  File "<string>", line 2, in commit
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
-    ret_value = fn(self, *arg, **kw)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
-    self._prepare_impl()
-    ~~~~~~~~~~~~~~~~~~^^
-  File "<string>", line 2, in _prepare_impl
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
-    ret_value = fn(self, *arg, **kw)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
-    self.session.flush()
-    ~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
-    self._flush(objects)
-    ~~~~~~~~~~~^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
-    with util.safe_reraise():
-         ~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
-    raise exc_value.with_traceback(exc_tb)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
-    flush_context.execute()
-    ~~~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
-    rec.execute(self)
-    ~~~~~~~~~~~^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
-    util.preloaded.orm_persistence.save_obj(
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
-        self.mapper,
-        ^^^^^^^^^^^^
-        uow.states_for_mapper_hierarchy(self.mapper, False, False),
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        uow,
-        ^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
-    _emit_insert_statements(
-    ~~~~~~~~~~~~~~~~~~~~~~~^
-        base_mapper,
-        ^^^^^^^^^^^^
-    ...<3 lines>...
-        insert,
-        ^^^^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1048, in _emit_insert_statements
-    result = connection.execute(
-        statement, multiparams, execution_options=execution_options
-    )
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
-    return meth(
-        self,
-        distilled_parameters,
-        execution_options or NO_OPTIONS,
-    )
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
-    return connection._execute_clauseelement(
-           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
-        self, distilled_params, execution_options
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
-    ret = self._execute_context(
-        dialect,
-    ...<8 lines>...
-        cache_hit=cache_hit,
-    )
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
-    return self._exec_single_context(
-           ~~~~~~~~~~~~~~~~~~~~~~~~~^
-        dialect, context, statement, parameters
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
-    self._handle_dbapi_exception(
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
-        e, str_statement, effective_parameters, cursor, context
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
-    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-    ~~~~~~~~~~~~~~~~~~~~~~~^
-        cursor, str_statement, effective_parameters, context
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
-    cursor.execute(statement, parameters)
-    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 182, in execute
-    self._adapt_connection._handle_exception(error)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 342, in _handle_exception
-    raise error
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 164, in execute
-    self.await_(_cursor.execute(operation, parameters))
-    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
-    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
-           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
-    value = await result
-            ^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 40, in execute
-    await self._execute(self._cursor.execute, sql, parameters)
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\cursor.py", line 32, in _execute
-    return await self._conn._execute(fn, *args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 160, in _execute
-    return await future
-           ^^^^^^^^^^^^
-  File "C:\Users\kelli\AppData\Local\Programs\Python\Python314\Lib\site-packages\aiosqlite\core.py", line 63, in _connection_worker_thread
-    result = function()
-sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) UNIQUE constraint failed: reports.report_date
-[SQL: INSERT INTO reports (id, title, summary, content, report_date, highlights, analysis, podcast_url, podcast_duration, podcast_status, word_count, reading_time, news_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
-[parameters: ('ca367b23-5a1e-4dc4-8249-b168fec6b40c', '2026年03月12日 (周四) 财经深度日报', '今日A股市场下跌，上证指数-0.71%。银行板块表现活跃，央行维持流动性合理充裕。建议投资者保持观望态度，关注政策动向和行业轮动机会。', '# 2026年03月12日 (周四) 财经深度日报\n\n## 📊 今日市场概览\n\n今日 A 股市场下跌，三大指数分化明显：\n\n| 指数 | 涨跌幅 | 走势 |\n|------|--------|------|\n| 上证指数 | -0.71% | 📉 下跌 |\n| 深证成指 | + ... (1176 characters truncated) ... 于今日市场表现和消息面分析，预计明日：\n\n- **大盘走势**：延续震荡格局，关注支撑位有效性\n- **热点方向**：银行、基建 可能继续活跃\n- **操作策略**：建议观望配置，关注低位优质标的\n\n---\n\n*免责声明：以上分析仅供参考，不构成投资建议。投资有风险，入市需谨慎。*', '2026-03-12', '[{"title": "\\u592e\\u884c\\u516c\\u5f00\\u5e02\\u573a\\u64cd\\u4f5c\\u7ef4\\u62a4\\u6d41\\u52a8\\u6027", "source": "\\u592e\\u884c\\u5b98\\u7f51", " ... (763 characters truncated) ... "sentiment": "positive", "related_stocks": [], "historical_context": "\\u677f\\u5757\\u8f6e\\u52a8\\u884c\\u60c5\\u5ef6\\u7eed", "source_url": null}]', '{"overall_sentiment": "negative", "trend": "bearish", "key_factors": ["\\u592e\\u884c\\u653f\\u7b56", "\\u677f\\u5757\\u8f6e\\u52a8", "\\u5916\\u56f4 ... (122 characters truncated) ... "\\u673a\\u6784\\u6301\\u4ed3\\u8c03\\u6574\\u9891\\u7e41", "\\u5730\\u7f18\\u653f\\u6cbb\\u4e0d\\u786e\\u5b9a\\u6027\\u4e0a\\u5347"], "indices": []}', '/podcasts/ca367b23-5a1e-4dc4-8249-b168fec6b40c.mp3', 1200, 'ready', 1357, 3, 4, '2026-03-12 16:56:15.917945', None)]
-(Background on this error at: https://sqlalche.me/e/20/gkpj)
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
-INFO:     127.0.0.1:64645 - "GET /api/reports/today HTTP/1.1" 200 OK
+[OK] 百度社会新闻: 获取 20 条
+[OK] 百度股票焦点: 获取 20 条
+[OK] 日经新闻: 获取 28 条
+[OK] 彭博社: 获取 50 条
+[OK] 金十数据: 获取 1 条
+[OK] 东方财富研报: 获取 50 条
+[OK] 香港经济日报: 获取 30 条
+[RSS] 15/15 个源成功，获取 430 条新闻
+  [AKShare] 全球财经快讯: 30 条
+0it [00:00, ?it/s]                  [AKShare] 补充 30 条新闻
+  [雪球] 热帖采集失败: Expecting value: line 1 column 1 (char 0)
+[雪球] 热帖补充 0 条
+[同花顺] 快讯补充 20 条
+  [自选股] 共 2 只股票，涉及 2 个行业
+    [个股新闻] 贵州茅台(600519) 采集失败: Failed to perform, curl: (7) Failed to connect to search-api-web.eastmoney.com port 443 after 2020 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+    [个股新闻] 腾讯控股(00700) 采集失败: Failed to perform, curl: (7) Failed to connect to search-api-web.eastmoney.com port 443 after 2000 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  [自选股] 个股新闻: 0 条
+  0%|          | 0/4 [00:00<?, ?it/s] 25%|██▌       | 1/4 [00:00<00:02,  1.01it/s] 50%|█████     | 2/4 [00:02<00:02,  1.37s/it] 75%|███████▌  | 3/4 [00:04<00:01,  1.38s/it]100%|██████████| 4/4 [00:05<00:00,  1.28s/it]                                               0%|          | 0/4 [00:00<?, ?it/s] 25%|██▌       | 1/4 [00:01<00:05,  1.95s/it] 50%|█████     | 2/4 [00:05<00:05,  2.79s/it] 75%|███████▌  | 3/4 [00:11<00:04,  4.52s/it]100%|██████████| 4/4 [00:13<00:00,  3.30s/it]                                             

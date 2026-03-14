@@ -16,6 +16,7 @@ import httpx
 
 from ..config import settings
 from ..models.report import Report
+from .audio_mixer import get_audio_mixer
 
 
 class PodcastGeneratorService:
@@ -144,26 +145,123 @@ class PodcastGeneratorService:
         filename = f"{report.id}.mp3"
         output_path = self.output_dir / filename
         
-        # 生成音频
-        communicate = edge_tts.Communicate(
-            text=podcast_text,
-            voice=self.voice,
-            rate=self.rate,
-            volume=self.volume
-        )
+        # 临时文件（用于TTS输出，之后会与背景音乐混合）
+        temp_path = self.output_dir / f"{report.id}_voice.mp3"
         
-        await communicate.save(str(output_path))
+        # 分段生成语音（在 [SECTION_BREAK] 处分段，并加入停顿）
+        await self._generate_segmented_tts(podcast_text, str(temp_path))
         
-        # 估算时长（大约每分钟 250 字）
-        word_count = len(podcast_text)
-        duration_seconds = int((word_count / 250) * 60)
+        # 与背景音乐混合
+        audio_mixer = get_audio_mixer()
+        if audio_mixer.has_bgm():
+            print(f"[BGM] 检测到背景音乐，开始混音...")
+            audio_mixer.mix_podcast_with_bgm(str(temp_path), str(output_path))
+            # 删除临时文件
+            try:
+                os.remove(str(temp_path))
+            except:
+                pass
+        else:
+            # 没有背景音乐，直接重命名
+            print(f"[INFO] 未配置背景音乐，使用纯语音")
+            if temp_path != output_path:
+                os.rename(str(temp_path), str(output_path))
         
-        # 确保在 20-30 分钟范围内
-        duration_seconds = max(1200, min(1800, duration_seconds))
+        # 获取实际音频时长
+        try:
+            from pydub import AudioSegment
+            audio = AudioSegment.from_mp3(str(output_path))
+            duration_seconds = len(audio) // 1000
+        except Exception as e:
+            print(f"[WARN] 无法获取音频时长: {e}")
+            # 估算时长（大约每分钟 250 字）
+            word_count = len(podcast_text)
+            duration_seconds = int((word_count / 250) * 60)
+            # 如果有背景音乐，加上开头和结尾的额外时间
+            if audio_mixer.has_bgm():
+                duration_seconds += 8  # 4秒开头 + 4秒结尾
         
-        print(f"✅ 播客生成完成: {filename}, 时长约 {duration_seconds // 60} 分钟")
+        print(f"[OK] 播客生成完成: {filename}, 时长约 {duration_seconds // 60} 分 {duration_seconds % 60} 秒")
         
         return str(output_path), duration_seconds
+
+    async def _generate_segmented_tts(self, full_text: str, output_path: str):
+        """
+        分段生成 TTS，在模块之间加入停顿
+        
+        通过 [SECTION_BREAK] 标记分段，每段之间加入 1.5 秒停顿
+        """
+        from pydub import AudioSegment
+        import tempfile
+        
+        # 分段
+        segments = full_text.split('[SECTION_BREAK]')
+        segments = [s.strip() for s in segments if s.strip()]
+        
+        print(f"[TTS] 检测到 {len(segments)} 个内容模块")
+        
+        if len(segments) <= 1:
+            # 没有分段标记，直接生成
+            communicate = edge_tts.Communicate(
+                text=full_text.replace('[SECTION_BREAK]', ''),
+                voice=self.voice,
+                rate=self.rate,
+                volume=self.volume
+            )
+            await communicate.save(output_path)
+            return
+        
+        # 创建临时目录存放分段音频
+        temp_dir = Path(tempfile.gettempdir()) / f"podcast_segments_{uuid.uuid4().hex[:8]}"
+        temp_dir.mkdir(exist_ok=True)
+        
+        try:
+            # 生成每个段落的音频
+            segment_files = []
+            for i, segment in enumerate(segments):
+                if not segment:
+                    continue
+                    
+                segment_path = temp_dir / f"segment_{i:02d}.mp3"
+                print(f"[TTS] 正在生成第 {i+1}/{len(segments)} 段...")
+                
+                communicate = edge_tts.Communicate(
+                    text=segment,
+                    voice=self.voice,
+                    rate=self.rate,
+                    volume=self.volume
+                )
+                await communicate.save(str(segment_path))
+                segment_files.append(segment_path)
+            
+            # 合并所有段落，中间加入停顿
+            print(f"[TTS] 正在合并音频段落...")
+            
+            # 1.5 秒的静音停顿
+            pause_duration = 1500  # 毫秒
+            pause = AudioSegment.silent(duration=pause_duration)
+            
+            # 合并
+            final_audio = AudioSegment.empty()
+            for i, segment_path in enumerate(segment_files):
+                segment_audio = AudioSegment.from_mp3(str(segment_path))
+                final_audio += segment_audio
+                
+                # 在段落之间加入停顿（最后一段不加）
+                if i < len(segment_files) - 1:
+                    final_audio += pause
+            
+            # 导出最终音频
+            final_audio.export(output_path, format="mp3", bitrate="192k")
+            print(f"[TTS] 分段合成完成，共 {len(segment_files)} 段")
+            
+        finally:
+            # 清理临时文件
+            import shutil
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
     
     def _prepare_podcast_text(self, report: Report, weather_info: str = "") -> str:
         """
@@ -174,6 +272,7 @@ class PodcastGeneratorService:
         2. 多样化开场白，使用配置的用户昵称
         3. 开场加入北京天气
         4. "今日"表述更准确
+        5. 模块之间加入 [SECTION_BREAK] 标记，生成时会加入停顿和背景音乐渐强效果
         """
         report_date = report.report_date
         is_weekend = self._is_weekend(report_date)
@@ -201,6 +300,7 @@ class PodcastGeneratorService:
 温馨提示：今天是周末，A股和港股都休市哦。
 所以今天的内容主要是本周回顾和下周展望，帮你做好投资规划。
 
+[SECTION_BREAK]
 """
         else:
             opening += f"""
@@ -208,6 +308,7 @@ class PodcastGeneratorService:
 
 废话不多说，直接上干货！
 
+[SECTION_BREAK]
 """
         
         # 核心观点（如果有）- 开门见山
@@ -230,11 +331,13 @@ class PodcastGeneratorService:
                 core_opinions_text += """
 这些判断，你可以下周开盘后观察验证一下。
 
+[SECTION_BREAK]
 """
             else:
                 core_opinions_text += """
 这几条判断，你可以不信，但我建议你记下来，过几天回来对照看看我说得准不准。
 
+[SECTION_BREAK]
 """
         else:
             # 使用摘要作为核心内容
@@ -243,12 +346,15 @@ class PodcastGeneratorService:
 
 接下来我展开聊聊。
 
+[SECTION_BREAK]
 """
         
         # 跨界热点分析（如果有）- 这是差异化的重点
         cross_border_text = ""
         if hasattr(report, 'cross_border_events') and report.cross_border_events:
             cross_border_text = f"""
+
+[SECTION_BREAK]
 
 {name}，说完财经新闻，我们聊聊跨界热点。
 很多人只盯着财经频道，其实很多影响股市的大事，都发生在财经圈外面。
@@ -286,11 +392,15 @@ class PodcastGeneratorService:
             if is_weekend:
                 highlights_text = """
 
+[SECTION_BREAK]
+
 好，接下来聊聊本周的几条重要新闻，以及我的个人看法。
 
 """
             else:
                 highlights_text = f"""
+
+[SECTION_BREAK]
 
 {name}，接下来聊聊今天的几条重要新闻，以及我的个人看法。
 这里说的"今天"，指的是最新的交易日和近期的重要消息。
@@ -327,6 +437,8 @@ class PodcastGeneratorService:
             if is_weekend:
                 analysis_text = f"""
 
+[SECTION_BREAK]
+
 {name}，说说我对下周市场的看法。
 
 {trend_opinion}。原因很简单：
@@ -342,6 +454,8 @@ class PodcastGeneratorService:
 """
             else:
                 analysis_text = f"""
+
+[SECTION_BREAK]
 
 {name}，说说我对整体市场的看法。
 
@@ -364,6 +478,8 @@ class PodcastGeneratorService:
         if is_weekend:
             closing = f"""
 
+[SECTION_BREAK]
+
 好了{name}，今天的周末财经复盘就到这里。
 
 总结一下：
@@ -378,6 +494,8 @@ class PodcastGeneratorService:
 """
         else:
             closing = f"""
+
+[SECTION_BREAK]
 
 好了{name}，今天的财经脱口秀就到这里。
 
@@ -440,52 +558,153 @@ class PodcastGeneratorService:
     def _clean_for_tts(self, markdown_text: str) -> str:
         """
         清理 Markdown 文本，使其适合 TTS 朗读
+        
+        优化项：
+        1. 粗体标记(**)转为停顿（气口）
+        2. 过滤emoji表情符号
+        3. 过滤新闻来源标注（如"新闻1"、"据新闻2"、"[1]"等）
         """
         text = markdown_text
         
-        # 移除代码块
-        text = re.sub(r'```[\s\S]*?```', '', text)
+        # ========== 1. 处理粗体为气口停顿 ==========
+        # 粗体内容后加逗号作为气口停顿
+        text = re.sub(r'\*\*([^*]+)\*\*', r'\1，', text)
+        text = re.sub(r'__([^_]+)__', r'\1，', text)
         
-        # 移除行内代码
+        # ========== 2. 移除emoji表情符号 ==========
+        # 使用更精确的emoji范围，避免误删中文
+        emoji_ranges = [
+            ('\U0001F600', '\U0001F64F'),  # 表情符号
+            ('\U0001F300', '\U0001F5FF'),  # 符号和象形文字
+            ('\U0001F680', '\U0001F6FF'),  # 交通和地图符号
+            ('\U0001F900', '\U0001F9FF'),  # 补充符号
+            ('\U0001FA00', '\U0001FAFF'),  # 扩展符号
+            ('\U00002600', '\U000026FF'),  # 杂项符号
+            ('\U00002700', '\U000027BF'),  # 装饰符号
+            ('\U0001F1E0', '\U0001F1FF'),  # 国旗
+        ]
+        for start, end in emoji_ranges:
+            text = re.sub(f'[{start}-{end}]', '', text)
+        
+        # 移除特定常用emoji（可能不在上述范围内的）
+        specific_emojis = '📊📈📉💹💰🔥⚠️✅❌⭐🌟💡🎯📌📍🔴🟢🟡🎉🎊👍👎💪🙏❤️💙💚💛🧡💜🖤🤍🤎'
+        for emoji in specific_emojis:
+            text = text.replace(emoji, '')
+        
+        # ========== 3. 移除新闻来源标注 ==========
+        # 注意：顺序很重要！先匹配长的模式，再匹配短的模式
+        
+        # 移除 [1] [2] 等纯数字方括号引用
+        text = re.sub(r'\[\d+\]', '', text)
+        # 移除 [新闻1] [来源2] 等方括号引用
+        text = re.sub(r'\[(新闻|来源|参考)\d*\]', '', text)
+        
+        # 先处理包含前缀的模式（"据新闻X"、"根据新闻X"）
+        # 移除 "据新闻1，" "根据新闻2，" 等表述（完整移除包括前缀）
+        text = re.sub(r'根据新闻\d+[，,]?\s*', '', text)  # 先处理"根据新闻"（更长）
+        text = re.sub(r'据新闻\d+[，,]?\s*', '', text)    # 再处理"据新闻"
+        
+        # 再处理独立的 "新闻X" 标注
+        # 移除 "新闻1：" "新闻2、" 等独立标注（后面有标点的）
+        text = re.sub(r'新闻\d+[：:、，,]', '', text)
+        # 移除句首的 "新闻X" 后跟动词（新闻1显示... -> ...）
+        text = re.sub(r'新闻\d+(?:显示|报道|称|指出|表示)[，,]?', '', text)
+        
+        # 处理来源相关
+        # 移除 "（来源：xxx）" "(Source: xxx)" 等括号内容（先处理括号包裹的）
+        text = re.sub(r'（来源[：:][^）]*）', '', text)
+        text = re.sub(r'\(来源[：:][^\)]*\)', '', text)
+        text = re.sub(r'[（(][Ss]ource[：:][^）)]*[）)]', '', text)
+        # 移除 "来源：xxx。" "来源：xxx，" 等（到句末或逗号）
+        text = re.sub(r'来源[：:][^。！？，\n]*[。！？，]?', '', text)
+        # 移除可能残留的空括号
+        text = re.sub(r'（\s*）', '', text)
+        text = re.sub(r'\(\s*\)', '', text)
+        
+        # 移除 "——新闻X" "—来源" 等破折号引用
+        text = re.sub(r'[—–-]{1,2}\s*(新闻|来源)\d*', '', text)
+        # 移除 "注1：xxx" "注：xxx" 等注释
+        text = re.sub(r'注\d*[：:][^\n。]*[。]?', '', text)
+        # 移除上标数字引用 ¹²³ 等
+        text = re.sub(r'[¹²³⁴⁵⁶⁷⁸⁹⁰]+', '', text)
+        
+        # ========== 移除代码块和行内代码 ==========
+        text = re.sub(r'```[\s\S]*?```', '', text)
         text = re.sub(r'`[^`]+`', '', text)
         
-        # 转换标题为朗读格式
+        # ========== 转换标题为朗读格式 ==========
         text = re.sub(r'^#{1,6}\s+(.+)$', r'\n\n\1\n', text, flags=re.MULTILINE)
         
-        # 移除链接，保留文字
+        # ========== 移除链接和图片 ==========
         text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
-        
-        # 移除图片
         text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
         
-        # 转换列表项
-        text = re.sub(r'^[-*]\s+', '• ', text, flags=re.MULTILINE)
+        # ========== 转换列表项 ==========
+        text = re.sub(r'^[-*]\s+', '', text, flags=re.MULTILINE)
         text = re.sub(r'^\d+\.\s+', '', text, flags=re.MULTILINE)
         
-        # 移除粗体/斜体标记
-        text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+        # ========== 移除剩余的斜体标记 ==========
         text = re.sub(r'\*([^*]+)\*', r'\1', text)
-        text = re.sub(r'__([^_]+)__', r'\1', text)
         text = re.sub(r'_([^_]+)_', r'\1', text)
         
-        # 处理表格（简单移除）
+        # ========== 处理表格 ==========
         text = re.sub(r'\|[^\n]+\|', '', text)
         text = re.sub(r'^[-|:]+$', '', text, flags=re.MULTILINE)
         
-        # 替换一些符号为可朗读的文字
+        # ========== 替换符号为可朗读文字 ==========
         text = text.replace('&', '和')
-        # 将 "X%" 转换为 "百分之X"（正确的中文读法）
         text = re.sub(r'(\d+(?:\.\d+)?)\s*%', r'百分之\1', text)
         text = text.replace('①', '第一')
         text = text.replace('②', '第二')
         text = text.replace('③', '第三')
         
+        # ========== 数字朗读优化 ==========
+        # 移除带括号的情绪值，如（+0.72）、(+0.35)等，不朗读
+        text = re.sub(r'[（(][+\-]?\d+\.?\d*[）)]', '', text)
+        
+        # 处理小数点后的数字朗读（+0.12 读作"零点一二"而不是"零点十二"）
+        # 自定义函数处理小数朗读
+        def convert_decimal_reading(match):
+            """将小数转换为逐位朗读格式"""
+            full_match = match.group(0)
+            sign = match.group(1) or ''  # 正负号
+            integer_part = match.group(2)  # 整数部分
+            decimal_part = match.group(3)  # 小数部分
+            
+            # 处理符号：加号不读，减号读"负"
+            sign_text = ''
+            if sign == '-':
+                sign_text = '负'
+            # 加号不读，所以 sign == '+' 时 sign_text 保持为空
+            
+            # 处理整数部分
+            digit_map = {'0': '零', '1': '一', '2': '二', '3': '三', '4': '四',
+                        '5': '五', '6': '六', '7': '七', '8': '八', '9': '九'}
+            
+            # 整数部分直接读数字
+            int_text = digit_map.get(integer_part, integer_part)
+            
+            # 小数部分逐位读
+            decimal_text = ''.join([digit_map.get(d, d) for d in decimal_part])
+            
+            return f'{sign_text}{int_text}点{decimal_text}'
+        
+        # 匹配带符号的小数：+0.12, -0.35, 0.72 等
+        # 注意：只处理小数部分不超过4位的情况
+        text = re.sub(r'([+\-])?(\d)\.(\d{1,4})(?!\d)', convert_decimal_reading, text)
+        
+        # ========== 清理多余的标点和空白 ==========
+        # 连续的逗号合并
+        text = re.sub(r'[，,]{2,}', '，', text)
+        # 句号前的逗号去掉
+        text = re.sub(r'，([。！？])', r'\1', text)
         # 清理多余空行
         text = re.sub(r'\n{3,}', '\n\n', text)
+        # 清理行首行尾空白
+        text = re.sub(r'^\s+', '', text, flags=re.MULTILINE)
         
-        # 添加适当的停顿标记
+        # ========== 添加适当的停顿标记 ==========
         text = text.replace('。', '。\n')
-        text = text.replace('；', '；')
         text = text.replace('？', '？\n')
         text = text.replace('！', '！\n')
         
@@ -504,9 +723,9 @@ class PodcastGeneratorService:
         """设置语音角色"""
         if voice in self.available_voices:
             self.voice = voice
-            print(f"✅ 语音已切换为: {self.available_voices[voice]}")
+            print(f"[OK] 语音已切换为: {self.available_voices[voice]}")
         else:
-            print(f"⚠️ 未知的语音角色: {voice}")
+            print(f"[WARN] 未知的语音角色: {voice}")
 
 
 # 单例实例
