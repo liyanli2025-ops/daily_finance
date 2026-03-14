@@ -445,4 +445,802 @@ FileNotFoundError: [WinError 2] 系统找不到指定的文件。
     [个股新闻] 贵州茅台(600519) 采集失败: Failed to perform, curl: (7) Failed to connect to search-api-web.eastmoney.com port 443 after 2020 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
     [个股新闻] 腾讯控股(00700) 采集失败: Failed to perform, curl: (7) Failed to connect to search-api-web.eastmoney.com port 443 after 2000 ms: Could not connect to server. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
   [自选股] 个股新闻: 0 条
-  0%|          | 0/4 [00:00<?, ?it/s] 25%|██▌       | 1/4 [00:00<00:02,  1.01it/s] 50%|█████     | 2/4 [00:02<00:02,  1.37s/it] 75%|███████▌  | 3/4 [00:04<00:01,  1.38s/it]100%|██████████| 4/4 [00:05<00:00,  1.28s/it]                                               0%|          | 0/4 [00:00<?, ?it/s] 25%|██▌       | 1/4 [00:01<00:05,  1.95s/it] 50%|█████     | 2/4 [00:05<00:05,  2.79s/it] 75%|███████▌  | 3/4 [00:11<00:04,  4.52s/it]100%|██████████| 4/4 [00:13<00:00,  3.30s/it]                                             
+  0%|          | 0/4 [00:00<?, ?it/s] 25%|██▌       | 1/4 [00:00<00:02,  1.01it/s] 50%|█████     | 2/4 [00:02<00:02,  1.37s/it] 75%|███████▌  | 3/4 [00:04<00:01,  1.38s/it]100%|██████████| 4/4 [00:05<00:00,  1.28s/it]                                               0%|          | 0/4 [00:00<?, ?it/s] 25%|██▌       | 1/4 [00:01<00:05,  1.95s/it] 50%|█████     | 2/4 [00:05<00:05,  2.79s/it] 75%|███████▌  | 3/4 [00:11<00:04,  4.52s/it]100%|██████████| 4/4 [00:13<00:00,  3.30s/it]                                               [自选股] 行业新闻: 2 条
+    [雪球] 贵州茅台 讨论采集失败: Expecting value: line 1 column 1 (char 0)
+    [雪球] 腾讯控股 讨论采集失败: Expecting value: line 1 column 1 (char 0)
+[自选股] 相关新闻补充 2 条
+[NEWS] 共采集到 311 条新闻（原始 482 条，去重后 423 条）
+[SENTIMENT] 开始对 311 条新闻进行深度情感分析...
+  [情感分析统计] 正面: 64 (20.6%) | 负面: 17 (5.5%) | 中性: 230 (74.0%)
+[SENTIMENT] 情感分析完成
+   筛选出 50 条中国相关财经新闻
+   筛选出 15 条跨界热点新闻
+      - [tech] 余承东尼格买提 AWE 直播上手 Mate X7，它凭什么定义折叠屏的标杆？...
+      - [tech] 腾讯“龙虾”开启全国巡装：为用户免费安装，覆盖北上广深等全国 17 个城市...
+      - [tech] 华为与中国联通发布“AI 智慧盒”，融合家庭组网、电视与 AI 云服务...
+      - [tech] 聚焦 AWE 2026：华为鸿蒙智家进入智慧全生态时代，定义全屋智能新未来...
+      - [geopolitical] 韩国财长：如有必要 将进一步扩大现有规模逾100万.....
+
+[Step 2] AI 分析生成报告...
+[OK] OpenAI 客户端初始化成功 (base_url: https://api.deepseek.com)
+[AI DEBUG] 准备调用 AI，客户端状态:
+   - Anthropic: 未初始化
+   - OpenAI: 已初始化
+   - 使用免费服务: False
+   - 配置的模型: deepseek-chat
+   - 配置的 Base URL: https://api.deepseek.com
+[AI] 调用模型: deepseek-chat (尝试 1/2)
+[AI DEBUG] 准备调用 AI，客户端状态:
+   - Anthropic: 未初始化
+   - OpenAI: 已初始化
+   - 使用免费服务: False
+   - 配置的模型: deepseek-chat
+   - 配置的 Base URL: https://api.deepseek.com
+[AI] 调用模型: deepseek-chat (尝试 1/2)
+[AI DEBUG] 准备调用 AI，客户端状态:
+   - Anthropic: 未初始化
+   - OpenAI: 已初始化
+   - 使用免费服务: False
+   - 配置的模型: deepseek-chat
+   - 配置的 Base URL: https://api.deepseek.com
+[AI] 调用模型: deepseek-chat (尝试 1/2)
+[AI DEBUG] 准备调用 AI，客户端状态:
+   - Anthropic: 未初始化
+   - OpenAI: 已初始化
+   - 使用免费服务: False
+   - 配置的模型: deepseek-chat
+   - 配置的 Base URL: https://api.deepseek.com
+[AI] 调用模型: deepseek-chat (尝试 1/2)
+[AI DEBUG] 准备调用 AI，客户端状态:
+   - Anthropic: 未初始化
+   - OpenAI: 已初始化
+   - 使用免费服务: False
+   - 配置的模型: deepseek-chat
+   - 配置的 Base URL: https://api.deepseek.com
+[AI] 调用模型: deepseek-chat (尝试 1/2)
+[AI DEBUG] 准备调用 AI，客户端状态:
+   - Anthropic: 未初始化
+   - OpenAI: 已初始化
+   - 使用免费服务: False
+   - 配置的模型: deepseek-chat
+   - 配置的 Base URL: https://api.deepseek.com
+[AI] 调用模型: deepseek-chat (尝试 1/2)
+[AI DEBUG] 准备调用 AI，客户端状态:
+   - Anthropic: 未初始化
+   - OpenAI: 已初始化
+   - 使用免费服务: False
+   - 配置的模型: deepseek-chat
+   - 配置的 Base URL: https://api.deepseek.com
+[AI] 调用模型: deepseek-chat (尝试 1/2)
+[AI DEBUG] 准备调用 AI，客户端状态:
+   - Anthropic: 未初始化
+   - OpenAI: 已初始化
+   - 使用免费服务: False
+   - 配置的模型: deepseek-chat
+   - 配置的 Base URL: https://api.deepseek.com
+[AI] 调用模型: deepseek-chat (尝试 1/2)
+[AI DEBUG] 准备调用 AI，客户端状态:
+   - Anthropic: 未初始化
+   - OpenAI: 已初始化
+   - 使用免费服务: False
+   - 配置的模型: deepseek-chat
+   - 配置的 Base URL: https://api.deepseek.com
+[AI] 调用模型: deepseek-chat (尝试 1/2)
+[AI DEBUG] 准备调用 AI，客户端状态:
+   - Anthropic: 未初始化
+   - OpenAI: 已初始化
+   - 使用免费服务: False
+   - 配置的模型: deepseek-chat
+   - 配置的 Base URL: https://api.deepseek.com
+[AI] 调用模型: deepseek-chat (尝试 1/2)
+[AI] 正在获取真实市场数据...
+✅ MarketDataService: AKShare 可用
+  0%|          | 0/2 [00:00<?, ?it/s] 50%|█████     | 1/2 [00:01<00:01,  1.46s/it]100%|██████████| 2/2 [00:03<00:00,  1.71s/it]                                               0%|          | 0/4 [00:00<?, ?it/s]                                     INFO:     127.0.0.1:50911 - "POST /api/generate-report-sync HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50911 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50911 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52339 - "GET /api/podcasts/today?_t=1773479559833 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52340 - "GET /api/podcasts/history?_t=1773479559833 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52347 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52345 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52356 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52345 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52377 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52345 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52378 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52345 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52391 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52345 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52394 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52430 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52431 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52431 - "GET /api/podcasts/today?_t=1773479579173 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52430 - "GET /api/podcasts/history?_t=1773479579174 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52395 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52432 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52451 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52432 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52452 - "GET /podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934.mp3 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:52432 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52474 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52649 - "GET /api/podcast/today HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52663 - "GET /api/podcast/history HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52664 - "GET /api/podcasts/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52680 - "HEAD /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece/audio HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:52814 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece/audio HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52826 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece/audio HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53214 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53215 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53285 - "POST /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece/regenerate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53319 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53331 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece/status HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 1430, in getresponse
+    response.begin()
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 300, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+http.client.RemoteDisconnected: Remote end closed connection without response
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\util\retry.py", line 490, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\util\util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 1430, in getresponse
+    response.begin()
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 300, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+urllib3.exceptions.ProtocolError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\market_data_service.py", line 305, in _get_sector_ranking
+    df = ak.stock_board_industry_name_em()
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\akshare\stock\stock_board_industry_em.py", line 137, in stock_board_industry_name_em
+    temp_df = fetch_paginated_data(url, params)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\akshare\utils\func.py", line 50, in fetch_paginated_data
+    r = request_with_retry(url, params=params, timeout=timeout)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\akshare\utils\request.py", line 64, in request_with_retry
+    raise last_exception
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\akshare\utils\request.py", line 52, in request_with_retry
+    response = session.get(url, params=params, timeout=timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\sessions.py", line 602, in get
+    return self.request("GET", url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\adapters.py", line 659, in send
+    raise ConnectionError(err, request=request)
+requests.exceptions.ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py:198: RuntimeWarning: Couldn't find ffprobe or avprobe - defaulting to ffprobe, but may not work
+  warn("Couldn't find ffprobe or avprobe - defaulting to ffprobe, but may not work", RuntimeWarning)
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    if not self.has_bgm():
+                  ^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 728, in from_file
+    info = mediainfo_json(orig_file, read_ahead_limit=read_ahead_limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py", line 274, in mediainfo_json
+    res = Popen(command, stdin=stdin_parameter, stdout=PIPE, stderr=PIPE)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1028, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1540, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    # 确保 ffmpeg 路径已设置（每次调用时检查）
+                ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 728, in from_file
+    info = mediainfo_json(orig_file, read_ahead_limit=read_ahead_limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INFO:     127.0.0.1:53475 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53675 - "POST /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece/regenerate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53881 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54086 - "GET /api/reports/today HTTP/1.1" 200 OK
+获取板块排行异常: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+获取市场统计异常: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+获取龙虎榜异常（可能无数据）: 'NoneType' object is not subscriptable
+[AI] 市场数据获取完成：3 个指数，0 个热门板块
+[AI DEBUG] 准备调用 AI，客户端状态:
+   - Anthropic: 未初始化
+   - OpenAI: 已初始化
+   - 使用免费服务: False
+   - 配置的模型: deepseek-chat
+   - 配置的 Base URL: https://api.deepseek.com
+[AI] 调用模型: deepseek-chat (尝试 1/2)
+   报告生成完成: 周末复盘：地缘“黑天鹅”振翅，市场在“滞胀”与“复苏”间摇摆
+   字数: 4447, 预计阅读时间: 11 分钟
+   核心观点: 3 条
+   跨界事件: 0 条
+
+[Step 3] 生成播客音频（观点输出风格）...
+🎵 检测到背景音乐，开始混音...
+🎵 开始混音处理...
+❌ 混音失败: [WinError 2] 系统找不到指定的文件。
+⚠️ 无法获取音频时长: [Errno 2] No such file or directory: 'data\\podcasts\\ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3'
+✅ 播客生成完成: ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3, 时长约 12 分 31 秒
+   播客生成完成: 时长 12 分钟
+
+[Step 4] 保存到数据库...
+   报告已保存，ID: ac49aad3-e268-4002-98cc-d1ae8dd99ece
+
+==================================================
+[DONE] 每日报告生成完成！
+==================================================
+
+[PODCAST] 重新生成播客: ac49aad3-e268-4002-98cc-d1ae8dd99ece
+🎵 检测到背景音乐，开始混音...
+🎵 开始混音处理...
+❌ 混音失败: [WinError 2] 系统找不到指定的文件。
+⚠️ 无法获取音频时长: [Errno 2] No such file or directory: 'data\\podcasts\\ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3'
+✅ 播客生成完成: ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3, 时长约 12 分 33 秒
+[OK] 播客重新生成完成: ac49aad3-e268-4002-98cc-d1ae8dd99ece
+[PODCAST] 重新生成播客: ac49aad3-e268-4002-98cc-d1ae8dd99ece
+🎵 检测到背景音乐，开始混音...
+🎵 开始混音处理...
+❌ 混音失败: [WinError 2] 系统找不到指定的文件。
+⚠️ 无法获取音频时长: [Errno 2] No such file or directory: 'data\\podcasts\\ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3'
+✅ 播客生成完成: ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3, 时长约 12 分 33 秒
+[OK] 播客重新生成完成: ac49aad3-e268-4002-98cc-d1ae8dd99ece
+
+[API] /api/generate-report-sync 被调用！时间: 2026-03-14 17:23:46.679588
+
+==================================================
+[START] 开始生成每日报告 - 2026-03-14 17:23:46
+==================================================
+INFO:     127.0.0.1:54486 - "GET /api/podcasts/today?_t=1773480228664 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54486 - "GET /api/podcasts/history?_t=1773480228664 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54494 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py", line 274, in mediainfo_json
+    res = Popen(command, stdin=stdin_parameter, stdout=PIPE, stderr=PIPE)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1028, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1540, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    1. 开头4秒：背景音乐正常音量
+                ^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 728, in from_file
+    info = mediainfo_json(orig_file, read_ahead_limit=read_ahead_limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py", line 274, in mediainfo_json
+    res = Popen(command, stdin=stdin_parameter, stdout=PIPE, stderr=PIPE)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1028, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1540, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。
+
+[Step 1] 采集新闻...
+[OK] 财联社电报: 获取 20 条
+[OK] 金十数据: 获取 1 条
+[OK] 百度社会新闻: 获取 20 条
+[OK] 百度国际新闻: 获取 20 条
+[OK] 百度股票焦点: 获取 20 条
+[OK] 百度科技焦点: 获取 20 条
+[OK] Finviz美股新闻: 获取 90 条
+[OK] 香港经济日报: 获取 30 条
+[OK] 百度财经焦点: 获取 20 条
+[OK] 彭博社: 获取 50 条
+[OK] 日经新闻: 获取 28 条
+[OK] 36氪快讯: 获取 20 条
+[OK] 东方财富研报: 获取 50 条
+[OK] 华尔街见闻-全球: 获取 31 条
+[OK] IT之家: 获取 10 条
+[RSS] 15/15 个源成功，获取 430 条新闻
+  [AKShare] 全球财经快讯: 30 条
+0it [00:00, ?it/s]                  Traceback (most recent call last):
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 1430, in getresponse
+    response.begin()
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 300, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+http.client.RemoteDisconnected: Remote end closed connection without response
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\util\retry.py", line 490, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\util\util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 1430, in getresponse
+    response.begin()
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 300, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+urllib3.exceptions.ProtocolError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\market_data_service.py", line 263, in _get_indices
+    df = ak.stock_zh_index_spot_em()
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\akshare\index\index_stock_zh.py", line 241, in stock_zh_index_spot_em
+    temp_df = fetch_paginated_data(url, params)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\akshare\utils\func.py", line 34, in fetch_paginated_data
+    r = request_with_retry(url, params=params, timeout=timeout)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\akshare\utils\request.py", line 64, in request_with_retry
+    raise last_exception
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\akshare\utils\request.py", line 52, in request_with_retry
+    response = session.get(url, params=params, timeout=timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\sessions.py", line 602, in get
+    return self.request("GET", url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\adapters.py", line 659, in send
+    raise ConnectionError(err, request=request)
+requests.exceptions.ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+Traceback (most recent call last):
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 1430, in getresponse
+    response.begin()
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 300, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+http.client.RemoteDisconnected: Remote end closed connection without response
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\util\retry.py", line 490, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\util\util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\urllib3\connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+INFO:     127.0.0.1:55302 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55303 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55391 - "GET /api/podcasts/today?_t=1773480454928 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55392 - "GET /api/podcasts/history?_t=1773480454928 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55396 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55392 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55391 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55391 - "GET /api/podcasts/today?_t=1773480458560 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55392 - "GET /api/podcasts/history?_t=1773480458560 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55397 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55392 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55391 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55418 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55419 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55419 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55419 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55419 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55418 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55420 - "GET /api/podcasts/today?_t=1773480499553 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55420 - "GET /api/podcasts/history?_t=1773480499553 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55475 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55474 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55474 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55474 - "GET /api/podcasts/today?_t=1773480509280 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55488 - "GET /api/podcasts/history?_t=1773480509280 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55478 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55488 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55474 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55505 - "GET /api/podcasts/today?_t=1773480517600 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55506 - "GET /api/podcasts/history?_t=1773480517600 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55511 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55506 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55506 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55506 - "GET /api/podcasts/today?_t=1773480523832 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55509 - "GET /api/podcasts/history?_t=1773480523832 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55512 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55532 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55536 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55534 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55534 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55534 - "GET /api/podcasts/today?_t=1773480569393 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55534 - "GET /api/podcasts/history?_t=1773480569393 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55537 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55606 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55628 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55827 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55831 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55829 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55832 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55829 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55854 - "GET /podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934.mp3 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:55829 - "GET /api/podcasts/018bc30f-a64e-48b5-a74f-117bce0bdd46 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55854 - "GET /podcasts/018bc30f-a64e-48b5-a74f-117bce0bdd46.mp3 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55829 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55854 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55829 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55856 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55829 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55868 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55829 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55869 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55829 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55874 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55829 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55875 - "GET /podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55829 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55881 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56005 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56006 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56006 - "GET /api/podcasts/today?_t=1773480698218 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56005 - "GET /api/podcasts/history?_t=1773480698218 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56012 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56005 - "POST /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/regenerate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56005 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56005 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56005 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56005 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56005 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56005 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56005 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56007 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56007 - "GET /api/podcasts/today?_t=1773480713433 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56005 - "GET /api/podcasts/history?_t=1773480713434 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56013 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56141 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56142 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56142 - "GET /api/podcasts/today?_t=1773480754689 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56141 - "GET /api/podcasts/history?_t=1773480754689 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56156 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56145 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56145 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56145 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56145 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56145 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56307 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56308 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56308 - "GET /api/podcasts/today?_t=1773480786569 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56307 - "GET /api/podcasts/history?_t=1773480786569 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56157 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56307 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56308 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56308 - "GET /api/podcasts/today?_t=1773480789409 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56307 - "GET /api/podcasts/history?_t=1773480789410 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56326 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56309 - "GET /api/podcasts/ac49aad3-e268-4002-98cc-d1ae8dd99ece HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56309 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56309 - "GET /api/podcasts/018bc30f-a64e-48b5-a74f-117bce0bdd46 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56309 - "GET /api/podcasts/4631ab8a-32cf-476a-a136-bdb399c6d934 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56424 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56425 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56798 - "POST /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/regenerate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56837 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56876 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58075 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58076 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58076 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58076 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58076 - "GET /api/podcasts/today?_t=1773481396226 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58075 - "GET /api/podcasts/history?_t=1773481396226 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58083 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58084 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58077 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58077 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58503 - "GET /api/podcasts/today?_t=1773481574313 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58504 - "GET /api/podcasts/history?_t=1773481574313 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58505 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58505 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58522 - "GET /api/podcasts/history?_t=1773481589106 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58505 - "GET /api/podcasts/today?_t=1773481589106 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58537 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:58537 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58557 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58558 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59722 - "GET /api/podcasts/today?_t=1773482066938 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59723 - "GET /api/podcasts/history?_t=1773482066938 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59728 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59726 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59726 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60168 - "GET /api/podcasts/today?_t=1773482180925 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60169 - "GET /api/podcasts/history?_t=1773482180925 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60170 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60170 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60170 - "GET /api/podcasts/today?_t=1773482210907 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/history?_t=1773482210907 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60247 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:60243 - "POST /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/regenerate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 1430, in getresponse
+    response.begin()
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\http\client.py", line 300, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+urllib3.exceptions.ProtocolError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\market_data_service.py", line 305, in _get_sector_ranking
+    df = ak.stock_board_industry_name_em()
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\akshare\stock\stock_board_industry_em.py", line 137, in stock_board_industry_name_em
+    temp_df = fetch_paginated_data(url, params)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\akshare\utils\func.py", line 34, in fetch_paginated_data
+    r = request_with_retry(url, params=params, timeout=timeout)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\akshare\utils\request.py", line 64, in request_with_retry
+    raise last_exception
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\akshare\utils\request.py", line 52, in request_with_retry
+    response = session.get(url, params=params, timeout=timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\sessions.py", line 602, in get
+    return self.request("GET", url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\adapters.py", line 659, in send
+    raise ConnectionError(err, request=request)
+requests.exceptions.ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py:198: RuntimeWarning: Couldn't find ffprobe or avprobe - defaulting to ffprobe, but may not work
+  warn("Couldn't find ffprobe or avprobe - defaulting to ffprobe, but may not work", RuntimeWarning)
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    1. 开头4秒：背景音乐正常音量
+                ^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 728, in from_file
+    info = mediainfo_json(orig_file, read_ahead_limit=read_ahead_limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py", line 274, in mediainfo_json
+    res = Popen(command, stdin=stdin_parameter, stdout=PIPE, stderr=PIPE)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1028, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1540, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    1. 开头4秒：背景音乐正常音量
+                ^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 728, in from_file
+    info = mediainfo_json(orig_file, read_ahead_limit=read_ahead_limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py", line 274, in mediainfo_json
+    res = Popen(command, stdin=stdin_parameter, stdout=PIPE, stderr=PIPE)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1028, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1540, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    1. 开头4秒：背景音乐正常音量
+                ^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 728, in from_file
+    info = mediainfo_json(orig_file, read_ahead_limit=read_ahead_limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\utils.py", line 274, in mediainfo_json
+    res = Popen(command, stdin=stdin_parameter, stdout=PIPE, stderr=PIPE)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1028, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1540, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] 系统找不到指定的文件。
+Traceback (most recent call last):
+  File "c:\Users\kelli\Desktop\daily\finance-daily\backend\app\services\audio_mixer.py", line 71, in mix_podcast_with_bgm
+    1. 开头4秒：背景音乐正常音量
+                ^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelli\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydub\audio_segment.py", line 796, in from_mp3
+    return cls.from_file(file, 'mp3', parameters=parameters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/today?_t=1773482257385 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/podcasts/history?_t=1773482257385 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60317 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60317 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60317 - "GET /api/podcasts/today?_t=1773482265186 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60336 - "GET /api/podcasts/history?_t=1773482265186 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60359 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60360 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60361 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60361 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59990 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59991 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60055 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59997 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59997 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59997 - "GET /api/podcasts/today?_t=1773482511714 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60129 - "GET /api/podcasts/history?_t=1773482511714 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60129 - "POST /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/regenerate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60129 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60129 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60129 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60129 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60129 - "GET /api/podcasts/today?_t=1773482521519 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60129 - "GET /api/podcasts/history?_t=1773482521519 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60257 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60258 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60259 - "GET /api/reports/7897aa07-9969-490e-b539-ea4b198ab766 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60259 - "GET /api/reports/018bc30f-a64e-48b5-a74f-117bce0bdd46 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60467 - "GET /api/podcasts/today?_t=1773482699787 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60468 - "GET /api/podcasts/history?_t=1773482699787 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60472 - "GET /podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18.mp3 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:60470 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60470 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60515 - "GET /api/reports/today HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60515 - "GET /api/reports/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60515 - "GET /api/podcasts/today?_t=1773482770723 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60515 - "GET /api/podcasts/history?_t=1773482770723 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60515 - "GET /api/podcasts/today?_t=1773482772747 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60700 - "GET /api/podcasts/history?_t=1773482772747 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60700 - "GET /api/podcasts/today?_t=1773482773388 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60515 - "GET /api/podcasts/history?_t=1773482773388 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60515 - "GET /api/podcasts/b8cf9632-cf45-46bf-ae68-f1a53983ad18 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61939 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62014 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62014 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62014 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62014 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62014 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62014 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62014 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62014 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62014 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62014 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62014 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62014 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62014 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62014 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62014 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61940 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61940 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61940 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62015 - "GET / HTTP/1.1" 200 OK

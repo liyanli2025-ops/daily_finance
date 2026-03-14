@@ -25,12 +25,8 @@ async def get_db(request: Request) -> AsyncSession:
 def _get_actual_audio_duration(report_id: str) -> Optional[int]:
     """从实际音频文件获取时长"""
     try:
-        import static_ffmpeg
-        static_ffmpeg.add_paths()
-    except:
-        pass
-    try:
-        from pydub import AudioSegment
+        # 使用 audio_mixer 模块中已配置好 ffmpeg 路径的 AudioSegment
+        from ..services.audio_mixer import AudioSegment
         from pathlib import Path
         # podcasts.py 在 app/routers/ 下，需要向上3级到 backend
         backend_dir = Path(__file__).resolve().parent.parent.parent
@@ -152,6 +148,10 @@ async def get_podcast_detail(
     if not report:
         raise HTTPException(status_code=404, detail="播客不存在")
     
+    # 尝试从实际音频文件获取时长（与 /today 和 /history 接口保持一致）
+    actual_duration = _get_actual_audio_duration(report.id) if report.podcast_url else None
+    duration = actual_duration if actual_duration else report.podcast_duration
+    
     return {
         "report_id": report.id,
         "title": report.title,
@@ -159,7 +159,7 @@ async def get_podcast_detail(
         "created_at": report.created_at.isoformat() if report.created_at else None,
         "podcast_status": report.podcast_status,
         "podcast_url": report.podcast_url,
-        "podcast_duration": report.podcast_duration
+        "podcast_duration": duration  # 使用实际文件时长
     }
 
 

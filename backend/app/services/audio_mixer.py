@@ -11,11 +11,25 @@ from typing import Optional
 try:
     import static_ffmpeg
     static_ffmpeg.add_paths()
-    print("[AudioMixer] 已配置 static-ffmpeg")
+    
+    # 获取 static_ffmpeg 的实际路径并设置给 pydub
+    import shutil
+    ffmpeg_path = shutil.which('ffmpeg')
+    ffprobe_path = shutil.which('ffprobe')
+    
+    if ffmpeg_path and ffprobe_path:
+        # 直接设置 pydub 使用的转换器路径
+        from pydub import AudioSegment
+        AudioSegment.converter = ffmpeg_path
+        AudioSegment.ffmpeg = ffmpeg_path
+        AudioSegment.ffprobe = ffprobe_path
+        print(f"[AudioMixer] 已配置 ffmpeg: {ffmpeg_path}")
+    else:
+        print("[AudioMixer] 警告: static-ffmpeg 路径未找到")
+        from pydub import AudioSegment
 except ImportError:
     print("[AudioMixer] static-ffmpeg 未安装，尝试使用系统 ffmpeg")
-
-from pydub import AudioSegment
+    from pydub import AudioSegment
 
 from ..config import settings
 
@@ -68,6 +82,13 @@ class AudioMixerService:
         Returns:
             输出文件路径
         """
+        # 确保 ffmpeg 路径已设置（每次调用时检查）
+        try:
+            import static_ffmpeg
+            static_ffmpeg.add_paths()
+        except ImportError:
+            pass
+        
         if not self.has_bgm():
             print("[WARN] 未找到背景音乐文件，跳过混音")
             return podcast_path
@@ -140,8 +161,8 @@ class AudioMixerService:
         
         # 将音频分成小块来检测
         chunk_size = 100  # 100ms 的块
-        silence_threshold = -40  # dBFS，低于此值认为是静音
-        min_pause_duration = 800  # 至少 800ms 的静音才算停顿
+        silence_threshold = -32  # dBFS，低于此值认为是静音（放宽阈值以更好检测TTS静音）
+        min_pause_duration = 600  # 至少 600ms 的静音才算停顿（降低以捕获更多停顿）
         
         current_pause_start = None
         
@@ -225,12 +246,12 @@ class AudioMixerService:
         效果：停顿时背景音乐音量从低 -> 正常 -> 低，形成"提示"效果
         """
         # 渐强/渐弱的过渡时间
-        transition_time = 300  # 300ms
+        transition_time = 250  # 250ms（缩短过渡时间，效果更明显）
         # 停顿中间保持正常音量的时间
-        hold_time = 500  # 500ms
+        hold_time = 400  # 400ms
         
-        # 计算每个停顿需要多少额外增益
-        gain_boost = -self.bgm_volume_reduction  # 提升回正常音量
+        # 计算每个停顿需要多少额外增益（增强效果）
+        gain_boost = -self.bgm_volume_reduction * 1.2  # 提升到略高于正常音量，效果更明显
         
         result = bgm_middle
         
@@ -260,7 +281,7 @@ class AudioMixerService:
                     # 使用 crossfade 思路：混合低音量和正常音量
                     fade_in_segment = fade_in_segment.fade(
                         from_gain=0,
-                        to_gain=gain_boost * 0.5,  # 只提升一半，不要太突兀
+                        to_gain=gain_boost * 0.8,  # 提升到80%，效果更明显
                         start=0,
                         duration=len(fade_in_segment)
                     )
@@ -269,14 +290,14 @@ class AudioMixerService:
                 # 保持部分（增益）
                 if hold_end <= len(result) and hold_end > hold_start:
                     hold_segment = result[hold_start:hold_end]
-                    hold_segment = hold_segment + (gain_boost * 0.5)  # 提升音量
+                    hold_segment = hold_segment + (gain_boost * 0.8)  # 提升音量到80%
                     result = result[:hold_start] + hold_segment + result[hold_end:]
                 
                 # 渐弱部分
                 if fade_out_end <= len(result):
                     fade_out_segment = result[fade_out_start:fade_out_end]
                     fade_out_segment = fade_out_segment.fade(
-                        from_gain=gain_boost * 0.5,
+                        from_gain=gain_boost * 0.8,
                         to_gain=0,
                         start=0,
                         duration=len(fade_out_segment)

@@ -1,7 +1,7 @@
 import requests
 
 # 测试添加自选股 API
-url = "http://localhost:8000/api/stocks/watchlist"
+url = "http://localhost:9090/api/stocks/watchlist"
 
 data = {
     "code": "688535",

@@ -34,8 +34,8 @@ echo.
 
 echo [6/6] 启动后端服务...
 echo ========================================
-echo   服务启动中，请访问: http://localhost:8000
-echo   API 文档: http://localhost:8000/docs
+echo   服务启动中，请访问: http://localhost:9090
+echo   API 文档: http://localhost:9090/docs
 echo   按 Ctrl+C 停止服务
 echo ========================================
 echo.

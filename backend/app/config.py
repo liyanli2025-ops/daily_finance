@@ -73,7 +73,7 @@ class Settings(BaseSettings):
         description="数据库连接字符串"
     )
     
-    # 数据存储路径
+    # 数据存储路径 - 使用相对路径，会在初始化时转为绝对路径
     data_dir: Path = Field(default=Path("./data"), description="数据目录")
     reports_dir: Path = Field(default=Path("./data/reports"), description="报告存储目录")
     podcasts_dir: Path = Field(default=Path("./data/podcasts"), description="播客存储目录")
@@ -93,6 +93,26 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+    
+    def model_post_init(self, __context):
+        """初始化后处理，将相对路径转换为绝对路径"""
+        # 获取 backend 目录的绝对路径（config.py 所在目录的上两级）
+        config_file = Path(__file__).resolve()
+        backend_dir = config_file.parent.parent
+        
+        # 转换为绝对路径
+        if not self.data_dir.is_absolute():
+            self.data_dir = backend_dir / self.data_dir
+        if not self.reports_dir.is_absolute():
+            self.reports_dir = backend_dir / self.reports_dir
+        if not self.podcasts_dir.is_absolute():
+            self.podcasts_dir = backend_dir / self.podcasts_dir
+        
+        # 修复数据库路径：将相对路径转换为绝对路径
+        if self.database_url.startswith("sqlite:///./"):
+            db_relative = self.database_url.replace("sqlite:///./", "")
+            db_absolute = backend_dir / db_relative
+            self.database_url = f"sqlite:///{db_absolute}"
     
     def ensure_directories(self):
         """确保所有数据目录存在"""

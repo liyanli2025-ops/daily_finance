@@ -3,7 +3,7 @@
  * 封装所有与后端的通信
  */
 
-const BASE_URL = 'http://localhost:8000/api';
+const BASE_URL = 'http://localhost:9090/api';
 
 class ApiService {
   private baseUrl: string;

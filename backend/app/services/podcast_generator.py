@@ -117,6 +117,12 @@ class PodcastGeneratorService:
         """判断是否是周末"""
         if check_date is None:
             check_date = date.today()
+        # 如果是字符串，转换为 date 对象
+        if isinstance(check_date, str):
+            try:
+                check_date = datetime.strptime(check_date, "%Y-%m-%d").date()
+            except ValueError:
+                check_date = date.today()
         return check_date.weekday() >= 5  # 5是周六，6是周日
     
     def _get_random_opening(self, is_weekend: bool = False) -> str:
@@ -169,7 +175,8 @@ class PodcastGeneratorService:
         
         # 获取实际音频时长
         try:
-            from pydub import AudioSegment
+            # 使用 audio_mixer 模块中已配置好 ffmpeg 路径的 AudioSegment
+            from .audio_mixer import AudioSegment
             audio = AudioSegment.from_mp3(str(output_path))
             duration_seconds = len(audio) // 1000
         except Exception as e:
@@ -191,7 +198,8 @@ class PodcastGeneratorService:
         
         通过 [SECTION_BREAK] 标记分段，每段之间加入 1.5 秒停顿
         """
-        from pydub import AudioSegment
+        # 使用 audio_mixer 模块中已配置好 ffmpeg 路径的 AudioSegment
+        from .audio_mixer import AudioSegment
         import tempfile
         
         # 分段
@@ -275,6 +283,13 @@ class PodcastGeneratorService:
         5. 模块之间加入 [SECTION_BREAK] 标记，生成时会加入停顿和背景音乐渐强效果
         """
         report_date = report.report_date
+        # 确保 report_date 是 date 对象
+        if isinstance(report_date, str):
+            try:
+                report_date = datetime.strptime(report_date, "%Y-%m-%d").date()
+            except ValueError:
+                report_date = date.today()
+        
         is_weekend = self._is_weekend(report_date)
         weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         weekday_name = weekday_names[report_date.weekday()]
@@ -303,9 +318,7 @@ class PodcastGeneratorService:
 [SECTION_BREAK]
 """
         else:
-            opening += f"""
-{report.title}
-
+            opening += """
 废话不多说，直接上干货！
 
 [SECTION_BREAK]
@@ -540,7 +553,37 @@ class PodcastGeneratorService:
         return full_text
     
     def _extract_key_paragraphs(self, content: str) -> str:
-        """从报告内容中提取关键段落用于播客"""
+        """
+        从报告内容中提取关键段落用于播客
+        
+        优化：跳过报告开头的标题、引言、开场白部分，直接从"模块"开始
+        避免与播客自己的开场白重复
+        """
+        # 先尝试找到"模块"开始的位置，跳过报告开头的引言部分
+        # 常见的模块标记：## 模块1、## 模块一、**模块1**、模块1：等
+        import re
+        
+        # 定位模块开始位置的正则模式
+        module_patterns = [
+            r'##\s*模块\s*[1一]',           # ## 模块1 或 ## 模块一
+            r'\*\*模块\s*[1一]',             # **模块1**
+            r'模块\s*[1一][：:、]',           # 模块1：或 模块1、
+            r'##\s*[🔍📊💡🎯📌⚡🔥]\s*模块', # 带emoji的模块标题
+            r'#\s+.*核心.*复盘',              # # 本周核心复盘 等周末模式
+        ]
+        
+        module_start = -1
+        for pattern in module_patterns:
+            match = re.search(pattern, content)
+            if match:
+                module_start = match.start()
+                break
+        
+        # 如果找到模块位置，从该位置开始提取
+        if module_start > 0:
+            content = content[module_start:]
+            print(f"[播客] 跳过报告开头，从模块位置开始（跳过了 {module_start} 字符）")
+        
         # 清理Markdown格式
         text = self._clean_for_tts(content)
         

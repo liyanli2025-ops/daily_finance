@@ -87,6 +87,27 @@
             animation: fadeIn 0.3s ease;
         }
         
+        /* 播客Tab特殊处理：使用visibility隐藏以保持audio播放 */
+        #podcasts {
+            display: block !important;
+        }
+        
+        #podcasts:not(.active) {
+            visibility: hidden;
+            position: absolute;
+            left: -9999px;
+            height: 0;
+            overflow: hidden;
+        }
+        
+        #podcasts.active {
+            visibility: visible;
+            position: relative;
+            left: 0;
+            height: auto;
+            overflow: visible;
+        }
+        
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -490,7 +511,7 @@
         <!-- 播客模块 -->
         <div id="podcasts" class="tab-content">
             <div class="card">
-                <h3>🎧 今日播客</h3>
+                <h3>🎧 今日播客 <button class="btn btn-secondary" style="float: right; padding: 5px 12px; font-size: 0.8rem;" onclick="refreshPodcast()">🔄 刷新</button></h3>
                 <div id="today-podcast">
                     <div class="empty-state">
                         <div class="icon">🎙️</div>
@@ -514,6 +535,9 @@
     <script>
         const API_BASE = 'http://localhost:9090/api';
         
+        // 标记播客是否已加载过（避免切换Tab时重复加载导致播放中断）
+        let podcastLoaded = false;
+        
         // 切换标签
         function switchTab(tabId) {
             // 更新按钮状态
@@ -531,8 +555,17 @@
             } else if (tabId === 'stocks') {
                 loadWatchlist();
             } else if (tabId === 'podcasts') {
-                loadTodayPodcast();
-                loadPodcastHistory();
+                // 只有首次进入或需要刷新时才加载播客
+                // 检查是否有正在播放的音频
+                const audio = document.querySelector('#podcasts audio');
+                const isPlaying = audio && !audio.paused;
+                
+                if (!podcastLoaded || !isPlaying) {
+                    loadTodayPodcast();
+                    loadPodcastHistory();
+                    podcastLoaded = true;
+                }
+                // 如果正在播放，不重新加载，保持播放状态
             }
         }
         
@@ -1017,6 +1050,15 @@
         
         // ========== 播客模块 ==========
         
+        // 手动刷新播客（强制重新加载）
+        function refreshPodcast() {
+            podcastLoaded = false;
+            loadTodayPodcast();
+            loadPodcastHistory();
+            podcastLoaded = true;
+            showToast('播客已刷新', 'success');
+        }
+        
         async function loadTodayPodcast() {
             const container = document.getElementById('today-podcast');
             try {
@@ -1059,7 +1101,7 @@
                             </div>
                             ${data.podcast_url ? `
                                 <audio controls preload="metadata" style="width: 100%; margin-top: 15px;">
-                                    <source src="http://localhost:9090${data.podcast_url}" type="audio/mpeg">
+                                    <source src="http://localhost:9090${data.podcast_url}?t=${Date.now()}" type="audio/mpeg">
                                     您的浏览器不支持音频播放
                                 </audio>
                             ` : '<p style="margin-top: 15px; color: rgba(255,255,255,0.5);">播客音频生成中...</p>'}
@@ -1180,7 +1222,7 @@
                         </div>
                         ${data.podcast_url ? `
                             <audio controls preload="metadata" style="width: 100%; margin-top: 15px;" autoplay>
-                                <source src="http://localhost:9090${data.podcast_url}" type="audio/mpeg">
+                                <source src="http://localhost:9090${data.podcast_url}?t=${Date.now()}" type="audio/mpeg">
                                 您的浏览器不支持音频播放
                             </audio>
                         ` : '<p style="margin-top: 15px; color: rgba(255,255,255,0.5);">播客音频不可用</p>'}

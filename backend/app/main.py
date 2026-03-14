@@ -10,6 +10,7 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pathlib import Path
 
 # 修复 Windows 控制台编码问题
@@ -92,6 +93,11 @@ podcasts_path = Path(settings.podcasts_dir)
 if podcasts_path.exists():
     app.mount("/podcasts", StaticFiles(directory=str(podcasts_path)), name="podcasts")
 
+# 前端静态文件服务
+web_path = Path(__file__).parent.parent.parent / "web"
+if web_path.exists():
+    app.mount("/static", StaticFiles(directory=str(web_path)), name="static")
+
 
 # 注册路由
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
@@ -101,7 +107,11 @@ app.include_router(stocks.router, prefix="/api/stocks", tags=["Stocks"])
 
 @app.get("/")
 async def root():
-    """根路径 - 服务状态检查"""
+    """根路径 - 返回前端页面"""
+    web_path = Path(__file__).parent.parent.parent / "web"
+    index_file = web_path / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
     return {
         "name": settings.app_name,
         "version": "0.1.0",
