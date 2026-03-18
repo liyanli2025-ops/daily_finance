@@ -212,6 +212,73 @@ class ApiService {
       method: 'POST',
     });
   }
+
+  // ==================== 公众号订阅 ====================
+
+  /**
+   * 获取公众号列表
+   */
+  async getWechatAccounts() {
+    return this.request<any[]>('/wechat/accounts');
+  }
+
+  /**
+   * 添加公众号
+   */
+  async addWechatAccount(data: {
+    name: string;
+    biz: string;
+    description?: string;
+    category?: string;
+  }) {
+    return this.request<any>('/wechat/accounts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * 删除公众号
+   */
+  async deleteWechatAccount(accountId: string) {
+    return this.request<any>(`/wechat/accounts/${accountId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * 切换公众号启用/禁用
+   */
+  async toggleWechatAccount(accountId: string) {
+    return this.request<any>(`/wechat/accounts/${accountId}/toggle`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * 从链接提取 biz
+   */
+  async extractWechatBiz(url: string) {
+    return this.request<any>(`/wechat/extract-biz?url=${encodeURIComponent(url)}`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * 测试采集公众号
+   */
+  async testWechatFetch(accountId: string) {
+    return this.request<any>(`/wechat/test-fetch/${accountId}`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * 获取预置公众号列表
+   */
+  async getWechatPresets() {
+    return this.request<any[]>('/wechat/presets');
+  }
 }
 
 // 导出单例实例

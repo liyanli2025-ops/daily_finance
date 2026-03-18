@@ -13,6 +13,7 @@ import {
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { router } from 'expo-router';
 
 export default function SettingsScreen() {
   const theme = useTheme();
@@ -128,6 +129,15 @@ export default function SettingsScreen() {
             />
           )}
           style={styles.listItem}
+        />
+
+        <List.Item
+          title="公众号订阅"
+          description="管理微信公众号信息源"
+          left={(props) => <List.Icon {...props} icon="wechat" />}
+          onPress={() => router.push('/wechat-accounts')}
+          style={styles.listItem}
+          right={(props) => <List.Icon {...props} icon="chevron-right" />}
         />
       </List.Section>
 

@@ -258,6 +258,14 @@ class NewsCollectorService:
         except Exception as e:
             print(f"[自选股] 新闻采集失败: {e}")
         
+        # 6. 【新增】采集微信公众号文章
+        try:
+            wechat_news = await self._collect_wechat_articles()
+            all_news.extend(wechat_news)
+            print(f"[公众号] 文章补充 {len(wechat_news)} 条")
+        except Exception as e:
+            print(f"[公众号] 文章采集失败: {e}")
+        
         # 去重
         unique_news = self._deduplicate(all_news)
         
@@ -1183,6 +1191,74 @@ class NewsCollectorService:
             return None
         
         return self.sentiment_analyzer.calculate_market_sentiment_index(analyzed_pairs)
+    
+    async def _collect_wechat_articles(self) -> List[News]:
+        """
+        采集微信公众号订阅的文章
+        
+        通过 WechatSubscriptionService + RSSHub 实现
+        需要数据库连接来读取用户订阅的公众号列表
+        """
+        news_list = []
+        
+        try:
+            from .wechat_service import get_wechat_service
+            import aiosqlite
+            from pathlib import Path
+            
+            wechat_service = get_wechat_service()
+            
+            # 直接读取数据库获取启用的公众号
+            db_path = Path(settings.database_url.replace("sqlite:///", ""))
+            if not db_path.exists():
+                return news_list
+            
+            # 读取所有启用的公众号
+            accounts = []
+            async with aiosqlite.connect(str(db_path)) as db:
+                async with db.execute(
+                    "SELECT biz, name FROM wechat_accounts WHERE enabled = 1"
+                ) as cursor:
+                    rows = await cursor.fetchall()
+                    for row in rows:
+                        accounts.append({"biz": row[0], "name": row[1]})
+            
+            if not accounts:
+                print("  [公众号] 无启用的公众号订阅")
+                return news_list
+            
+            print(f"  [公众号] 发现 {len(accounts)} 个启用的公众号，开始采集...")
+            
+            # 并行采集（限制并发）
+            import asyncio
+            semaphore = asyncio.Semaphore(3)
+            
+            async def _fetch_one(acc):
+                async with semaphore:
+                    try:
+                        articles = await wechat_service.fetch_articles(
+                            acc["biz"], acc["name"]
+                        )
+                        if articles:
+                            print(f"    [公众号] {acc['name']}: {len(articles)} 篇")
+                        return articles
+                    except Exception as e:
+                        print(f"    [公众号] {acc['name']} 失败: {e}")
+                        return []
+            
+            tasks = [_fetch_one(acc) for acc in accounts]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            for result in results:
+                if isinstance(result, Exception):
+                    continue
+                if result:
+                    news_list.extend(result)
+                    
+        except Exception as e:
+            print(f"  [公众号] 采集异常: {e}")
+        
+        return news_list
 
 
 # 单例实例

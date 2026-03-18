@@ -273,14 +273,20 @@ class PodcastGeneratorService:
     
     def _prepare_podcast_text(self, report: Report, weather_info: str = "") -> str:
         """
-        准备播客文本 - 差异化风格（观点输出 + 财经脱口秀）
+        准备播客文本 - 精简版（观点输出 + 财经脱口秀）
         
-        改进点：
-        1. 周末和工作日内容差异化
-        2. 多样化开场白，使用配置的用户昵称
-        3. 开场加入北京天气
-        4. "今日"表述更准确
-        5. 模块之间加入 [SECTION_BREAK] 标记，生成时会加入停顿和背景音乐渐强效果
+        结构（每个信息只说一遍）：
+        1. 开场白（天气 + 日期）
+        2. 核心判断（3句话，最重要的结论）
+        3. 报告正文精华（去重后的深度内容）
+        4. 跨界热点（差异化内容，与正文不重复）
+        5. 结束语（基于当天核心观点动态总结）
+        
+        去掉了：
+        - highlights_text（重点新闻已在报告正文 key_content 里覆盖）
+        - analysis_text（市场分析已在核心观点和报告正文里覆盖）
+        - 固定模板的结尾总结（改为动态生成）
+        - 内容不足时的鸡汤填充
         """
         report_date = report.report_date
         # 确保 report_date 是 date 对象
@@ -334,7 +340,7 @@ class PodcastGeneratorService:
 """
             else:
                 core_opinions_text = f"""
-{name}，先说说我今天的三个核心判断，听好了：
+{name}，先说说我今天的核心判断，听好了：
 
 """
             for i, opinion in enumerate(report.core_opinions, 1):
@@ -348,7 +354,7 @@ class PodcastGeneratorService:
 """
             else:
                 core_opinions_text += """
-这几条判断，你可以不信，但我建议你记下来，过几天回来对照看看我说得准不准。
+这几条判断，记下来，过几天回来对照看看准不准。
 
 [SECTION_BREAK]
 """
@@ -362,15 +368,14 @@ class PodcastGeneratorService:
 [SECTION_BREAK]
 """
         
-        # 跨界热点分析（如果有）- 这是差异化的重点
+        # 跨界热点分析（如果有）- 这是差异化的重点，和报告正文不重复
         cross_border_text = ""
         if hasattr(report, 'cross_border_events') and report.cross_border_events:
             cross_border_text = f"""
 
 [SECTION_BREAK]
 
-{name}，说完财经新闻，我们聊聊跨界热点。
-很多人只盯着财经频道，其实很多影响股市的大事，都发生在财经圈外面。
+{name}，聊聊跨界热点。很多影响股市的大事，其实发生在财经圈外面。
 
 """
             for event in report.cross_border_events:
@@ -382,175 +387,80 @@ class PodcastGeneratorService:
                 }.get(event.category.value, "其他")
                 
                 cross_border_text += f"""
-来看一个{category_name}的事件：{event.title}
+{category_name}方面：{event.title}
 
 简单说就是：{event.summary}
 
-这对股市有什么影响？我跟你说：
-直接影响是：{event.market_impact_direct}
-间接影响是：{event.market_impact_indirect}
+对股市的影响：{event.market_impact_direct}
+{event.market_impact_indirect}
 
-历史上类似情况：{event.historical_reference}
+受益方：{', '.join(event.beneficiaries) if event.beneficiaries else '暂无明确受益方'}
+受损方：{', '.join(event.losers) if event.losers else '暂无明确受损方'}
 
-所以受益的可能是：{', '.join(event.beneficiaries) if event.beneficiaries else '暂无明确受益方'}
-受损的可能是：{', '.join(event.losers) if event.losers else '暂无明确受损方'}
-
-我的建议是：{event.follow_up_advice}
+我的建议：{event.follow_up_advice}
 
 """
         
-        # 重点新闻 + 我的看法
-        highlights_text = ""
-        if report.highlights:
-            if is_weekend:
-                highlights_text = """
-
-[SECTION_BREAK]
-
-好，接下来聊聊本周的几条重要新闻，以及我的个人看法。
-
-"""
-            else:
-                highlights_text = f"""
-
-[SECTION_BREAK]
-
-{name}，接下来聊聊今天的几条重要新闻，以及我的个人看法。
-这里说的"今天"，指的是最新的交易日和近期的重要消息。
-
-"""
-            for i, h in enumerate(report.highlights[:3], 1):  # 只取前3条重点说
-                sentiment_opinion = {
-                    "positive": "我觉得这是个好消息",
-                    "negative": "这条消息需要警惕",
-                    "neutral": "这条消息影响不大"
-                }.get(h.sentiment.value, "")
-                
-                highlights_text += f"""
-第{i}条：{h.title}
-
-{h.summary}
-
-{sentiment_opinion}。
-"""
-                if h.historical_context:
-                    highlights_text += f"从历史经验看：{h.historical_context}\n"
-                
-                highlights_text += "\n"
-        
-        # 市场分析 + 操作建议
-        analysis_text = ""
-        if report.analysis:
-            trend_opinion = {
-                "bullish": "我个人倾向于看多",
-                "bearish": "我觉得需要谨慎一些",
-                "neutral": "目前我保持观望"
-            }.get(report.analysis.trend.value, "")
-            
-            if is_weekend:
-                analysis_text = f"""
-
-[SECTION_BREAK]
-
-{name}，说说我对下周市场的看法。
-
-{trend_opinion}。原因很简单：
-
-关键因素就这几个：{', '.join(report.analysis.key_factors)}
-
-如果你问我下周该关注什么？我觉得机会在：{', '.join(report.analysis.opportunities)}
-
-但也要注意这些风险：{', '.join(report.analysis.risks)}
-
-周末有时间的话，可以好好研究一下这些方向。
-
-"""
-            else:
-                analysis_text = f"""
-
-[SECTION_BREAK]
-
-{name}，说说我对整体市场的看法。
-
-{trend_opinion}。原因很简单：
-
-关键因素就这几个：{', '.join(report.analysis.key_factors)}
-
-如果你问我现在该买什么？我觉得机会在：{', '.join(report.analysis.opportunities)}
-
-但也要注意这些风险：{', '.join(report.analysis.risks)}
-
-记住，投资没有绝对的对错，关键是你要有自己的判断逻辑。
-
-"""
-        
-        # 处理报告正文的关键段落
+        # 处理报告正文的关键段落（已通过 _extract_key_paragraphs 去重和精炼）
         key_content = self._extract_key_paragraphs(report.content)
         
-        # 结束语（有态度的风格，周末和工作日不同）
-        if is_weekend:
-            closing = f"""
-
-[SECTION_BREAK]
-
-好了{name}，今天的周末财经复盘就到这里。
-
-总结一下：
-第一，回顾本周的重要事件，理清逻辑；
-第二，为下周做好准备，心中有数；
-第三，周末好好休息，保持好状态。
-
-最后送给你一句话：投资是马拉松，不是百米冲刺。
-学会休息，才能走得更远。
-
-{name}，周末愉快！我们下周再见！
-"""
-        else:
-            closing = f"""
-
-[SECTION_BREAK]
-
-好了{name}，今天的财经脱口秀就到这里。
-
-总结一下今天的核心观点：
-第一，关注政策面的变化；
-第二，重点板块可以逢低布局；
-第三，风险管理永远是第一位的。
-
-最后送给你一句话：投资不是赌博，是认知的变现。
-知道自己为什么买、为什么卖，比知道买什么更重要。
-
-{name}，今天就聊到这，我们明天再见！
-"""
+        # 结束语 - 基于当天实际核心观点动态生成
+        closing = self._generate_dynamic_closing(report, name, is_weekend)
         
-        # 组合完整文本
-        full_text = opening + core_opinions_text + key_content + cross_border_text + highlights_text + analysis_text + closing
+        # 组合完整文本（去掉了 highlights_text 和 analysis_text，避免重复）
+        full_text = opening + core_opinions_text + key_content + cross_border_text + closing
         
-        # 控制字数在合理范围（5000-7500字，对应20-30分钟）
-        if len(full_text) > 7500:
+        # 控制字数在合理范围（3000-6000字，对应12-24分钟）
+        if len(full_text) > 6000:
             # 截断并添加总结
-            full_text = full_text[:7000] + f"""
+            full_text = full_text[:5500] + f"""
 
-{name}，由于时间关系，今天就先聊到这里。
-更详细的分析可以在App里看完整报告。
+{name}，时间关系，今天就先聊到这里。更详细的内容可以在App里看完整报告。
 
 """ + closing
-        elif len(full_text) < 4000:
-            # 内容不足时，添加更多观点
-            padding = f"""
-
-{name}，让我再补充几点个人看法。
-
-关于当前市场，我认为最重要的是把握节奏。
-不要急于追涨，也不要盲目恐惧。
-记住：别人恐惧时贪婪，别人贪婪时恐惧。
-
-今天的市场情况：{report.summary}
-
-"""
-            full_text = full_text.replace(closing, padding + closing)
         
         return full_text
+    
+    def _generate_dynamic_closing(self, report: Report, name: str, is_weekend: bool) -> str:
+        """
+        基于当天报告内容动态生成结尾总结，不使用固定模板
+        """
+        closing = f"""
+
+[SECTION_BREAK]
+
+好了{name}，"""
+        
+        if is_weekend:
+            closing += "今天的周末财经复盘就到这里。\n\n"
+        else:
+            closing += "今天的财经快报就到这里。\n\n"
+        
+        # 用实际核心观点做总结
+        if hasattr(report, 'core_opinions') and report.core_opinions:
+            closing += "帮你划个重点：\n"
+            for i, opinion in enumerate(report.core_opinions, 1):
+                # 提取观点的前30个字作为精炼总结
+                short_opinion = opinion[:30].rstrip('，。、；') if len(opinion) > 30 else opinion.rstrip('，。、；')
+                closing += f"第{i}，{short_opinion}。\n"
+            closing += "\n"
+        
+        # 如果有市场趋势判断，加一句简短的态度
+        if report.analysis:
+            trend_one_liner = {
+                "bullish": "整体我偏乐观，但仓位控制好。",
+                "bearish": "短期注意风险，别急着抄底。",
+                "neutral": "震荡市别追涨杀跌，耐心等机会。"
+            }.get(report.analysis.trend.value, "")
+            if trend_one_liner:
+                closing += f"{trend_one_liner}\n\n"
+        
+        if is_weekend:
+            closing += f"{name}，周末愉快！我们下周再见！\n"
+        else:
+            closing += f"{name}，今天就聊到这，我们明天见！\n"
+        
+        return closing
     
     def _extract_key_paragraphs(self, content: str) -> str:
         """
