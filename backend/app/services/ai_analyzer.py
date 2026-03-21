@@ -8,7 +8,7 @@ AI 分析服务
 - 统一自选股管理（配置文件 + 数据库）
 """
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict, Any
 import uuid
 
@@ -113,6 +113,12 @@ class AIAnalyzerService:
         weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         weekday_name = weekday_names[today.weekday()]
         
+        # 计算上一个交易日（市场数据实际对应的日期）
+        last_trading = today - timedelta(days=1)
+        while last_trading.weekday() >= 5:
+            last_trading -= timedelta(days=1)
+        last_trading_str = f"{last_trading.month}月{last_trading.day}日{weekday_names[last_trading.weekday()]}"
+        
         # 【新增】获取自选股配置
         watchlist_text = self._prepare_watchlist_analysis()
         investment_style_desc = self._get_investment_style_description()
@@ -154,6 +160,8 @@ class AIAnalyzerService:
 ## 🎯 今日分析任务
 
 今天是{today.strftime('%Y年%m月%d日')} {weekday_name}。
+⚠️ 重要：本报告在开盘前生成，市场数据来自上一个交易日（{last_trading_str}）的收盘数据。
+请在分析中使用"上一个交易日"而非"今天"来描述市场数据，避免让读者/听众误解。
 {weekend_notice}
 
 ### 用户画像
@@ -177,11 +185,11 @@ class AIAnalyzerService:
 
 ---
 
-## 📰 {'本周' if is_weekend else '今日'}财经新闻（已按重要性排序，含情感标签）
+## 📰 {'本周' if is_weekend else '最新'}财经新闻（已按重要性排序，含情感标签）
 
 {finance_summary}
 
-## 🌍 {'本周' if is_weekend else '今日'}跨界热点
+## 🌍 {'本周' if is_weekend else '最新'}跨界热点
 
 {cross_border_summary if cross_border_summary else "暂无重大跨界热点"}
 
@@ -191,18 +199,18 @@ class AIAnalyzerService:
 
 请按照以下7大模块撰写深度分析报告，使用 Markdown 格式：
 
-### 模块1：🎯 {'本周核心复盘' if is_weekend else '今日三个核心判断'}
+### 模块1：🎯 {'本周核心复盘' if is_weekend else '三个核心判断'}
 
 **要求**：开门见山，直接亮明你的观点
 
-{"回顾本周最重要的3个市场特征，并给出下周的核心判断" if is_weekend else "用3句话概括今日最重要的市场信号和投资判断"}：
+{"回顾本周最重要的3个市场特征，并给出下周的核心判断" if is_weekend else "用3句话概括上一个交易日最重要的市场信号和投资判断"}：
 - 每个判断必须有具体数据支撑（引用上面的市场数据）
 - 参考市场情绪指数，判断当前情绪状态
 - 敢于给出明确方向（看多/看空/观望）
 - 给出置信度（高/中/低）
 
 示例格式：
-> **判断一（置信度：高）**：创业板今日放量上涨2.3%，突破20日均线，市场情绪指数+0.35偏多，建议加仓科技成长股。理由是...
+> **判断一（置信度：高）**：创业板上一个交易日放量上涨2.3%，突破20日均线，市场情绪指数+0.35偏多，建议加仓科技成长股。理由是...
 
 ### 模块2：📈 {'本周大盘复盘' if is_weekend else '大盘深度解读'}
 
@@ -295,7 +303,7 @@ class AIAnalyzerService:
 
 ```json
 {{
-  "title": "{'周末复盘版' if is_weekend else '结合今日特征'}的标题",
+  "title": "{'周末复盘版' if is_weekend else '结合当前市场特征'}的标题",
   "summary": "200字精华摘要（引用关键数据和情绪指数）",
   "core_opinions": [
     "核心判断1（含置信度和理由）",
@@ -953,9 +961,9 @@ class AIAnalyzerService:
         
         return f"""# {today} ({weekday}) 财经深度日报
 
-## 🎯 今日核心观点
+## 🎯 核心观点
 
-1. **央行维持流动性宽松，建议{action}金融板块**：今日央行开展逆回购操作，银行间利率维持低位，流动性充裕利好估值修复。
+1. **央行维持流动性宽松，建议{action}金融板块**：央行近日开展逆回购操作，银行间利率维持低位，流动性充裕利好估值修复。
 
 2. **{hot_sectors[0]}板块持续走强，龙头个股目标价上调15%**：政策催化+业绩兑现，板块估值仍有空间，建议逢低布局龙头。
 
@@ -967,7 +975,7 @@ class AIAnalyzerService:
 
 ### 央行逆回购操作释放积极信号
 
-**事件概述**：央行今日开展2000亿元7天期逆回购操作，利率维持1.8%不变。
+**事件概述**：央行近日开展2000亿元7天期逆回购操作，利率维持1.8%不变。
 
 **历史案例对比**：
 - 2024年9月，央行同样在市场低迷时加大逆回购力度，随后一个月上证指数上涨12.3%
@@ -992,7 +1000,7 @@ class AIAnalyzerService:
 ### {hot_sectors[0]}板块：强势领涨，仍有空间
 
 **板块表现**：
-- 今日涨幅：+{round(random.uniform(2, 5), 2)}%
+- 上一交易日涨幅：+{round(random.uniform(2, 5), 2)}%
 - 本周涨幅：+{round(random.uniform(5, 12), 2)}%
 - 资金流向：主力净流入{random.randint(20, 80)}亿元
 
@@ -1129,7 +1137,7 @@ class AIAnalyzerService:
 ```json
 {{
   "title": "{today} ({weekday}) 财经深度日报",
-  "summary": "今日A股市场{shanghai_trend}，上证指数{'+' if shanghai_change > 0 else ''}{shanghai_change}%。{hot_sectors[0]}板块表现活跃，央行维持流动性宽松。建议投资者保持{market_sentiment}态度，重点关注金融和{hot_sectors[0]}板块机会。",
+  "summary": "上一交易日A股市场{shanghai_trend}，上证指数{'+' if shanghai_change > 0 else ''}{shanghai_change}%。{hot_sectors[0]}板块表现活跃，央行维持流动性宽松。建议投资者保持{market_sentiment}态度，重点关注金融和{hot_sectors[0]}板块机会。",
   "core_opinions": [
     "央行维持流动性宽松，建议{action}金融板块",
     "{hot_sectors[0]}板块持续走强，龙头个股目标价上调15%",
@@ -1139,7 +1147,7 @@ class AIAnalyzerService:
     {{
       "title": "央行公开市场操作维护流动性",
       "source": "央行官网",
-      "summary": "央行今日开展2000亿元逆回购操作，利率维持1.8%不变，维护银行体系流动性合理充裕。",
+      "summary": "央行近日开展2000亿元逆回购操作，利率维持1.8%不变，维护银行体系流动性合理充裕。",
       "sentiment": "positive",
       "related_stocks": ["601398", "601288", "512800"],
       "historical_context": "2024年9月类似操作后，上证一个月涨12.3%"
@@ -1147,7 +1155,7 @@ class AIAnalyzerService:
     {{
       "title": "{hot_sectors[0]}板块集体走强",
       "source": "市场观察",
-      "summary": "{hot_sectors[0]}板块今日领涨两市，多只个股涨停，主力资金持续流入。",
+      "summary": "{hot_sectors[0]}板块上一交易日领涨两市，多只个股涨停，主力资金持续流入。",
       "sentiment": "positive",
       "related_stocks": [],
       "historical_context": "政策催化+业绩兑现双重驱动"

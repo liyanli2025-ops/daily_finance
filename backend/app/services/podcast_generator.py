@@ -6,9 +6,9 @@ import asyncio
 import os
 import re
 import random
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Tuple
 import uuid
 
 import edge_tts
@@ -55,21 +55,21 @@ class PodcastGeneratorService:
         
         # 工作日多样化开场白模板
         self.weekday_openings = [
-            f"{name}，早上好！新的一天开始了，让我们一起看看今天的财经大事。",
-            f"{name}你好呀！又是元气满满的一天，今天的市场有什么新动向呢？",
-            f"嗨，{name}！准备好了吗？今天的财经快报马上开始。",
-            f"{name}，早安！咖啡准备好了吗？边喝边听今天的市场分析吧。",
-            f"{name}，今天又是充满机会的一天！让我们看看市场在说什么。",
-            f"Hello{name}！通勤路上就让我来陪你，一起聊聊今天的财经热点。",
-            f"{name}早！新的一周，新的机会，今天的报告干货满满哦。",
-            f"{name}，起床啦！今天的市场消息已经为你整理好了。",
+            f"{name}，早上好！新的一天开始了，让我们一起看看最新的财经大事。",
+            f"{name}你好呀！又是元气满满的一天，最近的市场有什么新动向呢？",
+            f"嗨，{name}！准备好了吗？财经快报马上开始。",
+            f"{name}，早安！咖啡准备好了吗？边喝边听最新的市场分析吧。",
+            f"{name}，又是充满机会的一天！让我们看看市场在说什么。",
+            f"Hello{name}！通勤路上就让我来陪你，一起聊聊最新的财经热点。",
+            f"{name}早！新的一周，新的机会，这期报告干货满满哦。",
+            f"{name}，起床啦！最新的市场消息已经为你整理好了。",
         ]
         
         # 周末特别开场白
         self.weekend_openings = [
-            f"{name}，周末愉快！虽然A股和港股今天休市，但我们可以趁机复盘本周，展望下周。",
+            f"{name}，周末愉快！A股和港股休市中，但我们可以趁机复盘本周，展望下周。",
             f"{name}你好！难得的周末时光，让我们轻松聊聊这周的市场和下周的机会。",
-            f"嗨{name}，周末好！今天咱们不着急，慢慢聊聊这周发生的大事。",
+            f"嗨{name}，周末好！这期咱们不着急，慢慢聊聊这周发生的大事。",
             f"{name}，休息日快乐！市场虽然休息了，但我们的思考不能停。",
         ]
     
@@ -124,6 +124,46 @@ class PodcastGeneratorService:
             except ValueError:
                 check_date = date.today()
         return check_date.weekday() >= 5  # 5是周六，6是周日
+    
+    def _get_last_trading_day(self, current_date: date = None) -> date:
+        """
+        获取上一个交易日的日期
+        简单逻辑：往前推，跳过周末（不含法定节假日）
+        """
+        if current_date is None:
+            current_date = date.today()
+        last_day = current_date - timedelta(days=1)
+        # 跳过周末
+        while last_day.weekday() >= 5:
+            last_day -= timedelta(days=1)
+        return last_day
+    
+    def _get_market_data_date_info(self, report_date: date) -> Tuple[str, str, bool]:
+        """
+        根据报告日期，判断市场数据实际对应哪一天，返回准确的日期表述
+        
+        Returns:
+            (data_date_str, date_description, is_today_data)
+            - data_date_str: 数据对应的日期字符串，如 "3月20日周五"
+            - date_description: 用于播客的表述，如 "上一个交易日" 或 "今天"
+            - is_today_data: 数据是否就是今天的（即今天是交易日且已开盘）
+        """
+        weekday = report_date.weekday()  # 0=周一 ... 6=周日
+        
+        # 判断报告生成时，市场数据来自哪一天
+        # 系统默认凌晨5-6点生成，此时A股还没开盘（9:30），所以数据一定是上一个交易日的
+        if weekday >= 5:
+            # 周末：数据是上周五的
+            last_trading = self._get_last_trading_day(report_date)
+            weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+            data_date_str = f"{last_trading.month}月{last_trading.day}日{weekday_names[last_trading.weekday()]}"
+            return (data_date_str, "上一个交易日", False)
+        else:
+            # 工作日（凌晨生成，A股还没开盘，数据是上一个交易日的）
+            last_trading = self._get_last_trading_day(report_date)
+            weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+            data_date_str = f"{last_trading.month}月{last_trading.day}日{weekday_names[last_trading.weekday()]}"
+            return (data_date_str, "上一个交易日", False)
     
     def _get_random_opening(self, is_weekend: bool = False) -> str:
         """获取随机开场白"""
@@ -300,13 +340,16 @@ class PodcastGeneratorService:
         weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         weekday_name = weekday_names[report_date.weekday()]
         
+        # 获取市场数据对应的实际日期信息
+        data_date_str, date_description, is_today_data = self._get_market_data_date_info(report_date)
+        
         # 用户昵称
         name = self.user_nickname
         
         # 随机选择开场白
         random_greeting = self._get_random_opening(is_weekend)
         
-        # 开场白（包含天气和日期）
+        # 开场白（包含天气和日期，明确市场数据来自哪一天）
         opening = f"""
 {random_greeting}
 
@@ -317,15 +360,15 @@ class PodcastGeneratorService:
         
         # 周末特别提示
         if is_weekend:
-            opening += """
+            opening += f"""
 温馨提示：今天是周末，A股和港股都休市哦。
-所以今天的内容主要是本周回顾和下周展望，帮你做好投资规划。
+本期内容基于{date_description}也就是{data_date_str}的收盘数据，主要是本周回顾和下周展望，帮你做好投资规划。
 
 [SECTION_BREAK]
 """
         else:
-            opening += """
-废话不多说，直接上干货！
+            opening += f"""
+本期播客的市场数据来自{date_description}，也就是{data_date_str}的收盘数据。废话不多说，直接上干货！
 
 [SECTION_BREAK]
 """
@@ -340,7 +383,7 @@ class PodcastGeneratorService:
 """
             else:
                 core_opinions_text = f"""
-{name}，先说说我今天的核心判断，听好了：
+{name}，先说说我的几个核心判断，听好了：
 
 """
             for i, opinion in enumerate(report.core_opinions, 1):
@@ -361,7 +404,7 @@ class PodcastGeneratorService:
         else:
             # 使用摘要作为核心内容
             core_opinions_text = f"""
-{name}，今天的核心内容是：{report.summary}
+{name}，这期的核心内容是：{report.summary}
 
 接下来我展开聊聊。
 
@@ -415,7 +458,7 @@ class PodcastGeneratorService:
             # 截断并添加总结
             full_text = full_text[:5500] + f"""
 
-{name}，时间关系，今天就先聊到这里。更详细的内容可以在App里看完整报告。
+{name}，时间关系，这期就先聊到这里。更详细的内容可以在App里看完整报告。
 
 """ + closing
         
@@ -432,9 +475,9 @@ class PodcastGeneratorService:
 好了{name}，"""
         
         if is_weekend:
-            closing += "今天的周末财经复盘就到这里。\n\n"
+            closing += "这期的周末财经复盘就到这里。\n\n"
         else:
-            closing += "今天的财经快报就到这里。\n\n"
+            closing += "这期的财经快报就到这里。\n\n"
         
         # 用实际核心观点做总结
         if hasattr(report, 'core_opinions') and report.core_opinions:
@@ -458,7 +501,7 @@ class PodcastGeneratorService:
         if is_weekend:
             closing += f"{name}，周末愉快！我们下周再见！\n"
         else:
-            closing += f"{name}，今天就聊到这，我们明天见！\n"
+            closing += f"{name}，这期就聊到这，我们明天见！\n"
         
         return closing
     
