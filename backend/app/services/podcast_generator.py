@@ -81,31 +81,44 @@ class PodcastGeneratorService:
     
     async def get_beijing_weather(self) -> str:
         """
-        获取北京当天的天气情况
+        获取北京当天的天气情况（全天温度范围）
         使用免费的天气API
         """
         try:
             client = await self._get_http_client()
             
-            # 使用 wttr.in 免费天气服务
-            url = "https://wttr.in/Beijing?format=%C+%t+%h+%w&lang=zh-cn"
+            # 使用 wttr.in JSON API 获取全天温度范围
+            url = "https://wttr.in/Beijing?format=j1"
             response = await client.get(url, headers={"User-Agent": "curl/7.68.0"})
             
             if response.status_code == 200:
-                weather_raw = response.text.strip()
-                # 格式化天气信息
-                return f"北京今天的天气：{weather_raw}。"
-            
-            # 备用方案：使用另一个API
-            backup_url = "https://api.seniverse.com/v3/weather/now.json?key=demo&location=beijing&language=zh-Hans"
-            response = await client.get(backup_url)
-            if response.status_code == 200:
                 data = response.json()
-                result = data.get("results", [{}])[0]
-                now = result.get("now", {})
-                weather_text = now.get("text", "晴")
-                temperature = now.get("temperature", "20")
-                return f"北京今天{weather_text}，气温{temperature}度。"
+                # 获取今天的天气预报
+                weather_list = data.get("weather", [])
+                if weather_list:
+                    today = weather_list[0]
+                    max_temp = today.get("maxtempC", "")
+                    min_temp = today.get("mintempC", "")
+                    # 获取天气描述（从当前天气或小时预报中取）
+                    current = data.get("current_condition", [{}])[0]
+                    # 优先使用中文描述
+                    weather_desc_list = current.get("lang_zh", [{}])
+                    if weather_desc_list:
+                        weather_desc = weather_desc_list[0].get("value", "")
+                    else:
+                        weather_desc = current.get("weatherDesc", [{}])[0].get("value", "")
+                    
+                    if max_temp and min_temp:
+                        return f"北京今天{weather_desc}，全天气温{min_temp}到{max_temp}度。"
+                    elif weather_desc:
+                        return f"北京今天{weather_desc}。"
+            
+            # 备用方案：使用简单格式API获取天气描述
+            backup_url = "https://wttr.in/Beijing?format=%C&lang=zh-cn"
+            response = await client.get(backup_url, headers={"User-Agent": "curl/7.68.0"})
+            if response.status_code == 200:
+                weather_desc = response.text.strip()
+                return f"北京今天{weather_desc}。"
                 
         except Exception as e:
             print(f"[天气] 获取天气失败: {e}")
@@ -594,6 +607,8 @@ class PodcastGeneratorService:
         text = re.sub(r'\[\d+\]', '', text)
         # 移除 [新闻1] [来源2] 等方括号引用
         text = re.sub(r'\[(新闻|来源|参考)\d*\]', '', text)
+        # 移除 （新闻1）(新闻2) 等括号包裹的新闻引用
+        text = re.sub(r'[（(]\s*新闻\d+\s*[）)]', '', text)
         
         # 先处理包含前缀的模式（"据新闻X"、"根据新闻X"）
         # 移除 "据新闻1，" "根据新闻2，" 等表述（完整移除包括前缀）
