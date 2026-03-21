@@ -123,12 +123,17 @@ class AIAnalyzerService:
         watchlist_text = self._prepare_watchlist_analysis()
         investment_style_desc = self._get_investment_style_description()
         
-        # 【新增】获取真实市场数据
+        # 【新增】获取真实市场数据（带容错：即使失败也能继续生成报告）
         print("[AI] 正在获取真实市场数据...")
-        market_service = get_market_data_service()
-        market_data: MarketOverview = await market_service.get_market_overview(today)
-        market_data_text = market_data.to_prompt_text()
-        print(f"[AI] 市场数据获取完成：{len(market_data.indices)} 个指数，{len(market_data.top_sectors)} 个热门板块")
+        try:
+            market_service = get_market_data_service()
+            market_data: MarketOverview = await market_service.get_market_overview(today)
+            market_data_text = market_data.to_prompt_text()
+            print(f"[AI] 市场数据获取完成：{len(market_data.indices)} 个指数，{len(market_data.top_sectors)} 个热门板块")
+        except Exception as e:
+            print(f"[WARN] 市场数据获取失败，将使用空数据继续生成报告: {e}")
+            market_data = MarketOverview(date=today.strftime("%Y-%m-%d"))
+            market_data_text = "（市场数据暂不可用，请基于新闻信息进行分析）"
         
         # 【新增】计算市场情绪指数（基于 FinBERT 情感分析）
         sentiment_index_text = self._prepare_sentiment_index(news_list, cross_border_news or [])

@@ -198,17 +198,26 @@ class MarketDataService:
             print("⚠️ AKShare 不可用，返回空数据")
             return overview
         
-        # 并行获取各类数据
-        tasks = [
-            self._get_indices(),
-            self._get_sector_ranking(),
-            self._get_fund_flow(),
-            self._get_limit_stocks(target_date),
-            self._get_market_stats(),
-            self._get_hot_stocks(target_date),
+        # 串行获取各类数据，每次间隔 1 秒，避免触发数据源限流/反爬
+        task_configs = [
+            ("指数", self._get_indices),
+            ("板块排行", self._get_sector_ranking),
+            ("资金流向", self._get_fund_flow),
+            ("涨跌停", lambda: self._get_limit_stocks(target_date)),
+            ("市场统计", self._get_market_stats),
+            ("热门股票", lambda: self._get_hot_stocks(target_date)),
         ]
         
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        results = []
+        for name, task_func in task_configs:
+            try:
+                result = await task_func()
+                results.append(result)
+                print(f"  [OK] {name} 获取成功")
+            except Exception as e:
+                results.append(e)
+                print(f"  [FAIL] {name} 获取失败: {e}")
+            await asyncio.sleep(1)  # 间隔 1 秒，避免限流
         
         # 处理结果
         if not isinstance(results[0], Exception):
