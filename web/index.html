@@ -506,83 +506,6 @@
                 </div>
             </div>
             
-            <!-- ========== 公众号订阅区域 ========== -->
-            <div style="border-top: 2px solid rgba(255,255,255,0.1); margin: 30px 0 20px; padding-top: 30px;">
-                <h2 style="text-align: center; margin-bottom: 5px; font-size: 1.5rem;">📱 公众号订阅</h2>
-                <p style="text-align: center; color: rgba(255,255,255,0.5); margin-bottom: 25px; font-size: 0.9rem;">订阅的公众号文章会自动纳入每日财经播报</p>
-            </div>
-            
-            <!-- 添加公众号 -->
-            <div class="card">
-                <h3>➕ 添加公众号</h3>
-                <p style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-bottom: 15px;">
-                    每个公众号有一个唯一的 biz 参数，获取方法：在<strong>微信</strong>中打开该公众号的<strong>任意文章</strong> → 点<strong>分享</strong> → <strong>复制链接</strong> → 粘贴到下方自动提取。
-                </p>
-                
-                <!-- 从链接提取区域 -->
-                <div style="background: rgba(255,255,255,0.03); border-radius: 12px; padding: 15px; margin-bottom: 15px; border: 1px dashed rgba(255,255,255,0.15);">
-                    <div style="font-weight: 600; margin-bottom: 10px; font-size: 0.95rem;">🔗 方式一：从文章链接自动提取（推荐）</div>
-                    <textarea id="wechat-url" rows="2" placeholder="粘贴微信文章链接，如 https://mp.weixin.qq.com/s?__biz=MzA4NTI0MDY3OQ==&mid=123..." style="font-size: 0.9rem;"></textarea>
-                    <button class="btn btn-primary" style="padding: 8px 20px; font-size: 0.9rem;" onclick="extractBizFromUrl()">🔍 提取 biz 参数</button>
-                    <span id="extract-result" style="margin-left: 10px; font-size: 0.85rem;"></span>
-                </div>
-                
-                <!-- 手动填写区域 -->
-                <div style="background: rgba(255,255,255,0.03); border-radius: 12px; padding: 15px; border: 1px dashed rgba(255,255,255,0.15);">
-                    <div style="font-weight: 600; margin-bottom: 10px; font-size: 0.95rem;">✏️ 方式二：手动填写信息</div>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
-                        <div style="flex: 2; min-width: 150px;">
-                            <label style="font-size: 0.8rem; color: rgba(255,255,255,0.6); display: block; margin-bottom: 4px;">公众号名称 <span style="color: #ff5252;">*必填</span></label>
-                            <input type="text" id="wechat-name" placeholder="如：泽平宏观" style="margin-bottom: 0;">
-                        </div>
-                        <div style="flex: 3; min-width: 200px;">
-                            <label style="font-size: 0.8rem; color: rgba(255,255,255,0.6); display: block; margin-bottom: 4px;">biz 参数 <span style="color: #ff5252;">*必填</span></label>
-                            <input type="text" id="wechat-biz" placeholder="如：MzA4NTI0MDY3OQ==" style="margin-bottom: 0;">
-                        </div>
-                        <div style="flex: 1; min-width: 100px;">
-                            <label style="font-size: 0.8rem; color: rgba(255,255,255,0.6); display: block; margin-bottom: 4px;">分类</label>
-                            <select id="wechat-category" style="width: 100%; padding: 12px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #fff; font-size: 1rem;">
-                                <option value="财经">财经</option>
-                                <option value="宏观">宏观</option>
-                                <option value="行业">行业</option>
-                                <option value="券商">券商</option>
-                                <option value="基金">基金</option>
-                                <option value="港股">港股</option>
-                                <option value="数据">数据</option>
-                                <option value="科技">科技</option>
-                                <option value="其他">其他</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-success" style="height: 44px;" onclick="addWechatAccount()">添加</button>
-                    </div>
-                    <p style="color: rgba(255,255,255,0.4); font-size: 0.75rem; margin-top: 8px;">
-                        💡 提示：使用"方式一"从链接提取后，biz 会自动填入上方，你只需补填公众号名称即可。
-                    </p>
-                </div>
-            </div>
-            
-            <!-- 推荐公众号 -->
-            <div class="card">
-                <h3>⭐ 推荐财经公众号</h3>
-                <p style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-bottom: 15px;">点击即可一键添加，已添加的不会重复显示</p>
-                <div id="wechat-presets">
-                    <div class="empty-state">
-                        <div class="icon">⏳</div>
-                        <p>加载中...</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 已订阅公众号列表 -->
-            <div class="card">
-                <h3>📋 已订阅公众号 <button class="btn btn-secondary" style="float: right; padding: 5px 12px; font-size: 0.8rem;" onclick="loadWechatAccounts()">🔄 刷新</button></h3>
-                <div id="wechat-accounts-list">
-                    <div class="empty-state">
-                        <div class="icon">📱</div>
-                        <p>加载中...</p>
-                    </div>
-                </div>
-            </div>
             
         </div>
         
@@ -934,9 +857,7 @@
             // 加载合并统计和行业分布
             loadMergedWatchlistStats();
             loadSectorDistribution();
-            // 加载公众号订阅数据
-            loadWechatAccounts();
-            loadWechatPresets();
+            
         }
         
         async function loadMergedWatchlistStats() {
