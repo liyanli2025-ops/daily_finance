@@ -178,6 +178,29 @@ class MarketDataService:
         except ImportError:
             print("⚠️ MarketDataService: AKShare 不可用")
     
+    async def _call_akshare_with_retry(self, func, *args, max_retries: int = 3, **kwargs):
+        """
+        带重试的 AKShare 调用包装
+        
+        AKShare 底层用 requests 调东方财富接口，凌晨时段经常被限流/断连。
+        这里加重试 + 延迟，避免一次网络闪断就导致整个任务失败。
+        """
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                # AKShare 是同步库，在线程池中执行避免阻塞事件循环
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(None, lambda: func(*args, **kwargs))
+                return result
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    wait = (attempt + 1) * 3  # 3秒、6秒、9秒递增
+                    print(f"  [AKShare] {func.__name__} 第{attempt+1}次失败: {type(e).__name__}, {wait}秒后重试...")
+                    await asyncio.sleep(wait)
+        
+        raise last_error
+    
     async def get_market_overview(self, target_date: Optional[date] = None) -> MarketOverview:
         """
         获取市场全面数据
@@ -268,8 +291,8 @@ class MarketDataService:
         indices = []
         
         try:
-            # 获取 A股主要指数实时行情
-            df = ak.stock_zh_index_spot_em()
+            # 获取 A股主要指数实时行情（带重试）
+            df = await self._call_akshare_with_retry(ak.stock_zh_index_spot_em)
             
             # 筛选主要指数
             main_indices = {
@@ -310,8 +333,8 @@ class MarketDataService:
         bottom_sectors = []
         
         try:
-            # 获取行业板块行情
-            df = ak.stock_board_industry_name_em()
+            # 获取行业板块行情（带重试）
+            df = await self._call_akshare_with_retry(ak.stock_board_industry_name_em)
             
             if df is not None and not df.empty:
                 # 按涨跌幅排序
@@ -344,8 +367,8 @@ class MarketDataService:
         import akshare as ak
         
         try:
-            # 获取大盘资金流向
-            df = ak.stock_market_fund_flow()
+            # 获取大盘资金流向（带重试）
+            df = await self._call_akshare_with_retry(ak.stock_market_fund_flow)
             
             if df is not None and not df.empty:
                 # 取最新一行
@@ -375,7 +398,7 @@ class MarketDataService:
         try:
             # 获取涨停股票池
             try:
-                df_up = ak.stock_zt_pool_em(date=date_str)
+                df_up = await self._call_akshare_with_retry(ak.stock_zt_pool_em, date=date_str)
                 if df_up is not None and not df_up.empty:
                     limit_data.up_limit_count = len(df_up)
                     limit_data.up_limit_stocks = [
@@ -387,7 +410,7 @@ class MarketDataService:
             
             # 获取跌停股票池
             try:
-                df_down = ak.stock_zt_pool_dtgc_em(date=date_str)
+                df_down = await self._call_akshare_with_retry(ak.stock_zt_pool_dtgc_em, date=date_str)
                 if df_down is not None and not df_down.empty:
                     limit_data.down_limit_count = len(df_down)
                     limit_data.down_limit_stocks = [
@@ -409,8 +432,8 @@ class MarketDataService:
         stats = {"up": 0, "down": 0, "flat": 0, "total_volume": 0}
         
         try:
-            # 获取所有 A股实时行情
-            df = ak.stock_zh_a_spot_em()
+            # 获取所有 A股实时行情（带重试）
+            df = await self._call_akshare_with_retry(ak.stock_zh_a_spot_em)
             
             if df is not None and not df.empty:
                 # 统计涨跌
@@ -437,7 +460,7 @@ class MarketDataService:
         try:
             # 尝试获取龙虎榜数据
             try:
-                df = ak.stock_lhb_detail_em(start_date=date_str, end_date=date_str)
+                df = await self._call_akshare_with_retry(ak.stock_lhb_detail_em, start_date=date_str, end_date=date_str)
                 if df is not None and not df.empty:
                     # 去重，保留每只股票第一条
                     df_unique = df.drop_duplicates(subset=['代码'], keep='first')
@@ -456,7 +479,7 @@ class MarketDataService:
             # 如果龙虎榜没数据，获取换手率最高的股票
             if not hot_stocks:
                 try:
-                    df = ak.stock_zh_a_spot_em()
+                    df = await self._call_akshare_with_retry(ak.stock_zh_a_spot_em)
                     if df is not None and not df.empty:
                         # 按换手率排序
                         df_sorted = df.sort_values('换手率', ascending=False)
