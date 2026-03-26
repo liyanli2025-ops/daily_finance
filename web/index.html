@@ -506,6 +506,84 @@
                 </div>
             </div>
             
+            <!-- ========== 公众号订阅区域 ========== -->
+            <div style="border-top: 2px solid rgba(255,255,255,0.1); margin: 30px 0 20px; padding-top: 30px;">
+                <h2 style="text-align: center; margin-bottom: 5px; font-size: 1.5rem;">📱 公众号订阅</h2>
+                <p style="text-align: center; color: rgba(255,255,255,0.5); margin-bottom: 25px; font-size: 0.9rem;">订阅的公众号文章会自动纳入每日财经播报</p>
+            </div>
+            
+            <!-- 添加公众号 -->
+            <div class="card">
+                <h3>➕ 添加公众号</h3>
+                <p style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-bottom: 15px;">
+                    每个公众号有一个唯一的 biz 参数，获取方法：在<strong>微信</strong>中打开该公众号的<strong>任意文章</strong> → 点<strong>分享</strong> → <strong>复制链接</strong> → 粘贴到下方自动提取。
+                </p>
+                
+                <!-- 从链接提取区域 -->
+                <div style="background: rgba(255,255,255,0.03); border-radius: 12px; padding: 15px; margin-bottom: 15px; border: 1px dashed rgba(255,255,255,0.15);">
+                    <div style="font-weight: 600; margin-bottom: 10px; font-size: 0.95rem;">🔗 方式一：从文章链接自动提取（推荐）</div>
+                    <textarea id="wechat-url" rows="2" placeholder="粘贴微信文章链接，如 https://mp.weixin.qq.com/s?__biz=MzA4NTI0MDY3OQ==&mid=123..." style="font-size: 0.9rem;"></textarea>
+                    <button class="btn btn-primary" style="padding: 8px 20px; font-size: 0.9rem;" onclick="extractBizFromUrl()">🔍 提取 biz 参数</button>
+                    <span id="extract-result" style="margin-left: 10px; font-size: 0.85rem;"></span>
+                </div>
+                
+                <!-- 手动填写区域 -->
+                <div style="background: rgba(255,255,255,0.03); border-radius: 12px; padding: 15px; border: 1px dashed rgba(255,255,255,0.15);">
+                    <div style="font-weight: 600; margin-bottom: 10px; font-size: 0.95rem;">✏️ 方式二：手动填写信息</div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+                        <div style="flex: 2; min-width: 150px;">
+                            <label style="font-size: 0.8rem; color: rgba(255,255,255,0.6); display: block; margin-bottom: 4px;">公众号名称 <span style="color: #ff5252;">*必填</span></label>
+                            <input type="text" id="wechat-name" placeholder="如：泽平宏观" style="margin-bottom: 0;">
+                        </div>
+                        <div style="flex: 3; min-width: 200px;">
+                            <label style="font-size: 0.8rem; color: rgba(255,255,255,0.6); display: block; margin-bottom: 4px;">biz 参数 <span style="color: #ff5252;">*必填</span></label>
+                            <input type="text" id="wechat-biz" placeholder="如：MzA4NTI0MDY3OQ==" style="margin-bottom: 0;">
+                        </div>
+                        <div style="flex: 1; min-width: 100px;">
+                            <label style="font-size: 0.8rem; color: rgba(255,255,255,0.6); display: block; margin-bottom: 4px;">分类</label>
+                            <select id="wechat-category" style="width: 100%; padding: 12px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #fff; font-size: 1rem;">
+                                <option value="财经">财经</option>
+                                <option value="宏观">宏观</option>
+                                <option value="行业">行业</option>
+                                <option value="券商">券商</option>
+                                <option value="基金">基金</option>
+                                <option value="港股">港股</option>
+                                <option value="数据">数据</option>
+                                <option value="科技">科技</option>
+                                <option value="其他">其他</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-success" style="height: 44px;" onclick="addWechatAccount()">添加</button>
+                    </div>
+                    <p style="color: rgba(255,255,255,0.4); font-size: 0.75rem; margin-top: 8px;">
+                        💡 提示：使用"方式一"从链接提取后，biz 会自动填入上方，你只需补填公众号名称即可。
+                    </p>
+                </div>
+            </div>
+            
+            <!-- 推荐公众号 -->
+            <div class="card">
+                <h3>⭐ 推荐财经公众号</h3>
+                <p style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-bottom: 15px;">点击即可一键添加，已添加的不会重复显示</p>
+                <div id="wechat-presets">
+                    <div class="empty-state">
+                        <div class="icon">⏳</div>
+                        <p>加载中...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 已订阅公众号列表 -->
+            <div class="card">
+                <h3>📋 已订阅公众号 <button class="btn btn-secondary" style="float: right; padding: 5px 12px; font-size: 0.8rem;" onclick="loadWechatAccounts()">🔄 刷新</button></h3>
+                <div id="wechat-accounts-list">
+                    <div class="empty-state">
+                        <div class="icon">📱</div>
+                        <p>加载中...</p>
+                    </div>
+                </div>
+            </div>
+            
         </div>
         
         <!-- 播客模块 -->
@@ -856,6 +934,9 @@
             // 加载合并统计和行业分布
             loadMergedWatchlistStats();
             loadSectorDistribution();
+            // 加载公众号订阅数据
+            loadWechatAccounts();
+            loadWechatPresets();
         }
         
         async function loadMergedWatchlistStats() {
@@ -1048,6 +1129,313 @@
                 }
             } catch (err) {
                 showToast('删除失败：' + err.message, 'error');
+            }
+        }
+        
+        // ========== 公众号订阅模块 ==========
+        
+        // 从链接提取 biz
+        async function extractBizFromUrl() {
+            const url = document.getElementById('wechat-url').value.trim();
+            const resultEl = document.getElementById('extract-result');
+            
+            if (!url) {
+                showToast('请先粘贴微信文章链接', 'error');
+                return;
+            }
+            
+            resultEl.innerHTML = '<span class="loading" style="width:14px;height:14px;border-width:2px;margin-right:5px;vertical-align:middle;"></span>提取中...';
+            
+            try {
+                const res = await fetch(`${API_BASE}/wechat/extract-biz?url=${encodeURIComponent(url)}`, {
+                    method: 'POST'
+                });
+                
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || '提取失败');
+                }
+                
+                const data = await res.json();
+                
+                // 自动填入 biz 字段
+                document.getElementById('wechat-biz').value = data.biz;
+                resultEl.innerHTML = `<span style="color: #4caf50;">✅ 提取成功：${data.biz}</span>`;
+                
+                // 清空链接输入框
+                document.getElementById('wechat-url').value = '';
+                
+                // 聚焦到名称输入框，提示用户填写
+                document.getElementById('wechat-name').focus();
+                showToast('biz 已自动填入，请补填公众号名称后点击"添加"', 'success');
+                
+            } catch (err) {
+                resultEl.innerHTML = `<span style="color: #f44336;">❌ ${err.message}</span>`;
+                showToast('提取失败：' + err.message, 'error');
+            }
+        }
+        
+        // 添加公众号
+        async function addWechatAccount() {
+            const name = document.getElementById('wechat-name').value.trim();
+            const biz = document.getElementById('wechat-biz').value.trim();
+            const category = document.getElementById('wechat-category').value;
+            
+            if (!name) {
+                showToast('请填写公众号名称', 'error');
+                document.getElementById('wechat-name').focus();
+                return;
+            }
+            if (!biz) {
+                showToast('请填写 biz 参数（可通过粘贴文章链接自动提取）', 'error');
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_BASE}/wechat/accounts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, biz, category })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    showToast(`✅ 已添加公众号：${data.name}`, 'success');
+                    // 清空表单
+                    document.getElementById('wechat-name').value = '';
+                    document.getElementById('wechat-biz').value = '';
+                    document.getElementById('extract-result').innerHTML = '';
+                    // 刷新列表和推荐
+                    loadWechatAccounts();
+                    loadWechatPresets();
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    showToast('添加失败：' + (err.detail || '未知错误'), 'error');
+                }
+            } catch (err) {
+                showToast('添加失败：' + err.message, 'error');
+            }
+        }
+        
+        // 一键添加推荐公众号
+        async function addPresetAccount(name, biz, description, category) {
+            if (!confirm(`确定要添加公众号「${name}」吗？`)) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/wechat/accounts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, biz, description, category })
+                });
+                
+                if (res.ok) {
+                    showToast(`✅ 已添加：${name}`, 'success');
+                    loadWechatAccounts();
+                    loadWechatPresets();
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    showToast('添加失败：' + (err.detail || '未知错误'), 'error');
+                }
+            } catch (err) {
+                showToast('添加失败：' + err.message, 'error');
+            }
+        }
+        
+        // 切换公众号启用/禁用
+        async function toggleWechatAccount(accountId, accountName) {
+            try {
+                const res = await fetch(`${API_BASE}/wechat/accounts/${accountId}/toggle`, {
+                    method: 'POST'
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    showToast(data.message, 'success');
+                    loadWechatAccounts();
+                } else {
+                    showToast('操作失败', 'error');
+                }
+            } catch (err) {
+                showToast('操作失败：' + err.message, 'error');
+            }
+        }
+        
+        // 删除公众号
+        async function deleteWechatAccount(accountId, accountName) {
+            if (!confirm(`确定要删除公众号「${accountName}」吗？`)) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/wechat/accounts/${accountId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (res.ok) {
+                    showToast(`已删除：${accountName}`, 'success');
+                    loadWechatAccounts();
+                    loadWechatPresets();
+                } else {
+                    showToast('删除失败', 'error');
+                }
+            } catch (err) {
+                showToast('删除失败：' + err.message, 'error');
+            }
+        }
+        
+        // 测试采集公众号
+        async function testWechatFetch(accountId, accountName) {
+            showToast(`🔍 正在测试采集「${accountName}」...`, 'success');
+            
+            try {
+                const res = await fetch(`${API_BASE}/wechat/test-fetch/${accountId}`, {
+                    method: 'POST'
+                });
+                
+                if (!res.ok) throw new Error('测试失败');
+                
+                const data = await res.json();
+                
+                if (data.article_count > 0) {
+                    const titles = data.articles.map((a, i) => `${i+1}. ${a.title}`).join('\n');
+                    alert(`✅ 采集成功！获取到 ${data.article_count} 篇文章：\n\n${titles}`);
+                } else {
+                    alert(`⚠️ 未获取到文章，RSSHub 源可能暂时不可用，稍后会自动重试。`);
+                }
+            } catch (err) {
+                alert(`❌ 测试失败：${err.message}`);
+            }
+        }
+        
+        // 加载已订阅公众号列表
+        async function loadWechatAccounts() {
+            const container = document.getElementById('wechat-accounts-list');
+            try {
+                const res = await fetch(`${API_BASE}/wechat/accounts`);
+                if (!res.ok) throw new Error(`服务器错误 (${res.status})`);
+                const data = await res.json();
+                
+                if (!data || data.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">📱</div>
+                            <p>还没有订阅任何公众号</p>
+                            <p style="font-size: 0.85rem; opacity: 0.7; margin-top: 5px;">从上方推荐列表一键添加，或手动填写添加</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const enabledCount = data.filter(a => a.enabled).length;
+                const totalArticles = data.reduce((sum, a) => sum + (a.total_articles || 0), 0);
+                
+                container.innerHTML = `
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;">
+                        <div style="flex: 1; min-width: 100px; text-align: center; padding: 12px; background: rgba(0,212,255,0.1); border-radius: 10px;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #00d4ff;">${data.length}</div>
+                            <div style="font-size: 0.8rem; color: rgba(255,255,255,0.6);">总订阅</div>
+                        </div>
+                        <div style="flex: 1; min-width: 100px; text-align: center; padding: 12px; background: rgba(76,175,80,0.1); border-radius: 10px;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #4caf50;">${enabledCount}</div>
+                            <div style="font-size: 0.8rem; color: rgba(255,255,255,0.6);">已启用</div>
+                        </div>
+                        <div style="flex: 1; min-width: 100px; text-align: center; padding: 12px; background: rgba(156,39,176,0.1); border-radius: 10px;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #9c27b0;">${totalArticles}</div>
+                            <div style="font-size: 0.8rem; color: rgba(255,255,255,0.6);">累计文章</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        ${data.map(acc => {
+                            const failWarning = acc.fetch_fail_count > 2 ? `<span style="color: #ff5252; font-size: 0.7rem;" title="连续失败 ${acc.fetch_fail_count} 次">⚠️</span>` : '';
+                            const lastFetch = acc.last_fetched_at ? new Date(acc.last_fetched_at).toLocaleDateString('zh-CN', {month:'numeric',day:'numeric',hour:'numeric',minute:'numeric'}) : '未采集';
+                            return `
+                                <div style="
+                                    display: flex; align-items: center; gap: 8px;
+                                    padding: 8px 12px;
+                                    background: rgba(255,255,255,${acc.enabled ? '0.08' : '0.03'});
+                                    border: 1px solid rgba(255,255,255,${acc.enabled ? '0.15' : '0.05'});
+                                    border-radius: 12px;
+                                    opacity: ${acc.enabled ? '1' : '0.5'};
+                                    transition: all 0.3s;
+                                ">
+                                    <span style="font-weight: 600; font-size: 0.9rem;">${acc.name}</span>
+                                    <span style="background: rgba(0,212,255,0.15); color: #00d4ff; font-size: 0.65rem; padding: 2px 6px; border-radius: 8px;">${acc.category}</span>
+                                    ${acc.is_preset ? '<span style="background: rgba(255,193,7,0.15); color: #ffc107; font-size: 0.6rem; padding: 1px 5px; border-radius: 6px;">预置</span>' : ''}
+                                    ${failWarning}
+                                    <span style="color: rgba(255,255,255,0.4); font-size: 0.7rem;" title="上次采集时间">${lastFetch}</span>
+                                    <span style="color: rgba(255,255,255,0.3); font-size: 0.65rem;" title="累计文章">${acc.total_articles || 0}篇</span>
+                                    <button onclick="toggleWechatAccount('${acc.id}', '${acc.name}')" style="background: ${acc.enabled ? 'rgba(76,175,80,0.2)' : 'rgba(255,255,255,0.1)'}; color: ${acc.enabled ? '#4caf50' : 'rgba(255,255,255,0.5)'}; border: none; border-radius: 6px; padding: 3px 8px; font-size: 0.7rem; cursor: pointer;" title="${acc.enabled ? '点击禁用' : '点击启用'}">${acc.enabled ? '已启用' : '已禁用'}</button>
+                                    <button onclick="testWechatFetch('${acc.id}', '${acc.name}')" style="background: rgba(33,150,243,0.15); color: #2196f3; border: none; border-radius: 6px; padding: 3px 8px; font-size: 0.7rem; cursor: pointer;" title="测试采集">测试</button>
+                                    <button onclick="deleteWechatAccount('${acc.id}', '${acc.name}')" style="background: rgba(244,67,54,0.15); color: #f44336; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" title="删除">×</button>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">⚠️</div>
+                        <p>加载失败：${err.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // 加载推荐公众号
+        async function loadWechatPresets() {
+            const container = document.getElementById('wechat-presets');
+            try {
+                // 同时获取预设列表和已添加列表
+                const [presetsRes, accountsRes] = await Promise.all([
+                    fetch(`${API_BASE}/wechat/presets`),
+                    fetch(`${API_BASE}/wechat/accounts`)
+                ]);
+                
+                if (!presetsRes.ok || !accountsRes.ok) throw new Error('加载失败');
+                
+                const presets = await presetsRes.json();
+                const accounts = await accountsRes.json();
+                
+                // 过滤掉已添加的
+                const existingBizSet = new Set(accounts.map(a => a.biz));
+                const available = presets.filter(p => !existingBizSet.has(p.biz));
+                
+                if (available.length === 0) {
+                    container.innerHTML = `
+                        <p style="color: rgba(255,255,255,0.5); text-align: center; padding: 10px;">
+                            🎉 所有推荐公众号都已添加！
+                        </p>
+                    `;
+                    return;
+                }
+                
+                const categoryColors = {
+                    '宏观': '#e91e63', '财经': '#2196f3', '基金': '#9c27b0',
+                    '券商': '#00bcd4', '数据': '#ff9800', '港股': '#4caf50',
+                    '行业': '#795548', '科技': '#673ab7'
+                };
+                
+                container.innerHTML = `
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                        ${available.map(p => {
+                            const color = categoryColors[p.category] || '#9e9e9e';
+                            return `
+                                <div onclick="addPresetAccount('${p.name}', '${p.biz}', '${(p.description || '').replace(/'/g, "\\'")}', '${p.category}')" 
+                                     style="padding: 10px 15px; background: linear-gradient(135deg, ${color}22, ${color}11); border: 1px solid ${color}33; border-radius: 10px; cursor: pointer; transition: all 0.3s; min-width: 140px;"
+                                     onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px ${color}33'"
+                                     onmouseout="this.style.transform='none'; this.style.boxShadow='none'">
+                                    <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 4px;">${p.name}</div>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="background: ${color}33; color: ${color}; font-size: 0.7rem; padding: 1px 6px; border-radius: 6px;">${p.category}</span>
+                                        <span style="color: rgba(255,255,255,0.4); font-size: 0.7rem;">点击添加</span>
+                                    </div>
+                                    ${p.description ? `<div style="color: rgba(255,255,255,0.4); font-size: 0.75rem; margin-top: 4px;">${p.description}</div>` : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML = `<p style="color: rgba(255,255,255,0.5);">加载推荐列表失败</p>`;
             }
         }
         
