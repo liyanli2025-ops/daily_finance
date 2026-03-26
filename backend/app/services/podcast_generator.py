@@ -79,52 +79,138 @@ class PodcastGeneratorService:
             self.http_client = httpx.AsyncClient(timeout=10.0)
         return self.http_client
     
-    async def get_beijing_weather(self) -> str:
-        """
-        获取北京当天的天气情况（全天温度范围）
-        使用免费的天气API
-        """
+    # 英文天气描述 -> 中文映射字典
+    WEATHER_EN_TO_ZH = {
+        "sunny": "晴",
+        "clear": "晴",
+        "partly cloudy": "多云",
+        "partly Cloudy": "多云",
+        "cloudy": "多云",
+        "overcast": "阴",
+        "mist": "薄雾",
+        "fog": "雾",
+        "freezing fog": "冻雾",
+        "patchy rain possible": "可能有零星小雨",
+        "patchy rain nearby": "附近有零星小雨",
+        "patchy snow possible": "可能有零星小雪",
+        "patchy sleet possible": "可能有零星雨夹雪",
+        "patchy freezing drizzle possible": "可能有零星冻毛毛雨",
+        "thundery outbreaks possible": "可能有雷阵雨",
+        "blowing snow": "吹雪",
+        "blizzard": "暴风雪",
+        "haze": "霾",
+        "light drizzle": "小毛毛雨",
+        "light rain": "小雨",
+        "light rain shower": "小阵雨",
+        "moderate rain": "中雨",
+        "moderate rain at times": "时有中雨",
+        "heavy rain": "大雨",
+        "heavy rain at times": "时有大雨",
+        "light snow": "小雪",
+        "moderate snow": "中雪",
+        "heavy snow": "大雪",
+        "light sleet": "小雨夹雪",
+        "moderate or heavy sleet": "中到大雨夹雪",
+        "light freezing rain": "小冻雨",
+        "moderate or heavy freezing rain": "中到大冻雨",
+        "light showers of ice pellets": "小冰粒",
+        "moderate or heavy showers of ice pellets": "中到大冰粒",
+        "thunderstorm": "雷暴",
+        "rain": "雨",
+        "snow": "雪",
+        "sleet": "雨夹雪",
+        "drizzle": "毛毛雨",
+        "shower": "阵雨",
+        "ice pellets": "冰粒",
+        "patchy light rain": "零星小雨",
+        "patchy light snow": "零星小雪",
+        "patchy moderate snow": "零星中雪",
+        "patchy heavy snow": "零星大雪",
+        "patchy light drizzle": "零星毛毛雨",
+        "light snow showers": "小阵雪",
+        "moderate or heavy snow showers": "中到大阵雪",
+        "patchy light rain with thunder": "零星小雨伴雷",
+        "moderate or heavy rain with thunder": "中到大雨伴雷",
+        "patchy light snow with thunder": "零星小雪伴雷",
+        "moderate or heavy snow with thunder": "中到大雪伴雷",
+    }
+
+    def _translate_weather(self, desc_en: str) -> str:
+        """将英文天气描述翻译为中文，找不到则返回原文"""
+        if not desc_en:
+            return "晴"
+        lower = desc_en.strip().lower()
+        return self.WEATHER_EN_TO_ZH.get(lower, desc_en)
+
+    async def _get_aqi(self) -> Optional[int]:
+        """获取北京空气质量指数（AQI）"""
         try:
             client = await self._get_http_client()
-            
-            # 使用 wttr.in JSON API 获取全天温度范围
-            url = "https://wttr.in/Beijing?format=j1"
-            response = await client.get(url, headers={"User-Agent": "curl/7.68.0"})
-            
+            url = "https://api.waqi.info/feed/beijing/?token=demo"
+            response = await client.get(url)
             if response.status_code == 200:
                 data = response.json()
-                # 获取今天的天气预报
+                if data.get("status") == "ok":
+                    aqi = data.get("data", {}).get("aqi")
+                    if aqi is not None:
+                        return int(aqi)
+        except Exception as e:
+            print(f"[天气] 获取AQI失败: {e}")
+        return None
+
+    async def get_beijing_weather(self) -> str:
+        """
+        获取北京当天的天气情况
+        输出格式：北京今天天气x，气温x摄氏度到x摄氏度，空气质量指数x
+        """
+        weather_desc = ""
+        max_temp = ""
+        min_temp = ""
+
+        try:
+            client = await self._get_http_client()
+
+            # 使用 wttr.in JSON API
+            url = "https://wttr.in/Beijing?format=j1"
+            response = await client.get(url, headers={"User-Agent": "curl/7.68.0"})
+
+            if response.status_code == 200:
+                data = response.json()
                 weather_list = data.get("weather", [])
                 if weather_list:
                     today = weather_list[0]
                     max_temp = today.get("maxtempC", "")
                     min_temp = today.get("mintempC", "")
-                    # 获取天气描述（从当前天气或小时预报中取）
-                    current = data.get("current_condition", [{}])[0]
-                    # 优先使用中文描述
-                    weather_desc_list = current.get("lang_zh", [{}])
-                    if weather_desc_list:
-                        weather_desc = weather_desc_list[0].get("value", "")
-                    else:
-                        weather_desc = current.get("weatherDesc", [{}])[0].get("value", "")
-                    
-                    if max_temp and min_temp:
-                        return f"北京今天{weather_desc}，全天气温{min_temp}到{max_temp}度。"
-                    elif weather_desc:
-                        return f"北京今天{weather_desc}。"
-            
-            # 备用方案：使用简单格式API获取天气描述
-            backup_url = "https://wttr.in/Beijing?format=%C&lang=zh-cn"
-            response = await client.get(backup_url, headers={"User-Agent": "curl/7.68.0"})
-            if response.status_code == 200:
-                weather_desc = response.text.strip()
-                return f"北京今天{weather_desc}。"
-                
+
+                current = data.get("current_condition", [{}])[0]
+                # 优先使用中文描述
+                lang_zh_list = current.get("lang_zh", [])
+                if lang_zh_list and lang_zh_list[0].get("value"):
+                    weather_desc = lang_zh_list[0]["value"]
+                else:
+                    # 英文描述 -> 用映射字典翻译为中文
+                    en_desc = current.get("weatherDesc", [{}])[0].get("value", "")
+                    weather_desc = self._translate_weather(en_desc)
+
         except Exception as e:
             print(f"[天气] 获取天气失败: {e}")
-        
-        # 获取失败时返回通用语句
-        return "今天北京天气不错。"
+
+        # 获取空气质量指数
+        aqi = await self._get_aqi()
+
+        # 组装输出
+        if weather_desc and max_temp and min_temp:
+            base = f"北京今天天气{weather_desc}，气温{min_temp}摄氏度到{max_temp}摄氏度"
+            if aqi is not None:
+                return f"{base}，空气质量指数{aqi}。"
+            return f"{base}。"
+        elif weather_desc:
+            base = f"北京今天天气{weather_desc}"
+            if aqi is not None:
+                return f"{base}，空气质量指数{aqi}。"
+            return f"{base}。"
+
+        return "北京今天天气不错。"
     
     def _is_weekend(self, check_date: date = None) -> bool:
         """判断是否是周末"""
@@ -381,7 +467,7 @@ class PodcastGeneratorService:
 """
         else:
             opening += f"""
-本期播客的市场数据来自{date_description}，也就是{data_date_str}的收盘数据。废话不多说，直接上干货！
+本期播客的市场数据来自{date_description}，也就是{data_date_str}的收盘数据。马上进入正题。
 
 [SECTION_BREAK]
 """
@@ -391,26 +477,26 @@ class PodcastGeneratorService:
         if hasattr(report, 'core_opinions') and report.core_opinions:
             if is_weekend:
                 core_opinions_text = """
-先说说本周我的几个核心判断：
+先说说我对下周的操作建议：
 
 """
             else:
                 core_opinions_text = f"""
-{name}，先说说我的几个核心判断，听好了：
+{name}，先听我的三条操作建议：
 
 """
             for i, opinion in enumerate(report.core_opinions, 1):
-                core_opinions_text += f"第{i}个判断：{opinion}\n\n"
+                core_opinions_text += f"第{i}条：{opinion}\n\n"
             
             if is_weekend:
                 core_opinions_text += """
-这些判断，你可以下周开盘后观察验证一下。
+这几条建议，下周开盘可以参考执行。
 
 [SECTION_BREAK]
 """
             else:
                 core_opinions_text += """
-这几条判断，记下来，过几天回来对照看看准不准。
+以上三条，建议你记下来，今天开盘后对照操作。
 
 [SECTION_BREAK]
 """
@@ -466,10 +552,10 @@ class PodcastGeneratorService:
         # 组合完整文本（去掉了 highlights_text 和 analysis_text，避免重复）
         full_text = opening + core_opinions_text + key_content + cross_border_text + closing
         
-        # 控制字数在合理范围（3000-6000字，对应12-24分钟）
-        if len(full_text) > 6000:
+        # 控制字数在合理范围（2500-3750字，对应10-15分钟）
+        if len(full_text) > 3750:
             # 截断并添加总结
-            full_text = full_text[:5500] + f"""
+            full_text = full_text[:3400] + f"""
 
 {name}，时间关系，这期就先聊到这里。更详细的内容可以在App里看完整报告。
 
@@ -494,10 +580,10 @@ class PodcastGeneratorService:
         
         # 用实际核心观点做总结
         if hasattr(report, 'core_opinions') and report.core_opinions:
-            closing += "帮你划个重点：\n"
+            closing += "最后帮你总结今天的操作要点：\n"
             for i, opinion in enumerate(report.core_opinions, 1):
-                # 提取观点的前30个字作为精炼总结
-                short_opinion = opinion[:30].rstrip('，。、；') if len(opinion) > 30 else opinion.rstrip('，。、；')
+                # 提取观点的前40个字作为精炼总结
+                short_opinion = opinion[:40].rstrip('，。、；') if len(opinion) > 40 else opinion.rstrip('，。、；')
                 closing += f"第{i}，{short_opinion}。\n"
             closing += "\n"
         
@@ -553,14 +639,14 @@ class PodcastGeneratorService:
         # 清理Markdown格式
         text = self._clean_for_tts(content)
         
-        # 只保留前2000字的核心内容
-        if len(text) > 2000:
+        # 只保留前1500字的核心内容
+        if len(text) > 1500:
             # 尝试找到自然断点
-            cutoff = text.find('。', 1800)
+            cutoff = text.find('。', 1300)
             if cutoff > 0:
                 text = text[:cutoff + 1]
             else:
-                text = text[:2000] + "..."
+                text = text[:1500] + "..."
         
         return text
     

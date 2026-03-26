@@ -22,14 +22,12 @@ class MarketTrend(str, Enum):
 
 
 class ReportSectionType(str, Enum):
-    """报告模块类型（7大模块）"""
-    CORE_OPINIONS = "core_opinions"       # 今日核心观点
-    MACRO_POLICY = "macro_policy"         # 宏观政策解读
-    SECTOR_ROTATION = "sector_rotation"   # 行业轮动分析
-    STOCK_PICKS = "stock_picks"           # 个股机会挖掘
-    EVENT_DRIVEN = "event_driven"         # 事件驱动机会
-    CROSS_BORDER = "cross_border"         # 跨界热点扫描
-    RISK_RADAR = "risk_radar"             # 风险雷达
+    """报告模块类型（5大模块 —— 投资决策导向）"""
+    OPERATION_GUIDE = "operation_guide"       # 模块1：今日操作建议
+    MARKET_PANORAMA = "market_panorama"      # 模块2：市场全景（大盘+板块+资金）
+    WATCHLIST_BATTLE = "watchlist_battle"     # 模块3：自选股作战图
+    EVENT_CATALYST = "event_catalyst"        # 模块4：事件催化与埋伏策略
+    RISK_DASHBOARD = "risk_dashboard"        # 模块5：风控仪表盘
 
 
 class CrossBorderCategory(str, Enum):
