@@ -21,7 +21,6 @@ if sys.platform == 'win32':
 from .config import settings
 from .models.database import init_database, get_session_maker
 from .routers import reports, podcasts, stocks
-from .routers import wechat as wechat_router
 from .services.scheduler import SchedulerService
 
 
@@ -51,16 +50,6 @@ async def lifespan(app: FastAPI):
     await scheduler_service.start()
     app.state.scheduler = scheduler_service
     print("[OK] 定时调度器启动完成")
-    
-    # 初始化预置公众号
-    try:
-        from .services.wechat_service import get_wechat_service
-        wechat_svc = get_wechat_service()
-        async with app.state.session_maker() as session:
-            await wechat_svc.init_preset_accounts(session)
-        print("[OK] 公众号订阅初始化完成")
-    except Exception as e:
-        print(f"[WARN] 公众号订阅初始化失败: {e}")
     
     # 确保静态文件目录存在
     settings.podcasts_dir.mkdir(parents=True, exist_ok=True)
@@ -114,7 +103,6 @@ if web_path.exists():
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(podcasts.router, prefix="/api/podcasts", tags=["Podcasts"])
 app.include_router(stocks.router, prefix="/api/stocks", tags=["Stocks"])
-app.include_router(wechat_router.router, prefix="/api/wechat", tags=["WeChat"])
 
 
 @app.get("/")

@@ -27,12 +27,6 @@ rss_feeds = [
     {"url": "https://rsshub.rssforever.com/xueqiu/hots", "name": "雪球热帖"},
     {"url": "https://rsshub.app/xueqiu/today", "name": "雪球今日话题(备用)"},
     
-    # 微信公众号
-    {"url": "https://rsshub.rssforever.com/wechat/mp/MzA4NTI0MDY3OQ==", "name": "泽平宏观"},
-    {"url": "https://rsshub.rssforever.com/wechat/mp/MzI5ODY0NzM5NQ==", "name": "券商中国"},
-    {"url": "https://rsshub.rssforever.com/wechat/mp/MzI4MzA1MTA4OA==", "name": "格隆汇"},
-    {"url": "https://rsshub.rssforever.com/wechat/mp/MzAwNDY2OTI4MA==", "name": "华尔街见闻公众号"},
-    
     # 国际财经
     {"url": "https://rsshub.rssforever.com/wallstreetcn/news/global", "name": "华尔街见闻-全球"},
     {"url": "https://rsshub.rssforever.com/ft/chinese/hotstoryby7day", "name": "FT中文网热门"},

@@ -162,27 +162,6 @@ class EventModel(Base):
     news_count = Column(Integer, default=0)
 
 
-class WechatAccountModel(Base):
-    """微信公众号订阅表"""
-    __tablename__ = "wechat_accounts"
-    
-    id = Column(String(36), primary_key=True)
-    name = Column(String(200), nullable=False)          # 公众号名称，如"泽平宏观"
-    biz = Column(String(100), nullable=False, unique=True)  # __biz 参数，公众号唯一标识
-    description = Column(Text)                           # 公众号描述
-    category = Column(String(50), default="财经")        # 分类：财经/宏观/行业/券商 等
-    is_preset = Column(Boolean, default=False)           # 是否预置（系统默认）
-    enabled = Column(Boolean, default=True)              # 是否启用
-    
-    # 采集统计
-    last_fetched_at = Column(DateTime)                   # 最后一次采集时间
-    total_articles = Column(Integer, default=0)          # 累计抓到的文章数
-    fetch_fail_count = Column(Integer, default=0)        # 连续采集失败次数
-    
-    added_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime)
-
-
 # 数据库初始化函数
 def get_database_url(url: str) -> str:
     """转换数据库URL为异步版本"""

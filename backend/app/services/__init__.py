@@ -6,7 +6,6 @@ from .ai_analyzer import AIAnalyzerService
 from .podcast_generator import PodcastGeneratorService
 from .stock_service import StockDataService
 from .scheduler import SchedulerService
-from .wechat_service import WechatSubscriptionService
 
 __all__ = [
     "NewsCollectorService",
@@ -14,5 +13,4 @@ __all__ = [
     "PodcastGeneratorService",
     "StockDataService",
     "SchedulerService",
-    "WechatSubscriptionService",
 ]
