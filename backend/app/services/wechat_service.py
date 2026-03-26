@@ -3,9 +3,13 @@
 
 功能：
 - 公众号 CRUD（增删改查）
-- 通过 RSSHub 采集公众号文章
+- 通过 WeWe-RSS（优先）或 RSSHub（备用）采集公众号文章
 - 预置常见财经公众号
 - 从文章链接自动提取 __biz 参数
+
+数据源优先级：
+1. WeWe-RSS（本地部署，基于微信读书，稳定可靠）
+2. RSSHub（公共实例，微信路由经常被封，仅作备用）
 """
 import re
 import uuid
@@ -22,6 +26,8 @@ from ..models.news import News, NewsType, SentimentType
 
 # ==========================================
 # 预置的财经公众号（用户开箱即用）
+# biz 用于 RSSHub 备用通道
+# feed_id 用于 WeWe-RSS（在 WeWe-RSS 管理面板订阅后会自动获取）
 # ==========================================
 PRESET_ACCOUNTS = [
     {
@@ -87,7 +93,10 @@ PRESET_ACCOUNTS = [
 ]
 
 
-# RSSHub 实例列表（按优先级排序，某个挂了自动切换下一个）
+# WeWe-RSS 本地服务地址（部署在同一台服务器上）
+WEWE_RSS_BASE = "http://localhost:4000"
+
+# RSSHub 实例列表（备用，按优先级排序）
 RSSHUB_INSTANCES = [
     "https://rsshub.rssforever.com",
     "https://rsshub.app",
@@ -107,6 +116,7 @@ class WechatSubscriptionService:
             }
         )
         self._rsshub_base = RSSHUB_INSTANCES[0]
+        self._wewe_rss_available = None  # None=未检测, True/False=检测结果
     
     # ==========================================
     # 公众号 CRUD
@@ -292,16 +302,104 @@ class WechatSubscriptionService:
             return None
     
     # ==========================================
-    # RSSHub 采集
+    # WeWe-RSS 采集（优先方案）
+    # ==========================================
+    
+    async def _check_wewe_rss(self) -> bool:
+        """检测 WeWe-RSS 本地服务是否可用"""
+        if self._wewe_rss_available is not None:
+            return self._wewe_rss_available
+        
+        try:
+            response = await self.client.get(f"{WEWE_RSS_BASE}/feeds/all.json", timeout=5.0)
+            self._wewe_rss_available = response.status_code == 200
+        except Exception:
+            self._wewe_rss_available = False
+        
+        status = "✅ 可用" if self._wewe_rss_available else "❌ 不可用"
+        print(f"  [公众号] WeWe-RSS ({WEWE_RSS_BASE}) {status}")
+        return self._wewe_rss_available
+    
+    async def _fetch_from_wewe_rss(self, account_name: str = "未知") -> List[News]:
+        """
+        从 WeWe-RSS 获取所有订阅的文章
+        
+        WeWe-RSS 的文章按订阅源管理，使用 /feeds/all.json 获取全部文章，
+        然后按 account_name 筛选。
+        如果 account_name 为 "__ALL__" 则获取全部文章。
+        """
+        articles = []
+        
+        try:
+            url = f"{WEWE_RSS_BASE}/feeds/all.json?limit=50"
+            response = await self.client.get(url)
+            
+            if response.status_code != 200:
+                return articles
+            
+            data = response.json()
+            items = data.get("items", [])
+            
+            for item in items:
+                title = item.get("title", "").strip()
+                if not title:
+                    continue
+                
+                content_html = item.get("content_html", "")
+                summary = item.get("summary", "")
+                link = item.get("url", "")
+                source_name = item.get("_feed_title", "") or item.get("authors", [{}])[0].get("name", "未知公众号") if item.get("authors") else "未知公众号"
+                
+                # 如果指定了具体公众号名称，只保留匹配的
+                if account_name != "__ALL__" and source_name and account_name not in source_name and source_name not in account_name:
+                    continue
+                
+                # 解析时间
+                published = datetime.now()
+                date_str = item.get("date_published", "")
+                if date_str:
+                    try:
+                        published = datetime.fromisoformat(date_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                    except Exception:
+                        pass
+                
+                content = self._clean_html(content_html or summary)
+                
+                articles.append(News(
+                    id=str(uuid.uuid4()),
+                    title=title,
+                    content=content[:2000] if content else title,
+                    summary=content[:300] if content else title,
+                    source=f"公众号·{source_name}",
+                    source_url=link,
+                    published_at=published,
+                    news_type=NewsType.FINANCE,
+                    sentiment=SentimentType.NEUTRAL,
+                    importance_score=0.75,
+                    is_china_related=True,
+                    category="公众号"
+                ))
+            
+        except Exception as e:
+            print(f"  [公众号] WeWe-RSS 采集失败: {e}")
+        
+        return articles
+    
+    async def _fetch_all_from_wewe_rss(self) -> List[News]:
+        """从 WeWe-RSS 获取所有订阅的文章（不区分公众号）"""
+        return await self._fetch_from_wewe_rss("__ALL__")
+    
+    # ==========================================
+    # RSSHub 采集（备用方案）
     # ==========================================
     
     def _get_rsshub_url(self, biz: str) -> str:
         """生成 RSSHub 微信公众号 URL"""
         return f"{self._rsshub_base}/wechat/mp/articles/{biz}"
     
-    async def fetch_articles(self, biz: str, account_name: str = "未知") -> List[News]:
+    async def _fetch_from_rsshub(self, biz: str, account_name: str = "未知") -> List[News]:
         """
-        通过 RSSHub 采集公众号文章
+        通过 RSSHub 采集公众号文章（备用方案）
         
         会尝试多个 RSSHub 实例，某个不通就切换下一个
         """
@@ -312,18 +410,16 @@ class WechatSubscriptionService:
             try:
                 response = await self.client.get(url)
                 if response.status_code == 200:
-                    # 解析 RSS
                     feed = feedparser.parse(response.text)
                     
                     if not feed.entries:
                         continue
                     
-                    for entry in feed.entries[:10]:  # 最多取最近10篇
+                    for entry in feed.entries[:10]:
                         title = entry.get("title", "").strip()
                         summary = entry.get("summary", "").strip()
                         link = entry.get("link", "")
                         
-                        # 解析发布时间
                         published = datetime.now()
                         if hasattr(entry, "published_parsed") and entry.published_parsed:
                             try:
@@ -335,7 +431,6 @@ class WechatSubscriptionService:
                         if not title:
                             continue
                         
-                        # 清理 HTML
                         content = self._clean_html(summary)
                         
                         articles.append(News(
@@ -348,12 +443,11 @@ class WechatSubscriptionService:
                             published_at=published,
                             news_type=NewsType.FINANCE,
                             sentiment=SentimentType.NEUTRAL,
-                            importance_score=0.75,  # 公众号文章权重较高
+                            importance_score=0.75,
                             is_china_related=True,
                             category="公众号"
                         ))
                     
-                    # 成功了就记住这个实例
                     self._rsshub_base = instance
                     return articles
                     
@@ -363,12 +457,32 @@ class WechatSubscriptionService:
         
         return articles
     
+    # ==========================================
+    # 统一采集入口
+    # ==========================================
+    
+    async def fetch_articles(self, biz: str, account_name: str = "未知") -> List[News]:
+        """
+        采集某个公众号的文章
+        
+        优先使用 WeWe-RSS，不可用时降级到 RSSHub
+        """
+        # 方案1：WeWe-RSS
+        if await self._check_wewe_rss():
+            articles = await self._fetch_from_wewe_rss(account_name)
+            if articles:
+                return articles
+            print(f"  [公众号] WeWe-RSS 未获取到 {account_name} 的文章，尝试 RSSHub...")
+        
+        # 方案2：RSSHub 备用
+        return await self._fetch_from_rsshub(biz, account_name)
+    
     async def fetch_all_enabled(self, db_session) -> List[News]:
         """
         采集所有启用的公众号的文章
         
-        Returns:
-            所有公众号的新闻列表
+        如果 WeWe-RSS 可用，直接批量获取全部文章（更高效）；
+        否则逐个通过 RSSHub 采集。
         """
         from ..models.database import WechatAccountModel
         
@@ -381,15 +495,38 @@ class WechatSubscriptionService:
         
         all_articles = []
         
-        # 并行采集（但限制并发数，避免被封）
+        # 优先尝试 WeWe-RSS 批量采集
+        if await self._check_wewe_rss():
+            print(f"  [公众号] 使用 WeWe-RSS 批量采集...")
+            all_articles = await self._fetch_all_from_wewe_rss()
+            
+            if all_articles:
+                # 更新所有账号的采集状态
+                for account in accounts:
+                    account.last_fetched_at = datetime.now()
+                    account.fetch_fail_count = 0
+                    account.updated_at = datetime.now()
+                
+                try:
+                    await db_session.commit()
+                except Exception:
+                    pass
+                
+                print(f"[公众号] WeWe-RSS 采集完成：共 {len(all_articles)} 篇文章")
+                return all_articles
+            else:
+                print(f"  [公众号] WeWe-RSS 未获取到文章，降级到 RSSHub...")
+        
+        # 降级：逐个通过 RSSHub 采集
+        print(f"  [公众号] 使用 RSSHub 逐个采集...")
+        
         semaphore = asyncio.Semaphore(3)
         
         async def _fetch_one(account):
             async with semaphore:
                 try:
-                    articles = await self.fetch_articles(account.biz, account.name)
+                    articles = await self._fetch_from_rsshub(account.biz, account.name)
                     
-                    # 更新采集状态
                     if articles:
                         account.last_fetched_at = datetime.now()
                         account.total_articles += len(articles)
@@ -398,7 +535,6 @@ class WechatSubscriptionService:
                         account.fetch_fail_count += 1
                     
                     account.updated_at = datetime.now()
-                    
                     return articles
                 except Exception as e:
                     print(f"  [公众号] {account.name} 采集失败: {e}")
@@ -417,13 +553,12 @@ class WechatSubscriptionService:
                 all_articles.extend(result)
                 success_count += 1
         
-        # 提交状态更新
         try:
             await db_session.commit()
         except Exception:
             pass
         
-        print(f"[公众号] 采集完成: {success_count}/{len(accounts)} 个成功，共 {len(all_articles)} 篇文章")
+        print(f"[公众号] RSSHub 采集完成: {success_count}/{len(accounts)} 个成功，共 {len(all_articles)} 篇文章")
         
         return all_articles
     
