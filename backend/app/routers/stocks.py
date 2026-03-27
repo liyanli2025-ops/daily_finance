@@ -154,41 +154,47 @@ async def get_market_indices():
     """
     import asyncio
     
-    service = get_market_data_service()
+    main_indices = {
+        "000001": "上证指数",
+        "399001": "深证成指",
+        "399006": "创业板指",
+        "000688": "科创50",
+        "000300": "沪深300",
+    }
+    
+    def _fetch():
+        import akshare as ak
+        df = ak.stock_zh_index_spot_em()
+        results = []
+        for code, name in main_indices.items():
+            row = df[df['代码'] == code]
+            if not row.empty:
+                r = row.iloc[0]
+                results.append({
+                    "code": code,
+                    "name": name,
+                    "current": float(r['最新价']),
+                    "change": float(r['涨跌额']),
+                    "change_pct": float(r['涨跌幅']),
+                    "volume": float(r.get('成交量', 0)),
+                    "amount": float(r.get('成交额', 0)),
+                    "high": float(r.get('最高', 0)),
+                    "low": float(r.get('最低', 0)),
+                    "open": float(r.get('今开', 0)),
+                })
+        return results
     
     try:
-        # 设置 30 秒超时，防止 AKShare 卡死
-        indices = await asyncio.wait_for(service._get_indices(), timeout=30)
-        return {
-            "status": "success",
-            "data": [
-                {
-                    "code": idx.code,
-                    "name": idx.name,
-                    "current": idx.current,
-                    "change": idx.change,
-                    "change_pct": idx.change_pct,
-                    "volume": idx.volume,
-                    "amount": idx.amount,
-                    "high": idx.high,
-                    "low": idx.low,
-                    "open": idx.open,
-                }
-                for idx in indices
-            ],
-        }
+        loop = asyncio.get_event_loop()
+        data = await asyncio.wait_for(
+            loop.run_in_executor(None, _fetch),
+            timeout=30
+        )
+        return {"status": "success", "data": data}
     except asyncio.TimeoutError:
-        return {
-            "status": "error",
-            "message": "获取指数数据超时，请稍后重试",
-            "data": [],
-        }
+        return {"status": "error", "message": "获取指数数据超时，请稍后重试", "data": []}
     except Exception as e:
-        return {
-            "status": "error",
-            "message": f"获取指数数据失败: {str(e)}",
-            "data": [],
-        }
+        return {"status": "error", "message": f"获取指数数据失败: {str(e)}", "data": []}
 
 
 @router.get("/{stock_code}/quote", response_model=StockQuote)
