@@ -122,22 +122,54 @@ async def search_stocks(
     market: Optional[str] = Query(None, description="市场类型: A 或 HK")
 ):
     """
-    搜索股票
-    TODO: 接入真实股票数据API
+    搜索股票 - 使用 akshare 搜索 A 股
     """
-    # 模拟搜索结果（实际应该调用股票数据服务）
-    mock_results = [
-        {"code": "600519", "name": "贵州茅台", "market": "A"},
-        {"code": "000858", "name": "五粮液", "market": "A"},
-        {"code": "00700", "name": "腾讯控股", "market": "HK"},
-        {"code": "09988", "name": "阿里巴巴-SW", "market": "HK"},
-    ]
+    import asyncio
     
-    # 过滤匹配结果
-    results = [
-        s for s in mock_results 
-        if keyword.lower() in s["code"].lower() or keyword.lower() in s["name"].lower()
-    ]
+    def _search():
+        import akshare as ak
+        try:
+            # 获取 A 股列表
+            df = ak.stock_zh_a_spot_em()
+            # 按代码或名称匹配
+            mask = df['名称'].str.contains(keyword, case=False, na=False) | \
+                   df['代码'].str.contains(keyword, case=False, na=False)
+            matched = df[mask].head(20)
+            
+            results = []
+            for _, row in matched.iterrows():
+                results.append({
+                    "code": str(row['代码']),
+                    "name": str(row['名称']),
+                    "market": "A"
+                })
+            return results
+        except Exception as e:
+            print(f"Stock search error: {e}")
+            # fallback 到硬编码列表
+            mock_results = [
+                {"code": "600519", "name": "贵州茅台", "market": "A"},
+                {"code": "000858", "name": "五粮液", "market": "A"},
+                {"code": "002594", "name": "比亚迪", "market": "A"},
+                {"code": "600036", "name": "招商银行", "market": "A"},
+                {"code": "002714", "name": "牧原股份", "market": "A"},
+                {"code": "000333", "name": "美的集团", "market": "A"},
+                {"code": "601318", "name": "中国平安", "market": "A"},
+                {"code": "600276", "name": "恒瑞医药", "market": "A"},
+            ]
+            return [
+                s for s in mock_results
+                if keyword.lower() in s["code"].lower() or keyword.lower() in s["name"].lower()
+            ]
+    
+    loop = asyncio.get_event_loop()
+    try:
+        results = await asyncio.wait_for(
+            loop.run_in_executor(None, _search),
+            timeout=15
+        )
+    except asyncio.TimeoutError:
+        results = []
     
     if market:
         results = [s for s in results if s["market"] == market]
