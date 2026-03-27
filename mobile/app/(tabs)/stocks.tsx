@@ -274,9 +274,23 @@ export default function StocksScreen() {
           {isSearching ? (
             <View style={styles.searchLoading}>
               <ActivityIndicator size="small" color={theme.colors.primary} />
+              <Text variant="bodySmall" style={{ color: theme.colors.outline, marginTop: 8 }}>
+                正在搜索...
+              </Text>
+            </View>
+          ) : searchQuery.length > 0 && searchResults.length === 0 ? (
+            <View style={styles.searchLoading}>
+              <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
+                未找到"{searchQuery}"，请稍后重试
+              </Text>
             </View>
           ) : (
             <ScrollView style={styles.searchResults}>
+              {searchResults.length > 0 && (
+                <Text variant="bodySmall" style={{ color: theme.colors.outline, marginBottom: 8 }}>
+                  点击添加到自选 ↓
+                </Text>
+              )}
               {searchResults.map((result, index) => (
                 <Card
                   key={index}

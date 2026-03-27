@@ -116,60 +116,117 @@ async def remove_from_watchlist(
     return {"status": "success", "message": "已从自选列表移除"}
 
 
+# 股票列表缓存（避免每次搜索都下载全市场数据）
+_stock_list_cache = {
+    "data": None,
+    "last_update": None,
+}
+
+# 内置常见股票列表（作为 fallback）
+_builtin_stocks = [
+    {"code": "600519", "name": "贵州茅台", "market": "A"},
+    {"code": "000858", "name": "五粮液", "market": "A"},
+    {"code": "002594", "name": "比亚迪", "market": "A"},
+    {"code": "600036", "name": "招商银行", "market": "A"},
+    {"code": "002714", "name": "牧原股份", "market": "A"},
+    {"code": "000333", "name": "美的集团", "market": "A"},
+    {"code": "601318", "name": "中国平安", "market": "A"},
+    {"code": "600276", "name": "恒瑞医药", "market": "A"},
+    {"code": "000001", "name": "平安银行", "market": "A"},
+    {"code": "600900", "name": "长江电力", "market": "A"},
+    {"code": "601012", "name": "隆基绿能", "market": "A"},
+    {"code": "300750", "name": "宁德时代", "market": "A"},
+    {"code": "600030", "name": "中信证券", "market": "A"},
+    {"code": "601398", "name": "工商银行", "market": "A"},
+    {"code": "600887", "name": "伊利股份", "market": "A"},
+    {"code": "000568", "name": "泸州老窖", "market": "A"},
+    {"code": "002415", "name": "海康威视", "market": "A"},
+    {"code": "600809", "name": "山西汾酒", "market": "A"},
+    {"code": "601888", "name": "中国中免", "market": "A"},
+    {"code": "000002", "name": "万科A", "market": "A"},
+    {"code": "601166", "name": "兴业银行", "market": "A"},
+    {"code": "002304", "name": "洋河股份", "market": "A"},
+    {"code": "600048", "name": "保利发展", "market": "A"},
+    {"code": "002352", "name": "顺丰控股", "market": "A"},
+    {"code": "300059", "name": "东方财富", "market": "A"},
+    {"code": "601899", "name": "紫金矿业", "market": "A"},
+    {"code": "002230", "name": "科大讯飞", "market": "A"},
+    {"code": "600585", "name": "海螺水泥", "market": "A"},
+    {"code": "603259", "name": "药明康德", "market": "A"},
+    {"code": "601668", "name": "中国建筑", "market": "A"},
+    {"code": "600050", "name": "中国联通", "market": "A"},
+    {"code": "601857", "name": "中国石油", "market": "A"},
+    {"code": "600028", "name": "中国石化", "market": "A"},
+    {"code": "000651", "name": "格力电器", "market": "A"},
+    {"code": "000725", "name": "京东方A", "market": "A"},
+    {"code": "600690", "name": "海尔智家", "market": "A"},
+    {"code": "002475", "name": "立讯精密", "market": "A"},
+    {"code": "300124", "name": "汇川技术", "market": "A"},
+    {"code": "600031", "name": "三一重工", "market": "A"},
+    {"code": "601919", "name": "中远海控", "market": "A"},
+]
+
+
 @router.get("/search")
 async def search_stocks(
     keyword: str = Query(..., min_length=1, description="股票代码或名称"),
     market: Optional[str] = Query(None, description="市场类型: A 或 HK")
 ):
     """
-    搜索股票 - 使用 akshare 搜索 A 股
+    搜索股票 - 先用缓存/内置列表快速响应，后台更新全市场数据
     """
     import asyncio
+    from datetime import datetime, timedelta
     
-    def _search():
-        import akshare as ak
+    def _search_from_cache():
+        """从缓存的全市场数据搜索"""
+        if _stock_list_cache["data"] is not None:
+            results = [
+                s for s in _stock_list_cache["data"]
+                if keyword.lower() in s["code"].lower() or keyword.lower() in s["name"].lower()
+            ]
+            return results[:20]
+        return None
+    
+    def _search_from_builtin():
+        """从内置列表搜索"""
+        return [
+            s for s in _builtin_stocks
+            if keyword.lower() in s["code"].lower() or keyword.lower() in s["name"].lower()
+        ]
+    
+    def _update_cache():
+        """后台更新全市场股票列表缓存"""
         try:
-            # 获取 A 股列表
+            import akshare as ak
             df = ak.stock_zh_a_spot_em()
-            # 按代码或名称匹配
-            mask = df['名称'].str.contains(keyword, case=False, na=False) | \
-                   df['代码'].str.contains(keyword, case=False, na=False)
-            matched = df[mask].head(20)
-            
-            results = []
-            for _, row in matched.iterrows():
-                results.append({
+            stock_list = []
+            for _, row in df.iterrows():
+                stock_list.append({
                     "code": str(row['代码']),
                     "name": str(row['名称']),
                     "market": "A"
                 })
-            return results
+            _stock_list_cache["data"] = stock_list
+            _stock_list_cache["last_update"] = datetime.now()
+            print(f"[OK] 股票列表缓存更新完成，共 {len(stock_list)} 只股票")
         except Exception as e:
-            print(f"Stock search error: {e}")
-            # fallback 到硬编码列表
-            mock_results = [
-                {"code": "600519", "name": "贵州茅台", "market": "A"},
-                {"code": "000858", "name": "五粮液", "market": "A"},
-                {"code": "002594", "name": "比亚迪", "market": "A"},
-                {"code": "600036", "name": "招商银行", "market": "A"},
-                {"code": "002714", "name": "牧原股份", "market": "A"},
-                {"code": "000333", "name": "美的集团", "market": "A"},
-                {"code": "601318", "name": "中国平安", "market": "A"},
-                {"code": "600276", "name": "恒瑞医药", "market": "A"},
-            ]
-            return [
-                s for s in mock_results
-                if keyword.lower() in s["code"].lower() or keyword.lower() in s["name"].lower()
-            ]
+            print(f"[ERROR] 更新股票列表缓存失败: {e}")
     
-    loop = asyncio.get_event_loop()
-    try:
-        results = await asyncio.wait_for(
-            loop.run_in_executor(None, _search),
-            timeout=15
-        )
-    except asyncio.TimeoutError:
-        results = []
+    # 1. 先尝试从缓存搜索
+    cached_results = _search_from_cache()
+    if cached_results is not None:
+        results = cached_results
+        # 检查缓存是否需要更新（超过1小时）
+        if _stock_list_cache["last_update"] and \
+           datetime.now() - _stock_list_cache["last_update"] > timedelta(hours=1):
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(None, _update_cache)
+    else:
+        # 2. 缓存为空，用内置列表立即返回，同时后台更新缓存
+        results = _search_from_builtin()
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(None, _update_cache)
     
     if market:
         results = [s for s in results if s["market"] == market]
