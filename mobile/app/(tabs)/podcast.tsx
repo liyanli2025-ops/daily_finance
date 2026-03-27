@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ScrollView,
   Animated,
   Platform,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,7 +22,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function PodcastScreen() {
   const { colors, isDark } = useAppTheme();
-  const { todayReport, recentReports, fetchTodayReport } = useReportStore();
+  const { todayReport, recentReports, fetchTodayReport, fetchRecentReports } = useReportStore();
   const {
     isPlaying,
     currentPosition,
@@ -34,9 +36,11 @@ export default function PodcastScreen() {
   } = useAudioStore();
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [showPlaylist, setShowPlaylist] = useState(false);
 
   useEffect(() => {
     fetchTodayReport();
+    fetchRecentReports();
   }, []);
 
   // 播放按钮呼吸动画
@@ -331,9 +335,7 @@ export default function PodcastScreen() {
               style={[styles.sideButton, {
                 backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
               }]}
-              onPress={() => {
-                // 导航到历史列表（当前Tab下滚动到往期）
-              }}
+              onPress={() => setShowPlaylist(true)}
             >
               <MaterialCommunityIcons
                 name="playlist-play"
@@ -344,6 +346,102 @@ export default function PodcastScreen() {
           </View>
         </View>
       </View>
+
+      {/* 播客历史浮层 */}
+      <Modal
+        visible={showPlaylist}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPlaylist(false)}
+      >
+        <TouchableOpacity
+          style={styles.playlistOverlay}
+          activeOpacity={1}
+          onPress={() => setShowPlaylist(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={[styles.playlistSheet, {
+            backgroundColor: isDark ? colors.surfaceContainer : colors.surface,
+          }]}>
+            {/* 拖拽指示条 */}
+            <View style={styles.playlistHandle}>
+              <View style={[styles.handleBar, {
+                backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)',
+              }]} />
+            </View>
+
+            {/* 标题栏 */}
+            <View style={styles.playlistHeader}>
+              <Text style={[styles.playlistTitle, { color: colors.onSurface }]}>
+                📻 历史播客
+              </Text>
+              <TouchableOpacity onPress={() => setShowPlaylist(false)}>
+                <MaterialCommunityIcons name="close" size={22} color={colors.onSurfaceVariant} />
+              </TouchableOpacity>
+            </View>
+
+            {/* 播客列表 */}
+            <FlatList
+              data={recentReports?.filter((r: any) => r.podcast_status === 'ready') || []}
+              keyExtractor={(item: any) => item.id}
+              showsVerticalScrollIndicator={false}
+              style={styles.playlistList}
+              ListEmptyComponent={
+                <View style={styles.playlistEmpty}>
+                  <MaterialCommunityIcons name="podcast" size={40} color={colors.outline} />
+                  <Text style={[styles.playlistEmptyText, { color: colors.outline }]}>
+                    暂无历史播客
+                  </Text>
+                </View>
+              }
+              renderItem={({ item }: { item: any }) => {
+                const isCurrentlyPlaying = currentReportId === item.id;
+                const reportDate = item.report_date || item.created_at?.split('T')[0] || '';
+                return (
+                  <TouchableOpacity
+                    style={[styles.playlistItem, {
+                      backgroundColor: isCurrentlyPlaying
+                        ? (isDark ? 'rgba(182,160,255,0.12)' : 'rgba(124,77,255,0.08)')
+                        : 'transparent',
+                    }]}
+                    onPress={() => {
+                      play(item.id, item.podcast_url);
+                      setShowPlaylist(false);
+                    }}
+                  >
+                    <View style={[styles.playlistItemIcon, {
+                      backgroundColor: isCurrentlyPlaying
+                        ? colors.primary
+                        : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'),
+                    }]}>
+                      <MaterialCommunityIcons
+                        name={isCurrentlyPlaying && isPlaying ? 'equalizer' : 'play'}
+                        size={16}
+                        color={isCurrentlyPlaying ? '#fff' : colors.onSurfaceVariant}
+                      />
+                    </View>
+                    <View style={styles.playlistItemInfo}>
+                      <Text
+                        style={[styles.playlistItemTitle, {
+                          color: isCurrentlyPlaying ? colors.primary : colors.onSurface,
+                        }]}
+                        numberOfLines={1}
+                      >
+                        {item.title || '财经日报'}
+                      </Text>
+                      <Text style={[styles.playlistItemDate, { color: colors.onSurfaceVariant }]}>
+                        {reportDate}
+                      </Text>
+                    </View>
+                    {isCurrentlyPlaying && (
+                      <View style={[styles.nowPlayingDot, { backgroundColor: colors.primary }]} />
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -580,6 +678,96 @@ function createStyles(colors: any, isDark: boolean) {
           elevation: 8,
         },
       }),
+    },
+
+    // 播客历史浮层
+    playlistOverlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      paddingBottom: Platform.OS === 'ios' ? 88 : 64, // 给 Tab Bar 留空间
+    },
+    playlistSheet: {
+      maxHeight: SCREEN_HEIGHT * 0.55,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingBottom: Platform.OS === 'ios' ? 20 : 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderBottomWidth: 0,
+      borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+      ...Platform.select({
+        ios: {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -8 },
+          shadowOpacity: 0.25,
+          shadowRadius: 24,
+        },
+        android: {
+          elevation: 24,
+        },
+      }),
+    },
+    playlistHandle: {
+      alignItems: 'center',
+      paddingVertical: 12,
+    },
+    handleBar: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+    },
+    playlistHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 24,
+      paddingBottom: 16,
+    },
+    playlistTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    playlistList: {
+      paddingHorizontal: 16,
+    },
+    playlistEmpty: {
+      alignItems: 'center',
+      paddingVertical: 40,
+      gap: 12,
+    },
+    playlistEmptyText: {
+      fontSize: 14,
+    },
+    playlistItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      marginBottom: 4,
+      gap: 12,
+    },
+    playlistItemIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    playlistItemInfo: {
+      flex: 1,
+      gap: 2,
+    },
+    playlistItemTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    playlistItemDate: {
+      fontSize: 12,
+    },
+    nowPlayingDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
     },
   });
 }

@@ -213,7 +213,15 @@ export default function SettingsScreen() {
             subtitle="1.0.0 (MVP)"
           />
           <View style={[styles.separator, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]} />
-          <TouchableOpacity onPress={() => Alert.alert('使用说明', '每天早上 7 点，系统自动生成财经日报和播客。在首页查看报告，播客页收听音频，自选股页追踪个股。')}>
+          <SettingRow
+            colors={colors}
+            isDark={isDark}
+            icon="server-network"
+            title="服务器"
+            subtitle="82.156.59.2"
+          />
+          <View style={[styles.separator, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]} />
+          <TouchableOpacity onPress={() => Alert.alert('使用说明', '每天早上 7 点，系统自动生成财经日报和播客。\n\n• 首页：查看今日报告和历史存档\n• 播客：收听 AI 财经播报\n• 股票：查看市场行情和自选股\n\n报告和播客由后端自动生成，无需手动操作。')}>
             <SettingRow
               colors={colors}
               isDark={isDark}

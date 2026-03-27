@@ -71,8 +71,8 @@ export const LightColors = {
   gradientEnd: '#3367ff',
 
   // TabBar
-  tabBarBackground: 'rgba(255, 255, 255, 0.6)',
-  tabBarBorder: 'rgba(255, 255, 255, 0.2)',
+  tabBarBackground: 'rgba(255, 255, 255, 0.92)',
+  tabBarBorder: 'rgba(0, 0, 0, 0.06)',
   tabBarActive: '#7C4DFF',
   tabBarInactive: '#5c5e66',
 

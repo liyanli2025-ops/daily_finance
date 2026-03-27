@@ -49,16 +49,23 @@ export default function StocksScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [indices, setIndices] = useState<MarketIndex[]>([]);
   const [indicesLoading, setIndicesLoading] = useState(true);
+  const [indicesError, setIndicesError] = useState<string | null>(null);
 
   const fetchIndices = async () => {
     try {
       setIndicesLoading(true);
+      setIndicesError(null);
       const res = await api.getMarketIndices();
       if (res.status === 'success' && res.data.length > 0) {
         setIndices(res.data);
+      } else if (res.status === 'error') {
+        setIndicesError(res.message || '获取失败');
+      } else {
+        setIndicesError('暂无数据');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('获取指数数据失败', e);
+      setIndicesError('网络请求失败，请下拉刷新重试');
     } finally {
       setIndicesLoading(false);
     }
@@ -140,9 +147,24 @@ export default function StocksScreen() {
                 </Card>
               ))
             ) : (
-              <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
-                暂无指数数据（可能非交易时段）
-              </Text>
+              <View style={styles.indicesErrorContainer}>
+                <MaterialCommunityIcons
+                  name="chart-line"
+                  size={32}
+                  color={theme.colors.outline}
+                />
+                <Text variant="bodySmall" style={{ color: theme.colors.outline, marginTop: 8, textAlign: 'center' }}>
+                  {indicesError || '暂无指数数据'}
+                </Text>
+                <Button
+                  mode="text"
+                  compact
+                  onPress={fetchIndices}
+                  style={{ marginTop: 4 }}
+                >
+                  点击重试
+                </Button>
+              </View>
             )}
           </View>
         </View>
@@ -326,6 +348,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 20,
   },
+  indicesErrorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
   watchlistSection: {
     flex: 1,
   },
@@ -351,7 +379,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 16,
-    bottom: 16,
+    bottom: 80,
     borderRadius: 16,
   },
   modalContent: {

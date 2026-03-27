@@ -83,10 +83,10 @@ export default function StockCard({ stock, onPress, onRemove }: StockCardProps) 
           {/* 价格信息 */}
           <View style={styles.priceSection}>
             <Text variant="titleLarge" style={[styles.price, { color: priceColor }]}>
-              {stock.current_price?.toFixed(2) ?? '--'}
+              {stock.current_price != null ? stock.current_price.toFixed(2) : '--'}
             </Text>
             <Text variant="bodySmall" style={{ color: priceColor }}>
-              {stock.change_percent !== undefined 
+              {stock.change_percent != null
                 ? `${stock.change_percent >= 0 ? '+' : ''}${stock.change_percent.toFixed(2)}%`
                 : '--'}
             </Text>

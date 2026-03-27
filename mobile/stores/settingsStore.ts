@@ -30,7 +30,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   defaultPlaybackRate: 1,
   autoDownload: true,
   followMarkets: ['A', 'HK'],
-  apiUrl: 'http://82.156.59.2:8000',
+  apiUrl: 'http://82.156.59.2',
   isLoading: false,
 
   loadSettings: async () => {

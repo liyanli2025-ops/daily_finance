@@ -45,7 +45,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiUrl": "http://82.156.59.2:8000"
+      "apiUrl": "http://82.156.59.2"
     }
   }
 }

@@ -3,7 +3,7 @@
  * 封装所有与后端的通信
  */
 
-const BASE_URL = 'http://82.156.59.2:8000/api';
+const BASE_URL = 'http://82.156.59.2/api';
 
 class ApiService {
   private baseUrl: string;
@@ -18,7 +18,8 @@ class ApiService {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    timeout: number = 15000
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     
@@ -26,8 +27,12 @@ class ApiService {
       'Content-Type': 'application/json',
     };
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
     const config: RequestInit = {
       ...options,
+      signal: controller.signal,
       headers: {
         ...defaultHeaders,
         ...options.headers,
@@ -36,13 +41,19 @@ class ApiService {
 
     try {
       const response = await fetch(url, config);
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        console.error(`API请求超时: ${endpoint}`);
+        throw new Error('请求超时');
+      }
       console.error(`API请求失败: ${endpoint}`, error);
       throw error;
     }
@@ -131,7 +142,7 @@ class ApiService {
         open: number;
       }>;
       message?: string;
-    }>('/stocks/market/indices');
+    }>('/stocks/market/indices', {}, 45000);
   }
 
   /**
