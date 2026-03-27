@@ -152,10 +152,13 @@ async def get_market_indices():
     
     返回上证指数、深证成指、创业板指、科创50、沪深300 的实时数据
     """
+    import asyncio
+    
     service = get_market_data_service()
     
     try:
-        indices = await service._get_indices()
+        # 设置 30 秒超时，防止 AKShare 卡死
+        indices = await asyncio.wait_for(service._get_indices(), timeout=30)
         return {
             "status": "success",
             "data": [
@@ -173,6 +176,12 @@ async def get_market_indices():
                 }
                 for idx in indices
             ],
+        }
+    except asyncio.TimeoutError:
+        return {
+            "status": "error",
+            "message": "获取指数数据超时，请稍后重试",
+            "data": [],
         }
     except Exception as e:
         return {
