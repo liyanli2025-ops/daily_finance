@@ -1,64 +1,62 @@
 import { Tabs } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTheme } from 'react-native-paper';
+import { StyleSheet, Platform, View } from 'react-native';
+import { useAppTheme } from '@/theme/ThemeContext';
 
 export default function TabLayout() {
-  const theme = useTheme();
+  const { colors, isDark } = useAppTheme();
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.outline,
+        headerShown: false,
+        tabBarActiveTintColor: colors.tabBarActive,
+        tabBarInactiveTintColor: colors.tabBarInactive,
         tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.outline,
-          borderTopWidth: 0.5,
-          height: 60,
-          paddingBottom: 8,
+          position: 'absolute',
+          backgroundColor: colors.tabBarBackground,
+          borderTopColor: colors.tabBarBorder,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          height: Platform.OS === 'ios' ? 88 : 64,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
           paddingTop: 8,
+          elevation: 0,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-        },
-        headerStyle: {
-          backgroundColor: theme.colors.surface,
-        },
-        headerTintColor: theme.colors.onSurface,
-        headerTitleStyle: {
-          fontWeight: '600',
-          fontSize: 18,
+          fontSize: 9,
+          fontWeight: '700',
+          letterSpacing: 1.2,
+          textTransform: 'uppercase',
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: '今日报告',
+          title: '首页',
           tabBarLabel: '首页',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="newspaper-variant-outline" size={size} color={color} />
+            <MaterialCommunityIcons name="newspaper-variant-outline" size={22} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="podcast"
         options={{
-          title: '财经播客',
+          title: '播客',
           tabBarLabel: '播客',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="podcast" size={size} color={color} />
+            <MaterialCommunityIcons name="play-circle-outline" size={22} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="stocks"
         options={{
-          title: '自选股',
+          title: '股票',
           tabBarLabel: '股票',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="chart-line" size={size} color={color} />
+            <MaterialCommunityIcons name="chart-line" size={22} color={color} />
           ),
         }}
       />
@@ -68,7 +66,7 @@ export default function TabLayout() {
           title: '设置',
           tabBarLabel: '设置',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="cog-outline" size={size} color={color} />
+            <MaterialCommunityIcons name="cog-outline" size={22} color={color} />
           ),
         }}
       />

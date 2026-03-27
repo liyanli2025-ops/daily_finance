@@ -15,7 +15,21 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useStockStore } from '@/stores/stockStore';
+import { api } from '@/services/api';
 import StockCard from '@/components/StockCard';
+
+interface MarketIndex {
+  code: string;
+  name: string;
+  current: number;
+  change: number;
+  change_pct: number;
+  volume: number;
+  amount: number;
+  high: number;
+  low: number;
+  open: number;
+}
 
 export default function StocksScreen() {
   const theme = useTheme();
@@ -33,14 +47,31 @@ export default function StocksScreen() {
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [indices, setIndices] = useState<MarketIndex[]>([]);
+  const [indicesLoading, setIndicesLoading] = useState(true);
+
+  const fetchIndices = async () => {
+    try {
+      setIndicesLoading(true);
+      const res = await api.getMarketIndices();
+      if (res.status === 'success' && res.data.length > 0) {
+        setIndices(res.data);
+      }
+    } catch (e) {
+      console.error('获取指数数据失败', e);
+    } finally {
+      setIndicesLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchWatchlist();
+    fetchIndices();
   }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchWatchlist();
+    await Promise.all([fetchWatchlist(), fetchIndices()]);
     setRefreshing(false);
   };
 
@@ -75,35 +106,44 @@ export default function StocksScreen() {
             📊 市场概览
           </Text>
           <View style={styles.indexContainer}>
-            {[
-              { name: '上证指数', value: '3089.23', change: '+0.52%', up: true },
-              { name: '深证成指', value: '9456.78', change: '-0.23%', up: false },
-              { name: '恒生指数', value: '17234.56', change: '+1.05%', up: true },
-            ].map((index, i) => (
-              <Card
-                key={i}
-                style={[styles.indexCard, { backgroundColor: theme.colors.surface }]}
-              >
-                <Card.Content>
-                  <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
-                    {index.name}
-                  </Text>
-                  <Text variant="titleMedium" style={{ fontWeight: '700', marginTop: 4 }}>
-                    {index.value}
-                  </Text>
-                  <Text
-                    variant="bodySmall"
-                    style={{
-                      color: index.up ? '#4CAF50' : '#F44336',
-                      fontWeight: '600',
-                      marginTop: 2,
-                    }}
-                  >
-                    {index.change}
-                  </Text>
-                </Card.Content>
-              </Card>
-            ))}
+            {indicesLoading ? (
+              <View style={styles.indicesLoadingContainer}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text variant="bodySmall" style={{ color: theme.colors.outline, marginTop: 8 }}>
+                  加载指数数据...
+                </Text>
+              </View>
+            ) : indices.length > 0 ? (
+              indices.slice(0, 5).map((idx) => (
+                <Card
+                  key={idx.code}
+                  style={[styles.indexCard, { backgroundColor: theme.colors.surface }]}
+                >
+                  <Card.Content>
+                    <Text variant="bodySmall" style={{ color: theme.colors.outline }} numberOfLines={1}>
+                      {idx.name}
+                    </Text>
+                    <Text variant="titleMedium" style={{ fontWeight: '700', marginTop: 4 }}>
+                      {idx.current.toFixed(2)}
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      style={{
+                        color: idx.change_pct >= 0 ? '#4CAF50' : '#F44336',
+                        fontWeight: '600',
+                        marginTop: 2,
+                      }}
+                    >
+                      {idx.change_pct >= 0 ? '+' : ''}{idx.change_pct.toFixed(2)}%
+                    </Text>
+                  </Card.Content>
+                </Card>
+              ))
+            ) : (
+              <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
+                暂无指数数据（可能非交易时段）
+              </Text>
+            )}
           </View>
         </View>
 
@@ -272,11 +312,19 @@ const styles = StyleSheet.create({
   },
   indexContainer: {
     flexDirection: 'row',
-    gap: 12,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   indexCard: {
+    minWidth: '30%',
     flex: 1,
     borderRadius: 12,
+  },
+  indicesLoadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
   },
   watchlistSection: {
     flex: 1,

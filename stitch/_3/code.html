@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>历史播报存档 - 简约列表</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#7C4DFF",
+              "primary-dim": "#6834eb",
+              "surface": "#f8f9fc",
+              "on-surface": "#111318",
+              "on-surface-variant": "#5c5e66",
+              "outline-variant": "#c4c6cf",
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {
+              "DEFAULT": "8px",
+              "lg": "12px",
+              "xl": "16px",
+              "2xl": "20px",
+              "3xl": "24px",
+              "full": "9999px"
+            },
+          },
+        },
+      }
+    </script>
+<style>
+      body {
+        font-family: 'Manrope', sans-serif;
+        background-color: #f8f9fc;
+        background-image: 
+          radial-gradient(at 0% 0%, rgba(124, 77, 255, 0.08) 0px, transparent 50%),
+          radial-gradient(at 100% 100%, rgba(124, 77, 255, 0.05) 0px, transparent 50%);
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.4);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+      }
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .play-fill {
+        font-variation-settings: 'FILL' 1;
+      }
+    </style>
+</head>
+<body class="min-h-screen text-on-surface selection:bg-primary/30">
+<!-- Subtle Background Logo -->
+<div class="fixed inset-0 flex items-center justify-center pointer-events-none opacity-[0.02] overflow-hidden z-0">
+<img alt="Background Logo" class="w-[80%] max-w-none grayscale rotate-12" src="https://lh3.googleusercontent.com/aida/ADBb0ujt0s0n6dg_UFniDbn3NDppyKRXWBCVpprummbbya_nMDO5S5VHXzjQggX6T96g_FwKq9bskOeCZKRCXxONFV-C0mixRIQxPIyOIN9TYwXH4JjjrqMvoLJlaX7Ce6sQMNgnvH8rKxgSf984YZlzyOjExMf3DtMS-Pf8-AYQ66Q1peXYjVGQqmdz6iCPh-HsHmZ-LJx89vKD0XdoYqbdKReiLkuqAV9r1SORutPGnBfNJbVS1Jafdvmy9Qd6sdn8e91kYdm8P8d2Gw"/>
+</div>
+<!-- Header -->
+<header class="fixed top-0 w-full z-50 bg-white/40 backdrop-blur-md border-b border-white/20">
+<div class="flex items-center justify-between px-6 h-16 max-w-2xl mx-auto">
+<div class="flex items-center gap-3">
+<div class="p-2 rounded-xl bg-primary/10 text-primary">
+<span class="material-symbols-outlined">calendar_today</span>
+</div>
+<h1 class="font-headline text-xl font-bold tracking-tight text-on-surface">Archives</h1>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 text-on-surface-variant"><span class="material-symbols-outlined">search</span></button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-primary/20">
+<img alt="User" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5wVRsj3OzySBJHYVrid-xopfgYJpRLxOZXoOL5zarcn0SW8dUeXp7jySWhARV213KfyDBdiDaevWBjQ8QAKgyzC90mdypdj7kXEv84q2U7pMNa_i7it_wSPwxWFlWOC6sEcVXoMvlqPkhjnZFY-24QsuksxrtvLTbYgVPnVo2Y2XMK0otOWYMHwqFDpJU1ASYFlWz62D-9X64pdTmDPn3hYFMGpshkkJUPqU-ZTsEk1tvajDS9AeJbHuGAqEl8W5z_WooptbTgylS"/>
+</div>
+</div>
+</div>
+</header>
+<main class="relative z-10 pt-24 pb-32 px-6 max-w-2xl mx-auto">
+<!-- Hero Header -->
+<div class="mb-8">
+<h2 class="font-headline text-3xl font-extrabold tracking-tight text-on-surface mb-1">历史播报存档</h2>
+<p class="text-on-surface-variant text-sm font-medium">探索过去的声音，回顾每日精彩瞬间。</p>
+</div>
+<!-- Simplified Archive List -->
+<div class="space-y-3">
+<!-- Episode 1 -->
+<div class="group glass-card rounded-2xl p-4 flex items-center justify-between hover:bg-white/60 transition-all duration-300 cursor-pointer shadow-sm">
+<div class="flex-grow min-w-0 pr-4">
+<p class="text-[10px] font-bold text-primary uppercase tracking-widest mb-0.5">2023年10月24日</p>
+<h3 class="text-base font-bold text-on-surface truncate group-hover:text-primary transition-colors">AI 革命：如何重塑我们的未来生活</h3>
+</div>
+<div class="w-10 h-10 flex-shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
+<span class="material-symbols-outlined play-fill">play_arrow</span>
+</div>
+</div>
+<!-- Episode 2 -->
+<div class="group glass-card rounded-2xl p-4 flex items-center justify-between hover:bg-white/60 transition-all duration-300 cursor-pointer shadow-sm">
+<div class="flex-grow min-w-0 pr-4">
+<p class="text-[10px] font-bold text-primary uppercase tracking-widest mb-0.5">2023年10月23日</p>
+<h3 class="text-base font-bold text-on-surface truncate group-hover:text-primary transition-colors">城市景观：失落的街道艺术与文化记忆</h3>
+</div>
+<div class="w-10 h-10 flex-shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
+<span class="material-symbols-outlined play-fill">play_arrow</span>
+</div>
+</div>
+<!-- Episode 3 -->
+<div class="group glass-card rounded-2xl p-4 flex items-center justify-between hover:bg-white/60 transition-all duration-300 cursor-pointer shadow-sm">
+<div class="flex-grow min-w-0 pr-4">
+<p class="text-[10px] font-bold text-primary uppercase tracking-widest mb-0.5">2023年10月22日</p>
+<h3 class="text-base font-bold text-on-surface truncate group-hover:text-primary transition-colors">今日财报速递：数字经济的新增长极</h3>
+</div>
+<div class="w-10 h-10 flex-shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
+<span class="material-symbols-outlined play-fill">play_arrow</span>
+</div>
+</div>
+<!-- Episode 4 -->
+<div class="group glass-card rounded-2xl p-4 flex items-center justify-between hover:bg-white/60 transition-all duration-300 cursor-pointer shadow-sm">
+<div class="flex-grow min-w-0 pr-4">
+<p class="text-[10px] font-bold text-primary uppercase tracking-widest mb-0.5">2023年10月21日</p>
+<h3 class="text-base font-bold text-on-surface truncate group-hover:text-primary transition-colors">深度对谈：气候变化与全球治理的挑战</h3>
+</div>
+<div class="w-10 h-10 flex-shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
+<span class="material-symbols-outlined play-fill">play_arrow</span>
+</div>
+</div>
+<!-- Episode 5 -->
+<div class="group glass-card rounded-2xl p-4 flex items-center justify-between hover:bg-white/60 transition-all duration-300 cursor-pointer shadow-sm">
+<div class="flex-grow min-w-0 pr-4">
+<p class="text-[10px] font-bold text-primary uppercase tracking-widest mb-0.5">2023年10月20日</p>
+<h3 class="text-base font-bold text-on-surface truncate group-hover:text-primary transition-colors">科技周报：下一代无线通信技术展望</h3>
+</div>
+<div class="w-10 h-10 flex-shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
+<span class="material-symbols-outlined play-fill">play_arrow</span>
+</div>
+</div>
+<!-- Episode 6 -->
+<div class="group glass-card rounded-2xl p-4 flex items-center justify-between hover:bg-white/60 transition-all duration-300 cursor-pointer shadow-sm">
+<div class="flex-grow min-w-0 pr-4">
+<p class="text-[10px] font-bold text-primary uppercase tracking-widest mb-0.5">2023年10月19日</p>
+<h3 class="text-base font-bold text-on-surface truncate group-hover:text-primary transition-colors">文化漫谈：东方美学在现代设计中的回归</h3>
+</div>
+<div class="w-10 h-10 flex-shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
+<span class="material-symbols-outlined play-fill">play_arrow</span>
+</div>
+</div>
+</div>
+<!-- Simple Pagination -->
+<div class="mt-10 flex justify-center items-center gap-6">
+<button class="text-on-surface-variant disabled:opacity-30 flex items-center gap-1 text-sm font-bold" disabled="">
+<span class="material-symbols-outlined">chevron_left</span> Previous
+        </button>
+<span class="text-xs font-bold text-on-surface">Page 1 of 12</span>
+<button class="text-primary flex items-center gap-1 text-sm font-bold">
+            Next <span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</main>
+<!-- Navigation -->
+<nav class="fixed bottom-0 left-0 w-full z-50 bg-white/60 backdrop-blur-xl px-4 pb-6 pt-3 rounded-t-3xl border-t border-white/20">
+<div class="flex justify-around items-center max-w-md mx-auto">
+<a class="flex flex-col items-center justify-center text-primary" href="#">
+<span class="material-symbols-outlined play-fill">subscriptions</span>
+<span class="text-[10px] font-bold mt-1">Library</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">explore</span>
+<span class="text-[10px] font-bold mt-1">Discover</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">sensors</span>
+<span class="text-[10px] font-bold mt-1">Live</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-bold mt-1">Profile</span>
+</a>
+</div>
+</nav>
+</body></html>

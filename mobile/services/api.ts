@@ -3,7 +3,7 @@
  * 封装所有与后端的通信
  */
 
-const BASE_URL = 'http://localhost:9090/api';
+const BASE_URL = 'http://82.156.59.2:8000/api';
 
 class ApiService {
   private baseUrl: string;
@@ -111,6 +111,28 @@ class ApiService {
   }
 
   // ==================== 股票相关 ====================
+
+  /**
+   * 获取主要市场指数实时行情
+   */
+  async getMarketIndices() {
+    return this.request<{
+      status: string;
+      data: Array<{
+        code: string;
+        name: string;
+        current: number;
+        change: number;
+        change_pct: number;
+        volume: number;
+        amount: number;
+        high: number;
+        low: number;
+        open: number;
+      }>;
+      message?: string;
+    }>('/stocks/market/indices');
+  }
 
   /**
    * 获取自选股列表

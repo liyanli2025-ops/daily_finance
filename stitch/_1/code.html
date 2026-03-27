@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Luminous Lens - AI Podcast Player</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-tint": "#b6a0ff",
+                        "primary-fixed": "#a98fff",
+                        "on-tertiary": "#655400",
+                        "inverse-on-surface": "#53555a",
+                        "surface-container-low": "#111318",
+                        "on-error": "#490013",
+                        "error-dim": "#d73357",
+                        "error-container": "#a70138",
+                        "primary-fixed-dim": "#9c7eff",
+                        "outline-variant": "#46484d",
+                        "secondary-dim": "#3367ff",
+                        "inverse-surface": "#f9f9ff",
+                        "on-primary": "#340090",
+                        "on-primary-fixed": "#000000",
+                        "secondary-fixed": "#c5d0ff",
+                        "on-surface-variant": "#aaabb0",
+                        "surface-variant": "#23262c",
+                        "surface-bright": "#292c33",
+                        "secondary": "#7c98ff",
+                        "error": "#ff6e84",
+                        "on-secondary-fixed-variant": "#0042c9",
+                        "primary-dim": "#7e51ff",
+                        "surface-container-highest": "#23262c",
+                        "tertiary-container": "#ffd709",
+                        "tertiary-fixed-dim": "#efc900",
+                        "on-background": "#171a1f",
+                        "surface-container": "#171a1f",
+                        "on-primary-container": "#280072",
+                        "on-tertiary-container": "#5b4b00",
+                        "surface": "#fdfdfd",
+                        "on-secondary": "#00195b",
+                        "inverse-primary": "#6834eb",
+                        "background": "#fdfdfd",
+                        "secondary-fixed-dim": "#b3c1ff",
+                        "on-secondary-fixed": "#002a88",
+                        "primary": "#b6a0ff",
+                        "surface-container-high": "#1d2025",
+                        "tertiary": "#ffe792",
+                        "on-primary-fixed-variant": "#32008a",
+                        "secondary-container": "#004ee8",
+                        "on-secondary-container": "#f8f7ff",
+                        "primary-container": "#a98fff",
+                        "surface-dim": "#0c0e12",
+                        "on-error-container": "#ffb2b9",
+                        "tertiary-fixed": "#ffd709",
+                        "on-surface": "#111318",
+                        "on-tertiary-fixed": "#453900",
+                        "tertiary-dim": "#efc900",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed-variant": "#665500",
+                        "outline": "#74757a"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Manrope"],
+                        "label": ["Manrope"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .text-gradient-primary {
+            background: linear-gradient(135deg, #7e51ff 0%, #3367ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .blob {
+            position: absolute;
+            filter: blur(80px);
+            z-index: 0;
+            opacity: 0.3;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        body {
+            min-height: 100dvh;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 font-body text-on-surface overflow-hidden h-screen w-full relative">
+<!-- Atmospheric Background Elements -->
+<div class="blob w-[500px] h-[500px] bg-primary-fixed rounded-full -top-20 -left-20"></div>
+<div class="blob w-[400px] h-[400px] bg-secondary-dim rounded-full bottom-20 -right-20"></div>
+<!-- Floating Logo Decal (Asymmetric background element) -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.05] pointer-events-none scale-125">
+<img alt="Stylized technology bear logo icon" class="w-96 h-96 grayscale" src="https://lh3.googleusercontent.com/aida/ADBb0ujt0s0n6dg_UFniDbn3NDppyKRXWBCVpprummbbya_nMDO5S5VHXzjQggX6T96g_FwKq9bskOeCZKRCXxONFV-C0mixRIQxPIyOIN9TYwXH4JjjrqMvoLJlaX7Ce6sQMNgnvH8rKxgSf984YZlzyOjExMf3DtMS-Pf8-AYQ66Q1peXYjVGQqmdz6iCPh-HsHmZ-LJx89vKD0XdoYqbdKReiLkuqAV9r1SORutPGnBfNJbVS1Jafdvmy9Qd6sdn8e91kYdm8P8d2Gw"/>
+</div>
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-white/40 backdrop-blur-xl flex justify-between items-center px-6 py-4 shadow-sm">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full overflow-hidden ring-2 ring-primary/10">
+<img alt="User Profile Photo" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0tEYMZTAUKZN2gP9mQGY7tMJn3FCI60_UWt5BOwnmbKvxHwtXacEXEHL2xltN4g3qlgi9ZLCHoVXAyayv4rqFQ-ebFaKt-gvSWW0GvWy4KsPSKI6k_FVdm9sL63myT2baebqs1dNAG_a6ZzW_Bblv9iQ_4-fK_QOyxc4c5i6kgk_kq0jnCO11H9osWwjxI70DqBEYvQiB-5tnxe2VyNt8Ezz2Km5_N2CMI8EFErgTFuFJNfGPVw_MRB1t_l_ki4in2bI1B7_ZR3CC"/>
+</div>
+<h1 class="font-manrope font-bold text-base tracking-tight text-slate-900">August 12</h1>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-slate-600 cursor-pointer">search</span>
+<span class="material-symbols-outlined text-slate-600 cursor-pointer">more_vert</span>
+</div>
+</header>
+<!-- Main Content: Scrolling Text Canvas -->
+<main class="relative z-10 h-full flex flex-col pt-24 pb-72 px-8">
+<div class="flex-grow overflow-y-auto space-y-8 scroll-smooth no-scrollbar">
+<!-- Previous Text (Faded) -->
+<p class="text-3xl md:text-5xl font-medium text-slate-400/30 leading-tight">
+                Welcome to the morning briefing. Today we examine the convergence of synthetic biology and local manufacturing.
+            </p>
+<p class="text-3xl md:text-5xl font-medium text-slate-400/40 leading-tight">
+                Data streams suggest a 14% increase in micro-factory efficiency within the Northern Hemisphere.
+            </p>
+<!-- Active Text (Highlighted) -->
+<p class="text-4xl md:text-6xl font-extrabold leading-tight text-gradient-primary">
+                The core innovation lies in the recursive nature of the AI's feedback loops, effectively allowing the system to "dream" of more efficient mechanical structures before they are ever physicalized.
+            </p>
+<!-- Upcoming Text (Blurred/Faded) -->
+<p class="text-3xl md:text-5xl font-medium text-slate-400/20 leading-tight">
+                By mid-day, these structures are autonomously printed and tested in high-pressure chambers.
+            </p>
+<p class="text-3xl md:text-5xl font-medium text-slate-400/10 leading-tight">
+                The implications for the construction industry are significant, potentially reducing waste by nearly half.
+            </p>
+</div>
+</main>
+<!-- Lower Section: Player Controls (Moved up into safe area) -->
+<div class="fixed bottom-6 left-0 w-full px-4 z-50">
+<div class="glass-panel rounded-[2rem] p-6 shadow-2xl max-w-xl mx-auto">
+<!-- Metadata & Progress -->
+<div class="flex flex-col gap-4 mb-6">
+<div class="flex justify-between items-start">
+<div>
+<span class="text-[10px] uppercase tracking-[0.2em] font-bold text-primary-dim mb-1 block">AI Daily Show</span>
+<h2 class="text-lg font-bold tracking-tight text-slate-900">The Recursive Dreamer</h2>
+</div>
+<div class="text-right">
+<span class="text-[10px] font-bold text-slate-500 font-mono bg-slate-100 px-2 py-1 rounded-full">04:22 / 12:45</span>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="relative h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+<div class="absolute top-0 left-0 h-full w-1/3 bg-primary-dim rounded-full"></div>
+</div>
+</div>
+<!-- Controls Layout -->
+<div class="flex flex-col gap-6">
+<div class="flex items-center justify-between">
+<!-- Left Cluster -->
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
+<span class="material-symbols-outlined text-xl">shuffle</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
+<span class="material-symbols-outlined text-xl">replay_10</span>
+</button>
+</div>
+<!-- Main Playback -->
+<div class="flex items-center gap-6">
+<button class="text-slate-800 hover:text-primary transition-colors active:scale-95">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">skip_previous</span>
+</button>
+<button class="w-16 h-16 rounded-full bg-primary-dim flex items-center justify-center text-white shadow-lg shadow-primary-dim/30 hover:shadow-primary-dim/50 transition-all active:scale-90">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">pause</span>
+</button>
+<button class="text-slate-800 hover:text-primary transition-colors active:scale-95">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">skip_next</span>
+</button>
+</div>
+<!-- Right Cluster -->
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
+<span class="material-symbols-outlined text-xl">forward_30</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
+<span class="material-symbols-outlined text-xl">speed</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Floating UI Decorative Accents -->
+<div class="fixed top-1/3 -right-12 w-24 h-48 bg-tertiary/20 blur-3xl pointer-events-none"></div>
+</body></html>

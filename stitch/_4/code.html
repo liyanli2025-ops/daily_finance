@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary-dim": "#7e51ff",
+              "surface-container-highest": "#23262c",
+              "on-background": "#f6f6fc",
+              "surface-container-low": "#111318",
+              "inverse-primary": "#6834eb",
+              "surface": "#0c0e12",
+              "secondary-dim": "#3367ff",
+              "secondary": "#7c98ff",
+              "primary": "#7C4DFF",
+              "error-container": "#a70138",
+              "primary-fixed-dim": "#9c7eff",
+              "surface-dim": "#0c0e12",
+              "tertiary-fixed": "#ffd709",
+              "secondary-fixed": "#c5d0ff",
+              "on-primary-fixed": "#000000",
+              "surface-tint": "#b6a0ff",
+              "surface-container-lowest": "#000000",
+              "inverse-on-surface": "#53555a",
+              "on-tertiary-container": "#5b4b00",
+              "primary-fixed": "#a98fff",
+              "on-surface-variant": "#aaabb0",
+              "on-primary": "#ffffff",
+              "on-error-container": "#ffb2b9",
+              "outline": "#74757a",
+              "on-surface": "#f6f6fc",
+              "surface-variant": "#23262c",
+              "secondary-fixed-dim": "#b3c1ff",
+              "on-tertiary-fixed-variant": "#665500",
+              "surface-container-high": "#1d2025",
+              "surface-bright": "#292c33",
+              "on-primary-container": "#280072",
+              "inverse-surface": "#f9f9ff",
+              "background": "#08090a",
+              "on-tertiary-fixed": "#453900",
+              "on-secondary-container": "#f8f7ff",
+              "surface-container": "#171a1f",
+              "tertiary-dim": "#efc900",
+              "on-error": "#490013",
+              "tertiary-fixed-dim": "#efc900",
+              "on-primary-fixed-variant": "#32008a",
+              "tertiary-container": "#ffd709",
+              "on-tertiary": "#655400",
+              "on-secondary-fixed": "#002a88",
+              "primary-container": "#a98fff",
+              "outline-variant": "#46484d",
+              "tertiary": "#ffe792",
+              "on-secondary": "#00195b",
+              "on-secondary-fixed-variant": "#0042c9",
+              "error-dim": "#d73357",
+              "secondary-container": "#004ee8",
+              "error": "#ff6e84"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.5rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .bg-mesh {
+            background: radial-gradient(circle at 50% 0%, rgba(124, 77, 255, 0.08) 0%, transparent 70%),
+                        radial-gradient(circle at 0% 100%, rgba(51, 103, 255, 0.05) 0%, transparent 50%);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            min-height: 100dvh;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary/30">
+<!-- Ambient Background Elements -->
+<div class="fixed inset-0 bg-mesh pointer-events-none z-0"></div>
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-background/40 backdrop-blur-xl border-b border-white/5">
+<div class="flex items-center justify-between px-6 h-16 w-full max-w-2xl mx-auto">
+<div class="flex items-center gap-3">
+<img alt="Logo" class="w-8 h-8 rounded-lg opacity-80" src="https://lh3.googleusercontent.com/aida/ADBb0ujt0s0n6dg_UFniDbn3NDppyKRXWBCVpprummbbya_nMDO5S5VHXzjQggX6T96g_FwKq9bskOeCZKRCXxONFV-C0mixRIQxPIyOIN9TYwXH4JjjrqMvoLJlaX7Ce6sQMNgnvH8rKxgSf984YZlzyOjExMf3DtMS-Pf8-AYQ66Q1peXYjVGQqmdz6iCPh-HsHmZ-LJx89vKD0XdoYqbdKReiLkuqAV9r1SORutPGnBfNJbVS1Jafdvmy9Qd6sdn8e91kYdm8P8d2Gw"/>
+<h1 class="font-headline text-lg font-bold tracking-tight text-on-surface">Archive</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-white/5 transition-colors">
+<span class="material-symbols-outlined text-xl">search</span>
+</button>
+</div>
+</div>
+</header>
+<main class="relative z-10 pt-24 pb-32 px-6 max-w-2xl mx-auto">
+<!-- Section Header -->
+<header class="mb-8">
+<h2 class="text-2xl font-headline font-bold text-on-surface">History播报存档</h2>
+<p class="text-on-surface-variant text-sm mt-1">Past episodes and recordings</p>
+</header>
+<!-- Vertical Episode List -->
+<div class="flex flex-col gap-3">
+<!-- Episode Item 1 -->
+<div class="glass-card flex items-center justify-between p-4 rounded-xl group hover:bg-white/5 transition-all active:scale-[0.98]">
+<div class="flex flex-col gap-0.5">
+<span class="text-[11px] font-bold text-primary uppercase tracking-wider">Jan 24, 2024</span>
+<h3 class="text-base font-semibold text-on-surface group-hover:text-primary transition-colors">The Future of Neural Networks in Radio</h3>
+</div>
+<button class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-all">
+<span class="material-symbols-outlined fill-1" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<!-- Episode Item 2 -->
+<div class="glass-card flex items-center justify-between p-4 rounded-xl group hover:bg-white/5 transition-all active:scale-[0.98]">
+<div class="flex flex-col gap-0.5">
+<span class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Jan 23, 2024</span>
+<h3 class="text-base font-semibold text-on-surface group-hover:text-primary transition-colors">Daily Pulse: Market Shift</h3>
+</div>
+<button class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-on-surface-variant group-hover:bg-primary group-hover:text-on-primary transition-all">
+<span class="material-symbols-outlined fill-1" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<!-- Episode Item 3 -->
+<div class="glass-card flex items-center justify-between p-4 rounded-xl group hover:bg-white/5 transition-all active:scale-[0.98]">
+<div class="flex flex-col gap-0.5">
+<span class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Jan 22, 2024</span>
+<h3 class="text-base font-semibold text-on-surface group-hover:text-primary transition-colors">Cybersecurity Morning Briefing</h3>
+</div>
+<button class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-on-surface-variant group-hover:bg-primary group-hover:text-on-primary transition-all">
+<span class="material-symbols-outlined fill-1" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<!-- Episode Item 4 -->
+<div class="glass-card flex items-center justify-between p-4 rounded-xl group hover:bg-white/5 transition-all active:scale-[0.98]">
+<div class="flex flex-col gap-0.5">
+<span class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Jan 21, 2024</span>
+<h3 class="text-base font-semibold text-on-surface group-hover:text-primary transition-colors">Hardware Horizons: Silicon Trends</h3>
+</div>
+<button class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-on-surface-variant group-hover:bg-primary group-hover:text-on-primary transition-all">
+<span class="material-symbols-outlined fill-1" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<!-- Episode Item 5 -->
+<div class="glass-card flex items-center justify-between p-4 rounded-xl group hover:bg-white/5 transition-all active:scale-[0.98]">
+<div class="flex flex-col gap-0.5">
+<span class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Jan 20, 2024</span>
+<h3 class="text-base font-semibold text-on-surface group-hover:text-primary transition-colors">Ambient Resonance &amp; Productivity</h3>
+</div>
+<button class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-on-surface-variant group-hover:bg-primary group-hover:text-on-primary transition-all">
+<span class="material-symbols-outlined fill-1" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<!-- Episode Item 6 -->
+<div class="glass-card flex items-center justify-between p-4 rounded-xl group hover:bg-white/5 transition-all active:scale-[0.98]">
+<div class="flex flex-col gap-0.5">
+<span class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Jan 19, 2024</span>
+<h3 class="text-base font-semibold text-on-surface group-hover:text-primary transition-colors">Sustainable Tech Operations</h3>
+</div>
+<button class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-on-surface-variant group-hover:bg-primary group-hover:text-on-primary transition-all">
+<span class="material-symbols-outlined fill-1" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<!-- Episode Item 7 -->
+<div class="glass-card flex items-center justify-between p-4 rounded-xl group hover:bg-white/5 transition-all active:scale-[0.98]">
+<div class="flex flex-col gap-0.5">
+<span class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Jan 18, 2024</span>
+<h3 class="text-base font-semibold text-on-surface group-hover:text-primary transition-colors">Cloud Migration Strategies</h3>
+</div>
+<button class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-on-surface-variant group-hover:bg-primary group-hover:text-on-primary transition-all">
+<span class="material-symbols-outlined fill-1" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Pagination -->
+<div class="mt-12 text-center">
+<button class="px-8 py-3 rounded-full border border-white/10 text-sm font-semibold text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-all">
+                Load More
+            </button>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 bg-background/60 backdrop-blur-2xl border-t border-white/5 flex justify-around items-center px-4 pb-8 pt-3">
+<a class="flex flex-col items-center justify-center text-primary transition-all" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">subscriptions</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Library</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-on-surface transition-all" href="#">
+<span class="material-symbols-outlined mb-1">explore</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Discover</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-on-surface transition-all" href="#">
+<span class="material-symbols-outlined mb-1">sensors</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Live</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-on-surface transition-all" href="#">
+<span class="material-symbols-outlined mb-1">person</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Profile</span>
+</a>
+</nav>
+</body></html>

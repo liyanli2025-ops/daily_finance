@@ -14,6 +14,7 @@ from ..models.stock import (
 )
 from ..models.database import StockModel, StockPredictionModel
 from ..services.watchlist_service import get_watchlist_service, WatchlistStock
+from ..services.market_data_service import get_market_data_service
 from ..config import settings
 
 router = APIRouter()
@@ -142,6 +143,43 @@ async def search_stocks(
         results = [s for s in results if s["market"] == market]
     
     return results
+
+
+@router.get("/market/indices")
+async def get_market_indices():
+    """
+    获取主要市场指数实时行情（轻量级接口）
+    
+    返回上证指数、深证成指、创业板指、科创50、沪深300 的实时数据
+    """
+    service = get_market_data_service()
+    
+    try:
+        indices = await service._get_indices()
+        return {
+            "status": "success",
+            "data": [
+                {
+                    "code": idx.code,
+                    "name": idx.name,
+                    "current": idx.current,
+                    "change": idx.change,
+                    "change_pct": idx.change_pct,
+                    "volume": idx.volume,
+                    "amount": idx.amount,
+                    "high": idx.high,
+                    "low": idx.low,
+                    "open": idx.open,
+                }
+                for idx in indices
+            ],
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"获取指数数据失败: {str(e)}",
+            "data": [],
+        }
 
 
 @router.get("/{stock_code}/quote", response_model=StockQuote)
