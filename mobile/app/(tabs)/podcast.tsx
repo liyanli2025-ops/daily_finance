@@ -36,6 +36,9 @@ export default function PodcastScreen() {
   } = useAudioStore();
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const scrollViewRef = useRef<ScrollView>(null);
+  const segmentYPositions = useRef<number[]>([]);
+  const segmentsContainerY = useRef<number>(0);
   const [showPlaylist, setShowPlaylist] = useState(false);
 
   useEffect(() => {
@@ -135,6 +138,18 @@ export default function PodcastScreen() {
     );
   }, [progress, textSegments.length]);
 
+  // 歌词自动滚动到当前段落
+  useEffect(() => {
+    if (isPlaying && scrollViewRef.current && segmentYPositions.current[activeSegmentIndex] !== undefined) {
+      const targetY = segmentsContainerY.current + segmentYPositions.current[activeSegmentIndex];
+      // 滚动到当前段落，让它显示在屏幕上方约 1/3 处
+      scrollViewRef.current.scrollTo({
+        y: Math.max(0, targetY - SCREEN_HEIGHT * 0.3),
+        animated: true,
+      });
+    }
+  }, [activeSegmentIndex, isPlaying]);
+
   const today = new Date();
   const dateStr = `${today.getMonth() + 1}月${today.getDate()}日`;
 
@@ -166,6 +181,7 @@ export default function PodcastScreen() {
 
       {/* 主内容：滚动文本区 */}
       <ScrollView
+        ref={scrollViewRef}
         style={styles.textCanvas}
         contentContainerStyle={styles.textCanvasContent}
         showsVerticalScrollIndicator={false}
@@ -187,35 +203,46 @@ export default function PodcastScreen() {
         )}
 
         {/* 文本段落（歌词式显示） */}
-        <View style={styles.segmentsContainer}>
+        <View
+          style={styles.segmentsContainer}
+          onLayout={(e) => {
+            segmentsContainerY.current = e.nativeEvent.layout.y;
+          }}
+        >
           {textSegments.map((text, index) => {
             const isActive = index === activeSegmentIndex;
             const isPast = index < activeSegmentIndex;
             const isFuture = index > activeSegmentIndex;
 
             return (
-              <Text
+              <View
                 key={index}
-                style={[
-                  styles.segmentText,
-                  isActive && {
-                    color: colors.primary,
-                    fontSize: 26,
-                    fontWeight: '700',
-                    opacity: 1,
-                  },
-                  isPast && {
-                    color: colors.onSurfaceVariant,
-                    opacity: 0.3,
-                  },
-                  isFuture && {
-                    color: colors.onSurfaceVariant,
-                    opacity: isDark ? 0.15 : 0.2,
-                  },
-                ]}
+                onLayout={(e) => {
+                  segmentYPositions.current[index] = e.nativeEvent.layout.y;
+                }}
               >
-                {text}
-              </Text>
+                <Text
+                  style={[
+                    styles.segmentText,
+                    isActive && {
+                      color: colors.primary,
+                      fontSize: 26,
+                      fontWeight: '700',
+                      opacity: 1,
+                    },
+                    isPast && {
+                      color: colors.onSurfaceVariant,
+                      opacity: 0.3,
+                    },
+                    isFuture && {
+                      color: colors.onSurfaceVariant,
+                      opacity: isDark ? 0.15 : 0.2,
+                    },
+                  ]}
+                >
+                  {text}
+                </Text>
+              </View>
             );
           })}
         </View>
