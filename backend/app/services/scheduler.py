@@ -272,13 +272,80 @@ class SchedulerService:
     async def update_watchlist_data(self):
         """
         更新自选股数据
+        - 获取所有自选股
+        - 批量获取实时行情
+        - 更新数据库中的价格和涨跌幅
         """
-        print(f"[STOCK] 更新自选股数据 - {datetime.now().strftime('%H:%M:%S')}")
+        print(f"[STOCK] 开始更新自选股数据 - {datetime.now().strftime('%H:%M:%S')}")
         
-        # TODO: 实现自选股数据更新逻辑
-        # 1. 获取所有自选股
-        # 2. 批量获取实时行情
-        # 3. 更新数据库
+        if not self._session_maker:
+            print("[WARN] 数据库未初始化，跳过自选股更新")
+            return
+        
+        try:
+            from sqlalchemy import select
+            from ..models.database import StockModel
+            
+            async with self._session_maker() as session:
+                # 1. 获取所有自选股
+                query = select(StockModel)
+                result = await session.execute(query)
+                stocks = result.scalars().all()
+                
+                if not stocks:
+                    print("[STOCK] 没有自选股，跳过更新")
+                    return
+                
+                print(f"[STOCK] 开始更新 {len(stocks)} 只自选股")
+                
+                # 2. 批量获取实时行情
+                import akshare as ak
+                
+                # 获取 A股实时行情（一次性获取所有）
+                try:
+                    a_share_df = ak.stock_zh_a_spot_em()
+                except Exception as e:
+                    print(f"[STOCK] 获取A股行情失败: {e}")
+                    a_share_df = None
+                
+                # 获取港股实时行情
+                try:
+                    hk_df = ak.stock_hk_spot_em()
+                except Exception as e:
+                    print(f"[STOCK] 获取港股行情失败: {e}")
+                    hk_df = None
+                
+                # 3. 更新每只股票
+                updated_count = 0
+                for stock in stocks:
+                    try:
+                        if stock.market == 'A' and a_share_df is not None:
+                            row = a_share_df[a_share_df['代码'] == stock.code]
+                            if not row.empty:
+                                r = row.iloc[0]
+                                stock.current_price = float(r['最新价']) if r['最新价'] else None
+                                stock.change_percent = float(r['涨跌幅']) if r['涨跌幅'] else None
+                                stock.last_updated = datetime.now()
+                                updated_count += 1
+                        elif stock.market == 'HK' and hk_df is not None:
+                            code_padded = stock.code.zfill(5)
+                            row = hk_df[hk_df['代码'] == code_padded]
+                            if not row.empty:
+                                r = row.iloc[0]
+                                stock.current_price = float(r['最新价']) if r['最新价'] else None
+                                stock.change_percent = float(r['涨跌幅']) if r['涨跌幅'] else None
+                                stock.last_updated = datetime.now()
+                                updated_count += 1
+                    except Exception as e:
+                        print(f"[STOCK] 更新 {stock.code} 失败: {e}")
+                
+                await session.commit()
+                print(f"[STOCK] 自选股数据更新完成，更新了 {updated_count}/{len(stocks)} 只")
+                
+        except Exception as e:
+            print(f"[ERROR] 更新自选股数据失败: {e}")
+            import traceback
+            traceback.print_exc()
     
     async def _save_report(self, report):
         """保存报告到数据库"""

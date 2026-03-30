@@ -78,6 +78,12 @@ export default function StocksScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    // 先刷新自选股行情数据，再获取最新列表
+    try {
+      await api.refreshWatchlist();
+    } catch (e) {
+      console.log('刷新行情失败，继续获取列表');
+    }
     await Promise.all([fetchWatchlist(), fetchIndices()]);
     setRefreshing(false);
   };

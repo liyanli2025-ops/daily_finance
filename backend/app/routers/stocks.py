@@ -242,6 +242,7 @@ async def get_market_indices():
     返回上证指数、深证成指、创业板指、科创50、沪深300 的实时数据
     """
     import asyncio
+    import time
     
     main_indices = {
         "000001": "上证指数",
@@ -251,33 +252,44 @@ async def get_market_indices():
         "000300": "沪深300",
     }
     
-    def _fetch():
+    def _fetch_with_retry(max_retries=2):
+        """带重试的数据获取"""
         import akshare as ak
-        df = ak.stock_zh_index_spot_em()
-        results = []
-        for code, name in main_indices.items():
-            row = df[df['代码'] == code]
-            if not row.empty:
-                r = row.iloc[0]
-                results.append({
-                    "code": code,
-                    "name": name,
-                    "current": float(r['最新价']),
-                    "change": float(r['涨跌额']),
-                    "change_pct": float(r['涨跌幅']),
-                    "volume": float(r.get('成交量', 0)),
-                    "amount": float(r.get('成交额', 0)),
-                    "high": float(r.get('最高', 0)),
-                    "low": float(r.get('最低', 0)),
-                    "open": float(r.get('今开', 0)),
-                })
-        return results
+        
+        for attempt in range(max_retries):
+            try:
+                df = ak.stock_zh_index_spot_em()
+                results = []
+                for code, name in main_indices.items():
+                    row = df[df['代码'] == code]
+                    if not row.empty:
+                        r = row.iloc[0]
+                        results.append({
+                            "code": code,
+                            "name": name,
+                            "current": float(r['最新价']) if r['最新价'] else 0,
+                            "change": float(r['涨跌额']) if r['涨跌额'] else 0,
+                            "change_pct": float(r['涨跌幅']) if r['涨跌幅'] else 0,
+                            "volume": float(r.get('成交量', 0) or 0),
+                            "amount": float(r.get('成交额', 0) or 0),
+                            "high": float(r.get('最高', 0) or 0),
+                            "low": float(r.get('最低', 0) or 0),
+                            "open": float(r.get('今开', 0) or 0),
+                        })
+                return results
+            except Exception as e:
+                print(f"[INDICES] 第 {attempt + 1} 次尝试失败: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(1)  # 等待1秒后重试
+                else:
+                    raise e
+        return []
     
     try:
         loop = asyncio.get_event_loop()
         data = await asyncio.wait_for(
-            loop.run_in_executor(None, _fetch),
-            timeout=30
+            loop.run_in_executor(None, _fetch_with_retry),
+            timeout=45  # 增加超时时间
         )
         return {"status": "success", "data": data}
     except asyncio.TimeoutError:
@@ -436,22 +448,82 @@ async def trigger_stock_analysis(
 
 @router.post("/watchlist/refresh")
 async def refresh_watchlist(
-    background_tasks: BackgroundTasks,
     request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    刷新所有自选股数据
+    刷新所有自选股数据（立即执行）
+    获取最新行情并更新数据库
     """
+    import asyncio
+    
     query = select(StockModel)
     result = await db.execute(query)
     stocks = result.scalars().all()
     
-    # TODO: 在后台刷新所有股票数据
+    if not stocks:
+        return {"status": "success", "message": "没有自选股", "updated": 0}
+    
+    # 批量获取实时行情
+    def _fetch_quotes():
+        import akshare as ak
+        a_share_df = None
+        hk_df = None
+        
+        try:
+            a_share_df = ak.stock_zh_a_spot_em()
+        except Exception as e:
+            print(f"获取A股行情失败: {e}")
+        
+        try:
+            hk_df = ak.stock_hk_spot_em()
+        except Exception as e:
+            print(f"获取港股行情失败: {e}")
+        
+        return a_share_df, hk_df
+    
+    try:
+        loop = asyncio.get_event_loop()
+        a_share_df, hk_df = await asyncio.wait_for(
+            loop.run_in_executor(None, _fetch_quotes),
+            timeout=30
+        )
+    except asyncio.TimeoutError:
+        return {"status": "error", "message": "获取行情超时，请稍后重试", "updated": 0}
+    except Exception as e:
+        return {"status": "error", "message": f"获取行情失败: {str(e)}", "updated": 0}
+    
+    # 更新每只股票
+    updated_count = 0
+    for stock in stocks:
+        try:
+            if stock.market == 'A' and a_share_df is not None:
+                row = a_share_df[a_share_df['代码'] == stock.code]
+                if not row.empty:
+                    r = row.iloc[0]
+                    stock.current_price = float(r['最新价']) if r['最新价'] else None
+                    stock.change_percent = float(r['涨跌幅']) if r['涨跌幅'] else None
+                    stock.last_updated = datetime.now()
+                    updated_count += 1
+            elif stock.market == 'HK' and hk_df is not None:
+                code_padded = stock.code.zfill(5)
+                row = hk_df[hk_df['代码'] == code_padded]
+                if not row.empty:
+                    r = row.iloc[0]
+                    stock.current_price = float(r['最新价']) if r['最新价'] else None
+                    stock.change_percent = float(r['涨跌幅']) if r['涨跌幅'] else None
+                    stock.last_updated = datetime.now()
+                    updated_count += 1
+        except Exception as e:
+            print(f"更新 {stock.code} 失败: {e}")
+    
+    await db.commit()
     
     return {
-        "status": "started",
-        "message": f"正在刷新 {len(stocks)} 只股票的数据"
+        "status": "success",
+        "message": f"已刷新 {updated_count}/{len(stocks)} 只股票的数据",
+        "updated": updated_count,
+        "total": len(stocks)
     }
 
 
