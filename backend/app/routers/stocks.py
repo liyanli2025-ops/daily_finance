@@ -239,59 +239,73 @@ async def get_market_indices():
     """
     获取主要市场指数实时行情（轻量级接口）
     
+    使用新浪财经 API（更稳定）作为主要数据源
     返回上证指数、深证成指、创业板指、科创50、沪深300 的实时数据
     """
     import asyncio
-    import time
+    import requests
     
-    main_indices = {
-        "000001": "上证指数",
-        "399001": "深证成指",
-        "399006": "创业板指",
-        "000688": "科创50",
-        "000300": "沪深300",
+    # 新浪财经指数代码映射
+    sina_indices = {
+        "s_sh000001": {"code": "000001", "name": "上证指数"},
+        "s_sz399001": {"code": "399001", "name": "深证成指"},
+        "s_sz399006": {"code": "399006", "name": "创业板指"},
+        "s_sh000688": {"code": "000688", "name": "科创50"},
+        "s_sh000300": {"code": "000300", "name": "沪深300"},
     }
     
-    def _fetch_with_retry(max_retries=2):
-        """带重试的数据获取"""
-        import akshare as ak
+    def _fetch_from_sina():
+        """从新浪财经获取指数数据"""
+        symbols = ",".join(sina_indices.keys())
+        url = f"https://hq.sinajs.cn/list={symbols}"
         
-        for attempt in range(max_retries):
-            try:
-                df = ak.stock_zh_index_spot_em()
-                results = []
-                for code, name in main_indices.items():
-                    row = df[df['代码'] == code]
-                    if not row.empty:
-                        r = row.iloc[0]
-                        results.append({
-                            "code": code,
-                            "name": name,
-                            "current": float(r['最新价']) if r['最新价'] else 0,
-                            "change": float(r['涨跌额']) if r['涨跌额'] else 0,
-                            "change_pct": float(r['涨跌幅']) if r['涨跌幅'] else 0,
-                            "volume": float(r.get('成交量', 0) or 0),
-                            "amount": float(r.get('成交额', 0) or 0),
-                            "high": float(r.get('最高', 0) or 0),
-                            "low": float(r.get('最低', 0) or 0),
-                            "open": float(r.get('今开', 0) or 0),
-                        })
-                return results
-            except Exception as e:
-                print(f"[INDICES] 第 {attempt + 1} 次尝试失败: {e}")
-                if attempt < max_retries - 1:
-                    time.sleep(1)  # 等待1秒后重试
-                else:
-                    raise e
-        return []
+        headers = {
+            "Referer": "https://finance.sina.com.cn",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        response.encoding = 'gbk'
+        
+        results = []
+        for line in response.text.strip().split('\n'):
+            if '=' not in line:
+                continue
+            
+            var_name = line.split('=')[0].replace('var hq_str_', '')
+            data_str = line.split('"')[1] if '"' in line else ""
+            
+            if var_name in sina_indices and data_str:
+                info = sina_indices[var_name]
+                parts = data_str.split(',')
+                
+                if len(parts) >= 4:
+                    # 新浪简化指数格式: 名称,当前点,涨跌点,涨跌幅,成交量(手),成交额(万元)
+                    results.append({
+                        "code": info["code"],
+                        "name": info["name"],
+                        "current": float(parts[1]) if parts[1] else 0,
+                        "change": float(parts[2]) if parts[2] else 0,
+                        "change_pct": float(parts[3]) if parts[3] else 0,
+                        "volume": float(parts[4]) * 100 if len(parts) > 4 and parts[4] else 0,  # 转为股
+                        "amount": float(parts[5]) * 10000 if len(parts) > 5 and parts[5] else 0,  # 转为元
+                        "high": 0,
+                        "low": 0,
+                        "open": 0,
+                    })
+        
+        return results
     
     try:
         loop = asyncio.get_event_loop()
         data = await asyncio.wait_for(
-            loop.run_in_executor(None, _fetch_with_retry),
-            timeout=45  # 增加超时时间
+            loop.run_in_executor(None, _fetch_from_sina),
+            timeout=15
         )
-        return {"status": "success", "data": data}
+        if data:
+            return {"status": "success", "data": data}
+        else:
+            return {"status": "error", "message": "未获取到指数数据", "data": []}
     except asyncio.TimeoutError:
         return {"status": "error", "message": "获取指数数据超时，请稍后重试", "data": []}
     except Exception as e:
@@ -453,9 +467,10 @@ async def refresh_watchlist(
 ):
     """
     刷新所有自选股数据（立即执行）
-    获取最新行情并更新数据库
+    使用新浪财经 API 获取最新行情并更新数据库
     """
     import asyncio
+    import requests
     
     query = select(StockModel)
     result = await db.execute(query)
@@ -464,29 +479,83 @@ async def refresh_watchlist(
     if not stocks:
         return {"status": "success", "message": "没有自选股", "updated": 0}
     
-    # 批量获取实时行情
-    def _fetch_quotes():
-        import akshare as ak
-        a_share_df = None
-        hk_df = None
+    def _fetch_quotes_from_sina(stock_list):
+        """从新浪财经批量获取股票行情"""
+        # 构建新浪财经股票代码
+        # A股: sh600519 或 sz000001
+        # 港股: hk00700
+        symbols = []
+        for s in stock_list:
+            if s.market == 'A':
+                if s.code.startswith('6'):
+                    symbols.append(f"sh{s.code}")
+                else:
+                    symbols.append(f"sz{s.code}")
+            elif s.market == 'HK':
+                symbols.append(f"hk{s.code.zfill(5)}")
         
-        try:
-            a_share_df = ak.stock_zh_a_spot_em()
-        except Exception as e:
-            print(f"获取A股行情失败: {e}")
+        if not symbols:
+            return {}
         
-        try:
-            hk_df = ak.stock_hk_spot_em()
-        except Exception as e:
-            print(f"获取港股行情失败: {e}")
+        url = f"https://hq.sinajs.cn/list={','.join(symbols)}"
+        headers = {
+            "Referer": "https://finance.sina.com.cn",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
         
-        return a_share_df, hk_df
+        response = requests.get(url, headers=headers, timeout=15)
+        response.encoding = 'gbk'
+        
+        quotes = {}
+        for line in response.text.strip().split('\n'):
+            if '=' not in line or '""' in line:
+                continue
+            
+            var_name = line.split('=')[0].replace('var hq_str_', '')
+            data_str = line.split('"')[1] if '"' in line else ""
+            
+            if not data_str:
+                continue
+            
+            parts = data_str.split(',')
+            
+            # 提取代码
+            if var_name.startswith('sh') or var_name.startswith('sz'):
+                code = var_name[2:]
+                # A股格式: 股票名称,今日开盘价,昨日收盘价,当前价格,最高价,最低价,...,涨跌额,涨跌幅,...
+                if len(parts) >= 4:
+                    current_price = float(parts[3]) if parts[3] else None
+                    prev_close = float(parts[2]) if parts[2] else None
+                    if current_price and prev_close and prev_close > 0:
+                        change_pct = round((current_price - prev_close) / prev_close * 100, 2)
+                    else:
+                        change_pct = None
+                    quotes[code] = {
+                        "price": current_price,
+                        "change_pct": change_pct
+                    }
+            elif var_name.startswith('hk'):
+                code = var_name[2:].lstrip('0')  # 去掉前导0
+                # 港股格式略有不同
+                if len(parts) >= 7:
+                    current_price = float(parts[6]) if parts[6] else None
+                    prev_close = float(parts[3]) if parts[3] else None
+                    if current_price and prev_close and prev_close > 0:
+                        change_pct = round((current_price - prev_close) / prev_close * 100, 2)
+                    else:
+                        change_pct = None
+                    quotes[code] = {
+                        "price": current_price,
+                        "change_pct": change_pct
+                    }
+        
+        return quotes
     
     try:
         loop = asyncio.get_event_loop()
-        a_share_df, hk_df = await asyncio.wait_for(
-            loop.run_in_executor(None, _fetch_quotes),
-            timeout=30
+        quotes = await asyncio.wait_for(
+            loop.run_in_executor(None, _fetch_quotes_from_sina, stocks),
+            timeout=20
         )
     except asyncio.TimeoutError:
         return {"status": "error", "message": "获取行情超时，请稍后重试", "updated": 0}
@@ -497,23 +566,14 @@ async def refresh_watchlist(
     updated_count = 0
     for stock in stocks:
         try:
-            if stock.market == 'A' and a_share_df is not None:
-                row = a_share_df[a_share_df['代码'] == stock.code]
-                if not row.empty:
-                    r = row.iloc[0]
-                    stock.current_price = float(r['最新价']) if r['最新价'] else None
-                    stock.change_percent = float(r['涨跌幅']) if r['涨跌幅'] else None
-                    stock.last_updated = datetime.now()
-                    updated_count += 1
-            elif stock.market == 'HK' and hk_df is not None:
-                code_padded = stock.code.zfill(5)
-                row = hk_df[hk_df['代码'] == code_padded]
-                if not row.empty:
-                    r = row.iloc[0]
-                    stock.current_price = float(r['最新价']) if r['最新价'] else None
-                    stock.change_percent = float(r['涨跌幅']) if r['涨跌幅'] else None
-                    stock.last_updated = datetime.now()
-                    updated_count += 1
+            quote = quotes.get(stock.code)
+            if quote:
+                if quote["price"] is not None:
+                    stock.current_price = quote["price"]
+                if quote["change_pct"] is not None:
+                    stock.change_percent = quote["change_pct"]
+                stock.last_updated = datetime.now()
+                updated_count += 1
         except Exception as e:
             print(f"更新 {stock.code} 失败: {e}")
     
