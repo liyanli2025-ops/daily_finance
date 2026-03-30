@@ -239,67 +239,75 @@ async def get_market_indices():
     """
     获取主要市场指数实时行情（轻量级接口）
     
-    使用新浪财经 API（更稳定）作为主要数据源
+    使用腾讯财经 API 作为数据源（国内最稳定）
     返回上证指数、深证成指、创业板指、科创50、沪深300 的实时数据
     """
     import asyncio
-    import requests
+    import urllib.request
+    import ssl
     
-    # 新浪财经指数代码映射
-    sina_indices = {
-        "s_sh000001": {"code": "000001", "name": "上证指数"},
-        "s_sz399001": {"code": "399001", "name": "深证成指"},
-        "s_sz399006": {"code": "399006", "name": "创业板指"},
-        "s_sh000688": {"code": "000688", "name": "科创50"},
-        "s_sh000300": {"code": "000300", "name": "沪深300"},
+    # 腾讯财经指数代码映射
+    # 格式: sh000001 (上证), sz399001 (深证)
+    qq_indices = {
+        "sh000001": {"code": "000001", "name": "上证指数"},
+        "sz399001": {"code": "399001", "name": "深证成指"},
+        "sz399006": {"code": "399006", "name": "创业板指"},
+        "sh000688": {"code": "000688", "name": "科创50"},
+        "sh000300": {"code": "000300", "name": "沪深300"},
     }
     
-    def _fetch_from_sina():
-        """从新浪财经获取指数数据"""
-        symbols = ",".join(sina_indices.keys())
-        url = f"https://hq.sinajs.cn/list={symbols}"
+    def _fetch_from_qq():
+        """从腾讯财经获取指数数据"""
+        symbols = ",".join(qq_indices.keys())
+        url = f"http://qt.gtimg.cn/q={symbols}"
         
-        headers = {
-            "Referer": "https://finance.sina.com.cn",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
+        # 创建不验证SSL的context
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
         
-        response = requests.get(url, headers=headers, timeout=10)
-        response.encoding = 'gbk'
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'Mozilla/5.0')
+        
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as response:
+            content = response.read().decode('gbk')
         
         results = []
-        for line in response.text.strip().split('\n'):
-            if '=' not in line:
+        for line in content.strip().split(';'):
+            if '=' not in line or '~' not in line:
                 continue
             
-            var_name = line.split('=')[0].replace('var hq_str_', '')
+            var_name = line.split('=')[0].replace('v_', '').strip()
             data_str = line.split('"')[1] if '"' in line else ""
             
-            if var_name in sina_indices and data_str:
-                info = sina_indices[var_name]
-                parts = data_str.split(',')
+            if var_name in qq_indices and data_str:
+                info = qq_indices[var_name]
+                parts = data_str.split('~')
                 
-                if len(parts) >= 4:
-                    # 新浪简化指数格式: 名称,当前点,涨跌点,涨跌幅,成交量(手),成交额(万元)
-                    results.append({
-                        "code": info["code"],
-                        "name": info["name"],
-                        "current": float(parts[1]) if parts[1] else 0,
-                        "change": float(parts[2]) if parts[2] else 0,
-                        "change_pct": float(parts[3]) if parts[3] else 0,
-                        "volume": float(parts[4]) * 100 if len(parts) > 4 and parts[4] else 0,  # 转为股
-                        "amount": float(parts[5]) * 10000 if len(parts) > 5 and parts[5] else 0,  # 转为元
-                        "high": 0,
-                        "low": 0,
-                        "open": 0,
-                    })
+                # 腾讯格式: 0~名称~代码~当前价~涨跌~涨跌%~成交量~成交额~...
+                if len(parts) >= 6:
+                    try:
+                        results.append({
+                            "code": info["code"],
+                            "name": info["name"],
+                            "current": float(parts[3]) if parts[3] else 0,
+                            "change": float(parts[4]) if parts[4] else 0,
+                            "change_pct": float(parts[5]) if parts[5] else 0,
+                            "volume": float(parts[6]) * 100 if len(parts) > 6 and parts[6] else 0,
+                            "amount": float(parts[7]) * 10000 if len(parts) > 7 and parts[7] else 0,
+                            "high": float(parts[33]) if len(parts) > 33 and parts[33] else 0,
+                            "low": float(parts[34]) if len(parts) > 34 and parts[34] else 0,
+                            "open": float(parts[5]) if len(parts) > 5 else 0,
+                        })
+                    except (ValueError, IndexError) as e:
+                        print(f"解析 {var_name} 失败: {e}")
         
         return results
     
     try:
         loop = asyncio.get_event_loop()
         data = await asyncio.wait_for(
-            loop.run_in_executor(None, _fetch_from_sina),
+            loop.run_in_executor(None, _fetch_from_qq),
             timeout=15
         )
         if data:
@@ -467,10 +475,11 @@ async def refresh_watchlist(
 ):
     """
     刷新所有自选股数据（立即执行）
-    使用新浪财经 API 获取最新行情并更新数据库
+    使用腾讯财经 API 获取最新行情并更新数据库
     """
     import asyncio
-    import requests
+    import urllib.request
+    import ssl
     
     query = select(StockModel)
     result = await db.execute(query)
@@ -479,15 +488,15 @@ async def refresh_watchlist(
     if not stocks:
         return {"status": "success", "message": "没有自选股", "updated": 0}
     
-    def _fetch_quotes_from_sina(stock_list):
-        """从新浪财经批量获取股票行情"""
-        # 构建新浪财经股票代码
+    def _fetch_quotes_from_qq(stock_list):
+        """从腾讯财经批量获取股票行情"""
+        # 构建腾讯财经股票代码
         # A股: sh600519 或 sz000001
         # 港股: hk00700
         symbols = []
         for s in stock_list:
             if s.market == 'A':
-                if s.code.startswith('6'):
+                if s.code.startswith('6') or s.code.startswith('9'):
                     symbols.append(f"sh{s.code}")
                 else:
                     symbols.append(f"sz{s.code}")
@@ -497,64 +506,64 @@ async def refresh_watchlist(
         if not symbols:
             return {}
         
-        url = f"https://hq.sinajs.cn/list={','.join(symbols)}"
-        headers = {
-            "Referer": "https://finance.sina.com.cn",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
+        url = f"http://qt.gtimg.cn/q={','.join(symbols)}"
         
-        response = requests.get(url, headers=headers, timeout=15)
-        response.encoding = 'gbk'
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'Mozilla/5.0')
+        
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as response:
+            content = response.read().decode('gbk')
         
         quotes = {}
-        for line in response.text.strip().split('\n'):
-            if '=' not in line or '""' in line:
+        for line in content.strip().split(';'):
+            if '=' not in line or '~' not in line:
                 continue
             
-            var_name = line.split('=')[0].replace('var hq_str_', '')
+            var_name = line.split('=')[0].replace('v_', '').strip()
             data_str = line.split('"')[1] if '"' in line else ""
             
             if not data_str:
                 continue
             
-            parts = data_str.split(',')
+            parts = data_str.split('~')
             
             # 提取代码
             if var_name.startswith('sh') or var_name.startswith('sz'):
                 code = var_name[2:]
-                # A股格式: 股票名称,今日开盘价,昨日收盘价,当前价格,最高价,最低价,...,涨跌额,涨跌幅,...
-                if len(parts) >= 4:
-                    current_price = float(parts[3]) if parts[3] else None
-                    prev_close = float(parts[2]) if parts[2] else None
-                    if current_price and prev_close and prev_close > 0:
-                        change_pct = round((current_price - prev_close) / prev_close * 100, 2)
-                    else:
-                        change_pct = None
-                    quotes[code] = {
-                        "price": current_price,
-                        "change_pct": change_pct
-                    }
+                # 腾讯格式: 0~名称~代码~当前价~涨跌~涨跌%~成交量~成交额~...
+                if len(parts) >= 6:
+                    try:
+                        current_price = float(parts[3]) if parts[3] else None
+                        change_pct = float(parts[5]) if parts[5] else None
+                        quotes[code] = {
+                            "price": current_price,
+                            "change_pct": change_pct
+                        }
+                    except ValueError:
+                        pass
             elif var_name.startswith('hk'):
                 code = var_name[2:].lstrip('0')  # 去掉前导0
-                # 港股格式略有不同
-                if len(parts) >= 7:
-                    current_price = float(parts[6]) if parts[6] else None
-                    prev_close = float(parts[3]) if parts[3] else None
-                    if current_price and prev_close and prev_close > 0:
-                        change_pct = round((current_price - prev_close) / prev_close * 100, 2)
-                    else:
-                        change_pct = None
-                    quotes[code] = {
-                        "price": current_price,
-                        "change_pct": change_pct
-                    }
+                if len(parts) >= 6:
+                    try:
+                        current_price = float(parts[3]) if parts[3] else None
+                        change_pct = float(parts[5]) if parts[5] else None
+                        quotes[code] = {
+                            "price": current_price,
+                            "change_pct": change_pct
+                        }
+                    except ValueError:
+                        pass
         
         return quotes
     
     try:
         loop = asyncio.get_event_loop()
         quotes = await asyncio.wait_for(
-            loop.run_in_executor(None, _fetch_quotes_from_sina, stocks),
+            loop.run_in_executor(None, _fetch_quotes_from_qq, stocks),
             timeout=20
         )
     except asyncio.TimeoutError:
