@@ -109,34 +109,179 @@ export default function PodcastScreen() {
   const isPodcastReady = currentReport?.podcast_status === 'ready';
   const progress = duration > 0 ? currentPosition / duration : 0;
 
-  // 模拟播客文本段落（实际应从报告 highlights 中提取）
+  // 播客章节结构（基于实际播客生成逻辑）
+  // 结构：开场白 -> 核心观点 -> 报告正文 -> 跨界热点（可选）-> 结束语
+  const podcastChapters = useMemo(() => {
+    if (!currentReport || !duration) return [];
+    
+    const chapters: { name: string; startTime: number; content: string }[] = [];
+    const totalDuration = duration;
+    
+    // 根据报告内容估算各章节时长比例
+    const hasCoreCopinions = currentReport.core_opinions && currentReport.core_opinions.length > 0;
+    const hasCrossBorder = currentReport.cross_border_events && currentReport.cross_border_events.length > 0;
+    
+    // 时长分配（基于播客生成逻辑）
+    // 开场白约 10%，核心观点约 15%，正文约 50-60%，跨界约 10%（如有），结尾约 10-15%
+    let currentTime = 0;
+    
+    // 1. 开场白（天气 + 日期）
+    const openingDuration = totalDuration * 0.10;
+    chapters.push({
+      name: '开场',
+      startTime: currentTime,
+      content: '大家好，欢迎收听今日财经播报...',
+    });
+    currentTime += openingDuration;
+    
+    // 2. 核心观点
+    if (hasCoreCopinions) {
+      const opinionsDuration = totalDuration * 0.18;
+      chapters.push({
+        name: '核心观点',
+        startTime: currentTime,
+        content: currentReport.core_opinions?.join('\n\n') || '',
+      });
+      currentTime += opinionsDuration;
+    }
+    
+    // 3. 报告正文/市场分析
+    const mainContentDuration = totalDuration * (hasCrossBorder ? 0.45 : 0.55);
+    chapters.push({
+      name: '深度分析',
+      startTime: currentTime,
+      content: currentReport.summary || '市场分析...',
+    });
+    currentTime += mainContentDuration;
+    
+    // 4. 跨界热点（如果有）
+    if (hasCrossBorder) {
+      const crossBorderDuration = totalDuration * 0.12;
+      chapters.push({
+        name: '跨界热点',
+        startTime: currentTime,
+        content: currentReport.cross_border_events?.map((e: any) => e.title).join('\n') || '',
+      });
+      currentTime += crossBorderDuration;
+    }
+    
+    // 5. 结束语
+    chapters.push({
+      name: '总结',
+      startTime: currentTime,
+      content: '今天的播报就到这里...',
+    });
+    
+    return chapters;
+  }, [currentReport, duration]);
+
+  // 文本段落（用于歌词显示）
   const textSegments = useMemo(() => {
     if (!currentReport) return [];
-    const segments = [];
-    if (currentReport.summary) {
-      segments.push(currentReport.summary);
-    }
-    if (currentReport.highlights) {
-      currentReport.highlights.forEach((h: any) => {
-        if (h.title) segments.push(h.title);
+    const segments: { text: string; chapterIndex: number }[] = [];
+    
+    // 开场
+    segments.push({ text: '欢迎收听今日财经播报', chapterIndex: 0 });
+    
+    // 核心观点
+    if (currentReport.core_opinions && currentReport.core_opinions.length > 0) {
+      currentReport.core_opinions.forEach((opinion: string, idx: number) => {
+        segments.push({ text: `${idx + 1}. ${opinion}`, chapterIndex: 1 });
       });
     }
-    if (segments.length === 0) {
-      segments.push('等待播客内容生成...');
-      segments.push('每天早上 7:00 自动生成财经播客');
-      segments.push('包含市场分析、操作建议、自选股解读等内容');
+    
+    // 摘要作为主要内容
+    if (currentReport.summary) {
+      // 将摘要按句子分割
+      const sentences = currentReport.summary.split(/[。！？]/).filter((s: string) => s.trim());
+      sentences.forEach((sentence: string) => {
+        if (sentence.trim()) {
+          segments.push({ 
+            text: sentence.trim() + '。', 
+            chapterIndex: currentReport.core_opinions?.length > 0 ? 2 : 1 
+          });
+        }
+      });
     }
+    
+    // 重点新闻标题
+    if (currentReport.highlights) {
+      currentReport.highlights.slice(0, 3).forEach((h: any) => {
+        if (h.title) {
+          segments.push({ 
+            text: h.title, 
+            chapterIndex: currentReport.core_opinions?.length > 0 ? 2 : 1 
+          });
+        }
+      });
+    }
+    
+    // 跨界热点
+    if (currentReport.cross_border_events && currentReport.cross_border_events.length > 0) {
+      currentReport.cross_border_events.forEach((event: any) => {
+        segments.push({ 
+          text: event.title, 
+          chapterIndex: podcastChapters.length - 2 
+        });
+      });
+    }
+    
+    // 结束语
+    segments.push({ text: '今天的播报就到这里，我们明天见！', chapterIndex: podcastChapters.length - 1 });
+    
+    if (segments.length === 0) {
+      return [
+        { text: '等待播客内容生成...', chapterIndex: 0 },
+        { text: '每天早上 7:00 自动生成财经播客', chapterIndex: 0 },
+        { text: '包含市场分析、操作建议、自选股解读等内容', chapterIndex: 0 },
+      ];
+    }
+    
     return segments;
-  }, [currentReport]);
+  }, [currentReport, podcastChapters.length]);
 
-  // 基于播放进度确定当前高亮段落
+  // 当前所在章节
+  const currentChapterIndex = useMemo(() => {
+    if (podcastChapters.length === 0) return 0;
+    for (let i = podcastChapters.length - 1; i >= 0; i--) {
+      if (currentPosition >= podcastChapters[i].startTime) {
+        return i;
+      }
+    }
+    return 0;
+  }, [currentPosition, podcastChapters]);
+
+  // 基于播放进度和章节确定当前高亮段落
   const activeSegmentIndex = useMemo(() => {
     if (textSegments.length === 0) return 0;
+    
+    // 找到当前章节对应的文本段落
+    const segmentsInCurrentChapter = textSegments.filter(
+      (s) => s.chapterIndex === currentChapterIndex
+    );
+    
+    if (segmentsInCurrentChapter.length === 0) {
+      return Math.min(
+        Math.floor(progress * textSegments.length),
+        textSegments.length - 1
+      );
+    }
+    
+    // 在当前章节内按进度计算
+    const chapterStart = podcastChapters[currentChapterIndex]?.startTime || 0;
+    const chapterEnd = podcastChapters[currentChapterIndex + 1]?.startTime || duration;
+    const chapterProgress = chapterEnd > chapterStart 
+      ? (currentPosition - chapterStart) / (chapterEnd - chapterStart) 
+      : 0;
+    
+    const firstSegmentInChapter = textSegments.findIndex(s => s.chapterIndex === currentChapterIndex);
+    const segmentOffset = Math.floor(chapterProgress * segmentsInCurrentChapter.length);
+    
     return Math.min(
-      Math.floor(progress * textSegments.length),
+      firstSegmentInChapter + segmentOffset,
       textSegments.length - 1
     );
-  }, [progress, textSegments.length]);
+  }, [progress, textSegments, currentChapterIndex, currentPosition, podcastChapters, duration]);
 
   // 歌词自动滚动到当前段落
   useEffect(() => {
@@ -209,7 +354,7 @@ export default function PodcastScreen() {
             segmentsContainerY.current = e.nativeEvent.layout.y;
           }}
         >
-          {textSegments.map((text, index) => {
+          {textSegments.map((segment, index) => {
             const isActive = index === activeSegmentIndex;
             const isPast = index < activeSegmentIndex;
             const isFuture = index > activeSegmentIndex;
@@ -240,7 +385,7 @@ export default function PodcastScreen() {
                     },
                   ]}
                 >
-                  {text}
+                  {segment.text}
                 </Text>
               </View>
             );
@@ -257,9 +402,74 @@ export default function PodcastScreen() {
           backgroundColor: isDark ? colors.glassBackgroundStrong : colors.glassBackgroundStrong,
           borderColor: isDark ? colors.glassBorder : colors.glassBorder,
         }]}>
-          {/* 进度条 */}
+          {/* 章节快捷跳转 */}
+          {podcastChapters.length > 0 && isPodcastReady && (
+            <View style={styles.chapterNav}>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chapterNavContent}
+              >
+                {podcastChapters.map((chapter, index) => {
+                  const isCurrentChapter = index === currentChapterIndex;
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.chapterButton,
+                        {
+                          backgroundColor: isCurrentChapter
+                            ? (isDark ? 'rgba(182,160,255,0.2)' : 'rgba(124,77,255,0.12)')
+                            : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
+                          borderColor: isCurrentChapter
+                            ? colors.primary
+                            : 'transparent',
+                        },
+                      ]}
+                      onPress={() => seekTo(chapter.startTime)}
+                    >
+                      <Text
+                        style={[
+                          styles.chapterButtonText,
+                          {
+                            color: isCurrentChapter ? colors.primary : colors.onSurfaceVariant,
+                            fontWeight: isCurrentChapter ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {chapter.name}
+                      </Text>
+                      <Text style={[styles.chapterTime, { color: colors.onSurfaceVariant }]}>
+                        {formatTime(chapter.startTime)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* 进度条（带章节标记） */}
           <View style={styles.progressBarContainer}>
             <View style={[styles.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }]}>
+              {/* 章节标记点 */}
+              {podcastChapters.map((chapter, index) => {
+                if (index === 0 || !duration) return null;
+                const markerPosition = (chapter.startTime / duration) * 100;
+                return (
+                  <TouchableOpacity
+                    key={`marker-${index}`}
+                    style={[
+                      styles.chapterMarker,
+                      {
+                        left: `${markerPosition}%`,
+                        backgroundColor: index <= currentChapterIndex ? colors.primary : colors.onSurfaceVariant,
+                      },
+                    ]}
+                    onPress={() => seekTo(chapter.startTime)}
+                  />
+                );
+              })}
               <View
                 style={[
                   styles.progressFill,
@@ -282,7 +492,7 @@ export default function PodcastScreen() {
             </View>
           </View>
 
-          {/* 时间与标签 */}
+          {/* 时间与当前章节标签 */}
           <View style={styles.timeRow}>
             <Text style={[styles.timeText, { color: colors.onSurfaceVariant }]}>
               {formatTime(currentPosition)}
@@ -292,7 +502,9 @@ export default function PodcastScreen() {
               borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
             }]}>
               <MaterialCommunityIcons name="broadcast" size={10} color={colors.tertiary} />
-              <Text style={[styles.syncText, { color: colors.onSurface }]}>AI 播报</Text>
+              <Text style={[styles.syncText, { color: colors.onSurface }]}>
+                {podcastChapters[currentChapterIndex]?.name || 'AI 播报'}
+              </Text>
             </View>
             <Text style={[styles.timeText, { color: colors.onSurfaceVariant }]}>
               {duration > 0 ? formatTimeRemaining(duration - currentPosition) : '--:--'}
@@ -608,6 +820,43 @@ function createStyles(colors: any, isDark: boolean) {
           elevation: 12,
         },
       }),
+    },
+    // 章节导航
+    chapterNav: {
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+    },
+    chapterNavContent: {
+      paddingHorizontal: 16,
+      gap: 8,
+    },
+    chapterButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+      borderWidth: 1,
+      alignItems: 'center',
+      minWidth: 60,
+    },
+    chapterButtonText: {
+      fontSize: 11,
+      letterSpacing: 0.3,
+    },
+    chapterTime: {
+      fontSize: 9,
+      opacity: 0.7,
+      marginTop: 2,
+    },
+    // 章节标记点
+    chapterMarker: {
+      position: 'absolute',
+      top: -2,
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+      marginLeft: -3,
+      zIndex: 5,
     },
     progressBarContainer: {
       paddingHorizontal: 0,

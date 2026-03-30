@@ -4,9 +4,9 @@
   "description": "AI 驱动的每日财经播报与市场分析",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#1a1a2e",
   "theme_color": "#7C4DFF",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/app-icon-192.png",
