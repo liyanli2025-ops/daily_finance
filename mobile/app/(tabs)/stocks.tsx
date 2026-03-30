@@ -204,10 +204,10 @@ export default function StocksScreen() {
           ) : (
             <View style={styles.stockGrid}>
               {watchlist.map((stock) => (
-                <StockCard
+              <StockCard
                   key={stock.id}
                   stock={stock}
-                  onPress={() => router.push(`/stock/${stock.code}?market=${stock.market}`)}
+                  onPress={() => {}} // 暂时禁用，详情页待完善
                   onRemove={() => removeFromWatchlist(stock.id)}
                 />
               ))}

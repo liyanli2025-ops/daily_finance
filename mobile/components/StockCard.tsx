@@ -153,8 +153,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
     gap: 8,
   },
-  marketChip: {
-    height: 20,
+  marketTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   priceSection: {
     alignItems: 'flex-end',

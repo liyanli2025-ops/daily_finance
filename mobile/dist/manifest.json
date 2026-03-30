@@ -1,12 +1,10 @@
 {
   "name": "财经日报",
   "short_name": "财经日报",
-  "description": "AI 驱动的每日财经播报与市场分析",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1a1a2e",
-  "theme_color": "#7C4DFF",
-  "orientation": "portrait",
+  "theme_color": "#6200ee",
   "icons": [
     {
       "src": "/app-icon-192.png",
