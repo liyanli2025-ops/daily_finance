@@ -301,8 +301,8 @@ async def search_stocks(
                     code = item.get("Code", "")
                     name = item.get("Name", "")
                     
-                    # 只保留 A 股和港股主板
-                    if classify == "AStock":
+                    # A 股：主板+创业板(AStock) + 科创板(23) + 北交所(NEEQ)
+                    if classify in ("AStock", "23", "NEEQ"):
                         results.append({"code": code, "name": name, "market": "A"})
                     elif classify == "HK":
                         # 过滤掉权证、牛熊证（名称通常包含"购"/"沽"/"牛"/"熊"）
