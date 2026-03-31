@@ -178,11 +178,7 @@ export default function ReportDetailScreen() {
               onPress={() => router.push('/podcast')}
             />
           )}
-          <IconButton
-            icon="share-variant"
-            iconColor={theme.colors.onSurface}
-            onPress={handleShare}
-          />
+
         </View>
       </View>
 
