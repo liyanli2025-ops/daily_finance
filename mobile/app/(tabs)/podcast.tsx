@@ -576,8 +576,37 @@ export default function PodcastScreen() {
             </View>
           )}
 
-          {/* 进度条（带章节标记） */}
-          <View style={styles.progressBarContainer}>
+          {/* 进度条（带章节标记）- 可拖动 */}
+          <View 
+            style={styles.progressBarContainer}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={(e) => {
+              if (isPodcastReady && duration > 0) {
+                const pageX = Platform.OS === 'web' ? (e.nativeEvent as any).pageX : e.nativeEvent.locationX;
+                // 需要计算相对位置
+                (e.target as any)?.measureInWindow?.((x: number, y: number, width: number) => {
+                  if (width > 0) {
+                    const relativeX = pageX - x;
+                    const progress = Math.max(0, Math.min(relativeX / width, 1));
+                    seekTo(progress * duration);
+                  }
+                });
+              }
+            }}
+            onResponderMove={(e) => {
+              if (isPodcastReady && duration > 0) {
+                const pageX = Platform.OS === 'web' ? (e.nativeEvent as any).pageX : e.nativeEvent.locationX;
+                (e.target as any)?.measureInWindow?.((x: number, y: number, width: number) => {
+                  if (width > 0) {
+                    const relativeX = pageX - x;
+                    const progress = Math.max(0, Math.min(relativeX / width, 1));
+                    seekTo(progress * duration);
+                  }
+                });
+              }
+            }}
+          >
             <View style={[styles.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }]}>
               {/* 章节标记点 */}
               {podcastChapters.map((chapter, index) => {
@@ -1026,11 +1055,14 @@ function createStyles(colors: any, isDark: boolean) {
     },
     progressBarContainer: {
       paddingHorizontal: 0,
+      paddingVertical: 12, // 增加可点击区域
+      cursor: 'pointer' as any, // Web 平台显示手型光标
     },
     progressTrack: {
-      height: 3,
+      height: 6, // 增加高度以便更容易点击
       width: '100%',
       position: 'relative',
+      borderRadius: 3,
     },
     progressFill: {
       position: 'absolute',

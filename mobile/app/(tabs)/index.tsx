@@ -69,7 +69,10 @@ export default function HomeScreen() {
             <Text style={[styles.headerTitle, { color: colors.onSurface }]}>首页</Text>
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.headerButton}>
+            <TouchableOpacity 
+              style={styles.headerButton}
+              onPress={() => router.push('/search')}
+            >
               <MaterialCommunityIcons name="magnify" size={22} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
             <View style={[styles.avatar, { backgroundColor: isDark ? colors.surfaceContainerHigh : colors.surfaceContainerLow, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(124,77,255,0.15)' }]}>
