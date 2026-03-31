@@ -48,13 +48,17 @@ console.log('✅ 已添加 iOS PWA 配置到 index.html');
 
 // 复制小熊图标为 apple-touch-icon.png
 const appleTouchIconPath = path.join(distPath, 'apple-touch-icon.png');
+const sourceIcon180Path = path.join(assetsPath, 'apple-touch-icon-180.png'); // 优先使用压缩后的 180x180 图标
 const sourceIconPath = path.join(assetsPath, 'icon.png');
 
-if (fs.existsSync(sourceIconPath)) {
+if (fs.existsSync(sourceIcon180Path)) {
+  fs.copyFileSync(sourceIcon180Path, appleTouchIconPath);
+  console.log('✅ 已复制 180x180 小熊图标为 apple-touch-icon.png');
+} else if (fs.existsSync(sourceIconPath)) {
   fs.copyFileSync(sourceIconPath, appleTouchIconPath);
   console.log('✅ 已复制小熊图标为 apple-touch-icon.png');
 } else {
-  console.warn('⚠️ 找不到 assets/icon.png，请手动添加 apple-touch-icon.png');
+  console.warn('⚠️ 找不到图标文件，请手动添加 apple-touch-icon.png');
 }
 
 // 创建/更新 manifest.json
