@@ -21,8 +21,8 @@ export default function TabLayout() {
   // 调试日志
   console.log('[MiniPlayer] pathname:', pathname, 'currentReportId:', currentReportId, 'showMiniPlayer:', showMiniPlayer);
   
-  // 迷你播放器的高度
-  const miniPlayerHeight = showMiniPlayer ? 60 : 0;
+  // 迷你播放器的高度（卡片高度 + 上下边距）
+  const miniPlayerHeight = showMiniPlayer ? 76 : 0;
 
   return (
     <View style={{ flex: 1 }}>
