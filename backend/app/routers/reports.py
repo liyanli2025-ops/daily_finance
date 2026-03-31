@@ -42,6 +42,7 @@ async def list_reports(
             summary=r.summary,
             report_date=r.report_date,
             podcast_status=r.podcast_status,
+            podcast_url=r.podcast_url,
             podcast_duration=r.podcast_duration,
             created_at=r.created_at
         )

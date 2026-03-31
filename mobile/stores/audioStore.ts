@@ -2,6 +2,20 @@ import { create } from 'zustand';
 import { Audio } from 'expo-av';
 import { Platform, Alert } from 'react-native';
 
+// 服务器基础地址（不包含 /api）
+const SERVER_BASE_URL = 'http://82.156.59.2';
+
+// 处理音频 URL，将相对路径转换为完整 URL
+const getFullAudioUrl = (url: string): string => {
+  if (!url) return '';
+  // 如果已经是完整URL，直接返回
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // 如果是相对路径，拼接服务器地址
+  return `${SERVER_BASE_URL}${url}`;
+};
+
 interface AudioStore {
   isPlaying: boolean;
   currentPosition: number;
@@ -44,6 +58,10 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       return;
     }
 
+    // 转换为完整 URL
+    const fullUrl = getFullAudioUrl(audioUrl);
+    console.log('[AudioStore] 播放音频:', fullUrl);
+
     // 如果是同一个音频且已暂停，则继续播放
     if (currentReportId === reportId && currentSound) {
       await currentSound.playAsync();
@@ -68,7 +86,7 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
 
       // 加载新音频
       const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
+        { uri: fullUrl },
         { shouldPlay: true, rate: get().playbackRate },
         (status) => {
           if (status.isLoaded) {

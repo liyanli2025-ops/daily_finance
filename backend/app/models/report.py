@@ -160,6 +160,7 @@ class ReportListItem(BaseModel):
     summary: str
     report_date: dt_date
     podcast_status: str
+    podcast_url: Optional[str] = None
     podcast_duration: Optional[int]
     created_at: dt
     

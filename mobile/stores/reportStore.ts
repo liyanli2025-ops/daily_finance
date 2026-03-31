@@ -61,6 +61,7 @@ interface ReportListItem {
   summary: string;
   report_date: string;
   podcast_status: string;
+  podcast_url?: string;
   podcast_duration?: number;
   created_at: string;
 }
