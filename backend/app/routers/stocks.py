@@ -29,27 +29,113 @@ async def get_db(request: Request) -> AsyncSession:
 @router.get("/watchlist", response_model=List[Stock])
 async def get_watchlist(db: AsyncSession = Depends(get_db)):
     """
-    获取自选股列表
+    获取自选股列表（含实时行情）
+    
+    直接从腾讯财经 API 获取最新股价，失败时回退到数据库缓存
     """
+    import asyncio
+    import urllib.request
+    import ssl
+    
     query = select(StockModel).order_by(StockModel.added_at)
     result = await db.execute(query)
     stocks = result.scalars().all()
     
-    return [
-        Stock(
+    if not stocks:
+        return []
+    
+    def _fetch_realtime_quotes(stock_list):
+        """从腾讯财经批量获取股票实时行情"""
+        symbols = []
+        for s in stock_list:
+            if s.market == 'A':
+                if s.code.startswith('6') or s.code.startswith('9'):
+                    symbols.append(f"sh{s.code}")
+                else:
+                    symbols.append(f"sz{s.code}")
+            elif s.market == 'HK':
+                symbols.append(f"hk{s.code.zfill(5)}")
+        
+        if not symbols:
+            return {}
+        
+        url = f"http://qt.gtimg.cn/q={','.join(symbols)}"
+        
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'Mozilla/5.0')
+        
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as response:
+            content = response.read().decode('gbk')
+        
+        quotes = {}
+        for line in content.strip().split(';'):
+            if '=' not in line or '~' not in line:
+                continue
+            
+            var_name = line.split('=')[0].replace('v_', '').strip()
+            data_str = line.split('"')[1] if '"' in line else ""
+            
+            if not data_str:
+                continue
+            
+            parts = data_str.split('~')
+            
+            if var_name.startswith('sh') or var_name.startswith('sz'):
+                code = var_name[2:]
+                if len(parts) >= 33:
+                    try:
+                        current_price = float(parts[3]) if parts[3] else None
+                        change_pct = float(parts[32]) if parts[32] else None
+                        quotes[code] = {"price": current_price, "change_pct": change_pct}
+                    except ValueError:
+                        pass
+            elif var_name.startswith('hk'):
+                code = var_name[2:].lstrip('0')
+                if len(parts) >= 33:
+                    try:
+                        current_price = float(parts[3]) if parts[3] else None
+                        change_pct = float(parts[32]) if parts[32] else None
+                        quotes[code] = {"price": current_price, "change_pct": change_pct}
+                    except ValueError:
+                        pass
+        
+        return quotes
+    
+    # 尝试获取实时行情，失败则使用数据库缓存
+    quotes = {}
+    try:
+        loop = asyncio.get_event_loop()
+        quotes = await asyncio.wait_for(
+            loop.run_in_executor(None, _fetch_realtime_quotes, stocks),
+            timeout=10
+        )
+    except Exception as e:
+        print(f"[WATCHLIST] 实时行情获取失败，使用数据库缓存: {e}")
+    
+    result_list = []
+    for s in stocks:
+        quote = quotes.get(s.code)
+        current_price = quote["price"] if quote and quote.get("price") is not None else s.current_price
+        change_percent = quote["change_pct"] if quote and quote.get("change_pct") is not None else s.change_percent
+        
+        result_list.append(Stock(
             id=s.id,
             code=s.code,
             name=s.name,
             market=MarketType(s.market),
-            current_price=s.current_price,
-            change_percent=s.change_percent,
+            current_price=current_price,
+            change_percent=change_percent,
             latest_prediction=PredictionType(s.latest_prediction) if s.latest_prediction else None,
             latest_confidence=s.latest_confidence,
             added_at=s.added_at,
             last_updated=s.last_updated
-        )
-        for s in stocks
-    ]
+        ))
+    
+    return result_list
 
 
 @router.post("/watchlist", response_model=Stock)

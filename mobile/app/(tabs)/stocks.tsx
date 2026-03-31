@@ -99,6 +99,20 @@ export default function StocksScreen() {
   useEffect(() => {
     fetchWatchlist();
     fetchIndices();
+
+    // 交易时间内自动刷新（每30秒）
+    const interval = setInterval(() => {
+      const now = new Date();
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      // 9:15 - 15:05 之间自动刷新
+      if ((hour === 9 && minute >= 15) || (hour > 9 && hour < 15) || (hour === 15 && minute <= 5)) {
+        fetchWatchlist();
+        fetchIndices();
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const onRefresh = async () => {
