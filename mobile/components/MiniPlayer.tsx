@@ -137,30 +137,60 @@ export default function MiniPlayer({ onPress }: MiniPlayerProps) {
 
   return (
     <View style={styles.container}>
-      {/* 顶部进度条 */}
+      {/* 顶部进度条 - 增大触摸区域 */}
       <View
         ref={trackRef}
-        style={styles.progressBar}
-        onStartShouldSetResponder={() => Platform.OS !== 'web'}
+        style={styles.progressTouchArea}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
         onResponderGrant={(e: GestureResponderEvent) => {
           if (Platform.OS === 'web') return;
-          const locationX = e.nativeEvent.locationX;
-          const width = e.nativeEvent.layout?.width || 1;
-          const newProgress = Math.max(0, Math.min(locationX / width, 1));
-          if (duration > 0) {
-            useAudioStore.getState().seekTo(newProgress * duration);
-          }
+          setIsDragging(true);
+          // 获取触摸位置
+          const touch = e.nativeEvent;
+          trackRef.current?.measure?.((x, y, width, height, pageX, pageY) => {
+            if (width > 0) {
+              const relativeX = touch.pageX - pageX;
+              const newProgress = Math.max(0, Math.min(relativeX / width, 1));
+              setDragProgress(newProgress);
+            }
+          });
+        }}
+        onResponderMove={(e: GestureResponderEvent) => {
+          if (Platform.OS === 'web') return;
+          const touch = e.nativeEvent;
+          trackRef.current?.measure?.((x, y, width, height, pageX, pageY) => {
+            if (width > 0) {
+              const relativeX = touch.pageX - pageX;
+              const newProgress = Math.max(0, Math.min(relativeX / width, 1));
+              setDragProgress(newProgress);
+            }
+          });
+        }}
+        onResponderRelease={(e: GestureResponderEvent) => {
+          if (Platform.OS === 'web') return;
+          const touch = e.nativeEvent;
+          trackRef.current?.measure?.((x, y, width, height, pageX, pageY) => {
+            if (width > 0 && duration > 0) {
+              const relativeX = touch.pageX - pageX;
+              const newProgress = Math.max(0, Math.min(relativeX / width, 1));
+              useAudioStore.getState().seekTo(newProgress * duration);
+            }
+          });
+          setIsDragging(false);
         }}
       >
-        <View
-          style={[
-            styles.progressFill,
-            {
-              width: `${displayProgress * 100}%`,
-              backgroundColor: colors.primary,
-            },
-          ]}
-        />
+        <View style={styles.progressBar}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                width: `${displayProgress * 100}%`,
+                backgroundColor: colors.primary,
+              },
+            ]}
+          />
+        </View>
       </View>
 
       {/* 主内容区 */}
@@ -221,11 +251,16 @@ function createStyles(colors: any, isDark: boolean) {
         },
       }),
     },
+    progressTouchArea: {
+      width: '100%',
+      paddingVertical: 10, // 增大触摸区域
+      justifyContent: 'center',
+    },
     progressBar: {
-      height: 3,
+      height: 4,
       backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
       width: '100%',
-      marginTop: 8, // 上方留出空间防止误触
+      borderRadius: 2,
     },
     progressFill: {
       height: '100%',

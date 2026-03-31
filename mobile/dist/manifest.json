@@ -1,6 +1,6 @@
 {
-  "name": "每日财经播报",
-  "short_name": "财经播报",
+  "name": "财经FM",
+  "short_name": "财经FM",
   "description": "AI驱动的每日财经播报应用",
   "start_url": "/",
   "display": "standalone",
@@ -8,12 +8,18 @@
   "theme_color": "#7C4DFF",
   "icons": [
     {
-      "src": "/app-icon-192.png",
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/app-icon-512.png",
+      "src": "/apple-touch-icon.png",
       "sizes": "512x512",
       "type": "image/png"
     }
