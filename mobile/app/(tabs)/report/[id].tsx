@@ -50,48 +50,48 @@ export default function ReportDetailScreen() {
     body: {
       color: theme.colors.onSurface,
       fontSize: 16,
-      lineHeight: 26,
+      lineHeight: 30, // 26 → 30，行间距更大
     },
     heading1: {
       color: theme.colors.onSurface,
       fontSize: 24,
       fontWeight: '700' as const,
-      marginTop: 24,
-      marginBottom: 12,
+      marginTop: 36, // 24 → 36
+      marginBottom: 16, // 12 → 16
     },
     heading2: {
       color: theme.colors.onSurface,
       fontSize: 20,
       fontWeight: '600' as const,
-      marginTop: 20,
-      marginBottom: 10,
+      marginTop: 32, // 20 → 32
+      marginBottom: 14, // 10 → 14
     },
     heading3: {
       color: theme.colors.onSurface,
       fontSize: 18,
       fontWeight: '600' as const,
-      marginTop: 16,
-      marginBottom: 8,
+      marginTop: 24, // 16 → 24
+      marginBottom: 10, // 8 → 10
     },
     paragraph: {
-      marginBottom: 12,
+      marginBottom: 20, // 12 → 20
     },
     bullet_list: {
-      marginBottom: 12,
+      marginBottom: 16, // 12 → 16
     },
     ordered_list: {
-      marginBottom: 12,
+      marginBottom: 16, // 12 → 16
     },
     list_item: {
-      marginBottom: 4,
+      marginBottom: 8, // 4 → 8
     },
     blockquote: {
       backgroundColor: theme.colors.surfaceVariant,
       borderLeftColor: theme.colors.primary,
       borderLeftWidth: 4,
       paddingHorizontal: 16,
-      paddingVertical: 8,
-      marginVertical: 12,
+      paddingVertical: 12, // 8 → 12
+      marginVertical: 20, // 12 → 20
     },
     code_inline: {
       backgroundColor: theme.colors.surfaceVariant,
@@ -104,11 +104,12 @@ export default function ReportDetailScreen() {
     fence: {
       backgroundColor: theme.colors.surfaceVariant,
       borderRadius: 8,
-      padding: 12,
-      marginVertical: 12,
+      padding: 16, // 12 → 16
+      marginVertical: 20, // 12 → 20
     },
     strong: {
       fontWeight: '700' as const,
+      letterSpacing: 0.3, // 加粗字间距
     },
     em: {
       fontStyle: 'italic' as const,
@@ -116,7 +117,7 @@ export default function ReportDetailScreen() {
     hr: {
       backgroundColor: theme.colors.outline,
       height: 1,
-      marginVertical: 16,
+      marginVertical: 28, // 16 → 28
     },
   };
 
@@ -338,7 +339,8 @@ export default function ReportDetailScreen() {
           </View>
         )}
 
-        <View style={{ height: 48 }} />
+        {/* 底部安全区 - 给底部导航栏让路 */}
+        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
@@ -358,25 +360,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 4,
-    paddingVertical: 4,
+    paddingVertical: 8, // 4 → 8
   },
   toolbarActions: {
     flexDirection: 'row',
   },
   scrollView: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20, // 16 → 20
   },
   header: {
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingTop: 12, // 8 → 12
+    paddingBottom: 24, // 16 → 24
   },
   title: {
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 12, // 8 → 12
   },
   metaRow: {
-    marginBottom: 12,
+    marginBottom: 16, // 12 → 16
   },
   statsRow: {
     flexDirection: 'row',
@@ -387,45 +389,45 @@ const styles = StyleSheet.create({
     height: 28,
   },
   playerSection: {
-    marginBottom: 16,
+    marginBottom: 24, // 16 → 24
   },
   summarySection: {
-    padding: 16,
+    padding: 20, // 16 → 20
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: 24, // 16 → 24
   },
   sectionLabel: {
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 12, // 8 → 12
   },
   summaryText: {
-    lineHeight: 24,
+    lineHeight: 26, // 24 → 26
   },
   // 核心观点样式
   coreOpinionsSection: {
-    padding: 16,
+    padding: 20, // 16 → 20
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: 24, // 16 → 24
   },
   opinionItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
-    gap: 8,
+    marginBottom: 16, // 12 → 16
+    gap: 10, // 8 → 10
   },
   opinionText: {
     flex: 1,
-    lineHeight: 22,
+    lineHeight: 24, // 22 → 24
     fontWeight: '500',
   },
   // 跨界热点样式
   crossBorderSection: {
-    marginBottom: 16,
+    marginBottom: 24, // 16 → 24
   },
   crossBorderCard: {
-    padding: 14,
+    padding: 16, // 14 → 16
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 16, // 12 → 16
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -435,14 +437,14 @@ const styles = StyleSheet.create({
   crossBorderHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12, // 10 → 12
   },
   categoryChip: {
     height: 26,
   },
   crossBorderSummary: {
-    lineHeight: 20,
-    marginBottom: 12,
+    lineHeight: 22, // 20 → 22
+    marginBottom: 16, // 12 → 16
     opacity: 0.85,
   },
   impactRow: {
@@ -452,41 +454,41 @@ const styles = StyleSheet.create({
   },
   impactItem: {
     flex: 1,
-    padding: 10,
+    padding: 12, // 10 → 12
     borderRadius: 8,
     backgroundColor: 'rgba(0,0,0,0.05)',
   },
   divider: {
-    marginBottom: 16,
+    marginBottom: 24, // 16 → 24
   },
   contentSection: {
-    paddingBottom: 24,
+    paddingBottom: 32, // 24 → 32
   },
   analysisSection: {
-    marginTop: 16,
+    marginTop: 24, // 16 → 24
   },
   sectionTitle: {
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 16, // 12 → 16
   },
   analysisCard: {
-    padding: 16,
+    padding: 20, // 16 → 20
     borderRadius: 12,
   },
   analysisRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 20, // 16 → 20
   },
   analysisItem: {
-    marginBottom: 12,
+    marginBottom: 16, // 12 → 16
   },
   tagContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 8,
+    marginTop: 10, // 8 → 10
   },
   tag: {
     height: 28,

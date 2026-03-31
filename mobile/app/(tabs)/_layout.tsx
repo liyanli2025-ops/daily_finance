@@ -70,6 +70,13 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* 报告详情页 - 隐藏在 tab 栏中但保留底部导航 */}
+      <Tabs.Screen
+        name="report"
+        options={{
+          href: null, // 不显示在底部 tab 栏
+        }}
+      />
     </Tabs>
   );
 }

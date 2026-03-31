@@ -106,7 +106,7 @@ export default function HomeScreen() {
               borderColor: isDark ? colors.glassBorder : colors.glassBorder,
             }]}
             activeOpacity={0.8}
-            onPress={() => router.push(`/report/${todayReport.id}`)}
+            onPress={() => router.push(`/(tabs)/report/${todayReport.id}`)}
           >
             <View style={styles.todayCardInner}>
               <View style={[styles.todayBadge, { backgroundColor: isDark ? 'rgba(182,160,255,0.15)' : 'rgba(124,77,255,0.1)' }]}>
