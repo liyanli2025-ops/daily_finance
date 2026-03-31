@@ -45,7 +45,8 @@ export default function StockCard({ stock, onPress, onRemove }: StockCardProps) 
     }
   };
 
-  const priceColor = (stock.change_percent ?? 0) >= 0 ? '#4CAF50' : '#F44336';
+  // 中国A股习惯：红涨绿跌
+  const priceColor = (stock.change_percent ?? 0) >= 0 ? '#F44336' : '#4CAF50';
 
   return (
     <Card

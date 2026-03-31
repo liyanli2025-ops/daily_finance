@@ -179,7 +179,8 @@ export default function StockDetailScreen() {
     );
   }
 
-  const priceColor = stock.change_percent >= 0 ? '#22C55E' : '#EF4444';
+  // 中国A股习惯：红涨绿跌
+  const priceColor = stock.change_percent >= 0 ? '#EF4444' : '#22C55E';
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>

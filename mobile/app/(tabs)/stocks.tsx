@@ -142,7 +142,7 @@ export default function StocksScreen() {
                     <Text
                       variant="bodySmall"
                       style={{
-                        color: idx.change_pct >= 0 ? '#4CAF50' : '#F44336',
+                        color: idx.change_pct >= 0 ? '#F44336' : '#4CAF50',  // 红涨绿跌
                         fontWeight: '600',
                         marginTop: 2,
                       }}
