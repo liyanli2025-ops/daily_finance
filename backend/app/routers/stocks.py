@@ -284,20 +284,66 @@ async def get_market_indices():
                 info = qq_indices[var_name]
                 parts = data_str.split('~')
                 
-                # 腾讯格式: 0~名称~代码~当前价~涨跌~涨跌%~成交量~成交额~...
+                # 腾讯格式（指数）: 0~名称~代码~当前价~涨跌~涨跌%~成交量~成交额~...~开盘价~最高~最低...
+                # 注意：指数的字段位置可能与个股不同
+                # parts[3] = 当前价
+                # parts[4] = 涨跌额
+                # parts[5] = 涨跌幅（百分比数值，不带%号）
+                # parts[32] = 涨跌幅（另一个位置，更准确）
                 if len(parts) >= 6:
                     try:
+                        current_price = float(parts[3]) if parts[3] else 0
+                        change = float(parts[4]) if parts[4] else 0
+                        
+                        # 尝试从多个位置获取涨跌幅
+                        change_pct = 0
+                        # 首先尝试 parts[32]（更准确的涨跌幅位置）
+                        if len(parts) > 32 and parts[32]:
+                            try:
+                                change_pct = float(parts[32])
+                            except:
+                                pass
+                        
+                        # 如果 parts[32] 无效，使用 parts[5]
+                        if change_pct == 0 and parts[5]:
+                            try:
+                                pct_val = float(parts[5])
+                                # 如果值太大（超过100），说明不是百分比，需要计算
+                                if abs(pct_val) > 100:
+                                    # 从 parts[4]（涨跌额）和 parts[3]（当前价）计算
+                                    if current_price > 0 and change != 0:
+                                        prev_close = current_price - change
+                                        if prev_close > 0:
+                                            change_pct = (change / prev_close) * 100
+                                else:
+                                    change_pct = pct_val
+                            except:
+                                pass
+                        
+                        # 获取开盘价（尝试多个位置）
+                        open_price = 0
+                        for pos in [5, 30, 31]:  # 可能的开盘价位置
+                            if len(parts) > pos and parts[pos]:
+                                try:
+                                    val = float(parts[pos])
+                                    # 开盘价应该接近当前价，不会差太远
+                                    if current_price > 0 and abs(val - current_price) / current_price < 0.1:
+                                        open_price = val
+                                        break
+                                except:
+                                    pass
+                        
                         results.append({
                             "code": info["code"],
                             "name": info["name"],
-                            "current": float(parts[3]) if parts[3] else 0,
-                            "change": float(parts[4]) if parts[4] else 0,
-                            "change_pct": float(parts[5]) if parts[5] else 0,
+                            "current": current_price,
+                            "change": change,
+                            "change_pct": round(change_pct, 2),
                             "volume": float(parts[6]) * 100 if len(parts) > 6 and parts[6] else 0,
                             "amount": float(parts[7]) * 10000 if len(parts) > 7 and parts[7] else 0,
                             "high": float(parts[33]) if len(parts) > 33 and parts[33] else 0,
                             "low": float(parts[34]) if len(parts) > 34 and parts[34] else 0,
-                            "open": float(parts[5]) if len(parts) > 5 else 0,
+                            "open": open_price,
                         })
                     except (ValueError, IndexError) as e:
                         print(f"解析 {var_name} 失败: {e}")
