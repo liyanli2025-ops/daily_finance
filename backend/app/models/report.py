@@ -21,6 +21,12 @@ class MarketTrend(str, Enum):
     NEUTRAL = "neutral"      # 中性
 
 
+class ReportType(str, Enum):
+    """报告类型"""
+    MORNING = "morning"      # 早报
+    EVENING = "evening"      # 晚报
+
+
 class ReportSectionType(str, Enum):
     """报告模块类型（5大模块 —— 投资决策导向）"""
     OPERATION_GUIDE = "operation_guide"       # 模块1：今日操作建议
@@ -122,6 +128,9 @@ class Report(ReportBase):
     """完整报告模型"""
     id: str = Field(..., description="报告ID")
     
+    # 报告类型（早报/晚报）
+    report_type: ReportType = Field(default=ReportType.MORNING, description="报告类型：morning早报/evening晚报")
+    
     # 核心观点（3句话版）
     core_opinions: List[str] = Field(default_factory=list, description="今日核心观点（3条）")
     
@@ -159,6 +168,7 @@ class ReportListItem(BaseModel):
     title: str
     summary: str
     report_date: dt_date
+    report_type: ReportType = ReportType.MORNING  # 报告类型
     podcast_status: str
     podcast_url: Optional[str] = None
     podcast_duration: Optional[int]

@@ -18,11 +18,18 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, description="服务端口")
     
     # 推送时间配置
-    daily_report_hour: int = Field(default=6, ge=0, le=23, description="每日报告推送小时")
-    daily_report_minute: int = Field(default=0, ge=0, le=59, description="每日报告推送分钟")
+    daily_report_hour: int = Field(default=6, ge=0, le=23, description="每日早报推送小时")
+    daily_report_minute: int = Field(default=0, ge=0, le=59, description="每日早报推送分钟")
+    
+    # 【新增】晚报推送时间配置（交易日下午5点前完成）
+    evening_report_hour: int = Field(default=17, ge=0, le=23, description="每日晚报推送小时")
+    evening_report_minute: int = Field(default=0, ge=0, le=59, description="每日晚报推送分钟")
     
     # 新闻采集提前时间（提前多少分钟开始采集）
     collection_lead_time: int = Field(default=60, description="采集提前时间（分钟）")
+    
+    # 【新增】晚报采集开始时间（下午4点开始收集内容）
+    evening_collection_hour: int = Field(default=16, ge=0, le=23, description="晚报采集开始小时")
     
     # AI 服务配置
     # 优先级：Anthropic > OpenAI > 免费服务 (Pollinations.AI)

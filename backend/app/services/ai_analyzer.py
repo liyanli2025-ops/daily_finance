@@ -18,7 +18,7 @@ from ..models.report import (
     Report, ReportCreate, NewsHighlight, MarketAnalysis,
     IndexSnapshot, MarketTrend, SentimentType as ReportSentiment,
     ReportSection, ReportSectionType, AnalysisHighlight,
-    CrossBorderEvent, CrossBorderCategory
+    CrossBorderEvent, CrossBorderCategory, ReportType
 )
 from ..models.stock import StockPrediction, PredictionType
 from .market_data_service import get_market_data_service, MarketOverview
@@ -91,25 +91,28 @@ class AIAnalyzerService:
         else:
             return SentimentType.NEUTRAL
     
-    async def generate_daily_report(self, news_list: List[News], cross_border_news: List[News] = None) -> Report:
+    async def generate_daily_report(
+        self, 
+        news_list: List[News], 
+        cross_border_news: List[News] = None,
+        report_type: ReportType = ReportType.MORNING,
+        is_trading_day: bool = True,
+        morning_report: Optional[Report] = None
+    ) -> Report:
         """
-        生成每日财经深度报告（5模块 + 投资决策导向 + 自选股追踪 + 情感分析）
-        
-        优化版：
-        - 5模块精简结构（操作建议/市场全景/自选股作战图/事件催化/风控仪表盘）
-        - 投资决策导向：每段分析必须回答"所以我该怎么做"
-        - 集成 AKShare 真实市场数据 + FinBERT 情感分析
-        - 自选股给出明确信号+目标价+止损位
+        生成每日财经报告（支持早报/晚报/非交易日深度版）
         
         Args:
             news_list: 财经新闻列表
             cross_border_news: 跨界新闻列表
+            report_type: 报告类型（morning早报/evening晚报）
+            is_trading_day: 是否是交易日
+            morning_report: 今日早报（晚报时用于回顾对比）
             
         Returns:
             生成的报告对象
         """
         today = date.today()
-        is_weekend = today.weekday() >= 5  # 判断是否是周末（周六=5，周日=6）
         weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         weekday_name = weekday_names[today.weekday()]
         
@@ -123,7 +126,7 @@ class AIAnalyzerService:
         watchlist_text = self._prepare_watchlist_analysis()
         investment_style_desc = self._get_investment_style_description()
         
-        # 【新增】获取真实市场数据（带容错：即使失败也能继续生成报告）
+        # 【新增】获取真实市场数据（带容错）
         print("[AI] 正在获取真实市场数据...")
         try:
             market_service = get_market_data_service()
@@ -135,40 +138,86 @@ class AIAnalyzerService:
             market_data = MarketOverview(date=today.strftime("%Y-%m-%d"))
             market_data_text = "（市场数据暂不可用，请基于新闻信息进行分析）"
         
-        # 【新增】计算市场情绪指数（基于 FinBERT 情感分析）
+        # 【新增】计算市场情绪指数
         sentiment_index_text = self._prepare_sentiment_index(news_list, cross_border_news or [])
         
-        # 准备新闻摘要（增强版：包含情感标签）
+        # 准备新闻摘要
         finance_summary = self._prepare_news_summary_with_sentiment(news_list)
         cross_border_summary = self._prepare_cross_border_summary(cross_border_news or [])
         
-        # 周末特别说明
-        weekend_notice = ""
-        if is_weekend:
-            weekend_notice = """
-## ⚠️ 重要提示：今天是周末
-- A股和港股今日休市，没有实时交易数据
-- 本报告以【周回顾】和【下周展望】为主
-- 市场数据为上一个交易日（周五）的数据
-- 请注意区分"本周"和"下周"的表述
-
-"""
+        # 根据报告类型选择不同的 prompt
+        if report_type == ReportType.EVENING:
+            # 晚报 prompt
+            report_prompt = self._build_evening_report_prompt(
+                today, weekday_name, last_trading_str,
+                watchlist_text, investment_style_desc,
+                market_data_text, sentiment_index_text,
+                finance_summary, cross_border_summary,
+                morning_report
+            )
+        elif not is_trading_day:
+            # 非交易日深度版早报 prompt
+            report_prompt = self._build_weekend_report_prompt(
+                today, weekday_name, last_trading_str,
+                watchlist_text, investment_style_desc,
+                market_data_text, sentiment_index_text,
+                finance_summary, cross_border_summary
+            )
+        else:
+            # 交易日早报 prompt
+            report_prompt = self._build_morning_report_prompt(
+                today, weekday_name, last_trading_str,
+                watchlist_text, investment_style_desc,
+                market_data_text, sentiment_index_text,
+                finance_summary, cross_border_summary
+            )
         
-        # 【大幅优化】5模块深度分析 prompt —— 投资决策导向 + 深度分析兼顾
-        report_prompt = f"""你是{settings.user_nickname}的私人投资顾问，拥有20年A股和港股实战经验。
+        response = await self._call_ai(report_prompt, max_tokens=8000)
+        
+        # 解析响应
+        report = self._parse_enhanced_report_response(
+            response, today, news_list, cross_border_news or [], report_type
+        )
+        
+        return report
+    
+    def _build_morning_report_prompt(
+        self, today, weekday_name, last_trading_str,
+        watchlist_text, investment_style_desc,
+        market_data_text, sentiment_index_text,
+        finance_summary, cross_border_summary
+    ) -> str:
+        """
+        构建交易日早报 prompt
+        
+        特点：
+        - 结合前一个交易日的市场情况
+        - 昨天收盘后的新闻、重要信息
+        - 国际市场情况（美股、港股夜盘等）
+        - 侧重当天操作建议
+        - 建议布局的板块、行业要细致，带上股票名称
+        """
+        return f"""你是{settings.user_nickname}的私人投资顾问，拥有20年A股和港股实战经验。
 你的核心使命：**每一段分析都必须回答"所以我该怎么做"**。
+
+## 🌅 早报定位
+
+这是**交易日早报**，在开盘前生成。核心目标是：
+1. 帮{settings.user_nickname}快速了解昨夜今晨的重要信息
+2. 给出**今日操作的具体建议**
+3. 预判今日市场走势，提前布局
 
 你的风格：
 - 直接给结论，再讲逻辑——先告诉我"买还是卖"，再解释为什么
 - 敢于提出反共识观点——市场都看多时，你要指出盲点；市场恐慌时，你要找到机会
 - 不说废话——禁止"值得关注""需要注意""密切跟踪"等模糊表述，必须说"建议买入/卖出/观望/加仓/减仓"
 - 每个观点后必须有一句【操作建议】
+- **板块和行业要细致，最好带上具体股票名称**
 
 ## 🎯 今日任务
 
 今天是{today.strftime('%Y年%m月%d日')} {weekday_name}。
-⚠️ 本报告在开盘前生成，市场数据来自上一个交易日（{last_trading_str}）的收盘数据，请用"上一个交易日"描述。
-{weekend_notice}
+⚠️ 本报告在开盘前生成，市场数据来自上一个交易日（{last_trading_str}）的收盘数据。
 
 ### 用户画像
 - 昵称：{settings.user_nickname}
@@ -178,7 +227,7 @@ class AIAnalyzerService:
 
 ---
 
-## 📊 真实市场数据（基于 AKShare，请基于这些数据分析，不要编造）
+## 📊 真实市场数据（上一交易日收盘）
 
 {market_data_text}
 
@@ -188,96 +237,77 @@ class AIAnalyzerService:
 
 ---
 
-## 📰 {'本周' if is_weekend else '最新'}财经新闻（含情感标签）
+## 📰 昨夜今晨财经新闻（含情感标签）
 
 {finance_summary}
 
-## 🌍 {'本周' if is_weekend else '最新'}跨界热点
+## 🌍 跨界热点
 
 {cross_border_summary if cross_border_summary else "暂无重大跨界热点"}
 
 ---
 
-## 📝 报告结构（5大模块，每个模块必须以【操作建议】结尾）
+## 📝 早报结构（5大模块）
 
-### 模块1：🎯 {'本周复盘与下周操作指南' if is_weekend else '今日三条操作建议'}
+### 模块1：🎯 今日三条操作建议
 
 **这是全文最重要的部分，开门见山。**
 
-给出3条**可执行的操作建议**（不是判断、不是观察）：
+给出3条**可执行的操作建议**：
 - 格式：**建议X（置信度：高/中/低）**：做什么 + 为什么 + 风险是什么
-- 每条建议必须包含：具体的操作动作（买入/卖出/加仓/减仓/观望）+ 具体标的或板块 + 理由 + 止损条件
+- 每条建议必须包含：具体的操作动作（买入/卖出/加仓/减仓/观望）+ **具体标的或板块+代表个股** + 理由 + 止损条件
 - 参考市场情绪指数判断当前阶段
 
-示例（注意是建议做什么，不是描述发生了什么）：
-> **建议一（置信度：高）**：{'下周一' if is_weekend else '今天'}逢低加仓半导体ETF（如512480），目标仓位从2成提到3成。理由：上一个交易日费城半导体指数大涨3.2%，情绪指数+0.45偏多，A股半导体板块有望跟涨。止损位：如果3日内板块跌超3%则减回2成。
+示例：
+> **建议一（置信度：高）**：今日逢低加仓半导体板块，重点关注北方华创（002371）、中微公司（688012），目标仓位从2成提到3成。理由：昨夜费城半导体指数大涨3.2%，情绪指数+0.45偏多。止损位：如果3日内板块跌超3%则减回2成。
 
-### 模块2：📈 {'本周市场全景复盘' if is_weekend else '市场全景：大盘+板块+资金'}
+### 模块2：📈 市场全景：大盘+板块+资金
 
-**合并大盘和行业分析，重点是"这些信息对操作意味着什么"**
+1. **大盘研判**：昨日收盘+隔夜外盘+今日预判→ **结论：今日大盘偏多还是偏空？给出具体点位区间**
+2. **隔夜外盘**：美股、港股夜盘、商品期货的表现→ **对A股的影响判断**
+3. **资金暗语**：北向资金+主力资金流向→ **结论：聪明钱在往哪个方向押注？**
+4. **板块机会**：
+   - 今日看好的板块（带具体个股）：为什么看好？建议什么价位介入？
+   - 今日需要回避的板块：为什么回避？
 
-1. **大盘研判**：指数涨跌+成交量+情绪指数→ **结论：{'下周' if is_weekend else '明天'}大盘偏多还是偏空？给出具体点位区间**
-2. **资金暗语**：北向资金+主力资金流向→ **结论：聪明钱在往哪个方向押注？**
-3. **板块轮动**：
-   - 领涨板块为什么涨？是真逻辑还是短期炒作？→ **建议：哪些板块现在可以上车，哪些已经迟了**
-   - 领跌板块是机会还是陷阱？→ **建议：哪些板块可以抄底，哪些继续回避**
-4. **反共识观点**：市场一致预期是什么？你看到了什么被忽略的信号？
-
-每段分析后都要跟一句 **【操作含义】：所以你应该...**
-
-### 模块3：⭐ {'自选股本周表现与下周策略' if is_weekend else '自选股作战图'}
-
-**这是用户最关心的部分，给出最明确的信号。**
+### 模块3：⭐ 自选股作战图
 
 {self._get_watchlist_analysis_prompt()}
 
 对每只自选股，必须给出：
-- **信号**：明确的买入/持有/减仓/清仓/观望（不要含糊）
+- **信号**：明确的买入/持有/减仓/清仓/观望
 - **目标价**：短期（1-2周）目标价位
 - **止损位**：跌破多少必须走
 - **仓位建议**：建议占总仓位的百分比
-- **一句话理由**：为什么给这个信号
+- **一句话理由**
 
-格式参考：
-> **贵州茅台（600519）—— 持有** | 目标价：1850 | 止损位：1720 | 建议仓位：15%
-> 理由：上一个交易日缩量企稳，北向资金净买入2.3亿，短期调整充分，持股待涨。
+### 模块4：⚡ 今日事件催化
 
-### 模块4：⚡ {'下周事件日历与埋伏策略' if is_weekend else '事件催化：未来一周怎么埋伏'}
+今天盘中可能影响市场的事件（经济数据发布、政策会议、公司公告等）：
+- 事件内容和发布时间
+- 乐观情景下怎么操作
+- 悲观情景下怎么操作
 
-**不只是列事件，更要给出"提前布局"的策略**
+### 模块5：🛡️ 风控仪表盘
 
-按时间顺序列出未来一周的重要事件（经济数据、政策会议、财报发布等），每个事件给出：
-1. 事件内容和时间
-2. **乐观情景**：如果结果好于预期 → 哪些标的受益 → 建议提前买入多少仓位
-3. **悲观情景**：如果结果差于预期 → 哪些标的受损 → 建议提前做什么防护
-4. **操作策略**：具体怎么埋伏
-
-### 模块5：🛡️ 风控仪表盘：仓位与雷区
-
-**帮用户守住利润、控制回撤**
-
-1. **总仓位建议**：当前应该几成仓？结合情绪指数和市场阶段给出明确数字
-2. **仓位分配**：大盘蓝筹 vs 中小成长 vs 现金 的建议比例
-3. **雷区预警**：
-   - 近期要回避的板块和个股（减持、解禁、财报爆雷预警）
-   - 需要设置止损的持仓
-4. **系统性风险评估**：当前最大的潜在风险是什么？发生概率多大？如何对冲？
+1. **总仓位建议**：今日应该几成仓？
+2. **仓位分配**：大盘蓝筹 vs 中小成长 vs 现金
+3. **雷区预警**：今日需要特别注意的风险点
 
 ---
 
 ## ✍️ 写作风格
 
 1. **结论先行**：每段先给操作建议，再讲逻辑
-2. **数据说话**：每个观点引用具体数字，不要空谈
-3. **情绪为锚**：充分利用市场情绪指数
+2. **数据说话**：每个观点引用具体数字
+3. **具体到个股**：板块建议要带上代表性个股名称和代码
 4. **通俗直白**：像给朋友打电话聊投资一样说话
-5. **禁止模糊**：不说"值得关注""需要注意""后续观察"，必须给明确动作
 
 ## ⛔ 禁止
 
-- 不要有模板化开头（报告日期/分析师/致用户xxx等）
-- 不要重复描述人尽皆知的信息（如"美联储加息影响全球市场"这种废话）
+- 不要有模板化开头
 - 不要只描述现象不给建议
+- 不要泛泛而谈，要具体到个股
 
 ## 📤 结构化输出
 
@@ -285,59 +315,411 @@ class AIAnalyzerService:
 
 ```json
 {{
-  "title": "{'周末复盘版' if is_weekend else '结合当前市场特征'}的标题（要有观点，如'反弹确认，加仓科技'而非'市场分析报告'）",
+  "title": "结合当前市场特征的标题（要有观点和具体板块，如'半导体利好，今日加仓芯片龙头'）",
   "summary": "200字精华摘要（核心操作建议+关键数据）",
   "core_opinions": [
-    "操作建议1（含具体动作+理由+止损）",
+    "操作建议1（含具体动作+标的+理由+止损）",
     "操作建议2",
     "操作建议3"
   ],
   "market_score": 65,
   "position_advice": "6成",
-  "highlights": [
-    {{
-      "title": "重要新闻标题",
-      "source": "来源",
-      "summary": "100字摘要",
-      "sentiment": "positive/negative/neutral",
-      "sentiment_confidence": 0.85,
-      "related_stocks": ["相关股票代码"],
-      "historical_context": "历史参考"
-    }}
-  ],
-  "watchlist_analysis": [
-    {{
-      "code": "股票代码",
-      "name": "股票名称",
-      "signal": "买入/持有/减仓/观望",
-      "reason": "具体理由",
-      "key_price": "关键价位"
-    }}
-  ],
+  "highlights": [...],
+  "watchlist_analysis": [...],
   "market_analysis": {{
     "overall_sentiment": "positive/negative/neutral",
-    "sentiment_score": 0.35,
     "trend": "bullish/bearish/neutral",
-    "key_factors": ["影响因素1", "影响因素2"],
-    "opportunities": ["机会板块1", "机会板块2"],
-    "risks": ["风险点1", "风险点2"],
-    "support_level": "支撑位",
-    "resistance_level": "阻力位"
+    "key_factors": [...],
+    "opportunities": [...],
+    "risks": [...]
   }},
-  "hot_sectors": ["热门板块1", "板块2", "板块3"],
-  "risk_sectors": ["风险板块1", "风险板块2"],
-  "next_week_focus": ["下周关注点1", "关注点2"]
+  "hot_sectors": ["热门板块1（代表个股）", "板块2（代表个股）"],
+  "risk_sectors": ["风险板块1", "风险板块2"]
 }}
 ```
 
-请开始撰写报告："""
+请开始撰写早报："""
 
-        response = await self._call_ai(report_prompt, max_tokens=8000)
+    def _build_evening_report_prompt(
+        self, today, weekday_name, last_trading_str,
+        watchlist_text, investment_style_desc,
+        market_data_text, sentiment_index_text,
+        finance_summary, cross_border_summary,
+        morning_report: Optional[Report] = None
+    ) -> str:
+        """
+        构建交易日晚报 prompt
         
-        # 解析响应
-        report = self._parse_enhanced_report_response(response, today, news_list, cross_border_news or [])
+        特点：
+        - 结合当天交易情况，梳理并总结
+        - 回顾早报内容，评价预测准不准
+        - 结合市场技术面、新闻事件影响分析
+        - 对明日市场情况、投资建议作出预测
+        - 新颖/深刻的概念要解释清楚
+        """
+        # 准备早报回顾内容
+        morning_review = ""
+        if morning_report:
+            morning_review = f"""
+## 📋 今日早报回顾
+
+今天早上我给{settings.user_nickname}的预判是：
+
+**早报标题**：{morning_report.title}
+
+**早报核心建议**：
+"""
+            for i, opinion in enumerate(morning_report.core_opinions or [], 1):
+                morning_review += f"{i}. {opinion}\n"
+            
+            morning_review += f"""
+**早报摘要**：{morning_report.summary}
+
+⚠️ 请在晚报中**明确评价这些预判的准确性**：哪些判断对了？哪些判断错了？为什么？这对明天有什么启示？
+
+---
+"""
         
-        return report
+        return f"""你是{settings.user_nickname}的私人投资顾问，拥有20年A股和港股实战经验。
+
+## 🌆 晚报定位
+
+这是**交易日晚报**，在收盘后生成。核心目标是：
+1. 复盘今日市场，总结涨跌原因
+2. **回顾早报预测，评价准确性**
+3. 预判明日走势，给出操作建议
+4. 解释今天出现的新颖概念和热点
+
+你的风格：
+- 复盘要客观，有数据支撑
+- 敢于承认早报预判失误，分析原因
+- 对新概念、新热点要做科普解释
+- 明日预测要具体可执行
+
+## 🎯 今日任务
+
+今天是{today.strftime('%Y年%m月%d日')} {weekday_name}。
+本报告在收盘后生成，反映今日实际交易情况。
+
+### 用户画像
+- 昵称：{settings.user_nickname}
+- 投资风格：{investment_style_desc}
+
+{watchlist_text}
+
+{morning_review}
+
+---
+
+## 📊 今日市场数据
+
+{market_data_text}
+
+---
+
+{sentiment_index_text}
+
+---
+
+## 📰 今日财经要闻
+
+{finance_summary}
+
+## 🌍 今日跨界热点
+
+{cross_border_summary if cross_border_summary else "暂无重大跨界热点"}
+
+---
+
+## 📝 晚报结构（6大模块）
+
+### 模块1：📊 今日复盘总结
+
+**开门见山，总结今天市场的核心特征：**
+- 大盘涨跌及原因（一句话总结）
+- 领涨板块和领跌板块
+- 资金流向特征
+- 市场情绪变化
+
+### 模块2：✅ 早报预测回顾
+
+**这是晚报的特色模块，必须诚实评价：**
+
+针对今天早报的每条建议，逐一回顾：
+- 建议内容是什么
+- 实际结果如何（涨了还是跌了，幅度多少）
+- 预判准确度评分（1-10分）
+- 如果判断错了，错在哪里？为什么会出现偏差？
+
+**总结**：今日早报预判综合准确率 X%，经验教训是...
+
+### 模块3：💡 今日新概念/热点科普
+
+今天市场上出现的新词汇、新概念、新热点，给{settings.user_nickname}做科普：
+- 概念名称
+- 是什么意思（用大白话解释）
+- 为什么今天火了
+- 投资机会在哪里
+- 有什么风险
+
+例如：如果今天市场炒作"低空经济"概念，要解释清楚什么是低空经济、政策背景、产业链有哪些、哪些公司受益等。
+
+### 模块4：⭐ 自选股今日表现
+
+{self._get_watchlist_analysis_prompt()}
+
+对每只自选股总结今日表现：
+- 今日涨跌幅
+- 成交量变化
+- 是否符合早报预期
+- **明日操作建议**（继续持有/加仓/减仓/止损）
+
+### 模块5：🔮 明日预判
+
+基于今日复盘，对明天做出预判：
+1. **大盘预判**：明日大概率偏多还是偏空？点位区间预估
+2. **板块预判**：哪些板块明天可能继续强势/转弱/反弹
+3. **三条操作建议**：明天具体该怎么做
+
+### 模块6：🛡️ 风险提示
+
+1. 总仓位调整建议
+2. 需要注意的风险事件（明天的经济数据、财报、解禁等）
+3. 需要设置止损的持仓
+
+---
+
+## ✍️ 写作风格
+
+1. **复盘客观**：用数据说话，不美化也不丑化
+2. **敢于认错**：早报预判失误要坦诚分析原因
+3. **概念科普**：新概念解释要通俗易懂
+4. **预判具体**：明日建议要可执行
+
+## 📤 结构化输出
+
+在报告末尾，用 ```json 包裹输出以下数据：
+
+```json
+{{
+  "title": "晚报标题（如'半导体如期大涨，明日关注回调机会'）",
+  "summary": "200字精华摘要",
+  "core_opinions": [
+    "明日操作建议1",
+    "明日操作建议2", 
+    "明日操作建议3"
+  ],
+  "morning_accuracy": 75,
+  "morning_review": "早报预测回顾总结",
+  "new_concepts": ["今日新概念1", "新概念2"],
+  "market_analysis": {{
+    "overall_sentiment": "positive/negative/neutral",
+    "trend": "bullish/bearish/neutral",
+    "key_factors": [...],
+    "opportunities": [...],
+    "risks": [...]
+  }},
+  "tomorrow_outlook": {{
+    "direction": "bullish/bearish/neutral",
+    "key_levels": "支撑位xxx，压力位xxx",
+    "hot_sectors": ["板块1", "板块2"],
+    "risk_sectors": ["风险板块1"]
+  }}
+}}
+```
+
+请开始撰写晚报："""
+
+    def _build_weekend_report_prompt(
+        self, today, weekday_name, last_trading_str,
+        watchlist_text, investment_style_desc,
+        market_data_text, sentiment_index_text,
+        finance_summary, cross_border_summary
+    ) -> str:
+        """
+        构建非交易日深度早报 prompt
+        
+        特点：
+        - 整周市场表现复盘
+        - 重要新闻深度梳理
+        - 重要概念科普
+        - 市场讨论最多的行业、企业、新技术
+        - 下周操作和市场走向预测
+        - 时长更长，有科普作用
+        """
+        return f"""你是{settings.user_nickname}的私人投资顾问，拥有20年A股和港股实战经验。
+
+## 🏖️ 非交易日深度早报定位
+
+今天是**非交易日**（周末或节假日），A股休市。本期是**深度早报**，不追求时效性，而是做深度分析和科普。
+
+核心目标：
+1. **本周复盘**：系统梳理本周市场表现
+2. **深度科普**：解释本周热点概念、新技术、政策
+3. **行业聚焦**：深入分析市场讨论最多的行业和企业
+4. **下周展望**：给出下周操作策略
+
+你的风格：
+- 深度分析，不求快但求深
+- 科普内容要通俗易懂，小白也能听懂
+- 数据详实，有理有据
+- 给出可执行的下周操作建议
+
+## 🎯 今日任务
+
+今天是{today.strftime('%Y年%m月%d日')} {weekday_name}，非交易日。
+市场数据来自上一个交易日（{last_trading_str}）的收盘数据。
+
+### 用户画像
+- 昵称：{settings.user_nickname}
+- 投资风格：{investment_style_desc}
+
+{watchlist_text}
+
+---
+
+## 📊 本周市场数据
+
+{market_data_text}
+
+---
+
+{sentiment_index_text}
+
+---
+
+## 📰 本周重要财经新闻
+
+{finance_summary}
+
+## 🌍 本周跨界热点
+
+{cross_border_summary if cross_border_summary else "暂无重大跨界热点"}
+
+---
+
+## 📝 深度早报结构（7大模块，时长更长）
+
+### 模块1：📊 本周市场复盘
+
+**系统梳理本周市场表现：**
+- 主要指数本周涨跌幅及走势分析
+- 本周领涨板块TOP5和领跌板块TOP5
+- 北向资金本周流入流出情况
+- 本周市场情绪变化曲线
+- 本周市场的核心主线是什么
+
+### 模块2：🎓 本周热点概念科普（重点模块）
+
+**这是非交易日深度版的核心特色，做好科普：**
+
+选取本周市场讨论最热的2-3个概念/技术/政策，做深度科普：
+
+每个概念包含：
+1. **是什么**：用大白话解释这个概念
+2. **为什么火**：政策背景、事件催化
+3. **产业链拆解**：上游、中游、下游分别是什么
+4. **受益标的**：哪些公司最受益，为什么
+5. **投资节奏**：现在是什么阶段？是初期炒预期还是业绩兑现期？
+6. **风险提示**：有什么坑要避免
+
+### 模块3：🏭 本周行业深度
+
+**选取本周讨论度最高的1-2个行业，做深度分析：**
+
+包含：
+- 行业本周表现及原因
+- 行业政策面变化
+- 行业基本面变化（订单、产能、价格等）
+- 行业龙头公司近况
+- 行业估值分析（贵了还是便宜）
+- 下周行业展望
+
+### 模块4：🏢 本周明星企业
+
+**选取本周市场关注度最高的2-3家企业：**
+- 为什么被关注（财报、公告、新闻）
+- 公司基本面分析
+- 技术面分析
+- 投资价值评估
+
+### 模块5：⭐ 自选股本周总结
+
+{self._get_watchlist_analysis_prompt()}
+
+对每只自选股做本周总结：
+- 本周涨跌幅
+- 本周重要事件
+- 技术面位置
+- **下周操作建议**
+
+### 模块6：🔮 下周展望与策略
+
+1. **宏观日历**：下周有哪些重要事件（经济数据、政策会议、财报等）
+2. **大盘预判**：下周大概率是涨是跌？关键点位在哪
+3. **板块轮动**：哪些板块下周可能轮动到
+4. **三条操作建议**：下周一开盘具体怎么做
+
+### 模块7：📚 投资知识小课堂（可选）
+
+如果本周有值得讲的投资知识点，可以做一个小科普：
+- 可以是技术分析方法
+- 可以是基本面分析框架
+- 可以是风险控制技巧
+- 用案例说明，生动易懂
+
+---
+
+## ✍️ 写作风格
+
+1. **深入浅出**：专业内容用大白话讲
+2. **数据详实**：多用数据支撑观点
+3. **案例丰富**：用实际案例解释概念
+4. **可听性强**：适合播客收听，节奏适中
+
+## 📤 结构化输出
+
+在报告末尾，用 ```json 包裹输出以下数据：
+
+```json
+{{
+  "title": "非交易日深度版标题（如'本周复盘：AI主线不变，下周关注低位补涨'）",
+  "summary": "300字精华摘要（本周要点+下周建议）",
+  "core_opinions": [
+    "下周操作建议1",
+    "下周操作建议2",
+    "下周操作建议3"
+  ],
+  "weekly_review": {{
+    "market_performance": "本周市场整体表现总结",
+    "hot_themes": ["本周热点主题1", "主题2"],
+    "top_sectors": ["领涨板块1", "板块2"],
+    "bottom_sectors": ["领跌板块1", "板块2"]
+  }},
+  "concept_tutorials": [
+    {{
+      "name": "概念名称",
+      "explanation": "通俗解释",
+      "beneficiaries": ["受益标的1", "标的2"]
+    }}
+  ],
+  "next_week_outlook": {{
+    "direction": "bullish/bearish/neutral",
+    "key_events": ["重要事件1", "事件2"],
+    "opportunities": ["机会板块1", "板块2"],
+    "risks": ["风险点1", "风险2"]
+  }},
+  "market_analysis": {{
+    "overall_sentiment": "positive/negative/neutral",
+    "trend": "bullish/bearish/neutral",
+    "key_factors": [...],
+    "opportunities": [...],
+    "risks": [...]
+  }}
+}}
+```
+
+请开始撰写非交易日深度早报："""
     
     def _prepare_watchlist_analysis(self) -> str:
         """
@@ -796,10 +1178,13 @@ class AIAnalyzerService:
     def _parse_report_response(self, response: str, report_date: date, 
                                news_list: List[News]) -> Report:
         """解析 AI 响应，构建报告对象（旧版兼容）"""
-        return self._parse_enhanced_report_response(response, report_date, news_list, [])
+        return self._parse_enhanced_report_response(response, report_date, news_list, [], ReportType.MORNING)
     
-    def _parse_enhanced_report_response(self, response: str, report_date: date,
-                                        news_list: List[News], cross_border_news: List[News]) -> Report:
+    def _parse_enhanced_report_response(
+        self, response: str, report_date: date,
+        news_list: List[News], cross_border_news: List[News],
+        report_type: ReportType = ReportType.MORNING
+    ) -> Report:
         """解析 AI 响应，构建5模块投资决策导向报告对象"""
         # 尝试提取 JSON 数据
         json_data = self._extract_json(response)
@@ -809,8 +1194,12 @@ class AIAnalyzerService:
         if "```json" in response:
             content = response.split("```json")[0].strip()
         
+        # 根据报告类型确定默认标题
+        type_name = "早报" if report_type == ReportType.MORNING else "晚报"
+        default_title = f"{report_date.strftime('%Y年%m月%d日')} 财经{type_name}"
+        
         # 构建报告基础信息
-        title = json_data.get("title", f"{report_date.strftime('%Y年%m月%d日')} 财经深度日报")
+        title = json_data.get("title", default_title)
         summary = json_data.get("summary", content[:200])
         core_opinions = json_data.get("core_opinions", [])
         
@@ -877,6 +1266,7 @@ class AIAnalyzerService:
             id=str(uuid.uuid4()),
             title=title,
             summary=summary,
+            report_type=report_type,
             core_opinions=core_opinions,
             content=content,
             report_date=report_date,

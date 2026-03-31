@@ -1,6 +1,11 @@
 """
 播客生成服务
 使用 Edge TTS 将报告文本转换为音频
+
+重构版：支持早报/晚报不同风格
+- 早报：简洁直接，快节奏，聚焦当日操作
+- 晚报：深入复盘，稍慢节奏，回顾+展望
+- 非交易日：深度科普，慢节奏，知识性强
 """
 import asyncio
 import os
@@ -15,7 +20,7 @@ import edge_tts
 import httpx
 
 from ..config import settings
-from ..models.report import Report
+from ..models.report import Report, ReportType
 from .audio_mixer import get_audio_mixer
 
 
@@ -53,25 +58,44 @@ class PodcastGeneratorService:
         """初始化开场白模板，使用配置的用户昵称"""
         name = self.user_nickname
         
-        # 工作日多样化开场白模板
-        self.weekday_openings = [
-            f"{name}，早上好！新的一天开始了，让我们一起看看最新的财经大事。",
-            f"{name}你好呀！又是元气满满的一天，最近的市场有什么新动向呢？",
-            f"嗨，{name}！准备好了吗？财经快报马上开始。",
-            f"{name}，早安！咖啡准备好了吗？边喝边听最新的市场分析吧。",
-            f"{name}，又是充满机会的一天！让我们看看市场在说什么。",
-            f"Hello{name}！通勤路上就让我来陪你，一起聊聊最新的财经热点。",
-            f"{name}早！新的一周，新的机会，这期报告干货满满哦。",
-            f"{name}，起床啦！最新的市场消息已经为你整理好了。",
+        # ==================== 交易日早报开场白 ====================
+        self.morning_openings = [
+            f"{name}，早上好！新的交易日开始了，让我们看看今天的市场机会。",
+            f"{name}你好呀！又是充满机会的一天，最新的市场分析来了。",
+            f"嗨，{name}！财经早报马上开始，抓住今日投资先机。",
+            f"{name}，早安！边喝咖啡边听今天的操作建议吧。",
+            f"{name}，新的一天，新的机会！今天的市场有什么看点？",
+            f"Hello{name}！通勤路上，先听听今天的市场预判。",
+            f"{name}早！开盘前先听这期早报，做好今日作战准备。",
+            f"{name}，起床啦！今天的操作建议已经为你整理好了。",
         ]
         
-        # 周末特别开场白
-        self.weekend_openings = [
-            f"{name}，周末愉快！A股和港股休市中，但我们可以趁机复盘本周，展望下周。",
-            f"{name}你好！难得的周末时光，让我们轻松聊聊这周的市场和下周的机会。",
-            f"嗨{name}，周末好！这期咱们不着急，慢慢聊聊这周发生的大事。",
-            f"{name}，休息日快乐！市场虽然休息了，但我们的思考不能停。",
+        # ==================== 交易日晚报开场白 ====================
+        self.evening_openings = [
+            f"{name}，晚上好！今天市场收盘了，让我们一起复盘今日的得失。",
+            f"{name}你好！辛苦了一天，来听听今日市场的战报吧。",
+            f"嗨{name}，下班后的第一件事，回顾今天的投资表现。",
+            f"{name}，收盘了！今天的预测准不准？让我来给你详细分析。",
+            f"{name}晚上好！边吃饭边听今日复盘，为明天做好准备。",
+            f"Hello{name}！今天的市场让你满意吗？来听听详细分析。",
+            f"{name}，今日战报来了！先看看早上的预测兑现了多少。",
+            f"{name}晚安！睡前听听今日复盘，明天继续加油。",
         ]
+        
+        # ==================== 非交易日深度版开场白 ====================
+        self.weekend_openings = [
+            f"{name}，周末愉快！今天不开市，咱们来做个深度复盘。",
+            f"{name}你好！难得的休息日，一起聊聊本周市场和下周展望。",
+            f"嗨{name}，周末好！这期是深度版，内容丰富，泡杯茶慢慢听。",
+            f"{name}，休息日快乐！市场虽然休息，但我们的思考不能停。",
+            f"{name}周末好！今天不着急，我们深入聊聊市场的来龙去脉。",
+            f"Hello{name}！周末时光，适合深度思考，这期内容更丰富。",
+            f"{name}，假期愉快！趁着市场休息，做一期深度科普。",
+            f"{name}周末好！今天有充足时间，给你讲讲本周的热点概念。",
+        ]
+        
+        # 兼容旧版属性名
+        self.weekday_openings = self.morning_openings
     
     async def _get_http_client(self):
         """获取或创建HTTP客户端"""
@@ -264,11 +288,21 @@ class PodcastGeneratorService:
             data_date_str = f"{last_trading.month}月{last_trading.day}日{weekday_names[last_trading.weekday()]}"
             return (data_date_str, "上一个交易日", False)
     
-    def _get_random_opening(self, is_weekend: bool = False) -> str:
-        """获取随机开场白"""
+    def _get_random_opening(self, report_type: ReportType = None, is_weekend: bool = False) -> str:
+        """
+        获取随机开场白
+        
+        Args:
+            report_type: 报告类型（morning/evening）
+            is_weekend: 是否是非交易日
+        """
         if is_weekend:
             return random.choice(self.weekend_openings)
-        return random.choice(self.weekday_openings)
+        
+        if report_type == ReportType.EVENING:
+            return random.choice(self.evening_openings)
+        
+        return random.choice(self.morning_openings)
     
     async def generate_podcast(self, report: Report) -> tuple[str, int]:
         """
@@ -412,20 +446,11 @@ class PodcastGeneratorService:
     
     def _prepare_podcast_text(self, report: Report, weather_info: str = "") -> str:
         """
-        准备播客文本 - 精简版（观点输出 + 财经脱口秀）
+        准备播客文本 - 根据报告类型选择不同风格
         
-        结构（每个信息只说一遍）：
-        1. 开场白（天气 + 日期）
-        2. 核心判断（3句话，最重要的结论）
-        3. 报告正文精华（去重后的深度内容）
-        4. 跨界热点（差异化内容，与正文不重复）
-        5. 结束语（基于当天核心观点动态总结）
-        
-        去掉了：
-        - highlights_text（重点新闻已在报告正文 key_content 里覆盖）
-        - analysis_text（市场分析已在核心观点和报告正文里覆盖）
-        - 固定模板的结尾总结（改为动态生成）
-        - 内容不足时的鸡汤填充
+        早报风格：简洁直接，快节奏，聚焦当日操作
+        晚报风格：深入复盘，回顾早报，展望明日
+        非交易日：深度科普，慢节奏，知识性强
         """
         report_date = report.report_date
         # 确保 report_date 是 date 对象
@@ -435,82 +460,300 @@ class PodcastGeneratorService:
             except ValueError:
                 report_date = date.today()
         
+        # 获取报告类型
+        report_type = getattr(report, 'report_type', ReportType.MORNING)
+        if isinstance(report_type, str):
+            report_type = ReportType(report_type)
+        
         is_weekend = self._is_weekend(report_date)
+        
+        # 根据类型选择生成方法
+        if is_weekend:
+            return self._prepare_weekend_podcast_text(report, weather_info, report_date)
+        elif report_type == ReportType.EVENING:
+            return self._prepare_evening_podcast_text(report, weather_info, report_date)
+        else:
+            return self._prepare_morning_podcast_text(report, weather_info, report_date)
+    
+    def _prepare_morning_podcast_text(self, report: Report, weather_info: str, report_date: date) -> str:
+        """
+        准备交易日早报播客文本
+        
+        特点：
+        - 简洁直接，快节奏
+        - 聚焦当日操作建议
+        - 2500-3000字（约10-12分钟）
+        """
         weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         weekday_name = weekday_names[report_date.weekday()]
         
-        # 获取市场数据对应的实际日期信息
-        data_date_str, date_description, is_today_data = self._get_market_data_date_info(report_date)
+        # 获取市场数据日期信息
+        data_date_str, date_description, _ = self._get_market_data_date_info(report_date)
         
-        # 用户昵称
         name = self.user_nickname
+        random_greeting = self._get_random_opening(report_type=ReportType.MORNING, is_weekend=False)
         
-        # 随机选择开场白
-        random_greeting = self._get_random_opening(is_weekend)
-        
-        # 开场白（包含天气和日期，明确市场数据来自哪一天）
+        # 开场白
         opening = f"""
 {random_greeting}
 
 {weather_info}
 
 今天是{report_date.strftime('%Y年%m月%d日')}，{weekday_name}。
-"""
-        
-        # 周末特别提示
-        if is_weekend:
-            opening += f"""
-温馨提示：今天是周末，A股和港股都休市哦。
-本期内容基于{date_description}也就是{data_date_str}的收盘数据，主要是本周回顾和下周展望，帮你做好投资规划。
-
-[SECTION_BREAK]
-"""
-        else:
-            opening += f"""
-本期播客的市场数据来自{date_description}，也就是{data_date_str}的收盘数据。马上进入正题。
+本期播客的市场数据来自{date_description}，也就是{data_date_str}的收盘数据。
 
 [SECTION_BREAK]
 """
         
-        # 核心观点（如果有）- 开门见山
+        # 核心观点（最重要的部分）
         core_opinions_text = ""
         if hasattr(report, 'core_opinions') and report.core_opinions:
-            if is_weekend:
-                core_opinions_text = """
-先说说我对下周的操作建议：
-
-"""
-            else:
-                core_opinions_text = f"""
-{name}，先听我的三条操作建议：
+            core_opinions_text = f"""
+{name}，先听我今天的三条操作建议：
 
 """
             for i, opinion in enumerate(report.core_opinions, 1):
                 core_opinions_text += f"第{i}条：{opinion}\n\n"
             
-            if is_weekend:
-                core_opinions_text += """
-这几条建议，下周开盘可以参考执行。
-
-[SECTION_BREAK]
-"""
-            else:
-                core_opinions_text += """
+            core_opinions_text += """
 以上三条，建议你记下来，今天开盘后对照操作。
 
 [SECTION_BREAK]
 """
         else:
-            # 使用摘要作为核心内容
             core_opinions_text = f"""
-{name}，这期的核心内容是：{report.summary}
+{name}，今天的核心内容是：{report.summary}
 
 接下来我展开聊聊。
 
 [SECTION_BREAK]
 """
         
-        # 跨界热点分析（如果有）- 这是差异化的重点，和报告正文不重复
+        # 跨界热点
+        cross_border_text = self._prepare_cross_border_for_podcast(report, name)
+        
+        # 报告正文精华
+        key_content = self._extract_key_paragraphs(report.content)
+        
+        # 结束语
+        closing = self._generate_morning_closing(report, name)
+        
+        full_text = opening + core_opinions_text + key_content + cross_border_text + closing
+        
+        # 控制字数（早报偏短）
+        if len(full_text) > 3000:
+            full_text = full_text[:2700] + f"""
+
+{name}，时间关系，这期就先聊到这里。更详细的内容可以在App里看完整报告。
+
+""" + closing
+        
+        return full_text
+    
+    def _prepare_evening_podcast_text(self, report: Report, weather_info: str, report_date: date) -> str:
+        """
+        准备交易日晚报播客文本
+        
+        特点：
+        - 深入复盘，回顾早报预测
+        - 稍慢节奏，更多分析
+        - 3000-4000字（约12-16分钟）
+        """
+        weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        weekday_name = weekday_names[report_date.weekday()]
+        
+        name = self.user_nickname
+        random_greeting = self._get_random_opening(report_type=ReportType.EVENING, is_weekend=False)
+        
+        # 开场白
+        opening = f"""
+{random_greeting}
+
+今天是{report_date.strftime('%Y年%m月%d日')}，{weekday_name}，收盘了。
+让我们一起回顾今天的市场表现，看看早上的预测准不准。
+
+[SECTION_BREAK]
+"""
+        
+        # 今日复盘摘要
+        summary_text = f"""
+{name}，先简单总结一下今天的市场：
+
+{report.summary}
+
+[SECTION_BREAK]
+"""
+        
+        # 早报预测回顾（如果有的话，从报告内容中提取）
+        review_text = ""
+        if "早报" in report.content or "预测" in report.content:
+            review_text = f"""
+{name}，关于今天早上的预测准确度，我要向你汇报：
+
+"""
+            # 从报告中提取早报回顾相关内容
+            review_content = self._extract_section_content(report.content, ["早报预测回顾", "早报回顾", "预测准确"])
+            if review_content:
+                review_text += review_content + "\n\n"
+            review_text += "[SECTION_BREAK]\n"
+        
+        # 核心观点（明日建议）
+        core_opinions_text = ""
+        if hasattr(report, 'core_opinions') and report.core_opinions:
+            core_opinions_text = f"""
+{name}，基于今天的复盘，我给你明天的操作建议是：
+
+"""
+            for i, opinion in enumerate(report.core_opinions, 1):
+                core_opinions_text += f"第{i}条：{opinion}\n\n"
+            
+            core_opinions_text += """
+这几条建议，可以在明天开盘前再复习一下。
+
+[SECTION_BREAK]
+"""
+        
+        # 新概念科普（如果有）
+        concept_text = ""
+        if "概念" in report.content or "科普" in report.content:
+            concept_content = self._extract_section_content(report.content, ["新概念", "概念科普", "热点科普"])
+            if concept_content:
+                concept_text = f"""
+{name}，今天市场上有一些新概念值得了解：
+
+{concept_content}
+
+[SECTION_BREAK]
+"""
+        
+        # 跨界热点
+        cross_border_text = self._prepare_cross_border_for_podcast(report, name)
+        
+        # 报告正文精华
+        key_content = self._extract_key_paragraphs(report.content)
+        
+        # 结束语
+        closing = self._generate_evening_closing(report, name)
+        
+        full_text = opening + summary_text + review_text + core_opinions_text + concept_text + key_content + cross_border_text + closing
+        
+        # 控制字数（晚报可以更长）
+        if len(full_text) > 4000:
+            full_text = full_text[:3600] + f"""
+
+{name}，内容很多，今天就先聊到这里。详细分析请看App里的完整报告。
+
+""" + closing
+        
+        return full_text
+    
+    def _prepare_weekend_podcast_text(self, report: Report, weather_info: str, report_date: date) -> str:
+        """
+        准备非交易日深度版播客文本
+        
+        特点：
+        - 深度科普，慢节奏
+        - 整周复盘 + 概念讲解 + 下周展望
+        - 4000-5000字（约16-20分钟）
+        """
+        weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        weekday_name = weekday_names[report_date.weekday()]
+        
+        # 获取市场数据日期信息
+        data_date_str, date_description, _ = self._get_market_data_date_info(report_date)
+        
+        name = self.user_nickname
+        random_greeting = self._get_random_opening(report_type=ReportType.MORNING, is_weekend=True)
+        
+        # 开场白
+        opening = f"""
+{random_greeting}
+
+{weather_info}
+
+今天是{report_date.strftime('%Y年%m月%d日')}，{weekday_name}。
+
+温馨提示：今天是非交易日，A股和港股都休市。
+本期是深度版，内容比平时更丰富，适合泡杯茶慢慢听。
+市场数据来自{date_description}，也就是{data_date_str}的收盘数据。
+
+[SECTION_BREAK]
+"""
+        
+        # 本周复盘摘要
+        summary_text = f"""
+{name}，先来看看本周市场的整体表现：
+
+{report.summary}
+
+[SECTION_BREAK]
+"""
+        
+        # 核心观点（下周建议）
+        core_opinions_text = ""
+        if hasattr(report, 'core_opinions') and report.core_opinions:
+            core_opinions_text = f"""
+{name}，我对下周的操作建议是：
+
+"""
+            for i, opinion in enumerate(report.core_opinions, 1):
+                core_opinions_text += f"第{i}条：{opinion}\n\n"
+            
+            core_opinions_text += """
+这几条建议，下周一开盘可以参考执行。
+
+[SECTION_BREAK]
+"""
+        
+        # 概念科普模块（非交易日的核心特色）
+        concept_text = ""
+        concept_content = self._extract_section_content(report.content, ["概念科普", "热点概念", "本周热点", "新概念"])
+        if concept_content:
+            concept_text = f"""
+{name}，接下来给你讲讲本周市场上的热点概念：
+
+{concept_content}
+
+这些概念可能在下周继续发酵，值得关注。
+
+[SECTION_BREAK]
+"""
+        
+        # 行业深度分析
+        industry_text = ""
+        industry_content = self._extract_section_content(report.content, ["行业深度", "本周行业", "行业分析"])
+        if industry_content:
+            industry_text = f"""
+{name}，再来聊聊本周表现突出的行业：
+
+{industry_content}
+
+[SECTION_BREAK]
+"""
+        
+        # 跨界热点
+        cross_border_text = self._prepare_cross_border_for_podcast(report, name)
+        
+        # 报告正文精华
+        key_content = self._extract_key_paragraphs(report.content)
+        
+        # 结束语
+        closing = self._generate_weekend_closing(report, name)
+        
+        full_text = opening + summary_text + core_opinions_text + concept_text + industry_text + key_content + cross_border_text + closing
+        
+        # 控制字数（深度版可以更长）
+        if len(full_text) > 5000:
+            full_text = full_text[:4500] + f"""
+
+{name}，今天内容确实很多，更详细的分析请在App里查看完整报告。
+
+""" + closing
+        
+        return full_text
+    
+    def _prepare_cross_border_for_podcast(self, report: Report, name: str) -> str:
+        """准备跨界热点播客文本"""
         cross_border_text = ""
         if hasattr(report, 'cross_border_events') and report.cross_border_events:
             cross_border_text = f"""
@@ -542,66 +785,106 @@ class PodcastGeneratorService:
 我的建议：{event.follow_up_advice}
 
 """
-        
-        # 处理报告正文的关键段落（已通过 _extract_key_paragraphs 去重和精炼）
-        key_content = self._extract_key_paragraphs(report.content)
-        
-        # 结束语 - 基于当天实际核心观点动态生成
-        closing = self._generate_dynamic_closing(report, name, is_weekend)
-        
-        # 组合完整文本（去掉了 highlights_text 和 analysis_text，避免重复）
-        full_text = opening + core_opinions_text + key_content + cross_border_text + closing
-        
-        # 控制字数在合理范围（2500-3750字，对应10-15分钟）
-        if len(full_text) > 3750:
-            # 截断并添加总结
-            full_text = full_text[:3400] + f"""
-
-{name}，时间关系，这期就先聊到这里。更详细的内容可以在App里看完整报告。
-
-""" + closing
-        
-        return full_text
+        return cross_border_text
     
-    def _generate_dynamic_closing(self, report: Report, name: str, is_weekend: bool) -> str:
-        """
-        基于当天报告内容动态生成结尾总结，不使用固定模板
-        """
+    def _extract_section_content(self, content: str, section_keywords: List[str]) -> str:
+        """从报告内容中提取指定章节的内容"""
+        for keyword in section_keywords:
+            # 尝试找到包含关键词的章节
+            pattern = rf'#{1,3}\s*[^#]*{keyword}[^#]*\n([\s\S]*?)(?=#{1,3}|\Z)'
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                extracted = match.group(1).strip()
+                # 清理并限制长度
+                cleaned = self._clean_for_tts(extracted)
+                if len(cleaned) > 800:
+                    # 找到自然断点截断
+                    cutoff = cleaned.find('。', 600)
+                    if cutoff > 0:
+                        cleaned = cleaned[:cutoff + 1]
+                    else:
+                        cleaned = cleaned[:800] + "..."
+                return cleaned
+        return ""
+    
+    def _generate_morning_closing(self, report: Report, name: str) -> str:
+        """生成早报结束语"""
         closing = f"""
 
 [SECTION_BREAK]
 
-好了{name}，"""
-        
-        if is_weekend:
-            closing += "这期的周末财经复盘就到这里。\n\n"
-        else:
-            closing += "这期的财经快报就到这里。\n\n"
-        
-        # 用实际核心观点做总结
+好了{name}，这期早报就到这里。
+
+"""
+        # 用实际核心观点做简短总结
         if hasattr(report, 'core_opinions') and report.core_opinions:
             closing += "最后帮你总结今天的操作要点：\n"
-            for i, opinion in enumerate(report.core_opinions, 1):
-                # 提取观点的前40个字作为精炼总结
-                short_opinion = opinion[:40].rstrip('，。、；') if len(opinion) > 40 else opinion.rstrip('，。、；')
+            for i, opinion in enumerate(report.core_opinions[:2], 1):  # 早报只总结前2条
+                short_opinion = opinion[:35].rstrip('，。、；') if len(opinion) > 35 else opinion.rstrip('，。、；')
                 closing += f"第{i}，{short_opinion}。\n"
             closing += "\n"
         
-        # 如果有市场趋势判断，加一句简短的态度
+        closing += f"{name}，祝你今天交易顺利！我们晚上再见！\n"
+        return closing
+    
+    def _generate_evening_closing(self, report: Report, name: str) -> str:
+        """生成晚报结束语"""
+        closing = f"""
+
+[SECTION_BREAK]
+
+好了{name}，这期晚报复盘就到这里。
+
+"""
+        # 总结明日要点
+        if hasattr(report, 'core_opinions') and report.core_opinions:
+            closing += "帮你总结明天的操作要点：\n"
+            for i, opinion in enumerate(report.core_opinions[:2], 1):
+                short_opinion = opinion[:35].rstrip('，。、；') if len(opinion) > 35 else opinion.rstrip('，。、；')
+                closing += f"第{i}，{short_opinion}。\n"
+            closing += "\n"
+        
+        # 如果有市场趋势判断
         if report.analysis:
             trend_one_liner = {
-                "bullish": "整体我偏乐观，但仓位控制好。",
-                "bearish": "短期注意风险，别急着抄底。",
-                "neutral": "震荡市别追涨杀跌，耐心等机会。"
+                "bullish": "整体我对明天偏乐观。",
+                "bearish": "明天注意风险，别急着抄底。",
+                "neutral": "震荡市保持耐心，等待机会。"
             }.get(report.analysis.trend.value, "")
             if trend_one_liner:
                 closing += f"{trend_one_liner}\n\n"
         
-        if is_weekend:
-            closing += f"{name}，周末愉快！我们下周再见！\n"
-        else:
-            closing += f"{name}，这期就聊到这，我们明天见！\n"
+        closing += f"{name}，早点休息，我们明天早上见！\n"
+        return closing
+    
+    def _generate_weekend_closing(self, report: Report, name: str) -> str:
+        """生成非交易日深度版结束语"""
+        closing = f"""
+
+[SECTION_BREAK]
+
+好了{name}，这期深度版播客就到这里。
+
+"""
+        # 总结下周要点
+        if hasattr(report, 'core_opinions') and report.core_opinions:
+            closing += "帮你总结下周的操作要点：\n"
+            for i, opinion in enumerate(report.core_opinions, 1):
+                short_opinion = opinion[:40].rstrip('，。、；') if len(opinion) > 40 else opinion.rstrip('，。、；')
+                closing += f"第{i}，{short_opinion}。\n"
+            closing += "\n"
         
+        # 如果有市场趋势判断
+        if report.analysis:
+            trend_one_liner = {
+                "bullish": "整体我对下周偏乐观，可以适当积极一些。",
+                "bearish": "下周可能还有波动，控制好仓位。",
+                "neutral": "保持震荡思维，高抛低吸。"
+            }.get(report.analysis.trend.value, "")
+            if trend_one_liner:
+                closing += f"{trend_one_liner}\n\n"
+        
+        closing += f"{name}，周末愉快！好好休息，我们下周再见！\n"
         return closing
     
     def _extract_key_paragraphs(self, content: str) -> str:

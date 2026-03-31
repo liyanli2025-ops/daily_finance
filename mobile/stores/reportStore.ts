@@ -34,12 +34,16 @@ interface CrossBorderEvent {
   follow_up_advice?: string;
 }
 
+// 报告类型枚举
+type ReportType = 'morning' | 'evening';
+
 interface Report {
   id: string;
   title: string;
   summary: string;
   content: string;
   report_date: string;
+  report_type: ReportType;            // 报告类型：早报/晚报
   highlights: NewsHighlight[];
   analysis?: MarketAnalysis;
   // 新增字段
@@ -60,40 +64,52 @@ interface ReportListItem {
   title: string;
   summary: string;
   report_date: string;
+  report_type: ReportType;            // 报告类型：早报/晚报
   podcast_status: string;
   podcast_url?: string;
   podcast_duration?: number;
   created_at: string;
 }
 
+// 今日报告汇总
+interface TodayReportsResponse {
+  date: string;
+  reports: ReportListItem[];
+  morning_report: string | null;
+  evening_report: string | null;
+}
+
 interface ReportStore {
   todayReport: Report | null;
   currentReport: Report | null;
   recentReports: ReportListItem[];
+  todayAllReports: TodayReportsResponse | null;  // 今日所有报告（早报+晚报）
   isLoading: boolean;
   error: string | null;
 
-  fetchTodayReport: () => Promise<void>;
+  fetchTodayReport: (reportType?: ReportType) => Promise<void>;
   fetchReport: (id: string) => Promise<void>;
-  fetchRecentReports: () => Promise<void>;
+  fetchRecentReports: (reportType?: ReportType) => Promise<void>;
+  fetchTodayAllReports: () => Promise<void>;     // 获取今日所有报告
 }
 
 export const useReportStore = create<ReportStore>((set, get) => ({
   todayReport: null,
   currentReport: null,
   recentReports: [],
+  todayAllReports: null,
   isLoading: false,
   error: null,
 
-  fetchTodayReport: async () => {
+  fetchTodayReport: async (reportType?: ReportType) => {
     set({ isLoading: true, error: null });
     
     // 先尝试从缓存获取
     const cached = await cacheService.getCachedTodayReport();
-    if (cached) {
+    if (cached && (!reportType || cached.report_type === reportType)) {
       set({ todayReport: cached, isLoading: false });
       // 后台刷新
-      api.getTodayReport().then((report) => {
+      api.getTodayReport(reportType).then((report) => {
         set({ todayReport: report });
         cacheService.cacheTodayReport(report);
       }).catch(() => {});
@@ -101,7 +117,7 @@ export const useReportStore = create<ReportStore>((set, get) => ({
     }
     
     try {
-      const report = await api.getTodayReport();
+      const report = await api.getTodayReport(reportType);
       set({ todayReport: report, isLoading: false });
       // 缓存报告
       cacheService.cacheTodayReport(report);
@@ -113,10 +129,11 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       set({
         todayReport: {
           id: 'mock-1',
-          title: '2026年3月12日 财经深度日报',
+          title: '2026年3月31日 财经深度日报',
           summary: '今日市场震荡整理，央行货币政策维持稳定，新能源板块表现活跃。建议关注政策动向和行业轮动机会。',
           content: '# 今日市场概览\n\n今日A股市场震荡整理...',
           report_date: new Date().toISOString().split('T')[0],
+          report_type: 'morning',
           core_opinions: [
             '央行定向降准释放流动性，看好银行股短期修复行情，建议配置招商银行、宁波银行',
             '新能源汽车渗透率突破35%，宁德时代、比亚迪业绩确定性强，维持"买入"评级',
@@ -205,9 +222,9 @@ export const useReportStore = create<ReportStore>((set, get) => ({
     }
   },
 
-  fetchRecentReports: async () => {
+  fetchRecentReports: async (reportType?: ReportType) => {
     try {
-      const reports = await api.getReports();
+      const reports = await api.getReports(0, 20, reportType);
       set({ recentReports: reports });
     } catch (error) {
       console.error('获取报告列表失败:', error);
@@ -216,24 +233,45 @@ export const useReportStore = create<ReportStore>((set, get) => ({
         recentReports: [
           {
             id: 'mock-2',
-            title: '2026年3月11日 财经深度日报',
+            title: '2026年3月30日 财经早报',
             summary: '市场情绪回暖，科技板块领涨...',
-            report_date: '2026-03-11',
+            report_date: '2026-03-30',
+            report_type: 'morning',
             podcast_status: 'ready',
             podcast_duration: 1400,
-            created_at: '2026-03-11T06:00:00Z',
+            created_at: '2026-03-30T07:00:00Z',
           },
           {
             id: 'mock-3',
-            title: '2026年3月10日 财经深度日报',
+            title: '2026年3月30日 财经晚报',
+            summary: '今日复盘：科技股强势领涨，指数震荡上行...',
+            report_date: '2026-03-30',
+            report_type: 'evening',
+            podcast_status: 'ready',
+            podcast_duration: 1800,
+            created_at: '2026-03-30T17:00:00Z',
+          },
+          {
+            id: 'mock-4',
+            title: '2026年3月29日 财经早报',
             summary: '外围市场波动加剧，避险情绪升温...',
-            report_date: '2026-03-10',
+            report_date: '2026-03-29',
+            report_type: 'morning',
             podcast_status: 'ready',
             podcast_duration: 1600,
-            created_at: '2026-03-10T06:00:00Z',
+            created_at: '2026-03-29T07:00:00Z',
           },
         ],
       });
+    }
+  },
+
+  fetchTodayAllReports: async () => {
+    try {
+      const response = await api.getTodayAllReports();
+      set({ todayAllReports: response });
+    } catch (error) {
+      console.error('获取今日所有报告失败:', error);
     }
   },
 }));

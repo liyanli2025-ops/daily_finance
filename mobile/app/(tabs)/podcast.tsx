@@ -20,9 +20,28 @@ import { router } from 'expo-router';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// 报告类型
+type ReportType = 'morning' | 'evening';
+
+// 报告类型配置
+const REPORT_TYPE_CONFIG = {
+  morning: {
+    label: '早报',
+    icon: 'weather-sunny' as const,
+    color: '#FF9800',
+    description: '开盘前速递',
+  },
+  evening: {
+    label: '晚报',
+    icon: 'weather-night' as const,
+    color: '#7C4DFF',
+    description: '收盘复盘',
+  },
+};
+
 export default function PodcastScreen() {
   const { colors, isDark } = useAppTheme();
-  const { todayReport, currentReport, recentReports, fetchTodayReport, fetchRecentReports, fetchReport } = useReportStore();
+  const { todayReport, currentReport, recentReports, todayAllReports, fetchTodayReport, fetchRecentReports, fetchReport, fetchTodayAllReports } = useReportStore();
   const {
     isPlaying,
     currentPosition,
@@ -40,11 +59,13 @@ export default function PodcastScreen() {
   const segmentYPositions = useRef<number[]>([]);
   const segmentsContainerY = useRef<number>(0);
   const [showPlaylist, setShowPlaylist] = useState(false);
+  const [selectedReportType, setSelectedReportType] = useState<ReportType | null>(null);  // null 表示自动选择最新
 
   useEffect(() => {
-    fetchTodayReport();
+    fetchTodayReport(selectedReportType || undefined);
     fetchRecentReports();
-  }, []);
+    fetchTodayAllReports();
+  }, [selectedReportType]);
 
   // 当播放的报告ID变化时，获取对应的报告详情
   useEffect(() => {
@@ -351,9 +372,54 @@ export default function PodcastScreen() {
             </View>
             <Text style={[styles.headerDate, { color: colors.primary }]}>{dateStr}</Text>
           </View>
-          <TouchableOpacity onPress={() => {}}>
-            <MaterialCommunityIcons name="magnify" size={24} color={colors.onSurfaceVariant} />
-          </TouchableOpacity>
+          
+          {/* 早报/晚报切换 */}
+          <View style={styles.reportTypeToggle}>
+            {(['morning', 'evening'] as ReportType[]).map((type) => {
+              const config = REPORT_TYPE_CONFIG[type];
+              const isSelected = displayReport?.report_type === type;
+              const hasReport = todayAllReports?.reports?.some((r: any) => r.report_type === type && r.podcast_status === 'ready');
+              
+              return (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.reportTypeButton,
+                    {
+                      backgroundColor: isSelected
+                        ? (isDark ? 'rgba(182,160,255,0.2)' : 'rgba(124,77,255,0.12)')
+                        : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
+                      borderColor: isSelected ? colors.primary : 'transparent',
+                      opacity: hasReport ? 1 : 0.5,
+                    },
+                  ]}
+                  onPress={() => {
+                    if (hasReport) {
+                      setSelectedReportType(type);
+                    }
+                  }}
+                  disabled={!hasReport}
+                >
+                  <MaterialCommunityIcons
+                    name={config.icon}
+                    size={14}
+                    color={isSelected ? config.color : colors.onSurfaceVariant}
+                  />
+                  <Text
+                    style={[
+                      styles.reportTypeButtonText,
+                      {
+                        color: isSelected ? colors.primary : colors.onSurfaceVariant,
+                        fontWeight: isSelected ? '700' : '500',
+                      },
+                    ]}
+                  >
+                    {config.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
       </SafeAreaView>
 
@@ -371,12 +437,40 @@ export default function PodcastScreen() {
                 AI 财经播报 · {dateStr}
               </Text>
             </View>
+            {/* 报告类型标签 */}
+            {displayReport.report_type && (
+              <View style={[
+                styles.tag, 
+                { 
+                  backgroundColor: displayReport.report_type === 'morning' 
+                    ? (isDark ? 'rgba(255,152,0,0.15)' : 'rgba(255,152,0,0.1)') 
+                    : (isDark ? 'rgba(124,77,255,0.15)' : 'rgba(124,77,255,0.1)'),
+                  borderColor: displayReport.report_type === 'morning' 
+                    ? 'rgba(255,152,0,0.3)' 
+                    : 'rgba(124,77,255,0.3)',
+                  marginLeft: 8,
+                }
+              ]}>
+                <MaterialCommunityIcons
+                  name={REPORT_TYPE_CONFIG[displayReport.report_type]?.icon || 'weather-sunny'}
+                  size={10}
+                  color={REPORT_TYPE_CONFIG[displayReport.report_type]?.color || colors.primary}
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={[
+                  styles.tagText, 
+                  { color: REPORT_TYPE_CONFIG[displayReport.report_type]?.color || colors.primary }
+                ]}>
+                  {REPORT_TYPE_CONFIG[displayReport.report_type]?.label || '早报'}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
         {displayReport && (
           <Text style={[styles.episodeTitle, { color: colors.onSurface }]}>
-            {displayReport.title || '每日财经早报'}
+            {displayReport.title || (displayReport.report_type === 'evening' ? '每日财经晚报' : '每日财经早报')}
           </Text>
         )}
 
@@ -668,6 +762,9 @@ export default function PodcastScreen() {
               renderItem={({ item }: { item: any }) => {
                 const isCurrentlyPlaying = currentReportId === item.id;
                 const reportDate = item.report_date || item.created_at?.split('T')[0] || '';
+                const reportType = item.report_type || 'morning';
+                const typeConfig = REPORT_TYPE_CONFIG[reportType as ReportType];
+                
                 return (
                   <TouchableOpacity
                     style={[styles.playlistItem, {
@@ -692,14 +789,27 @@ export default function PodcastScreen() {
                       />
                     </View>
                     <View style={styles.playlistItemInfo}>
-                      <Text
-                        style={[styles.playlistItemTitle, {
-                          color: isCurrentlyPlaying ? colors.primary : colors.onSurface,
-                        }]}
-                        numberOfLines={1}
-                      >
-                        {item.title || '财经日报'}
-                      </Text>
+                      <View style={styles.playlistItemTitleRow}>
+                        <Text
+                          style={[styles.playlistItemTitle, {
+                            color: isCurrentlyPlaying ? colors.primary : colors.onSurface,
+                          }]}
+                          numberOfLines={1}
+                        >
+                          {item.title || '财经日报'}
+                        </Text>
+                        {/* 报告类型小标签 */}
+                        <View style={[styles.playlistTypeBadge, { backgroundColor: typeConfig.color + '20' }]}>
+                          <MaterialCommunityIcons
+                            name={typeConfig.icon}
+                            size={10}
+                            color={typeConfig.color}
+                          />
+                          <Text style={[styles.playlistTypeBadgeText, { color: typeConfig.color }]}>
+                            {typeConfig.label}
+                          </Text>
+                        </View>
+                      </View>
                       <Text style={[styles.playlistItemDate, { color: colors.onSurfaceVariant }]}>
                         {reportDate}
                       </Text>
@@ -786,6 +896,24 @@ function createStyles(colors: any, isDark: boolean) {
       fontWeight: '700',
       letterSpacing: -0.3,
     },
+    // 早报/晚报切换
+    reportTypeToggle: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    reportTypeButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+      borderWidth: 1,
+      gap: 4,
+    },
+    reportTypeButtonText: {
+      fontSize: 11,
+      letterSpacing: 0.3,
+    },
 
     // 文本区
     textCanvas: {
@@ -797,10 +925,15 @@ function createStyles(colors: any, isDark: boolean) {
       paddingTop: 8,
     },
     tagRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
       marginBottom: 12,
+      flexWrap: 'wrap',
     },
     tag: {
       alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
       paddingHorizontal: 12,
       paddingVertical: 5,
       borderRadius: 999,
@@ -1066,9 +1199,27 @@ function createStyles(colors: any, isDark: boolean) {
       flex: 1,
       gap: 2,
     },
+    playlistItemTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    playlistTypeBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 8,
+      gap: 3,
+    },
+    playlistTypeBadgeText: {
+      fontSize: 9,
+      fontWeight: '600',
+    },
     playlistItemTitle: {
       fontSize: 15,
       fontWeight: '600',
+      flex: 1,
     },
     playlistItemDate: {
       fontSize: 12,

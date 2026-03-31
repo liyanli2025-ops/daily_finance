@@ -30,6 +30,12 @@ class PredictionEnum(enum.Enum):
     NEUTRAL = "neutral"
 
 
+class ReportTypeEnum(enum.Enum):
+    """报告类型枚举"""
+    MORNING = "morning"    # 早报
+    EVENING = "evening"    # 晚报
+
+
 class NewsModel(Base):
     """新闻表"""
     __tablename__ = "news"
@@ -72,6 +78,9 @@ class ReportModel(Base):
     summary = Column(Text, nullable=False)
     content = Column(Text, nullable=False)
     report_date = Column(Date, nullable=False)  # 允许同一天生成多条报告
+    
+    # 报告类型（早报/晚报）
+    report_type = Column(String(20), default="morning")  # morning 或 evening
     
     # 核心观点（3条）
     core_opinions = Column(JSON, default=list)

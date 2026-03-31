@@ -40,13 +40,24 @@ def _get_actual_audio_duration(report_id: str) -> Optional[int]:
 
 
 @router.get("/today")
-async def get_today_podcast(db: AsyncSession = Depends(get_db)):
+async def get_today_podcast(
+    report_type: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
     """
     获取今日播客信息
+    - 可选指定报告类型（早报/晚报）
     """
     from sqlalchemy import desc
     today = date.today()
-    query = select(ReportModel).where(ReportModel.report_date == today).order_by(desc(ReportModel.created_at)).limit(1)
+    
+    query = select(ReportModel).where(ReportModel.report_date == today)
+    
+    # 按报告类型过滤
+    if report_type:
+        query = query.where(ReportModel.report_type == report_type)
+    
+    query = query.order_by(desc(ReportModel.created_at)).limit(1)
     result = await db.execute(query)
     report = result.scalar_one_or_none()
     
@@ -61,6 +72,7 @@ async def get_today_podcast(db: AsyncSession = Depends(get_db)):
         "report_id": report.id,
         "title": report.title,
         "date": str(report.report_date),
+        "report_type": report.report_type or "morning",
         "created_at": report.created_at.isoformat() if report.created_at else None,
         "podcast_status": report.podcast_status,
         "podcast_url": report.podcast_url,
@@ -72,11 +84,13 @@ async def get_today_podcast(db: AsyncSession = Depends(get_db)):
 async def list_podcasts(
     skip: int = 0,
     limit: int = 20,
+    report_type: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
     获取播客历史列表
-    修复：改为查询有播客URL或正在生成中的报告，按创建时间倒序
+    - 支持按报告类型过滤（早报/晚报）
+    - 按创建时间倒序
     """
     from sqlalchemy import desc, or_
     
@@ -89,10 +103,13 @@ async def list_podcasts(
                 ReportModel.podcast_status == "ready"
             )
         )
-        .order_by(desc(ReportModel.created_at))
-        .offset(skip)
-        .limit(limit)
     )
+    
+    # 按报告类型过滤
+    if report_type:
+        query = query.where(ReportModel.report_type == report_type)
+    
+    query = query.order_by(desc(ReportModel.created_at)).offset(skip).limit(limit)
     result = await db.execute(query)
     reports = result.scalars().all()
     
@@ -101,6 +118,7 @@ async def list_podcasts(
             "report_id": r.id,
             "title": r.title,
             "report_date": str(r.report_date),
+            "report_type": r.report_type or "morning",
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "podcast_status": r.podcast_status,
             "podcast_url": r.podcast_url,
@@ -156,6 +174,7 @@ async def get_podcast_detail(
         "report_id": report.id,
         "title": report.title,
         "report_date": str(report.report_date),
+        "report_type": report.report_type or "morning",
         "created_at": report.created_at.isoformat() if report.created_at else None,
         "podcast_status": report.podcast_status,
         "podcast_url": report.podcast_url,

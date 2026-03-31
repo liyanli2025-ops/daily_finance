@@ -63,16 +63,35 @@ class ApiService {
 
   /**
    * 获取今日报告
+   * @param reportType 报告类型：morning/evening，不指定则返回最新的
    */
-  async getTodayReport() {
-    return this.request<any>('/reports/today');
+  async getTodayReport(reportType?: 'morning' | 'evening') {
+    const params = reportType ? `?report_type=${reportType}` : '';
+    return this.request<any>(`/reports/today${params}`);
+  }
+
+  /**
+   * 获取今日所有报告（早报+晚报）
+   */
+  async getTodayAllReports() {
+    return this.request<{
+      date: string;
+      reports: any[];
+      morning_report: string | null;
+      evening_report: string | null;
+    }>('/reports/today/all');
   }
 
   /**
    * 获取报告列表
+   * @param reportType 报告类型：morning/evening，不指定则返回全部
    */
-  async getReports(skip = 0, limit = 20) {
-    return this.request<any[]>(`/reports?skip=${skip}&limit=${limit}`);
+  async getReports(skip = 0, limit = 20, reportType?: 'morning' | 'evening') {
+    let url = `/reports?skip=${skip}&limit=${limit}`;
+    if (reportType) {
+      url += `&report_type=${reportType}`;
+    }
+    return this.request<any[]>(url);
   }
 
   /**
@@ -93,9 +112,11 @@ class ApiService {
 
   /**
    * 获取今日播客信息
+   * @param reportType 报告类型：morning/evening，不指定则返回最新的
    */
-  async getTodayPodcast() {
-    return this.request<any>('/podcasts/today');
+  async getTodayPodcast(reportType?: 'morning' | 'evening') {
+    const params = reportType ? `?report_type=${reportType}` : '';
+    return this.request<any>(`/podcasts/today${params}`);
   }
 
   /**
@@ -116,9 +137,14 @@ class ApiService {
 
   /**
    * 获取播客历史列表
+   * @param reportType 报告类型：morning/evening，不指定则返回全部
    */
-  async getPodcastHistory(skip = 0, limit = 20) {
-    return this.request<any[]>(`/podcasts/history?skip=${skip}&limit=${limit}`);
+  async getPodcastHistory(skip = 0, limit = 20, reportType?: 'morning' | 'evening') {
+    let url = `/podcasts/history?skip=${skip}&limit=${limit}`;
+    if (reportType) {
+      url += `&report_type=${reportType}`;
+    }
+    return this.request<any[]>(url);
   }
 
   // ==================== 股票相关 ====================

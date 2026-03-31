@@ -1,9 +1,13 @@
 """
 定时调度服务
 管理每日报告生成、播客合成等定时任务
+
+重构版：支持早报+晚报双播客模式
+- 交易日：早报（凌晨） + 晚报（下午5点）
+- 非交易日：仅早报（深度周报版）
 """
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Optional
 import uuid
 
@@ -15,6 +19,7 @@ from .news_collector import get_news_collector
 from .ai_analyzer import get_ai_analyzer
 from .podcast_generator import get_podcast_generator
 from ..models.database import ReportModel, get_session_maker
+from ..models.report import ReportType, Report
 
 
 class SchedulerService:
@@ -25,23 +30,86 @@ class SchedulerService:
         self.is_running = False
         self._db_engine = None
         self._session_maker = None
+        
+        # 中国节假日列表（需要定期更新）
+        # 格式：YYYY-MM-DD
+        self._holidays_2024 = {
+            "2024-01-01",  # 元旦
+            "2024-02-10", "2024-02-11", "2024-02-12", "2024-02-13", "2024-02-14", "2024-02-15", "2024-02-16", "2024-02-17",  # 春节
+            "2024-04-04", "2024-04-05", "2024-04-06",  # 清明
+            "2024-05-01", "2024-05-02", "2024-05-03", "2024-05-04", "2024-05-05",  # 劳动节
+            "2024-06-08", "2024-06-09", "2024-06-10",  # 端午
+            "2024-09-15", "2024-09-16", "2024-09-17",  # 中秋
+            "2024-10-01", "2024-10-02", "2024-10-03", "2024-10-04", "2024-10-05", "2024-10-06", "2024-10-07",  # 国庆
+        }
+        self._holidays_2025 = {
+            "2025-01-01",  # 元旦
+            "2025-01-28", "2025-01-29", "2025-01-30", "2025-01-31", "2025-02-01", "2025-02-02", "2025-02-03", "2025-02-04",  # 春节
+            "2025-04-04", "2025-04-05", "2025-04-06",  # 清明
+            "2025-05-01", "2025-05-02", "2025-05-03", "2025-05-04", "2025-05-05",  # 劳动节
+            "2025-05-31", "2025-06-01", "2025-06-02",  # 端午
+            "2025-10-01", "2025-10-02", "2025-10-03", "2025-10-04", "2025-10-05", "2025-10-06", "2025-10-07", "2025-10-08",  # 国庆+中秋
+        }
+        self._holidays_2026 = {
+            "2026-01-01", "2026-01-02", "2026-01-03",  # 元旦
+            "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-21", "2026-02-22", "2026-02-23",  # 春节
+            "2026-04-05", "2026-04-06", "2026-04-07",  # 清明
+            "2026-05-01", "2026-05-02", "2026-05-03", "2026-05-04", "2026-05-05",  # 劳动节
+            "2026-06-19", "2026-06-20", "2026-06-21",  # 端午
+            "2026-09-25", "2026-09-26", "2026-09-27",  # 中秋
+            "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08",  # 国庆
+        }
     
     def set_db(self, engine, session_maker):
         """设置数据库连接"""
         self._db_engine = engine
         self._session_maker = session_maker
     
+    def is_trading_day(self, check_date: date = None) -> bool:
+        """
+        判断是否是交易日
+        
+        交易日条件：
+        1. 不是周末（周六、周日）
+        2. 不是法定节假日
+        """
+        if check_date is None:
+            check_date = date.today()
+        
+        # 周末不是交易日
+        if check_date.weekday() >= 5:  # 5=周六, 6=周日
+            return False
+        
+        # 检查是否是节假日
+        date_str = check_date.strftime("%Y-%m-%d")
+        all_holidays = self._holidays_2024 | self._holidays_2025 | self._holidays_2026
+        if date_str in all_holidays:
+            return False
+        
+        return True
+    
+    def get_last_trading_day(self, from_date: date = None) -> date:
+        """获取上一个交易日"""
+        if from_date is None:
+            from_date = date.today()
+        
+        last_day = from_date - timedelta(days=1)
+        while not self.is_trading_day(last_day):
+            last_day -= timedelta(days=1)
+        
+        return last_day
+    
     async def start(self):
         """启动调度器"""
         if self.is_running:
             return
         
-        # 计算新闻采集时间（比报告推送时间早 collection_lead_time 分钟）
+        # ==================== 早报任务配置 ====================
         report_hour = settings.daily_report_hour
         report_minute = settings.daily_report_minute
         lead_time = settings.collection_lead_time
         
-        # 计算采集开始时间
+        # 计算早报采集开始时间
         collection_time = datetime.now().replace(
             hour=report_hour, 
             minute=report_minute,
@@ -52,19 +120,37 @@ class SchedulerService:
         collection_hour = collection_time.hour
         collection_minute = collection_time.minute
         
-        # 添加每日报告生成任务
+        # 添加早报生成任务（每天执行，内部判断是否是交易日）
         self.scheduler.add_job(
-            self.generate_daily_report,
+            self.generate_morning_report,
             CronTrigger(
                 hour=collection_hour,
                 minute=collection_minute
             ),
-            id="daily_report",
-            name="每日财经报告生成",
+            id="morning_report",
+            name="每日早报生成",
             replace_existing=True
         )
         
-        # 添加自选股数据更新任务（每小时一次，交易时间）
+        # ==================== 晚报任务配置 ====================
+        evening_hour = settings.evening_report_hour
+        evening_minute = settings.evening_report_minute
+        evening_collection_hour = settings.evening_collection_hour
+        
+        # 添加晚报生成任务（仅交易日执行，在任务内部判断）
+        self.scheduler.add_job(
+            self.generate_evening_report,
+            CronTrigger(
+                hour=evening_collection_hour,
+                minute=0,
+                day_of_week="mon-fri"  # 周一到周五触发，内部再判断是否真正的交易日
+            ),
+            id="evening_report",
+            name="每日晚报生成",
+            replace_existing=True
+        )
+        
+        # ==================== 自选股更新任务 ====================
         self.scheduler.add_job(
             self.update_watchlist_data,
             CronTrigger(
@@ -80,8 +166,10 @@ class SchedulerService:
         self.is_running = True
         
         print(f"[SCHEDULER] 调度器已启动")
-        print(f"   - 每日报告生成时间: {collection_hour:02d}:{collection_minute:02d}")
-        print(f"   - 报告推送时间: {report_hour:02d}:{report_minute:02d}")
+        print(f"   - 早报采集时间: {collection_hour:02d}:{collection_minute:02d}")
+        print(f"   - 早报推送时间: {report_hour:02d}:{report_minute:02d}")
+        print(f"   - 晚报采集时间: {evening_collection_hour:02d}:00 (仅交易日)")
+        print(f"   - 晚报推送时间: {evening_hour:02d}:{evening_minute:02d} (仅交易日)")
     
     async def stop(self):
         """停止调度器"""
@@ -90,17 +178,29 @@ class SchedulerService:
             self.is_running = False
             print("[SCHEDULER] 调度器已停止")
     
-    async def generate_daily_report(self):
+    async def generate_morning_report(self):
         """
-        生成每日报告的完整流程：
-        1. 采集新闻（财经 + 跨界）
-        2. AI 分析生成报告（7模块 + 五要素）
-        3. 生成播客音频（差异化风格）
-        4. 保存到数据库
+        生成早报的完整流程
+        
+        交易日早报：
+        - 结合前一个交易日的市场情况
+        - 昨天收盘后的新闻、重要信息
+        - 国际市场情况（美股、港股夜盘等）
+        - 侧重当天操作建议
+        
+        非交易日早报（深度版）：
+        - 整周市场表现复盘
+        - 重要新闻深度梳理
+        - 重要概念科普
+        - 下周操作预测
         """
         import sys
+        today = date.today()
+        is_trading = self.is_trading_day(today)
+        report_type_str = "交易日早报" if is_trading else "非交易日深度早报"
+        
         print("\n" + "="*50, flush=True)
-        print(f"[START] 开始生成每日报告 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+        print(f"[START] 开始生成{report_type_str} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
         print("="*50, flush=True)
         sys.stdout.flush()
         
@@ -108,7 +208,10 @@ class SchedulerService:
             # Step 1: 采集新闻
             print("\n[Step 1] 采集新闻...")
             collector = get_news_collector()
-            all_news = await collector.collect_all(hours=24)
+            
+            # 非交易日采集更长时间的新闻（整周）
+            hours = 168 if not is_trading else 24  # 非交易日采集7天，交易日采集24小时
+            all_news = await collector.collect_all(hours=hours)
             
             # 分离财经新闻和跨界新闻
             news_by_type = collector.get_news_by_type(all_news)
@@ -127,84 +230,30 @@ class SchedulerService:
             
             if not all_news:
                 print("[WARN] 未能从 RSS 源采集到新闻，将使用模拟数据生成报告")
-                # 生成模拟新闻数据
-                from ..models.news import News, SentimentType, NewsType
-                import uuid
-                
-                mock_news = [
-                    News(
-                        id=str(uuid.uuid4()),
-                        title="A股市场震荡整理，科技板块表现活跃",
-                        content="今日A股市场整体呈现震荡整理态势，上证指数小幅收涨。科技板块领涨两市，新能源、半导体等热门赛道获得资金青睐。",
-                        summary="A股震荡整理，科技板块领涨",
-                        source="财经快讯",
-                        source_url="",
-                        published_at=datetime.now(),
-                        sentiment=SentimentType.POSITIVE,
-                        importance_score=0.8,
-                        keywords=["A股", "科技", "新能源"],
-                        related_stocks=["000001"],
-                        news_type=NewsType.FINANCE,
-                        created_at=datetime.now()
-                    ),
-                    News(
-                        id=str(uuid.uuid4()),
-                        title="央行维持流动性合理充裕，货币政策稳健",
-                        content="央行今日开展逆回购操作，维护银行体系流动性合理充裕。市场人士认为，当前货币政策将继续保持稳健基调。",
-                        summary="央行维持流动性，货币政策稳健",
-                        source="金融要闻",
-                        source_url="",
-                        published_at=datetime.now(),
-                        sentiment=SentimentType.NEUTRAL,
-                        importance_score=0.9,
-                        keywords=["央行", "货币政策", "流动性"],
-                        related_stocks=[],
-                        news_type=NewsType.FINANCE,
-                        created_at=datetime.now()
-                    ),
-                    # 模拟跨界新闻
-                    News(
-                        id=str(uuid.uuid4()),
-                        title="国际局势紧张，地缘政治风险上升",
-                        content="近期国际局势出现新变化，地缘政治风险有所上升。分析人士认为这可能影响全球资本市场风险偏好。",
-                        summary="地缘政治风险上升",
-                        source="国际新闻",
-                        source_url="",
-                        published_at=datetime.now(),
-                        sentiment=SentimentType.NEGATIVE,
-                        importance_score=0.85,
-                        keywords=["地缘", "风险", "国际"],
-                        related_stocks=[],
-                        news_type=NewsType.GEOPOLITICAL,
-                        beneficiary_sectors=["黄金", "军工"],
-                        affected_sectors=["航空", "旅游"],
-                        created_at=datetime.now()
-                    )
-                ]
-                china_news = [n for n in mock_news if n.news_type == NewsType.FINANCE]
-                cross_border_news = [n for n in mock_news if n.news_type != NewsType.FINANCE]
+                china_news, cross_border_news = self._generate_mock_news()
             
-            # Step 2: AI 分析生成报告（新版 7 模块 + 五要素）
-            print("\n[Step 2] AI 分析生成报告...")
-            # 强制重新初始化，确保使用最新配置
+            # Step 2: AI 分析生成早报
+            print(f"\n[Step 2] AI 分析生成{report_type_str}...")
             analyzer = get_ai_analyzer(force_reinit=True)
             
             # 对重要新闻进行情绪分析
             for news in china_news[:10]:
                 news.sentiment = await analyzer.analyze_news_sentiment(news)
             
-            # 生成报告（传入跨界新闻）
+            # 生成早报（传入报告类型和是否交易日）
             report = await analyzer.generate_daily_report(
                 china_news if china_news else finance_news,
-                cross_border_news
+                cross_border_news,
+                report_type=ReportType.MORNING,
+                is_trading_day=is_trading
             )
             print(f"   报告生成完成: {report.title}")
             print(f"   字数: {report.word_count}, 预计阅读时间: {report.reading_time} 分钟")
             print(f"   核心观点: {len(report.core_opinions)} 条")
             print(f"   跨界事件: {len(report.cross_border_events)} 条")
             
-            # Step 3: 生成播客（差异化风格）
-            print("\n[Step 3] 生成播客音频（观点输出风格）...")
+            # Step 3: 生成播客
+            print(f"\n[Step 3] 生成播客音频...")
             podcast_gen = get_podcast_generator()
             
             try:
@@ -223,13 +272,119 @@ class SchedulerService:
             print(f"   报告已保存，ID: {report.id}")
             
             print("\n" + "="*50)
-            print(f"[DONE] 每日报告生成完成！")
+            print(f"[DONE] {report_type_str}生成完成！")
             print("="*50 + "\n")
             
         except Exception as e:
-            print(f"\n[ERROR] 报告生成失败: {e}")
+            print(f"\n[ERROR] 早报生成失败: {e}")
             import traceback
             traceback.print_exc()
+    
+    async def generate_evening_report(self):
+        """
+        生成晚报的完整流程（仅交易日）
+        
+        晚报内容：
+        - 当天交易情况梳理总结
+        - 回顾早报内容，评价预测准确性
+        - 结合市场技术面、新闻事件影响分析
+        - 对明日市场情况、投资建议作出预测
+        - 新颖/深刻的概念解释
+        """
+        import sys
+        today = date.today()
+        
+        # 非交易日不生成晚报
+        if not self.is_trading_day(today):
+            print(f"[SKIP] 今天 {today} 不是交易日，跳过晚报生成")
+            return
+        
+        print("\n" + "="*50, flush=True)
+        print(f"[START] 开始生成交易日晚报 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+        print("="*50, flush=True)
+        sys.stdout.flush()
+        
+        try:
+            # Step 1: 获取今日早报（用于对比评价）
+            print("\n[Step 1] 获取今日早报...")
+            morning_report = await self._get_today_morning_report()
+            if morning_report:
+                print(f"   找到今日早报: {morning_report.title}")
+            else:
+                print("   [WARN] 未找到今日早报，将独立生成晚报")
+            
+            # Step 2: 采集盘后新闻和当日市场数据
+            print("\n[Step 2] 采集盘后数据...")
+            collector = get_news_collector()
+            
+            # 采集今天下午到现在的新闻
+            all_news = await collector.collect_all(hours=8)  # 从早上9点到下午5点约8小时
+            
+            # 分离新闻
+            news_by_type = collector.get_news_by_type(all_news)
+            finance_news = news_by_type.get('finance', [])
+            china_news = collector.filter_china_related(finance_news)
+            cross_border_news = collector.filter_cross_border_news(all_news)
+            
+            print(f"   筛选出 {len(china_news)} 条中国相关财经新闻")
+            print(f"   筛选出 {len(cross_border_news)} 条跨界热点新闻")
+            
+            if not all_news:
+                print("[WARN] 未能采集到新闻，将使用模拟数据")
+                china_news, cross_border_news = self._generate_mock_news()
+            
+            # Step 3: AI 分析生成晚报
+            print("\n[Step 3] AI 分析生成晚报...")
+            analyzer = get_ai_analyzer(force_reinit=True)
+            
+            # 对重要新闻进行情绪分析
+            for news in china_news[:10]:
+                news.sentiment = await analyzer.analyze_news_sentiment(news)
+            
+            # 生成晚报（传入今日早报用于回顾对比）
+            report = await analyzer.generate_daily_report(
+                china_news if china_news else finance_news,
+                cross_border_news,
+                report_type=ReportType.EVENING,
+                is_trading_day=True,
+                morning_report=morning_report  # 传入早报用于对比
+            )
+            print(f"   报告生成完成: {report.title}")
+            print(f"   字数: {report.word_count}, 预计阅读时间: {report.reading_time} 分钟")
+            
+            # Step 4: 生成播客（晚报版可以更长）
+            print("\n[Step 4] 生成播客音频...")
+            podcast_gen = get_podcast_generator()
+            
+            try:
+                audio_path, duration = await podcast_gen.generate_podcast(report)
+                report.podcast_url = f"/podcasts/{report.id}.mp3"
+                report.podcast_duration = duration
+                report.podcast_status = "ready"
+                print(f"   播客生成完成: 时长 {duration // 60} 分钟")
+            except Exception as e:
+                print(f"   [WARN] 播客生成失败: {e}")
+                report.podcast_status = "failed"
+            
+            # Step 5: 保存到数据库
+            print("\n[Step 5] 保存到数据库...")
+            await self._save_report(report)
+            print(f"   报告已保存，ID: {report.id}")
+            
+            print("\n" + "="*50)
+            print(f"[DONE] 交易日晚报生成完成！")
+            print("="*50 + "\n")
+            
+        except Exception as e:
+            print(f"\n[ERROR] 晚报生成失败: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    async def generate_daily_report(self):
+        """
+        兼容旧接口：生成每日报告（默认生成早报）
+        """
+        await self.generate_morning_report()
     
     async def generate_podcast_for_report(self, report_id: str):
         """
@@ -268,6 +423,107 @@ class SchedulerService:
                 await self._update_report_podcast(report_id, None, None, "failed")
             except Exception as e2:
                 print(f"[ERROR] 更新失败状态也失败: {e2}", flush=True)
+    
+    def _generate_mock_news(self):
+        """生成模拟新闻数据"""
+        from ..models.news import News, SentimentType, NewsType
+        
+        mock_news = [
+            News(
+                id=str(uuid.uuid4()),
+                title="A股市场震荡整理，科技板块表现活跃",
+                content="今日A股市场整体呈现震荡整理态势，上证指数小幅收涨。科技板块领涨两市，新能源、半导体等热门赛道获得资金青睐。",
+                summary="A股震荡整理，科技板块领涨",
+                source="财经快讯",
+                source_url="",
+                published_at=datetime.now(),
+                sentiment=SentimentType.POSITIVE,
+                importance_score=0.8,
+                keywords=["A股", "科技", "新能源"],
+                related_stocks=["000001"],
+                news_type=NewsType.FINANCE,
+                created_at=datetime.now()
+            ),
+            News(
+                id=str(uuid.uuid4()),
+                title="央行维持流动性合理充裕，货币政策稳健",
+                content="央行今日开展逆回购操作，维护银行体系流动性合理充裕。市场人士认为，当前货币政策将继续保持稳健基调。",
+                summary="央行维持流动性，货币政策稳健",
+                source="金融要闻",
+                source_url="",
+                published_at=datetime.now(),
+                sentiment=SentimentType.NEUTRAL,
+                importance_score=0.9,
+                keywords=["央行", "货币政策", "流动性"],
+                related_stocks=[],
+                news_type=NewsType.FINANCE,
+                created_at=datetime.now()
+            ),
+            News(
+                id=str(uuid.uuid4()),
+                title="国际局势紧张，地缘政治风险上升",
+                content="近期国际局势出现新变化，地缘政治风险有所上升。分析人士认为这可能影响全球资本市场风险偏好。",
+                summary="地缘政治风险上升",
+                source="国际新闻",
+                source_url="",
+                published_at=datetime.now(),
+                sentiment=SentimentType.NEGATIVE,
+                importance_score=0.85,
+                keywords=["地缘", "风险", "国际"],
+                related_stocks=[],
+                news_type=NewsType.GEOPOLITICAL,
+                beneficiary_sectors=["黄金", "军工"],
+                affected_sectors=["航空", "旅游"],
+                created_at=datetime.now()
+            )
+        ]
+        
+        china_news = [n for n in mock_news if n.news_type == NewsType.FINANCE]
+        cross_border_news = [n for n in mock_news if n.news_type != NewsType.FINANCE]
+        return china_news, cross_border_news
+    
+    async def _get_today_morning_report(self) -> Optional[Report]:
+        """获取今日早报（用于晚报对比）"""
+        from sqlalchemy import select, and_
+        from ..models.report import Report, NewsHighlight, MarketAnalysis, ReportType
+        
+        if not self._session_maker:
+            return None
+        
+        today = date.today()
+        
+        async with self._session_maker() as session:
+            query = select(ReportModel).where(
+                and_(
+                    ReportModel.report_date == today,
+                    ReportModel.report_type == "morning"
+                )
+            ).order_by(ReportModel.created_at.desc())
+            
+            result = await session.execute(query)
+            db_report = result.scalar_one_or_none()
+            
+            if not db_report:
+                return None
+            
+            return Report(
+                id=db_report.id,
+                title=db_report.title,
+                summary=db_report.summary,
+                content=db_report.content,
+                report_date=db_report.report_date,
+                report_type=ReportType(db_report.report_type) if db_report.report_type else ReportType.MORNING,
+                core_opinions=db_report.core_opinions or [],
+                highlights=[NewsHighlight(**h) for h in (db_report.highlights or [])],
+                analysis=MarketAnalysis(**db_report.analysis) if db_report.analysis else None,
+                podcast_url=db_report.podcast_url,
+                podcast_duration=db_report.podcast_duration,
+                podcast_status=db_report.podcast_status,
+                word_count=db_report.word_count,
+                reading_time=db_report.reading_time,
+                news_count=db_report.news_count,
+                created_at=db_report.created_at
+            )
     
     async def update_watchlist_data(self):
         """
@@ -362,6 +618,8 @@ class SchedulerService:
                 summary=report.summary,
                 content=report.content,
                 report_date=report.report_date,
+                # 报告类型（早报/晚报）
+                report_type=report.report_type.value if hasattr(report, 'report_type') and report.report_type else "morning",
                 # 新增字段
                 core_opinions=report.core_opinions if hasattr(report, 'core_opinions') else [],
                 highlights=[h.model_dump() for h in report.highlights],
@@ -384,7 +642,7 @@ class SchedulerService:
         """从数据库获取报告"""
         from sqlalchemy import select
         from ..models.database import ReportModel
-        from ..models.report import Report, NewsHighlight, MarketAnalysis
+        from ..models.report import Report, NewsHighlight, MarketAnalysis, ReportType
         
         if not self._session_maker:
             return None
@@ -403,6 +661,7 @@ class SchedulerService:
                 summary=db_report.summary,
                 content=db_report.content,
                 report_date=db_report.report_date,
+                report_type=ReportType(db_report.report_type) if db_report.report_type else ReportType.MORNING,
                 highlights=[NewsHighlight(**h) for h in (db_report.highlights or [])],
                 analysis=MarketAnalysis(**db_report.analysis) if db_report.analysis else None,
                 podcast_url=db_report.podcast_url,
