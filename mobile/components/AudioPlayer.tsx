@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Pressable, Platform, LayoutChangeEvent, GestureResponderEvent } from 'react-native';
 import { Text, useTheme, ProgressBar } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -26,69 +26,135 @@ function SeekableProgressBar({
   primaryColor: string;
   trackColor: string;
 }) {
-  const [trackWidth, setTrackWidth] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragProgress, setDragProgress] = useState(0);
   const trackRef = useRef<View>(null);
+  const trackRectRef = useRef<{ left: number; width: number } | null>(null);
 
-  const handleLayout = (e: LayoutChangeEvent) => {
-    setTrackWidth(e.nativeEvent.layout.width);
-  };
+  // 计算进度值
+  const calculateProgress = useCallback((clientX: number): number => {
+    if (!trackRectRef.current || trackRectRef.current.width <= 0) return progress;
+    const { left, width } = trackRectRef.current;
+    const relativeX = clientX - left;
+    return Math.max(0, Math.min(relativeX / width, 1));
+  }, [progress]);
 
-  // 计算位置并触发 seek
-  const calculateAndSeek = (pageX: number) => {
-    if (trackWidth <= 0 || duration <= 0) return;
-    
-    // 获取轨道在页面中的位置
-    trackRef.current?.measureInWindow((x) => {
-      const relativeX = pageX - x;
-      const clampedX = Math.max(0, Math.min(relativeX, trackWidth));
-      const newProgress = clampedX / trackWidth;
-      const newPosition = newProgress * duration;
-      onSeek(newPosition);
-    });
-  };
+  // Web 平台使用原生事件
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
 
-  // Web 平台直接处理点击
-  const handlePressIn = (e: GestureResponderEvent) => {
-    if (Platform.OS === 'web') {
-      const pageX = (e.nativeEvent as any).pageX;
-      calculateAndSeek(pageX);
-    }
-    setIsDragging(true);
-  };
+    const trackElement = (trackRef.current as any)?._nativeRef?.current;
+    if (!trackElement) return;
 
-  const handleMove = (e: GestureResponderEvent) => {
-    if (!isDragging || trackWidth <= 0) return;
-    
-    if (Platform.OS === 'web') {
-      const pageX = (e.nativeEvent as any).pageX;
-      trackRef.current?.measureInWindow((x) => {
-        const relativeX = pageX - x;
-        const clampedX = Math.max(0, Math.min(relativeX, trackWidth));
-        const newProgress = clampedX / trackWidth;
-        setDragProgress(newProgress);
-      });
-    } else {
-      const locationX = e.nativeEvent.locationX;
-      const clampedX = Math.max(0, Math.min(locationX, trackWidth));
-      const newProgress = clampedX / trackWidth;
+    const updateRect = () => {
+      const rect = trackElement.getBoundingClientRect();
+      trackRectRef.current = { left: rect.left, width: rect.width };
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      e.preventDefault();
+      updateRect();
+      setIsDragging(true);
+      const newProgress = calculateProgress(e.clientX);
       setDragProgress(newProgress);
-    }
+      // 立即 seek 到点击位置
+      if (duration > 0) {
+        onSeek(newProgress * duration);
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      const newProgress = calculateProgress(e.clientX);
+      setDragProgress(newProgress);
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      const newProgress = calculateProgress(e.clientX);
+      if (duration > 0) {
+        onSeek(newProgress * duration);
+      }
+      setIsDragging(false);
+    };
+
+    // Touch events for mobile web
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      updateRect();
+      setIsDragging(true);
+      const touch = e.touches[0];
+      const newProgress = calculateProgress(touch.clientX);
+      setDragProgress(newProgress);
+      if (duration > 0) {
+        onSeek(newProgress * duration);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDragging || e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const newProgress = calculateProgress(touch.clientX);
+      setDragProgress(newProgress);
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      const touch = e.changedTouches[0];
+      const newProgress = calculateProgress(touch.clientX);
+      if (duration > 0) {
+        onSeek(newProgress * duration);
+      }
+      setIsDragging(false);
+    };
+
+    trackElement.addEventListener('mousedown', handleMouseDown);
+    trackElement.addEventListener('touchstart', handleTouchStart, { passive: false });
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      trackElement.removeEventListener('mousedown', handleMouseDown);
+      trackElement.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isDragging, duration, onSeek, calculateProgress]);
+
+  // Native 平台使用 Responder 系统
+  const handleResponderGrant = (e: GestureResponderEvent) => {
+    if (Platform.OS === 'web') return;
+    setIsDragging(true);
+    const locationX = e.nativeEvent.locationX;
+    const width = e.nativeEvent.layout?.width || 1;
+    const newProgress = Math.max(0, Math.min(locationX / width, 1));
+    setDragProgress(newProgress);
   };
 
-  const handleRelease = (e: GestureResponderEvent) => {
+  const handleResponderMove = (e: GestureResponderEvent) => {
+    if (Platform.OS === 'web' || !isDragging) return;
+    const locationX = e.nativeEvent.locationX;
+    const width = e.nativeEvent.layout?.width || 1;
+    const newProgress = Math.max(0, Math.min(locationX / width, 1));
+    setDragProgress(newProgress);
+  };
+
+  const handleResponderRelease = (e: GestureResponderEvent) => {
+    if (Platform.OS === 'web') return;
     if (isDragging && duration > 0) {
-      if (Platform.OS === 'web') {
-        const pageX = (e.nativeEvent as any).pageX;
-        calculateAndSeek(pageX);
-      } else {
-        const locationX = e.nativeEvent.locationX;
-        const clampedX = Math.max(0, Math.min(locationX, trackWidth));
-        const newProgress = clampedX / trackWidth;
-        const newPosition = newProgress * duration;
-        onSeek(newPosition);
-      }
+      const locationX = e.nativeEvent.locationX;
+      const width = e.nativeEvent.layout?.width || 1;
+      const newProgress = Math.max(0, Math.min(locationX / width, 1));
+      onSeek(newProgress * duration);
     }
     setIsDragging(false);
   };
@@ -99,12 +165,11 @@ function SeekableProgressBar({
     <View
       ref={trackRef}
       style={[styles.seekableTrack, { backgroundColor: trackColor }]}
-      onLayout={handleLayout}
-      onStartShouldSetResponder={() => true}
-      onMoveShouldSetResponder={() => true}
-      onResponderGrant={handlePressIn}
-      onResponderMove={handleMove}
-      onResponderRelease={handleRelease}
+      onStartShouldSetResponder={() => Platform.OS !== 'web'}
+      onMoveShouldSetResponder={() => Platform.OS !== 'web'}
+      onResponderGrant={handleResponderGrant}
+      onResponderMove={handleResponderMove}
+      onResponderRelease={handleResponderRelease}
       onResponderTerminate={() => setIsDragging(false)}
     >
       {/* 填充部分 */}
@@ -116,6 +181,7 @@ function SeekableProgressBar({
             backgroundColor: primaryColor,
           },
         ]}
+        pointerEvents="none"
       />
       {/* 拖动把手 */}
       <View
@@ -128,6 +194,7 @@ function SeekableProgressBar({
             transform: [{ scale: isDragging ? 1.3 : 1 }],
           },
         ]}
+        pointerEvents="none"
       />
     </View>
   );
@@ -326,11 +393,13 @@ const styles = StyleSheet.create({
   },
   // 可拖动进度条样式
   seekableTrack: {
-    height: 6,
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
     position: 'relative',
     justifyContent: 'center',
-    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    paddingVertical: 10, // 增加可点击区域
+    marginVertical: -10,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {}),
   },
   seekableFill: {
     position: 'absolute',
