@@ -141,7 +141,7 @@ export const DarkColors = {
   // 玻璃效果专用
   glassBackground: 'rgba(12, 14, 18, 0.55)',
   glassBorder: 'rgba(255, 255, 255, 0.06)',
-  glassBackgroundStrong: 'rgba(12, 14, 18, 0.7)',
+  glassBackgroundStrong: 'rgba(20, 22, 28, 0.95)', // 播放器面板使用，几乎不透明
   
   // 渐变色
   gradientStart: '#7e51ff',
