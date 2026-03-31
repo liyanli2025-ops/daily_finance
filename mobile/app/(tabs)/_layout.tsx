@@ -1,9 +1,15 @@
 import { Tabs, usePathname } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { StyleSheet, Platform, View } from 'react-native';
+import { StyleSheet, Platform, View, Dimensions } from 'react-native';
 import { useAppTheme } from '@/theme/ThemeContext';
 import { useAudioStore } from '@/stores/audioStore';
 import MiniPlayer from '@/components/MiniPlayer';
+
+// 判断是否为 iOS PWA（standalone 模式下的 web）
+const isIOSWeb = Platform.OS === 'web' && typeof navigator !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent);
+// Tab 栏高度：iOS 原生 88，iOS PWA 72（safe area 由 CSS 处理），其他 64
+const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 88 : isIOSWeb ? 72 : 64;
+const TAB_BAR_PADDING_BOTTOM = Platform.OS === 'ios' ? 28 : isIOSWeb ? 12 : 8;
 
 export default function TabLayout() {
   const { colors, isDark } = useAppTheme();
@@ -36,8 +42,8 @@ export default function TabLayout() {
             backgroundColor: colors.tabBarBackground,
             borderTopColor: showMiniPlayer ? 'transparent' : colors.tabBarBorder,
             borderTopWidth: showMiniPlayer ? 0 : StyleSheet.hairlineWidth,
-            height: Platform.OS === 'ios' ? 88 : 64,
-            paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+            height: TAB_BAR_HEIGHT,
+            paddingBottom: TAB_BAR_PADDING_BOTTOM,
             paddingTop: 8,
             elevation: 0,
           },
@@ -107,7 +113,7 @@ export default function TabLayout() {
         <View style={[
           styles.miniPlayerContainer,
           { 
-            bottom: Platform.OS === 'ios' ? 88 : 64,
+            bottom: TAB_BAR_HEIGHT,
           }
         ]}>
           <MiniPlayer />

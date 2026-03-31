@@ -20,6 +20,10 @@ import { router } from 'expo-router';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// 判断是否为 iOS PWA
+const isIOSWeb = Platform.OS === 'web' && typeof navigator !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent);
+const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 100 : isIOSWeb ? 84 : 76;
+
 // 报告类型
 type ReportType = 'morning' | 'evening';
 
@@ -1011,7 +1015,7 @@ function createStyles(colors: any, isDark: boolean) {
     // 底部播放器
     playerOverlay: {
       position: 'absolute',
-      bottom: Platform.OS === 'ios' ? 100 : 76,
+      bottom: TAB_BAR_HEIGHT,
       left: 0,
       right: 0,
       zIndex: 40,
@@ -1177,7 +1181,7 @@ function createStyles(colors: any, isDark: boolean) {
     playlistOverlay: {
       flex: 1,
       justifyContent: 'flex-end',
-      paddingBottom: Platform.OS === 'ios' ? 88 : 64, // 给 Tab Bar 留空间
+      paddingBottom: TAB_BAR_HEIGHT, // 给 Tab Bar 留空间
     },
     playlistSheet: {
       maxHeight: SCREEN_HEIGHT * 0.55,

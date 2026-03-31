@@ -4,8 +4,9 @@
   "description": "AI驱动的每日财经播报应用",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#F5F3FF",
   "theme_color": "#7C4DFF",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/apple-touch-icon.png",
