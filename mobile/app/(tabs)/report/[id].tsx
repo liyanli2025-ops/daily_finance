@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Share } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { Text, useTheme, IconButton, Chip, Divider, ActivityIndicator } from 'react-native-paper';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -23,19 +23,6 @@ export default function ReportDetailScreen() {
     }
   }, [id]);
 
-  const handleShare = async () => {
-    if (report) {
-      try {
-        await Share.share({
-          title: report.title,
-          message: `${report.title}\n\n${report.summary}\n\n来自财经日报App`,
-        });
-      } catch (error) {
-        console.error('分享失败:', error);
-      }
-    }
-  };
-
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('zh-CN', {
@@ -46,52 +33,68 @@ export default function ReportDetailScreen() {
     });
   };
 
+  const isDark = theme.dark;
+
   const markdownStyles = {
     body: {
       color: theme.colors.onSurface,
       fontSize: 16,
-      lineHeight: 30, // 26 → 30，行间距更大
+      lineHeight: 30,
     },
     heading1: {
-      color: theme.colors.onSurface,
-      fontSize: 24,
+      color: theme.colors.primary,
+      fontSize: 22,
       fontWeight: '700' as const,
-      marginTop: 36, // 24 → 36
-      marginBottom: 16, // 12 → 16
+      marginTop: 40,
+      marginBottom: 16,
+      paddingBottom: 12,
+      borderBottomWidth: 2,
+      borderBottomColor: theme.colors.primary + '30',
     },
     heading2: {
       color: theme.colors.onSurface,
-      fontSize: 20,
-      fontWeight: '600' as const,
-      marginTop: 32, // 20 → 32
-      marginBottom: 14, // 10 → 14
+      fontSize: 19,
+      fontWeight: '700' as const,
+      marginTop: 36,
+      marginBottom: 14,
+      paddingLeft: 12,
+      borderLeftWidth: 4,
+      borderLeftColor: theme.colors.primary,
     },
     heading3: {
       color: theme.colors.onSurface,
-      fontSize: 18,
+      fontSize: 17,
       fontWeight: '600' as const,
-      marginTop: 24, // 16 → 24
-      marginBottom: 10, // 8 → 10
+      marginTop: 28,
+      marginBottom: 10,
+      paddingLeft: 10,
+      borderLeftWidth: 3,
+      borderLeftColor: theme.colors.secondary || theme.colors.primary + '80',
     },
     paragraph: {
-      marginBottom: 20, // 12 → 20
+      marginBottom: 20,
+      lineHeight: 30,
     },
     bullet_list: {
-      marginBottom: 16, // 12 → 16
+      marginBottom: 16,
+      paddingLeft: 4,
     },
     ordered_list: {
-      marginBottom: 16, // 12 → 16
+      marginBottom: 16,
+      paddingLeft: 4,
     },
     list_item: {
-      marginBottom: 8, // 4 → 8
+      marginBottom: 10,
+      lineHeight: 26,
     },
     blockquote: {
-      backgroundColor: theme.colors.surfaceVariant,
+      backgroundColor: isDark ? 'rgba(103,80,164,0.12)' : theme.colors.primary + '10',
       borderLeftColor: theme.colors.primary,
       borderLeftWidth: 4,
       paddingHorizontal: 16,
-      paddingVertical: 12, // 8 → 12
-      marginVertical: 20, // 12 → 20
+      paddingVertical: 14,
+      marginVertical: 20,
+      borderRadius: 8,
     },
     code_inline: {
       backgroundColor: theme.colors.surfaceVariant,
@@ -104,20 +107,35 @@ export default function ReportDetailScreen() {
     fence: {
       backgroundColor: theme.colors.surfaceVariant,
       borderRadius: 8,
-      padding: 16, // 12 → 16
-      marginVertical: 20, // 12 → 20
+      padding: 16,
+      marginVertical: 20,
     },
     strong: {
       fontWeight: '700' as const,
-      letterSpacing: 0.3, // 加粗字间距
+      color: theme.colors.onSurface,
     },
     em: {
       fontStyle: 'italic' as const,
     },
     hr: {
-      backgroundColor: theme.colors.outline,
+      backgroundColor: theme.colors.outlineVariant || theme.colors.outline,
       height: 1,
-      marginVertical: 28, // 16 → 28
+      marginVertical: 32,
+    },
+    table: {
+      borderColor: theme.colors.outlineVariant || theme.colors.outline,
+      borderWidth: 1,
+      borderRadius: 8,
+      marginVertical: 16,
+    },
+    th: {
+      backgroundColor: theme.colors.surfaceVariant,
+      padding: 10,
+      borderColor: theme.colors.outlineVariant || theme.colors.outline,
+    },
+    td: {
+      padding: 10,
+      borderColor: theme.colors.outlineVariant || theme.colors.outline,
     },
   };
 
@@ -286,53 +304,72 @@ export default function ReportDetailScreen() {
               📊 市场分析
             </Text>
             
-            <View style={[styles.analysisCard, { backgroundColor: theme.colors.surface }]}>
-              <View style={styles.analysisRow}>
-                <Text variant="bodyMedium">整体情绪：</Text>
-                <Chip
-                  style={{
+            <View style={[styles.analysisCard, { backgroundColor: isDark ? theme.colors.surfaceVariant : theme.colors.surface }]}>
+              {/* 整体情绪 */}
+              <View style={styles.sentimentRow}>
+                <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                  整体情绪
+                </Text>
+                <View style={[
+                  styles.sentimentBadge,
+                  {
                     backgroundColor:
                       report.analysis.overall_sentiment === 'positive'
-                        ? '#1B5E20'
+                        ? (isDark ? '#052e16' : '#DCFCE7')
                         : report.analysis.overall_sentiment === 'negative'
-                        ? '#B71C1C'
+                        ? (isDark ? '#450a0a' : '#FEE2E2')
+                        : theme.colors.surfaceVariant,
+                  }
+                ]}>
+                  <Text style={{
+                    color:
+                      report.analysis.overall_sentiment === 'positive'
+                        ? (isDark ? '#4ADE80' : '#16A34A')
+                        : report.analysis.overall_sentiment === 'negative'
+                        ? (isDark ? '#F87171' : '#DC2626')
                         : theme.colors.outline,
-                  }}
-                  textStyle={{ color: '#fff', fontSize: 12 }}
-                >
-                  {report.analysis.overall_sentiment === 'positive'
-                    ? '乐观'
-                    : report.analysis.overall_sentiment === 'negative'
-                    ? '悲观'
-                    : '中性'}
-                </Chip>
+                    fontSize: 14,
+                    fontWeight: '600',
+                  }}>
+                    {report.analysis.overall_sentiment === 'positive'
+                      ? '🟢 乐观'
+                      : report.analysis.overall_sentiment === 'negative'
+                      ? '🔴 悲观'
+                      : '⚪ 中性'}
+                  </Text>
+                </View>
               </View>
 
+              {/* 分隔线 */}
+              <View style={{ height: 1, backgroundColor: (theme.colors.outlineVariant || theme.colors.outline) + '40', marginVertical: 16 }} />
+
+              {/* 投资机会 */}
               {report.analysis.opportunities.length > 0 && (
                 <View style={styles.analysisItem}>
-                  <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
-                    投资机会
+                  <Text variant="labelMedium" style={{ color: isDark ? '#4ADE80' : '#16A34A', fontWeight: '600', marginBottom: 10 }}>
+                    💡 投资机会
                   </Text>
                   <View style={styles.tagContainer}>
-                    {report.analysis.opportunities.map((opp, i) => (
-                      <Chip key={i} compact style={styles.tag}>
-                        {opp}
-                      </Chip>
+                    {report.analysis.opportunities.map((opp: string, i: number) => (
+                      <View key={i} style={[styles.opportunityTag, isDark && styles.opportunityTagDark]}>
+                        <Text style={{ color: isDark ? '#4ADE80' : '#16A34A', fontSize: 13 }}>{opp}</Text>
+                      </View>
                     ))}
                   </View>
                 </View>
               )}
 
+              {/* 风险提示 */}
               {report.analysis.risks.length > 0 && (
-                <View style={styles.analysisItem}>
-                  <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
-                    风险提示
+                <View style={[styles.analysisItem, { marginBottom: 0 }]}>
+                  <Text variant="labelMedium" style={{ color: isDark ? '#F87171' : '#DC2626', fontWeight: '600', marginBottom: 10 }}>
+                    ⚠️ 风险提示
                   </Text>
                   <View style={styles.tagContainer}>
-                    {report.analysis.risks.map((risk, i) => (
-                      <Chip key={i} compact style={[styles.tag, { backgroundColor: '#B71C1C' }]}>
-                        {risk}
-                      </Chip>
+                    {report.analysis.risks.map((risk: string, i: number) => (
+                      <View key={i} style={[styles.riskTag, isDark && styles.riskTagDark]}>
+                        <Text style={{ color: isDark ? '#F87171' : '#DC2626', fontSize: 13 }}>{risk}</Text>
+                      </View>
                     ))}
                   </View>
                 </View>
@@ -474,25 +511,55 @@ const styles = StyleSheet.create({
     marginBottom: 16, // 12 → 16
   },
   analysisCard: {
-    padding: 20, // 16 → 20
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  analysisRow: {
+  sentimentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20, // 16 → 20
+  },
+  sentimentBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   analysisItem: {
-    marginBottom: 16, // 12 → 16
+    marginBottom: 16,
   },
   tagContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 10, // 8 → 10
+    marginTop: 2,
   },
-  tag: {
-    height: 28,
+  opportunityTag: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  opportunityTagDark: {
+    backgroundColor: 'rgba(74,222,128,0.15)',
+    borderColor: 'rgba(74,222,128,0.3)',
+  },
+  riskTag: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  riskTagDark: {
+    backgroundColor: 'rgba(248,113,113,0.15)',
+    borderColor: 'rgba(248,113,113,0.3)',
   },
 });
