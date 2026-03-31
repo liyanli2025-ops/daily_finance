@@ -185,35 +185,19 @@ export default function MiniPlayer({ onPress }: MiniPlayerProps) {
           </Text>
         </View>
 
-        {/* 右侧：控制按钮 */}
-        <View style={styles.controls}>
-          {/* 播放/暂停按钮 */}
-          <TouchableOpacity
-            style={[styles.playButton, { borderColor: colors.primary }]}
-            onPress={handlePlayPause}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialCommunityIcons
-              name={isPlaying ? 'pause' : 'play'}
-              size={22}
-              color={colors.primary}
-              style={!isPlaying ? { marginLeft: 2 } : undefined}
-            />
-          </TouchableOpacity>
-
-          {/* 播放列表按钮 */}
-          <TouchableOpacity
-            style={styles.listButton}
-            onPress={handleNavigateToPodcast}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialCommunityIcons
-              name="playlist-play"
-              size={24}
-              color={colors.onSurfaceVariant}
-            />
-          </TouchableOpacity>
-        </View>
+        {/* 右侧：播放/暂停按钮 */}
+        <TouchableOpacity
+          style={[styles.playButton, { borderColor: colors.primary }]}
+          onPress={handlePlayPause}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialCommunityIcons
+            name={isPlaying ? 'pause' : 'play'}
+            size={22}
+            color={colors.primary}
+            style={!isPlaying ? { marginLeft: 2 } : undefined}
+          />
+        </TouchableOpacity>
       </TouchableOpacity>
     </View>
   );
@@ -241,6 +225,7 @@ function createStyles(colors: any, isDark: boolean) {
       height: 3,
       backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
       width: '100%',
+      marginTop: 8, // 上方留出空间防止误触
     },
     progressFill: {
       height: '100%',
@@ -274,22 +259,11 @@ function createStyles(colors: any, isDark: boolean) {
       fontWeight: '600',
       letterSpacing: -0.2,
     },
-    controls: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
     playButton: {
       width: 36,
       height: 36,
       borderRadius: 18,
       borderWidth: 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    listButton: {
-      width: 36,
-      height: 36,
       alignItems: 'center',
       justifyContent: 'center',
     },
