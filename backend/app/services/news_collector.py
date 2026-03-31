@@ -204,6 +204,9 @@ class NewsCollectorService:
         Returns:
             去重后的新闻列表
         """
+        # 每次采集前清空去重缓存，避免跨次调用（如早报->晚报）时误过滤
+        self._seen_hashes.clear()
+        
         all_news = []
         
         # 1. 并行采集所有 RSS 源
@@ -258,14 +261,6 @@ class NewsCollectorService:
         except Exception as e:
             print(f"[自选股] 新闻采集失败: {e}")
         
-        # 6. 【新增】采集微信公众号文章
-        try:
-            wechat_news = await self._collect_wechat_articles()
-            all_news.extend(wechat_news)
-            print(f"[公众号] 文章补充 {len(wechat_news)} 条")
-        except Exception as e:
-            print(f"[公众号] 文章采集失败: {e}")
-        
         # 去重
         unique_news = self._deduplicate(all_news)
         
@@ -279,7 +274,7 @@ class NewsCollectorService:
         # 按重要性和时间排序
         filtered_news.sort(key=lambda x: (x.importance_score, x.published_at), reverse=True)
         
-        print(f"[NEWS] 共采集到 {len(filtered_news)} 条新闻（原始 {len(all_news)} 条，去重后 {len(unique_news)} 条）")
+        print(f"[NEWS] 共采集到 {len(filtered_news)} 条新闻（原始 {len(all_news)} 条，去重后 {len(unique_news)} 条，时间窗口 {hours}h，cutoff {cutoff_time.strftime('%H:%M')}）")
         
         # 5. 【新增】深度情感分析
         if self.sentiment_analyzer and self.sentiment_analysis_enabled and filtered_news:
