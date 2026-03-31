@@ -216,7 +216,13 @@ export default function HomeScreen() {
                       if (isCurrentPlaying) {
                         pause();
                       } else {
-                        play(report.id, report.podcast_url);
+                        play(
+                          report.id, 
+                          report.podcast_url,
+                          report.title,
+                          report.report_date,
+                          report.report_type as 'morning' | 'evening'
+                        );
                       }
                     }}
                   >

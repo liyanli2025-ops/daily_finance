@@ -1,4 +1,4 @@
-import { Tabs, useSegments } from 'expo-router';
+import { Tabs, usePathname } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet, Platform, View } from 'react-native';
 import { useAppTheme } from '@/theme/ThemeContext';
@@ -7,14 +7,19 @@ import MiniPlayer from '@/components/MiniPlayer';
 
 export default function TabLayout() {
   const { colors, isDark } = useAppTheme();
-  const segments = useSegments();
-  const { currentReportId } = useAudioStore();
+  const pathname = usePathname();
+  const currentReportId = useAudioStore((state) => state.currentReportId);
   
-  // 判断当前是否在播客页面
-  const isPodcastTab = segments.includes('podcast');
+  // 判断当前路径
+  const isPodcastTab = pathname === '/podcast' || pathname.startsWith('/podcast');
+  const isReportPage = pathname.startsWith('/report/');
   
   // 是否显示迷你播放器：有播放内容且不在播客页面
-  const showMiniPlayer = currentReportId && !isPodcastTab;
+  // 报告详情页暂时也显示（后续可以根据滚动位置控制）
+  const showMiniPlayer = !!currentReportId && !isPodcastTab;
+  
+  // 调试日志
+  console.log('[MiniPlayer] pathname:', pathname, 'currentReportId:', currentReportId, 'showMiniPlayer:', showMiniPlayer);
   
   // 迷你播放器的高度
   const miniPlayerHeight = showMiniPlayer ? 60 : 0;
