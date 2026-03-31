@@ -70,11 +70,14 @@ class AudioMixerService:
         
         # 背景音乐配置 - 使用绝对路径
         self.bgm_dir = project_root / "backend" / "data" / "bgm"
-        self.bgm_file = self.bgm_dir / "background.mp3"
+        self.bgm_file = self.bgm_dir / "background.mp3"  # 日报/早报默认背景音乐
+        self.bgm_evening_file = self.bgm_dir / "evening.mp3"  # 晚报背景音乐
         
         print(f"[AudioMixer] BGM目录: {self.bgm_dir}")
-        print(f"[AudioMixer] BGM文件: {self.bgm_file}")
-        print(f"[AudioMixer] BGM存在: {self.bgm_file.exists()}")
+        print(f"[AudioMixer] 日报BGM文件: {self.bgm_file}")
+        print(f"[AudioMixer] 日报BGM存在: {self.bgm_file.exists()}")
+        print(f"[AudioMixer] 晚报BGM文件: {self.bgm_evening_file}")
+        print(f"[AudioMixer] 晚报BGM存在: {self.bgm_evening_file.exists()}")
         
         # 混音参数
         self.intro_duration = 4000  # 开头纯音乐时长（毫秒）
@@ -85,11 +88,19 @@ class AudioMixerService:
         # 确保目录存在
         self.bgm_dir.mkdir(parents=True, exist_ok=True)
     
-    def has_bgm(self) -> bool:
+    def has_bgm(self, is_evening: bool = False) -> bool:
         """检查是否有背景音乐文件"""
+        if is_evening and self.bgm_evening_file.exists():
+            return True
         return self.bgm_file.exists()
     
-    def mix_podcast_with_bgm(self, podcast_path: str, output_path: Optional[str] = None) -> str:
+    def get_bgm_file(self, is_evening: bool = False) -> Path:
+        """获取背景音乐文件路径"""
+        if is_evening and self.bgm_evening_file.exists():
+            return self.bgm_evening_file
+        return self.bgm_file
+    
+    def mix_podcast_with_bgm(self, podcast_path: str, output_path: Optional[str] = None, is_evening: bool = False) -> str:
         """
         将播客与背景音乐混合
         
@@ -104,6 +115,7 @@ class AudioMixerService:
         Args:
             podcast_path: 原始播客音频路径
             output_path: 输出路径（可选，默认覆盖原文件）
+            is_evening: 是否是晚报（使用晚报专用背景音乐）
             
         Returns:
             输出文件路径
@@ -115,15 +127,20 @@ class AudioMixerService:
         except ImportError:
             pass
         
-        if not self.has_bgm():
+        if not self.has_bgm(is_evening):
             print("[WARN] 未找到背景音乐文件，跳过混音")
             return podcast_path
         
         if output_path is None:
             output_path = podcast_path
         
+        # 获取对应的背景音乐文件
+        bgm_file = self.get_bgm_file(is_evening)
+        bgm_type = "晚报" if is_evening else "日报"
+        
         try:
-            print(f"[BGM] 开始混音处理...")
+            print(f"[BGM] 开始混音处理（{bgm_type}模式）...")
+            print(f"   使用背景音乐: {bgm_file.name}")
             
             # 加载播客音频
             podcast = AudioSegment.from_mp3(podcast_path)
@@ -131,7 +148,7 @@ class AudioMixerService:
             print(f"   播客时长: {podcast_duration // 1000} 秒")
             
             # 加载背景音乐
-            bgm_original = AudioSegment.from_mp3(str(self.bgm_file))
+            bgm_original = AudioSegment.from_mp3(str(bgm_file))
             print(f"   背景音乐时长: {len(bgm_original) // 1000} 秒")
             
             # 检测播客中的静音段（停顿位置）

@@ -439,11 +439,18 @@ class PodcastGeneratorService:
         # 分段生成语音（在 [SECTION_BREAK] 处分段，并加入停顿）
         await self._generate_segmented_tts(podcast_text, str(temp_path))
         
+        # 判断是否是晚报
+        report_type = getattr(report, 'report_type', ReportType.MORNING)
+        if isinstance(report_type, str):
+            report_type = ReportType(report_type)
+        is_evening = (report_type == ReportType.EVENING)
+        
         # 与背景音乐混合
         audio_mixer = get_audio_mixer()
-        if audio_mixer.has_bgm():
-            print(f"[BGM] 检测到背景音乐，开始混音...")
-            audio_mixer.mix_podcast_with_bgm(str(temp_path), str(output_path))
+        if audio_mixer.has_bgm(is_evening):
+            bgm_type = "晚报" if is_evening else "日报"
+            print(f"[BGM] 检测到{bgm_type}背景音乐，开始混音...")
+            audio_mixer.mix_podcast_with_bgm(str(temp_path), str(output_path), is_evening=is_evening)
             # 删除临时文件
             try:
                 os.remove(str(temp_path))
@@ -467,7 +474,7 @@ class PodcastGeneratorService:
             word_count = len(podcast_text)
             duration_seconds = int((word_count / 250) * 60)
             # 如果有背景音乐，加上开头和结尾的额外时间
-            if audio_mixer.has_bgm():
+            if audio_mixer.has_bgm(is_evening):
                 duration_seconds += 8  # 4秒开头 + 4秒结尾
         
         print(f"[OK] 播客生成完成: {filename}, 时长约 {duration_seconds // 60} 分 {duration_seconds % 60} 秒")
