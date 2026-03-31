@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "财经日报",
+    "name": "财经FM",
     "slug": "finance-daily",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -29,7 +29,11 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "财经FM",
+      "shortName": "财经FM",
+      "themeColor": "#7C4DFF",
+      "backgroundColor": "#ffffff"
     },
     "plugins": [
       "expo-router",

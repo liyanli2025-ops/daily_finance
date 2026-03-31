@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Alert } from 'react-native';
 import {
   Text,
   Card,
@@ -11,6 +11,7 @@ import {
   Button,
   useTheme,
   ActivityIndicator,
+  Snackbar,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -50,6 +51,30 @@ export default function StocksScreen() {
   const [indices, setIndices] = useState<MarketIndex[]>([]);
   const [indicesLoading, setIndicesLoading] = useState(true);
   const [indicesError, setIndicesError] = useState<string | null>(null);
+  const [isPredicting, setIsPredicting] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  // AI 预测处理函数
+  const handleAIPrediction = async () => {
+    setIsPredicting(true);
+    try {
+      const result = await api.generateWatchlistPredictions();
+      if (result.status === 'success') {
+        setSnackbarMessage(`✅ ${result.message}`);
+        // 刷新列表以显示新的预测结果
+        await fetchWatchlist();
+      } else {
+        setSnackbarMessage(`❌ ${result.message || '预测失败'}`);
+      }
+    } catch (error: any) {
+      console.error('AI 预测失败:', error);
+      setSnackbarMessage(`❌ AI 预测失败: ${error.message || '请稍后重试'}`);
+    } finally {
+      setIsPredicting(false);
+      setSnackbarVisible(true);
+    }
+  };
 
   const fetchIndices = async () => {
     try {
@@ -178,12 +203,28 @@ export default function StocksScreen() {
         {/* 自选股列表 */}
         <View style={styles.watchlistSection}>
           <View style={styles.sectionHeader}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              ⭐ 我的自选
-            </Text>
-            <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
-              {watchlist.length} 只股票
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                ⭐ 我的自选
+              </Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.outline, marginLeft: 8 }}>
+                {watchlist.length} 只
+              </Text>
+            </View>
+            {watchlist.length > 0 && (
+              <Button
+                mode="outlined"
+                compact
+                icon="robot"
+                onPress={handleAIPrediction}
+                loading={isPredicting}
+                disabled={isPredicting}
+                style={{ borderRadius: 20 }}
+                labelStyle={{ fontSize: 12 }}
+              >
+                {isPredicting ? 'AI分析中...' : 'AI预测'}
+              </Button>
+            )}
           </View>
 
           {isLoading ? (
@@ -333,6 +374,19 @@ export default function StocksScreen() {
           </Button>
         </Modal>
       </Portal>
+
+      {/* 消息提示 */}
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={4000}
+        action={{
+          label: '关闭',
+          onPress: () => setSnackbarVisible(false),
+        }}
+      >
+        {snackbarMessage}
+      </Snackbar>
     </View>
   );
 }

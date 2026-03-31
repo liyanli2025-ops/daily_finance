@@ -868,6 +868,81 @@ class AIAnalyzerService:
             generated_at=datetime.now()
         )
     
+    async def analyze_stock_simple(self, code: str, name: str, market: str,
+                                   current_price: float = 0, change_percent: float = 0) -> StockPrediction:
+        """
+        简化版股票预测 - 快速生成 AI 预测
+        
+        不需要完整的基本面和技术面数据，适合批量预测
+        """
+        from ..models.stock import FundamentalData, TechnicalData, SentimentData, MarketType
+        
+        prompt = f"""你是一位专业的股票分析师。请对以下股票给出简短的投资评级。
+
+## 股票信息
+- 代码：{code}
+- 名称：{name}
+- 市场：{'A股' if market == 'A' else '港股'}
+- 当前价格：{current_price:.2f}
+- 今日涨跌：{change_percent:+.2f}%
+
+## 要求
+
+基于你对这只股票的了解（公司基本面、行业地位、近期消息等），给出：
+1. 投资评级：看多(bullish) / 中性(neutral) / 看空(bearish)
+2. 置信度：0-100 分
+3. 简短理由：50字以内
+
+请以 JSON 格式输出：
+```json
+{{
+  "prediction": "bullish/neutral/bearish",
+  "confidence": 70,
+  "reasoning": "理由..."
+}}
+```"""
+        
+        try:
+            response = await self._call_ai(prompt, max_tokens=300)
+            prediction_data = self._extract_json(response)
+        except Exception as e:
+            print(f"[AI] analyze_stock_simple 失败: {e}")
+            prediction_data = {
+                "prediction": "neutral",
+                "confidence": 50,
+                "reasoning": "AI 分析暂时不可用"
+            }
+        
+        prediction_str = prediction_data.get("prediction", "neutral").lower()
+        if prediction_str not in ["bullish", "bearish", "neutral"]:
+            prediction_str = "neutral"
+        
+        confidence = prediction_data.get("confidence", 50)
+        if isinstance(confidence, (int, float)):
+            confidence = min(100, max(0, confidence)) / 100
+        else:
+            confidence = 0.5
+        
+        return StockPrediction(
+            code=code,
+            name=name,
+            market=MarketType(market),
+            current_price=current_price,
+            fundamentals=FundamentalData(),
+            technicals=TechnicalData(),
+            sentiment=SentimentData(),
+            prediction=PredictionType(prediction_str),
+            confidence=confidence,
+            target_price=None,
+            stop_loss=None,
+            reasoning=prediction_data.get("reasoning", "暂无分析"),
+            fundamental_score=0.5,
+            technical_score=0.5,
+            sentiment_score=0.5,
+            overall_score=0.5,
+            generated_at=datetime.now()
+        )
+    
     async def _call_ai(self, prompt: str, max_tokens: int = 4000) -> str:
         """
         调用 AI 模型

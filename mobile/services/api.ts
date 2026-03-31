@@ -247,6 +247,29 @@ class ApiService {
     });
   }
 
+  /**
+   * 生成自选股 AI 预测
+   * 这是一个耗时操作，会调用 AI 对每只股票进行分析
+   */
+  async generateWatchlistPredictions() {
+    return this.request<{
+      status: string;
+      message: string;
+      predicted: number;
+      total: number;
+      results: Array<{
+        code: string;
+        name: string;
+        prediction?: string;
+        confidence?: number;
+        reasoning?: string;
+        error?: string;
+      }>;
+    }>('/stocks/watchlist/predict', {
+      method: 'POST',
+    }, 120000);  // 2分钟超时，因为 AI 分析比较慢
+  }
+
   // ==================== 系统相关 ====================
 
   /**

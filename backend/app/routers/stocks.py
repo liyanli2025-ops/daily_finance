@@ -644,6 +644,75 @@ async def refresh_watchlist(
     }
 
 
+@router.post("/watchlist/predict")
+async def generate_watchlist_predictions(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    background_tasks: BackgroundTasks = None
+):
+    """
+    为所有自选股生成 AI 预测
+    
+    这是一个耗时操作，会调用 AI 对每只股票进行分析
+    建议在报告生成后调用，或者用户手动触发
+    """
+    from ..services.ai_analyzer import AIAnalyzerService
+    
+    query = select(StockModel)
+    result = await db.execute(query)
+    stocks = result.scalars().all()
+    
+    if not stocks:
+        return {"status": "success", "message": "没有自选股", "predicted": 0}
+    
+    ai_analyzer = AIAnalyzerService()
+    predicted_count = 0
+    results = []
+    
+    for stock in stocks:
+        try:
+            # 简化的 AI 预测 - 不需要完整的基本面和技术面数据
+            prediction = await ai_analyzer.analyze_stock_simple(
+                code=stock.code,
+                name=stock.name,
+                market=stock.market,
+                current_price=stock.current_price or 0,
+                change_percent=stock.change_percent or 0
+            )
+            
+            # 更新数据库
+            stock.latest_prediction = prediction.prediction.value
+            stock.latest_confidence = prediction.confidence
+            stock.last_updated = datetime.now()
+            
+            predicted_count += 1
+            results.append({
+                "code": stock.code,
+                "name": stock.name,
+                "prediction": prediction.prediction.value,
+                "confidence": round(prediction.confidence * 100),
+                "reasoning": prediction.reasoning[:100] + "..." if len(prediction.reasoning) > 100 else prediction.reasoning
+            })
+            
+        except Exception as e:
+            print(f"[AI] 预测 {stock.code} 失败: {e}")
+            results.append({
+                "code": stock.code,
+                "name": stock.name,
+                "error": str(e)
+            })
+    
+    await db.commit()
+    
+    return {
+        "status": "success",
+        "message": f"已完成 {predicted_count}/{len(stocks)} 只股票的 AI 预测",
+        "predicted": predicted_count,
+        "total": len(stocks),
+        "results": results
+    }
+
+
 @router.get("/watchlist/merged")
 async def get_merged_watchlist(db: AsyncSession = Depends(get_db)):
     """
