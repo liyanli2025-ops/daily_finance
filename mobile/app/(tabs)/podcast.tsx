@@ -131,10 +131,22 @@ export default function PodcastScreen() {
     if (isPlaying) {
       pause();
     } else if (displayReport?.podcast_url) {
-      play(displayReport.id, displayReport.podcast_url);
+      play(
+        displayReport.id, 
+        displayReport.podcast_url, 
+        displayReport.title,
+        displayReport.report_date,
+        displayReport.report_type as 'morning' | 'evening'
+      );
     } else if (todayReport?.podcast_url) {
       // 如果当前报告没有音频但今日报告有，播放今日报告
-      play(todayReport.id, todayReport.podcast_url);
+      play(
+        todayReport.id, 
+        todayReport.podcast_url,
+        todayReport.title,
+        todayReport.report_date,
+        todayReport.report_type as 'morning' | 'evening'
+      );
     } else {
       // 没有音频 URL，audioStore 会显示提示
       play(displayReport?.id || todayReport?.id || '', '');
@@ -802,7 +814,13 @@ export default function PodcastScreen() {
                         : 'transparent',
                     }]}
                     onPress={() => {
-                      play(item.id, item.podcast_url);
+                      play(
+                        item.id, 
+                        item.podcast_url,
+                        item.title,
+                        item.report_date,
+                        item.report_type as 'morning' | 'evening'
+                      );
                       setShowPlaylist(false);
                     }}
                   >

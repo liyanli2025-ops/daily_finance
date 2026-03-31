@@ -22,11 +22,14 @@ interface AudioStore {
   duration: number;
   playbackRate: number;
   currentReportId: string | null;
+  currentReportTitle: string | null;  // 当前播放的报告标题
+  currentReportDate: string | null;   // 当前播放的报告日期
+  currentReportType: 'morning' | 'evening' | null;  // 报告类型
   sound: Audio.Sound | null;
   isLoading: boolean;
   error: string | null;
 
-  play: (reportId: string, audioUrl: string) => Promise<void>;
+  play: (reportId: string, audioUrl: string, title?: string, date?: string, reportType?: 'morning' | 'evening') => Promise<void>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
   stop: () => Promise<void>;
@@ -40,11 +43,14 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
   duration: 0,
   playbackRate: 1,
   currentReportId: null,
+  currentReportTitle: null,
+  currentReportDate: null,
+  currentReportType: null,
   sound: null,
   isLoading: false,
   error: null,
 
-  play: async (reportId: string, audioUrl: string) => {
+  play: async (reportId: string, audioUrl: string, title?: string, date?: string, reportType?: 'morning' | 'evening') => {
     const { sound: currentSound, currentReportId } = get();
 
     // 检查 URL 是否有效
@@ -107,6 +113,9 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       set({
         sound,
         currentReportId: reportId,
+        currentReportTitle: title || null,
+        currentReportDate: date || null,
+        currentReportType: reportType || null,
         isPlaying: true,
         isLoading: false,
       });
@@ -153,6 +162,9 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       isPlaying: false,
       currentPosition: 0,
       currentReportId: null,
+      currentReportTitle: null,
+      currentReportDate: null,
+      currentReportType: null,
     });
   },
 

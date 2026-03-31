@@ -200,6 +200,8 @@ export default function ReportDetailScreen() {
               reportTitle={report.title}
               audioUrl={report.podcast_url}
               duration={report.podcast_duration || 0}
+              reportDate={report.report_date}
+              reportType={report.report_type as 'morning' | 'evening'}
             />
           </View>
         )}

@@ -10,6 +10,8 @@ interface AudioPlayerProps {
   audioUrl: string;
   duration?: number;
   compact?: boolean;
+  reportDate?: string;
+  reportType?: 'morning' | 'evening';
 }
 
 // 可拖动的进度条组件
@@ -211,6 +213,8 @@ export default function AudioPlayer({
   audioUrl,
   duration = 0,
   compact = false,
+  reportDate,
+  reportType,
 }: AudioPlayerProps) {
   const theme = useTheme();
   const {
@@ -241,14 +245,14 @@ export default function AudioPlayer({
     if (isTrackPlaying) {
       pause();
     } else {
-      play(reportId, audioUrl);
+      play(reportId, audioUrl, reportTitle, reportDate, reportType);
     }
   };
 
   const handleSeek = (position: number) => {
     // 如果不是当前轨道，先开始播放
     if (!isCurrentTrack) {
-      play(reportId, audioUrl).then(() => {
+      play(reportId, audioUrl, reportTitle, reportDate, reportType).then(() => {
         seekTo(position);
       });
     } else {
