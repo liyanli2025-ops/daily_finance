@@ -281,91 +281,89 @@ async def search_stocks(
     market: Optional[str] = Query(None, description="市场类型: A 或 HK")
 ):
     """
-    搜索股票 - 先用缓存/内置列表快速响应，后台更新全市场数据
+    搜索股票 - 实时调用接口搜索全市场，缓存加速
+    策略：缓存有效 → 从缓存搜；缓存无效 → 同步拉取全市场数据再搜
     """
     import asyncio
     from datetime import datetime, timedelta
     
-    def _search_from_cache():
-        """从缓存的全市场数据搜索"""
-        if _stock_list_cache["data"] is not None:
-            results = [
-                s for s in _stock_list_cache["data"]
-                if keyword.lower() in s["code"].lower() or keyword.lower() in s["name"].lower()
-            ]
-            return results[:20]
-        return None
-    
-    def _search_from_builtin():
-        """从内置列表搜索"""
-        return [
-            s for s in _builtin_stocks
-            if keyword.lower() in s["code"].lower() or keyword.lower() in s["name"].lower()
+    def _search_from_list(stock_list):
+        """从给定列表中搜索匹配项"""
+        kw = keyword.lower()
+        results = [
+            s for s in stock_list
+            if kw in s["code"].lower() or kw in s["name"].lower()
         ]
+        if market:
+            results = [s for s in results if s["market"] == market]
+        return results[:20]
     
-    def _update_cache():
-        """后台更新全市场股票列表缓存（A股 + 港股）"""
+    def _fetch_all_stocks():
+        """同步拉取全市场股票列表（A股 + 港股）并更新缓存"""
+        import akshare as ak
+        stock_list = []
+        
+        # 1. 获取全 A 股
         try:
-            import akshare as ak
-            stock_list = []
-            
-            # 1. 获取全 A 股
-            try:
-                df_a = ak.stock_zh_a_spot_em()
-                for _, row in df_a.iterrows():
-                    stock_list.append({
-                        "code": str(row['代码']),
-                        "name": str(row['名称']),
-                        "market": "A"
-                    })
-                print(f"[OK] A股列表获取完成，共 {len(df_a)} 只")
-            except Exception as e:
-                print(f"[WARN] 获取A股列表失败: {e}")
-            
-            # 2. 获取港股主板
-            try:
-                df_hk = ak.stock_hk_spot_em()
-                for _, row in df_hk.iterrows():
-                    code = str(row.get('代码', ''))
-                    name = str(row.get('名称', ''))
-                    if code and name:
-                        stock_list.append({
-                            "code": code,
-                            "name": name,
-                            "market": "HK"
-                        })
-                print(f"[OK] 港股列表获取完成，共 {len(df_hk)} 只")
-            except Exception as e:
-                print(f"[WARN] 获取港股列表失败: {e}，港股将使用内置列表")
-            
-            if stock_list:
-                _stock_list_cache["data"] = stock_list
-                _stock_list_cache["last_update"] = datetime.now()
-                print(f"[OK] 股票列表缓存更新完成，共 {len(stock_list)} 只（A股+港股）")
-            else:
-                print("[WARN] 未获取到任何股票数据，保留旧缓存")
+            df_a = ak.stock_zh_a_spot_em()
+            for _, row in df_a.iterrows():
+                stock_list.append({
+                    "code": str(row['代码']),
+                    "name": str(row['名称']),
+                    "market": "A"
+                })
+            print(f"[OK] A股列表获取完成，共 {len(df_a)} 只")
         except Exception as e:
-            print(f"[ERROR] 更新股票列表缓存失败: {e}")
+            print(f"[WARN] 获取A股列表失败: {e}")
+        
+        # 2. 获取港股主板
+        try:
+            df_hk = ak.stock_hk_spot_em()
+            for _, row in df_hk.iterrows():
+                code = str(row.get('代码', ''))
+                name = str(row.get('名称', ''))
+                if code and name:
+                    stock_list.append({
+                        "code": code,
+                        "name": name,
+                        "market": "HK"
+                    })
+            print(f"[OK] 港股列表获取完成，共 {len(df_hk)} 只")
+        except Exception as e:
+            print(f"[WARN] 获取港股列表失败: {e}")
+        
+        # 更新缓存
+        if stock_list:
+            _stock_list_cache["data"] = stock_list
+            _stock_list_cache["last_update"] = datetime.now()
+            print(f"[OK] 股票列表缓存更新完成，共 {len(stock_list)} 只（A股+港股）")
+        
+        return stock_list
     
-    # 1. 先尝试从缓存搜索
-    cached_results = _search_from_cache()
-    if cached_results is not None:
-        results = cached_results
-        # 检查缓存是否需要更新（超过1小时）
-        if _stock_list_cache["last_update"] and \
-           datetime.now() - _stock_list_cache["last_update"] > timedelta(hours=1):
-            loop = asyncio.get_event_loop()
-            loop.run_in_executor(None, _update_cache)
-    else:
-        # 2. 缓存为空，用内置列表立即返回，同时后台更新缓存
-        results = _search_from_builtin()
+    # 1. 缓存有效（存在且不超过1小时）→ 直接从缓存搜
+    cache_valid = (
+        _stock_list_cache["data"] is not None 
+        and _stock_list_cache["last_update"] is not None
+        and datetime.now() - _stock_list_cache["last_update"] < timedelta(hours=1)
+    )
+    
+    if cache_valid:
+        return _search_from_list(_stock_list_cache["data"])
+    
+    # 2. 缓存无效 → 同步拉取全市场数据再搜（首次约3-5秒，之后走缓存）
+    try:
         loop = asyncio.get_event_loop()
-        loop.run_in_executor(None, _update_cache)
+        all_stocks = await loop.run_in_executor(None, _fetch_all_stocks)
+        if all_stocks:
+            return _search_from_list(all_stocks)
+    except Exception as e:
+        print(f"[ERROR] 实时拉取股票列表失败: {e}")
     
-    if market:
-        results = [s for s in results if s["market"] == market]
+    # 3. 接口也失败了 → 降级到内置列表 + 旧缓存
+    if _stock_list_cache["data"]:
+        return _search_from_list(_stock_list_cache["data"])
     
-    return results
+    return _search_from_list(_builtin_stocks)
 
 
 @router.get("/market/indices")

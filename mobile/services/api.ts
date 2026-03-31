@@ -198,12 +198,12 @@ class ApiService {
   }
 
   /**
-   * 搜索股票
+   * 搜索股票（首次搜索可能需要后端加载全市场数据，耗时较长）
    */
   async searchStocks(keyword: string, market?: string) {
     const params = new URLSearchParams({ keyword });
     if (market) params.append('market', market);
-    return this.request<any[]>(`/stocks/search?${params}`);
+    return this.request<any[]>(`/stocks/search?${params}`, {}, 30000);
   }
 
   /**
