@@ -532,13 +532,15 @@ async def refresh_watchlist(
             parts = data_str.split('~')
             
             # 提取代码
+            # 腾讯格式: 
+            # parts[1]=名称, parts[2]=代码, parts[3]=当前价, parts[4]=昨收
+            # parts[31]=涨跌额, parts[32]=涨跌幅%
             if var_name.startswith('sh') or var_name.startswith('sz'):
                 code = var_name[2:]
-                # 腾讯格式: 0~名称~代码~当前价~涨跌~涨跌%~成交量~成交额~...
-                if len(parts) >= 6:
+                if len(parts) >= 33:
                     try:
                         current_price = float(parts[3]) if parts[3] else None
-                        change_pct = float(parts[5]) if parts[5] else None
+                        change_pct = float(parts[32]) if parts[32] else None
                         quotes[code] = {
                             "price": current_price,
                             "change_pct": change_pct
@@ -547,10 +549,10 @@ async def refresh_watchlist(
                         pass
             elif var_name.startswith('hk'):
                 code = var_name[2:].lstrip('0')  # 去掉前导0
-                if len(parts) >= 6:
+                if len(parts) >= 33:
                     try:
                         current_price = float(parts[3]) if parts[3] else None
-                        change_pct = float(parts[5]) if parts[5] else None
+                        change_pct = float(parts[32]) if parts[32] else None
                         quotes[code] = {
                             "price": current_price,
                             "change_pct": change_pct
