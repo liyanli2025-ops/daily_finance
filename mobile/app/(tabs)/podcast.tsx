@@ -22,7 +22,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function PodcastScreen() {
   const { colors, isDark } = useAppTheme();
-  const { todayReport, recentReports, fetchTodayReport, fetchRecentReports } = useReportStore();
+  const { todayReport, currentReport, recentReports, fetchTodayReport, fetchRecentReports, fetchReport } = useReportStore();
   const {
     isPlaying,
     currentPosition,
@@ -45,6 +45,13 @@ export default function PodcastScreen() {
     fetchTodayReport();
     fetchRecentReports();
   }, []);
+
+  // 当播放的报告ID变化时，获取对应的报告详情
+  useEffect(() => {
+    if (currentReportId && currentReportId !== todayReport?.id) {
+      fetchReport(currentReportId);
+    }
+  }, [currentReportId, todayReport?.id]);
 
   // 播放按钮呼吸动画
   useEffect(() => {
@@ -85,14 +92,31 @@ export default function PodcastScreen() {
 
   const playbackRates = [0.75, 1, 1.25, 1.5, 2];
 
+  // 获取当前应显示的报告：优先显示正在播放的报告，否则显示今日报告
+  const displayReport = useMemo(() => {
+    // 如果有正在播放的报告，且 currentReport 已加载
+    if (currentReportId && currentReport && currentReport.id === currentReportId) {
+      return currentReport;
+    }
+    // 如果正在播放的是今日报告
+    if (currentReportId && todayReport && todayReport.id === currentReportId) {
+      return todayReport;
+    }
+    // 默认显示今日报告
+    return todayReport;
+  }, [currentReportId, currentReport, todayReport]);
+
   const handlePlayPause = () => {
     if (isPlaying) {
       pause();
+    } else if (displayReport?.podcast_url) {
+      play(displayReport.id, displayReport.podcast_url);
     } else if (todayReport?.podcast_url) {
+      // 如果当前报告没有音频但今日报告有，播放今日报告
       play(todayReport.id, todayReport.podcast_url);
     } else {
       // 没有音频 URL，audioStore 会显示提示
-      play(todayReport?.id || '', '');
+      play(displayReport?.id || todayReport?.id || '', '');
     }
   };
 
@@ -108,21 +132,20 @@ export default function PodcastScreen() {
     setPlaybackRate(playbackRates[nextIndex]);
   };
 
-  const currentReport = todayReport;
-  const isPodcastReady = currentReport?.podcast_status === 'ready';
+  const isPodcastReady = displayReport?.podcast_status === 'ready';
   const progress = duration > 0 ? currentPosition / duration : 0;
 
   // 播客章节结构（基于实际播客生成逻辑）
   // 结构：开场白 -> 核心观点 -> 报告正文 -> 跨界热点（可选）-> 结束语
   const podcastChapters = useMemo(() => {
-    if (!currentReport || !duration) return [];
+    if (!displayReport || !duration) return [];
     
     const chapters: { name: string; startTime: number; content: string }[] = [];
     const totalDuration = duration;
     
     // 根据报告内容估算各章节时长比例
-    const hasCoreCopinions = currentReport.core_opinions && currentReport.core_opinions.length > 0;
-    const hasCrossBorder = currentReport.cross_border_events && currentReport.cross_border_events.length > 0;
+    const hasCoreCopinions = displayReport.core_opinions && displayReport.core_opinions.length > 0;
+    const hasCrossBorder = displayReport.cross_border_events && displayReport.cross_border_events.length > 0;
     
     // 时长分配（基于播客生成逻辑）
     // 开场白约 10%，核心观点约 15%，正文约 50-60%，跨界约 10%（如有），结尾约 10-15%
@@ -143,7 +166,7 @@ export default function PodcastScreen() {
       chapters.push({
         name: '核心观点',
         startTime: currentTime,
-        content: currentReport.core_opinions?.join('\n\n') || '',
+        content: displayReport.core_opinions?.join('\n\n') || '',
       });
       currentTime += opinionsDuration;
     }
@@ -153,7 +176,7 @@ export default function PodcastScreen() {
     chapters.push({
       name: '深度分析',
       startTime: currentTime,
-      content: currentReport.summary || '市场分析...',
+      content: displayReport.summary || '市场分析...',
     });
     currentTime += mainContentDuration;
     
@@ -163,7 +186,7 @@ export default function PodcastScreen() {
       chapters.push({
         name: '跨界热点',
         startTime: currentTime,
-        content: currentReport.cross_border_events?.map((e: any) => e.title).join('\n') || '',
+        content: displayReport.cross_border_events?.map((e: any) => e.title).join('\n') || '',
       });
       currentTime += crossBorderDuration;
     }
@@ -176,52 +199,52 @@ export default function PodcastScreen() {
     });
     
     return chapters;
-  }, [currentReport, duration]);
+  }, [displayReport, duration]);
 
   // 文本段落（用于歌词显示）
   const textSegments = useMemo(() => {
-    if (!currentReport) return [];
+    if (!displayReport) return [];
     const segments: { text: string; chapterIndex: number }[] = [];
     
     // 开场
     segments.push({ text: '欢迎收听今日财经播报', chapterIndex: 0 });
     
     // 核心观点
-    if (currentReport.core_opinions && currentReport.core_opinions.length > 0) {
-      currentReport.core_opinions.forEach((opinion: string, idx: number) => {
+    if (displayReport.core_opinions && displayReport.core_opinions.length > 0) {
+      displayReport.core_opinions.forEach((opinion: string, idx: number) => {
         segments.push({ text: `${idx + 1}. ${opinion}`, chapterIndex: 1 });
       });
     }
     
     // 摘要作为主要内容
-    if (currentReport.summary) {
+    if (displayReport.summary) {
       // 将摘要按句子分割
-      const sentences = currentReport.summary.split(/[。！？]/).filter((s: string) => s.trim());
+      const sentences = displayReport.summary.split(/[。！？]/).filter((s: string) => s.trim());
       sentences.forEach((sentence: string) => {
         if (sentence.trim()) {
           segments.push({ 
             text: sentence.trim() + '。', 
-            chapterIndex: currentReport.core_opinions?.length > 0 ? 2 : 1 
+            chapterIndex: displayReport.core_opinions?.length > 0 ? 2 : 1 
           });
         }
       });
     }
     
     // 重点新闻标题
-    if (currentReport.highlights) {
-      currentReport.highlights.slice(0, 3).forEach((h: any) => {
+    if (displayReport.highlights) {
+      displayReport.highlights.slice(0, 3).forEach((h: any) => {
         if (h.title) {
           segments.push({ 
             text: h.title, 
-            chapterIndex: currentReport.core_opinions?.length > 0 ? 2 : 1 
+            chapterIndex: displayReport.core_opinions?.length > 0 ? 2 : 1 
           });
         }
       });
     }
     
     // 跨界热点
-    if (currentReport.cross_border_events && currentReport.cross_border_events.length > 0) {
-      currentReport.cross_border_events.forEach((event: any) => {
+    if (displayReport.cross_border_events && displayReport.cross_border_events.length > 0) {
+      displayReport.cross_border_events.forEach((event: any) => {
         segments.push({ 
           text: event.title, 
           chapterIndex: podcastChapters.length - 2 
@@ -241,7 +264,7 @@ export default function PodcastScreen() {
     }
     
     return segments;
-  }, [currentReport, podcastChapters.length]);
+  }, [displayReport, podcastChapters.length]);
 
   // 当前所在章节
   const currentChapterIndex = useMemo(() => {
@@ -298,8 +321,15 @@ export default function PodcastScreen() {
     }
   }, [activeSegmentIndex, isPlaying]);
 
-  const today = new Date();
-  const dateStr = `${today.getMonth() + 1}月${today.getDate()}日`;
+  // 获取显示的日期（基于当前播放的报告）
+  const dateStr = useMemo(() => {
+    if (displayReport?.report_date) {
+      const date = new Date(displayReport.report_date);
+      return `${date.getMonth() + 1}月${date.getDate()}日`;
+    }
+    const today = new Date();
+    return `${today.getMonth() + 1}月${today.getDate()}日`;
+  }, [displayReport?.report_date]);
 
   const styles = createStyles(colors, isDark);
 
@@ -334,7 +364,7 @@ export default function PodcastScreen() {
         contentContainerStyle={styles.textCanvasContent}
         showsVerticalScrollIndicator={false}
       >
-        {isPodcastReady && currentReport && (
+        {isPodcastReady && displayReport && (
           <View style={styles.tagRow}>
             <View style={[styles.tag, { backgroundColor: isDark ? 'rgba(182,160,255,0.1)' : 'rgba(124,77,255,0.08)', borderColor: isDark ? 'rgba(182,160,255,0.2)' : 'rgba(124,77,255,0.15)' }]}>
               <Text style={[styles.tagText, { color: colors.primary }]}>
@@ -344,9 +374,9 @@ export default function PodcastScreen() {
           </View>
         )}
 
-        {currentReport && (
+        {displayReport && (
           <Text style={[styles.episodeTitle, { color: colors.onSurface }]}>
-            {currentReport.title || '每日财经早报'}
+            {displayReport.title || '每日财经早报'}
           </Text>
         )}
 
