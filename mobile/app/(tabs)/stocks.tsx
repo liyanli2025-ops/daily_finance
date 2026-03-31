@@ -259,8 +259,16 @@ export default function StocksScreen() {
                 variant="bodySmall"
                 style={{ color: theme.colors.outline, marginTop: 8, textAlign: 'center' }}
               >
-                点击右下角 + 按钮添加股票
+                添加股票开始跟踪行情
               </Text>
+              <Button
+                mode="contained"
+                icon="plus"
+                onPress={() => setSearchVisible(true)}
+                style={{ marginTop: 20, borderRadius: 20 }}
+              >
+                添加自选股
+              </Button>
             </View>
           ) : (
             <View style={styles.stockGrid}>
@@ -315,19 +323,40 @@ export default function StocksScreen() {
           {/* 快捷标签 */}
           <View style={styles.quickTags}>
             <Chip
-              style={{ marginRight: 8 }}
+              style={styles.quickChip}
               onPress={() => handleSearch('茅台')}
             >
               贵州茅台
             </Chip>
             <Chip
-              style={{ marginRight: 8 }}
+              style={styles.quickChip}
               onPress={() => handleSearch('腾讯')}
             >
               腾讯控股
             </Chip>
-            <Chip onPress={() => handleSearch('比亚迪')}>
+            <Chip
+              style={styles.quickChip}
+              onPress={() => handleSearch('比亚迪')}
+            >
               比亚迪
+            </Chip>
+            <Chip
+              style={styles.quickChip}
+              onPress={() => handleSearch('宁德时代')}
+            >
+              宁德时代
+            </Chip>
+            <Chip
+              style={styles.quickChip}
+              onPress={() => handleSearch('小米')}
+            >
+              小米集团
+            </Chip>
+            <Chip
+              style={styles.quickChip}
+              onPress={() => handleSearch('阿里')}
+            >
+              阿里巴巴
             </Chip>
           </View>
 
@@ -467,8 +496,14 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 16,
-    bottom: 80,
+    bottom: 90,
     borderRadius: 16,
+    zIndex: 999,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   modalContent: {
     margin: 20,
@@ -479,7 +514,11 @@ const styles = StyleSheet.create({
   quickTags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 16,
+  },
+  quickChip: {
+    marginBottom: 0,
   },
   searchLoading: {
     paddingVertical: 20,

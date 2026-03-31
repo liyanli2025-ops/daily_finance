@@ -210,6 +210,7 @@ _stock_list_cache = {
 
 # 内置常见股票列表（作为 fallback）
 _builtin_stocks = [
+    # A股 - 大盘蓝筹
     {"code": "600519", "name": "贵州茅台", "market": "A"},
     {"code": "000858", "name": "五粮液", "market": "A"},
     {"code": "002594", "name": "比亚迪", "market": "A"},
@@ -250,6 +251,27 @@ _builtin_stocks = [
     {"code": "300124", "name": "汇川技术", "market": "A"},
     {"code": "600031", "name": "三一重工", "market": "A"},
     {"code": "601919", "name": "中远海控", "market": "A"},
+    # 热门港股
+    {"code": "00700", "name": "腾讯控股", "market": "HK"},
+    {"code": "09988", "name": "阿里巴巴-W", "market": "HK"},
+    {"code": "09618", "name": "京东集团-SW", "market": "HK"},
+    {"code": "03690", "name": "美团-W", "market": "HK"},
+    {"code": "09888", "name": "百度集团-SW", "market": "HK"},
+    {"code": "01810", "name": "小米集团-W", "market": "HK"},
+    {"code": "09999", "name": "网易-S", "market": "HK"},
+    {"code": "00388", "name": "香港交易所", "market": "HK"},
+    {"code": "02318", "name": "中国平安", "market": "HK"},
+    {"code": "00941", "name": "中国移动", "market": "HK"},
+    {"code": "01211", "name": "比亚迪股份", "market": "HK"},
+    {"code": "02020", "name": "安踏体育", "market": "HK"},
+    {"code": "00005", "name": "汇丰控股", "market": "HK"},
+    {"code": "01024", "name": "快手-W", "market": "HK"},
+    {"code": "06618", "name": "京东健康", "market": "HK"},
+    {"code": "09868", "name": "小鹏汽车-W", "market": "HK"},
+    {"code": "09866", "name": "蔚来-SW", "market": "HK"},
+    {"code": "02015", "name": "理想汽车-W", "market": "HK"},
+    {"code": "00981", "name": "中芯国际", "market": "HK"},
+    {"code": "09961", "name": "携程集团-S", "market": "HK"},
 ]
 
 
@@ -282,20 +304,46 @@ async def search_stocks(
         ]
     
     def _update_cache():
-        """后台更新全市场股票列表缓存"""
+        """后台更新全市场股票列表缓存（A股 + 港股）"""
         try:
             import akshare as ak
-            df = ak.stock_zh_a_spot_em()
             stock_list = []
-            for _, row in df.iterrows():
-                stock_list.append({
-                    "code": str(row['代码']),
-                    "name": str(row['名称']),
-                    "market": "A"
-                })
-            _stock_list_cache["data"] = stock_list
-            _stock_list_cache["last_update"] = datetime.now()
-            print(f"[OK] 股票列表缓存更新完成，共 {len(stock_list)} 只股票")
+            
+            # 1. 获取全 A 股
+            try:
+                df_a = ak.stock_zh_a_spot_em()
+                for _, row in df_a.iterrows():
+                    stock_list.append({
+                        "code": str(row['代码']),
+                        "name": str(row['名称']),
+                        "market": "A"
+                    })
+                print(f"[OK] A股列表获取完成，共 {len(df_a)} 只")
+            except Exception as e:
+                print(f"[WARN] 获取A股列表失败: {e}")
+            
+            # 2. 获取港股主板
+            try:
+                df_hk = ak.stock_hk_spot_em()
+                for _, row in df_hk.iterrows():
+                    code = str(row.get('代码', ''))
+                    name = str(row.get('名称', ''))
+                    if code and name:
+                        stock_list.append({
+                            "code": code,
+                            "name": name,
+                            "market": "HK"
+                        })
+                print(f"[OK] 港股列表获取完成，共 {len(df_hk)} 只")
+            except Exception as e:
+                print(f"[WARN] 获取港股列表失败: {e}，港股将使用内置列表")
+            
+            if stock_list:
+                _stock_list_cache["data"] = stock_list
+                _stock_list_cache["last_update"] = datetime.now()
+                print(f"[OK] 股票列表缓存更新完成，共 {len(stock_list)} 只（A股+港股）")
+            else:
+                print("[WARN] 未获取到任何股票数据，保留旧缓存")
         except Exception as e:
             print(f"[ERROR] 更新股票列表缓存失败: {e}")
     
