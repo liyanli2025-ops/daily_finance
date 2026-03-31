@@ -1046,11 +1046,11 @@ function createStyles(colors: any, isDark: boolean) {
     // 章节标记点
     chapterMarker: {
       position: 'absolute',
-      top: -2,
-      width: 7,
-      height: 7,
+      top: -1, // (6 - 8) / 2 = -1，使 8px 的圆点垂直居中在 6px 高的轨道上
+      width: 8,
+      height: 8,
       borderRadius: 4,
-      marginLeft: -3,
+      marginLeft: -4,
       zIndex: 5,
     },
     progressBarContainer: {
@@ -1072,12 +1072,13 @@ function createStyles(colors: any, isDark: boolean) {
     },
     progressThumb: {
       position: 'absolute',
-      top: -4,
-      width: 10,
-      height: 10,
-      borderRadius: 5,
+      top: -5, // (16 - 6) / 2 = 5，使 16px 的圆点垂直居中在 6px 高的轨道上
+      width: 16,
+      height: 16,
+      borderRadius: 8,
       borderWidth: 2,
-      marginLeft: -5,
+      marginLeft: -8,
+      zIndex: 10,
     },
     timeRow: {
       flexDirection: 'row',

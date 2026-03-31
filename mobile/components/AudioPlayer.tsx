@@ -43,7 +43,8 @@ function SeekableProgressBar({
   useEffect(() => {
     if (Platform.OS !== 'web') return;
 
-    const trackElement = (trackRef.current as any)?._nativeRef?.current;
+    // 在 Web 上，React Native Web 会将 View ref 直接映射到 DOM 元素
+    const trackElement = trackRef.current as unknown as HTMLElement | null;
     if (!trackElement) return;
 
     const updateRect = () => {
@@ -53,6 +54,7 @@ function SeekableProgressBar({
 
     const handleMouseDown = (e: MouseEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       updateRect();
       setIsDragging(true);
       const newProgress = calculateProgress(e.clientX);
@@ -84,6 +86,7 @@ function SeekableProgressBar({
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
       e.preventDefault();
+      e.stopPropagation();
       updateRect();
       setIsDragging(true);
       const touch = e.touches[0];
@@ -162,40 +165,42 @@ function SeekableProgressBar({
   const displayProgress = isDragging ? dragProgress : progress;
 
   return (
-    <View
-      ref={trackRef}
-      style={[styles.seekableTrack, { backgroundColor: trackColor }]}
-      onStartShouldSetResponder={() => Platform.OS !== 'web'}
-      onMoveShouldSetResponder={() => Platform.OS !== 'web'}
-      onResponderGrant={handleResponderGrant}
-      onResponderMove={handleResponderMove}
-      onResponderRelease={handleResponderRelease}
-      onResponderTerminate={() => setIsDragging(false)}
-    >
-      {/* 填充部分 */}
+    <View style={styles.seekableWrapper}>
       <View
-        style={[
-          styles.seekableFill,
-          {
-            width: `${displayProgress * 100}%`,
-            backgroundColor: primaryColor,
-          },
-        ]}
-        pointerEvents="none"
-      />
-      {/* 拖动把手 */}
-      <View
-        style={[
-          styles.seekableThumb,
-          {
-            left: `${displayProgress * 100}%`,
-            backgroundColor: primaryColor,
-            opacity: isDragging ? 1 : 0.9,
-            transform: [{ scale: isDragging ? 1.3 : 1 }],
-          },
-        ]}
-        pointerEvents="none"
-      />
+        ref={trackRef}
+        style={[styles.seekableTrack, { backgroundColor: trackColor }]}
+        onStartShouldSetResponder={() => Platform.OS !== 'web'}
+        onMoveShouldSetResponder={() => Platform.OS !== 'web'}
+        onResponderGrant={handleResponderGrant}
+        onResponderMove={handleResponderMove}
+        onResponderRelease={handleResponderRelease}
+        onResponderTerminate={() => setIsDragging(false)}
+      >
+        {/* 填充部分 */}
+        <View
+          style={[
+            styles.seekableFill,
+            {
+              width: `${displayProgress * 100}%`,
+              backgroundColor: primaryColor,
+            },
+          ]}
+          pointerEvents="none"
+        />
+        {/* 拖动把手 */}
+        <View
+          style={[
+            styles.seekableThumb,
+            {
+              left: `${displayProgress * 100}%`,
+              backgroundColor: primaryColor,
+              opacity: isDragging ? 1 : 0.9,
+              transform: [{ scale: isDragging ? 1.3 : 1 }],
+            },
+          ]}
+          pointerEvents="none"
+        />
+      </View>
     </View>
   );
 }
@@ -392,29 +397,31 @@ const styles = StyleSheet.create({
     right: 0,
   },
   // 可拖动进度条样式
+  seekableWrapper: {
+    paddingVertical: 10, // 增加可点击区域
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
   seekableTrack: {
-    height: 8,
-    borderRadius: 4,
+    height: 6,
+    borderRadius: 3,
     position: 'relative',
     justifyContent: 'center',
-    paddingVertical: 10, // 增加可点击区域
-    marginVertical: -10,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {}),
+    overflow: 'visible',
   },
   seekableFill: {
     position: 'absolute',
     left: 0,
     top: 0,
-    height: '100%',
+    bottom: 0,
     borderRadius: 3,
   },
   seekableThumb: {
     position: 'absolute',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginLeft: -7,
-    top: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginLeft: -8,
+    top: -5, // (16 - 6) / 2 = 5，使圆点垂直居中在进度条上
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
