@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { Text, useTheme, IconButton, Chip, Divider, ActivityIndicator } from 'react-native-paper';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -7,7 +7,51 @@ import Markdown from 'react-native-markdown-display';
 import { useReportStore } from '@/stores/reportStore';
 import AudioPlayer from '@/components/AudioPlayer';
 
+// ErrorBoundary 防止渲染崩溃导致白屏
+class ReportErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('报告详情页渲染错误:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={64} color="#999" />
+          <Text style={{ marginTop: 16, fontSize: 16, color: '#666', textAlign: 'center' }}>
+            页面加载出错了
+          </Text>
+          <Text style={{ marginTop: 8, fontSize: 13, color: '#999', textAlign: 'center' }}>
+            {this.state.error?.message || '未知错误'}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function ReportDetailScreen() {
+  return (
+    <ReportErrorBoundary>
+      <ReportDetailContent />
+    </ReportErrorBoundary>
+  );
+}
+
+function ReportDetailContent() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentReport, todayReport, isLoading, fetchReport } = useReportStore();
@@ -231,7 +275,7 @@ export default function ReportDetailScreen() {
         </View>
 
         {/* 核心观点 */}
-        {report.core_opinions && report.core_opinions.length > 0 && (
+        {Array.isArray(report.core_opinions) && report.core_opinions.length > 0 && (
           <View style={[styles.coreOpinionsSection, { backgroundColor: theme.colors.primary + '15' }]}>
             <Text variant="titleSmall" style={styles.sectionLabel}>
               🎯 今日核心观点
@@ -250,7 +294,7 @@ export default function ReportDetailScreen() {
         )}
 
         {/* 跨界热点 */}
-        {report.cross_border_events && report.cross_border_events.length > 0 && (
+        {Array.isArray(report.cross_border_events) && report.cross_border_events.length > 0 && (
           <View style={styles.crossBorderSection}>
             <Text variant="titleMedium" style={styles.sectionTitle}>
               🌍 跨界热点扫描
@@ -290,7 +334,7 @@ export default function ReportDetailScreen() {
 
         {/* 正文内容 */}
         <View style={styles.contentSection}>
-          <Markdown style={markdownStyles}>{report.content}</Markdown>
+          <Markdown style={markdownStyles}>{report.content || ''}</Markdown>
         </View>
 
         {/* 市场分析 */}
@@ -340,7 +384,7 @@ export default function ReportDetailScreen() {
               <View style={{ height: 1, backgroundColor: (theme.colors.outlineVariant || theme.colors.outline) + '40', marginVertical: 16 }} />
 
               {/* 投资机会 */}
-              {report.analysis.opportunities.length > 0 && (
+              {report.analysis.opportunities && report.analysis.opportunities.length > 0 && (
                 <View style={styles.analysisItem}>
                   <Text variant="labelMedium" style={{ color: isDark ? '#4ADE80' : '#16A34A', fontWeight: '600', marginBottom: 10 }}>
                     💡 投资机会
@@ -356,7 +400,7 @@ export default function ReportDetailScreen() {
               )}
 
               {/* 风险提示 */}
-              {report.analysis.risks.length > 0 && (
+              {report.analysis.risks && report.analysis.risks.length > 0 && (
                 <View style={[styles.analysisItem, { marginBottom: 0 }]}>
                   <Text variant="labelMedium" style={{ color: isDark ? '#F87171' : '#DC2626', fontWeight: '600', marginBottom: 10 }}>
                     ⚠️ 风险提示
