@@ -65,8 +65,17 @@ if ! grep -q 'apple-mobile-web-app-capable' "$DIST_DIR/index.html"; then
     echo "  ✅ PWA meta 标签已添加"
 fi
 
-# 4. 复制 PWA 资源
-cp "$(dirname "$0")/../assets/apple-touch-icon.png" "$DIST_DIR/apple-touch-icon.png" 2>/dev/null && echo "  ✅ apple-touch-icon 已复制"
+# 4. 生成 180x180 的 apple-touch-icon（不带 alpha，深蓝背景）
+SCRIPT_DIR="$(dirname "$0")"
+python3 -c "
+from PIL import Image
+img = Image.open('$SCRIPT_DIR/../assets/apple-touch-icon.png').convert('RGBA')
+bg = Image.new('RGB', img.size, (15, 32, 65))
+bg.paste(img, (0, 0), img)
+icon = bg.resize((180, 180), Image.LANCZOS)
+icon.save('$DIST_DIR/apple-touch-icon.png', optimize=True, quality=95)
+print('  ✅ apple-touch-icon 已生成 (180x180)')
+"
 
 # 5. 创建 manifest.json
 cat > "$DIST_DIR/manifest.json" << 'EOF'
