@@ -77,10 +77,10 @@ export default function MiniPlayer({ onPress }: MiniPlayerProps) {
         onPress={handleNavigateToPodcast}
         activeOpacity={0.9}
       >
-        {/* 左侧：小熊图标 */}
+        {/* 左侧：小熊图标 - 使用小尺寸图标加快加载 */}
         <View style={styles.iconContainer}>
           <Image
-            source={require('@/assets/icon.png')}
+            source={require('@/assets/icon-small.png')}
             style={styles.bearIcon}
             resizeMode="cover"
           />
