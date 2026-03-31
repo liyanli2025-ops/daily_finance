@@ -90,6 +90,9 @@ export default function PodcastScreen() {
       pause();
     } else if (todayReport?.podcast_url) {
       play(todayReport.id, todayReport.podcast_url);
+    } else {
+      // 没有音频 URL，audioStore 会显示提示
+      play(todayReport?.id || '', '');
     }
   };
 

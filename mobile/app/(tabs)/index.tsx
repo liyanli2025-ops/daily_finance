@@ -202,13 +202,18 @@ export default function HomeScreen() {
                       backgroundColor: isCurrentPlaying
                         ? colors.primary
                         : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(124,77,255,0.08)'),
+                      opacity: report.podcast_url ? 1 : 0.5,
                     }]}
                     onPress={(e) => {
                       e.stopPropagation();
+                      if (!report.podcast_url) {
+                        // 没有音频 URL，不做任何操作
+                        return;
+                      }
                       if (isCurrentPlaying) {
                         pause();
                       } else {
-                        play(report.id, report.podcast_url || '');
+                        play(report.id, report.podcast_url);
                       }
                     }}
                   >

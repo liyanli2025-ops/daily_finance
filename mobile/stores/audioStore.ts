@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Audio } from 'expo-av';
+import { Platform, Alert } from 'react-native';
 
 interface AudioStore {
   isPlaying: boolean;
@@ -8,6 +9,8 @@ interface AudioStore {
   playbackRate: number;
   currentReportId: string | null;
   sound: Audio.Sound | null;
+  isLoading: boolean;
+  error: string | null;
 
   play: (reportId: string, audioUrl: string) => Promise<void>;
   pause: () => Promise<void>;
@@ -24,9 +27,22 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
   playbackRate: 1,
   currentReportId: null,
   sound: null,
+  isLoading: false,
+  error: null,
 
   play: async (reportId: string, audioUrl: string) => {
     const { sound: currentSound, currentReportId } = get();
+
+    // 检查 URL 是否有效
+    if (!audioUrl || audioUrl.trim() === '') {
+      set({ error: '播客音频尚未生成' });
+      if (Platform.OS === 'web') {
+        alert('播客音频尚未生成，请稍后再试');
+      } else {
+        Alert.alert('提示', '播客音频尚未生成，请稍后再试');
+      }
+      return;
+    }
 
     // 如果是同一个音频且已暂停，则继续播放
     if (currentReportId === reportId && currentSound) {
@@ -39,6 +55,8 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
     if (currentSound) {
       await currentSound.unloadAsync();
     }
+
+    set({ isLoading: true, error: null });
 
     try {
       // 配置音频模式
@@ -72,27 +90,21 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
         sound,
         currentReportId: reportId,
         isPlaying: true,
+        isLoading: false,
       });
     } catch (error) {
       console.error('播放音频失败:', error);
-      
-      // 模拟播放状态（用于测试）
-      set({
-        currentReportId: reportId,
-        isPlaying: true,
-        duration: 1500, // 25分钟
+      set({ 
+        isLoading: false, 
+        isPlaying: false,
+        error: '播放失败，音频可能不存在或网络问题'
       });
-
-      // 模拟进度更新
-      const interval = setInterval(() => {
-        const state = get();
-        if (state.isPlaying && state.currentPosition < state.duration) {
-          set({ currentPosition: state.currentPosition + 1 });
-        } else if (state.currentPosition >= state.duration) {
-          clearInterval(interval);
-          set({ isPlaying: false, currentPosition: 0 });
-        }
-      }, 1000);
+      
+      if (Platform.OS === 'web') {
+        alert('播放失败：音频文件可能不存在或网络问题');
+      } else {
+        Alert.alert('播放失败', '音频文件可能不存在或网络问题');
+      }
     }
   },
 

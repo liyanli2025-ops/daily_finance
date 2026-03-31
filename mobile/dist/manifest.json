@@ -1,10 +1,11 @@
 {
-  "name": "财经日报",
-  "short_name": "财经日报",
+  "name": "每日财经播报",
+  "short_name": "财经播报",
+  "description": "AI驱动的每日财经播报应用",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a1a2e",
-  "theme_color": "#6200ee",
+  "background_color": "#ffffff",
+  "theme_color": "#7C4DFF",
   "icons": [
     {
       "src": "/app-icon-192.png",
