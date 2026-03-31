@@ -202,12 +202,6 @@ async def remove_from_watchlist(
     return {"status": "success", "message": "已从自选列表移除"}
 
 
-# 股票列表缓存（避免每次搜索都下载全市场数据）
-_stock_list_cache = {
-    "data": None,
-    "last_update": None,
-}
-
 # 内置常见股票列表（作为 fallback）
 _builtin_stocks = [
     # A股 - 大盘蓝筹
@@ -281,89 +275,67 @@ async def search_stocks(
     market: Optional[str] = Query(None, description="市场类型: A 或 HK")
 ):
     """
-    搜索股票 - 实时调用接口搜索全市场，缓存加速
-    策略：缓存有效 → 从缓存搜；缓存无效 → 同步拉取全市场数据再搜
+    搜索股票 - 使用东方财富搜索API，实时搜索全市场（A股+港股）
+    毫秒级响应，支持中文名称、股票代码、拼音首字母
     """
-    import asyncio
-    from datetime import datetime, timedelta
+    import httpx
     
-    def _search_from_list(stock_list):
-        """从给定列表中搜索匹配项"""
-        kw = keyword.lower()
+    async def _search_eastmoney(kw: str):
+        """调用东方财富搜索API"""
+        url = "https://searchapi.eastmoney.com/api/suggest/get"
+        params = {
+            "input": kw,
+            "type": "14",
+            "token": "D43BF722C8E33BDC906FB84D85E326E8",
+            "count": "20",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(url, params=params)
+                data = resp.json()
+                
+                results = []
+                items = data.get("QuotationCodeTable", {}).get("Data", []) or []
+                for item in items:
+                    classify = item.get("Classify", "")
+                    code = item.get("Code", "")
+                    name = item.get("Name", "")
+                    
+                    # 只保留 A 股和港股主板
+                    if classify == "AStock":
+                        results.append({"code": code, "name": name, "market": "A"})
+                    elif classify == "HK":
+                        # 过滤掉权证、牛熊证（名称通常包含"购"/"沽"/"牛"/"熊"）
+                        if not any(x in name for x in ["购", "沽", "牛", "熊", "法兴", "中银", "瑞银", "高盛", "摩通"]):
+                            results.append({"code": code, "name": name, "market": "HK"})
+                
+                return results
+        except Exception as e:
+            print(f"[ERROR] 东方财富搜索API失败: {e}")
+            return None
+    
+    def _search_from_builtin(kw: str):
+        """从内置列表搜索（降级方案）"""
+        kw_lower = kw.lower()
         results = [
-            s for s in stock_list
-            if kw in s["code"].lower() or kw in s["name"].lower()
+            s for s in _builtin_stocks
+            if kw_lower in s["code"].lower() or kw_lower in s["name"].lower()
         ]
-        if market:
-            results = [s for s in results if s["market"] == market]
-        return results[:20]
+        return results
     
-    def _fetch_all_stocks():
-        """同步拉取全市场股票列表（A股 + 港股）并更新缓存"""
-        import akshare as ak
-        stock_list = []
-        
-        # 1. 获取全 A 股
-        try:
-            df_a = ak.stock_zh_a_spot_em()
-            for _, row in df_a.iterrows():
-                stock_list.append({
-                    "code": str(row['代码']),
-                    "name": str(row['名称']),
-                    "market": "A"
-                })
-            print(f"[OK] A股列表获取完成，共 {len(df_a)} 只")
-        except Exception as e:
-            print(f"[WARN] 获取A股列表失败: {e}")
-        
-        # 2. 获取港股主板
-        try:
-            df_hk = ak.stock_hk_spot_em()
-            for _, row in df_hk.iterrows():
-                code = str(row.get('代码', ''))
-                name = str(row.get('名称', ''))
-                if code and name:
-                    stock_list.append({
-                        "code": code,
-                        "name": name,
-                        "market": "HK"
-                    })
-            print(f"[OK] 港股列表获取完成，共 {len(df_hk)} 只")
-        except Exception as e:
-            print(f"[WARN] 获取港股列表失败: {e}")
-        
-        # 更新缓存
-        if stock_list:
-            _stock_list_cache["data"] = stock_list
-            _stock_list_cache["last_update"] = datetime.now()
-            print(f"[OK] 股票列表缓存更新完成，共 {len(stock_list)} 只（A股+港股）")
-        
-        return stock_list
+    # 1. 优先调用东方财富搜索API（毫秒级响应）
+    results = await _search_eastmoney(keyword)
     
-    # 1. 缓存有效（存在且不超过1小时）→ 直接从缓存搜
-    cache_valid = (
-        _stock_list_cache["data"] is not None 
-        and _stock_list_cache["last_update"] is not None
-        and datetime.now() - _stock_list_cache["last_update"] < timedelta(hours=1)
-    )
+    if results is None:
+        # 2. API 失败 → 降级到内置列表
+        print(f"[WARN] 东方财富API不可用，使用内置列表搜索: {keyword}")
+        results = _search_from_builtin(keyword)
     
-    if cache_valid:
-        return _search_from_list(_stock_list_cache["data"])
+    # 3. 按市场过滤
+    if market:
+        results = [s for s in results if s["market"] == market]
     
-    # 2. 缓存无效 → 同步拉取全市场数据再搜（首次约3-5秒，之后走缓存）
-    try:
-        loop = asyncio.get_event_loop()
-        all_stocks = await loop.run_in_executor(None, _fetch_all_stocks)
-        if all_stocks:
-            return _search_from_list(all_stocks)
-    except Exception as e:
-        print(f"[ERROR] 实时拉取股票列表失败: {e}")
-    
-    # 3. 接口也失败了 → 降级到内置列表 + 旧缓存
-    if _stock_list_cache["data"]:
-        return _search_from_list(_stock_list_cache["data"])
-    
-    return _search_from_list(_builtin_stocks)
+    return results[:20]
 
 
 @router.get("/market/indices")

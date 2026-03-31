@@ -365,10 +365,7 @@ export default function StocksScreen() {
             <View style={styles.searchLoading}>
               <ActivityIndicator size="small" color={theme.colors.primary} />
               <Text variant="bodySmall" style={{ color: theme.colors.outline, marginTop: 8 }}>
-                正在搜索全市场股票...
-              </Text>
-              <Text variant="bodySmall" style={{ color: theme.colors.outline, marginTop: 4, fontSize: 11 }}>
-                首次搜索需加载数据，请稍等几秒
+                正在搜索...
               </Text>
             </View>
           ) : searchQuery.length > 0 && searchResults.length === 0 ? (
