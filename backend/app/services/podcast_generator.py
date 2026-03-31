@@ -2,7 +2,9 @@
 播客生成服务
 使用 Edge TTS 将报告文本转换为音频
 
-重构版：支持早报/晚报不同风格
+重构版 v2：AI 自动生成播客脚本
+- 不再依赖固定模板，每期开场白都独一无二
+- AI 根据报告内容、天气、日期等上下文生成自然口语化的播客脚本
 - 早报：简洁直接，快节奏，聚焦当日操作
 - 晚报：深入复盘，稍慢节奏，回顾+展望
 - 非交易日：深度科普，慢节奏，知识性强
@@ -48,11 +50,16 @@ class PodcastGeneratorService:
         self.output_dir = Path(settings.podcasts_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        # 初始化开场白模板（使用用户昵称）
+        # 初始化开场白模板（备用方案）
         self._init_openings()
         
         # HTTP客户端用于获取天气
         self.http_client = None
+        
+        # 初始化 AI 客户端（用于生成播客脚本）
+        self.ai_client = None
+        self.using_free_service = False
+        self._init_ai_client()
     
     def _init_openings(self):
         """初始化开场白模板，使用配置的用户昵称"""
@@ -96,6 +103,108 @@ class PodcastGeneratorService:
         
         # 兼容旧版属性名
         self.weekday_openings = self.morning_openings
+    
+    def _init_ai_client(self):
+        """初始化 AI 客户端（用于生成播客脚本）"""
+        # 尝试使用 Anthropic
+        if settings.anthropic_api_key:
+            try:
+                from anthropic import Anthropic
+                self.ai_client = ("anthropic", Anthropic(api_key=settings.anthropic_api_key))
+                print("[播客] AI 客户端初始化成功 (Anthropic)")
+                return
+            except Exception as e:
+                print(f"[播客] Anthropic 初始化失败: {e}")
+        
+        # 尝试使用 OpenAI/兼容服务
+        if settings.openai_api_key:
+            try:
+                from openai import OpenAI
+                base_url = settings.openai_base_url or "https://api.openai.com/v1"
+                self.ai_client = ("openai", OpenAI(api_key=settings.openai_api_key, base_url=base_url))
+                print(f"[播客] AI 客户端初始化成功 (OpenAI/兼容服务: {base_url})")
+                return
+            except Exception as e:
+                print(f"[播客] OpenAI 初始化失败: {e}")
+        
+        # 尝试使用免费服务
+        try:
+            from openai import OpenAI
+            self.ai_client = ("openai", OpenAI(
+                api_key="dummy",
+                base_url="https://text.pollinations.ai/openai"
+            ))
+            self.using_free_service = True
+            print("[播客] AI 客户端初始化成功 (免费服务 Pollinations)")
+        except Exception as e:
+            print(f"[播客] 免费服务初始化失败: {e}，将使用备用模板")
+            self.ai_client = None
+    
+    async def _call_ai_for_podcast(self, system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> Optional[str]:
+        """
+        调用 AI 生成播客脚本
+        
+        Args:
+            system_prompt: 系统提示词（定义 AI 主播人设）
+            user_prompt: 用户提示词（包含报告内容等素材）
+            max_tokens: 最大输出 token 数
+            
+        Returns:
+            AI 生成的播客脚本，失败返回 None
+        """
+        if not self.ai_client:
+            print("[播客] AI 客户端未初始化，无法生成脚本")
+            return None
+        
+        client_type, client = self.ai_client
+        max_retries = 3 if self.using_free_service else 2
+        
+        for attempt in range(max_retries):
+            try:
+                if client_type == "anthropic":
+                    message = client.messages.create(
+                        model=settings.ai_model if settings.ai_model else "claude-sonnet-4-20250514",
+                        max_tokens=max_tokens,
+                        system=system_prompt,
+                        messages=[{"role": "user", "content": user_prompt}]
+                    )
+                    return message.content[0].text
+                else:
+                    # OpenAI/兼容服务
+                    if self.using_free_service:
+                        model = "openai"
+                    elif settings.ai_model and "claude" not in settings.ai_model.lower():
+                        model = settings.ai_model
+                    elif settings.openai_base_url:
+                        if "deepseek" in settings.openai_base_url.lower():
+                            model = "deepseek-chat"
+                        elif "siliconflow" in settings.openai_base_url.lower():
+                            model = "deepseek-ai/DeepSeek-V3"
+                        else:
+                            model = "gpt-4-turbo"
+                    else:
+                        model = "gpt-4-turbo"
+                    
+                    print(f"[播客] 调用 AI 生成脚本: {model} (尝试 {attempt + 1}/{max_retries})")
+                    
+                    response = client.chat.completions.create(
+                        model=model,
+                        max_tokens=max_tokens,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ]
+                    )
+                    return response.choices[0].message.content
+                    
+            except Exception as e:
+                print(f"[播客] AI 调用失败 (尝试 {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 3
+                    print(f"   等待 {wait_time} 秒后重试...")
+                    await asyncio.sleep(wait_time)
+        
+        return None
     
     async def _get_http_client(self):
         """获取或创建HTTP客户端"""
@@ -317,8 +426,8 @@ class PodcastGeneratorService:
         # 获取北京天气
         weather_info = await self.get_beijing_weather()
         
-        # 准备播客文本（传入天气信息）
-        podcast_text = self._prepare_podcast_text(report, weather_info)
+        # 准备播客文本（使用 AI 生成脚本）
+        podcast_text = await self._prepare_podcast_text(report, weather_info)
         
         # 生成音频文件名
         filename = f"{report.id}.mp3"
@@ -444,13 +553,16 @@ class PodcastGeneratorService:
             except:
                 pass
     
-    def _prepare_podcast_text(self, report: Report, weather_info: str = "") -> str:
+    async def _prepare_podcast_text(self, report: Report, weather_info: str = "") -> str:
         """
-        准备播客文本 - 根据报告类型选择不同风格
+        准备播客文本 - 使用 AI 生成完整脚本
         
-        早报风格：简洁直接，快节奏，聚焦当日操作
-        晚报风格：深入复盘，回顾早报，展望明日
-        非交易日：深度科普，慢节奏，知识性强
+        v2: 全面升级，AI 自动生成播客脚本
+        - 不再依赖固定模板
+        - 根据报告内容、天气、日期等上下文生成
+        - 每期开场白、过渡语、结束语都独一无二
+        
+        如果 AI 生成失败，则回退到模板方案
         """
         report_date = report.report_date
         # 确保 report_date 是 date 对象
@@ -467,22 +579,194 @@ class PodcastGeneratorService:
         
         is_weekend = self._is_weekend(report_date)
         
-        # 根据类型选择生成方法
-        if is_weekend:
-            return self._prepare_weekend_podcast_text(report, weather_info, report_date)
-        elif report_type == ReportType.EVENING:
-            return self._prepare_evening_podcast_text(report, weather_info, report_date)
-        else:
-            return self._prepare_morning_podcast_text(report, weather_info, report_date)
-    
-    def _prepare_morning_podcast_text(self, report: Report, weather_info: str, report_date: date) -> str:
-        """
-        准备交易日早报播客文本
+        # 尝试使用 AI 生成播客脚本
+        ai_script = await self._generate_ai_podcast_script(
+            report=report,
+            weather_info=weather_info,
+            report_date=report_date,
+            report_type=report_type,
+            is_weekend=is_weekend
+        )
         
-        特点：
-        - 简洁直接，快节奏
-        - 聚焦当日操作建议
-        - 2500-3000字（约10-12分钟）
+        if ai_script:
+            print("[播客] ✅ AI 脚本生成成功")
+            return ai_script
+        
+        # AI 生成失败，回退到模板方案
+        print("[播客] ⚠️ AI 脚本生成失败，使用备用模板")
+        if is_weekend:
+            return self._prepare_weekend_podcast_text_fallback(report, weather_info, report_date)
+        elif report_type == ReportType.EVENING:
+            return self._prepare_evening_podcast_text_fallback(report, weather_info, report_date)
+        else:
+            return self._prepare_morning_podcast_text_fallback(report, weather_info, report_date)
+    
+    async def _generate_ai_podcast_script(
+        self,
+        report: Report,
+        weather_info: str,
+        report_date: date,
+        report_type: ReportType,
+        is_weekend: bool
+    ) -> Optional[str]:
+        """
+        使用 AI 生成完整的播客脚本
+        
+        Args:
+            report: 报告对象
+            weather_info: 天气信息
+            report_date: 报告日期
+            report_type: 报告类型
+            is_weekend: 是否是非交易日
+            
+        Returns:
+            AI 生成的播客脚本，失败返回 None
+        """
+        if not self.ai_client:
+            return None
+        
+        weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        weekday_name = weekday_names[report_date.weekday()]
+        data_date_str, date_description, _ = self._get_market_data_date_info(report_date)
+        name = self.user_nickname
+        
+        # 确定播客类型和风格要求
+        if is_weekend:
+            podcast_type = "周末深度版"
+            style_requirement = """
+风格要求：
+- 这是周末/非交易日版本，节奏可以放慢
+- 内容更深入，可以做整周复盘和概念科普
+- 适合用户泡杯茶慢慢听
+- 字数要求：4000-5000字（约16-20分钟）
+- 开头要提醒今天是非交易日，市场休市
+"""
+            time_context = "周末愉快" if report_date.weekday() == 5 else "假期愉快"
+        elif report_type == ReportType.EVENING:
+            podcast_type = "交易日晚报"
+            style_requirement = """
+风格要求：
+- 这是晚间复盘版本，总结今天市场表现
+- 重点回顾早报预测的准确度
+- 为明天做展望和建议
+- 字数要求：3000-4000字（约12-16分钟）
+- 口吻可以稍微轻松，像和朋友聊天复盘
+"""
+            time_context = "晚上好"
+        else:
+            podcast_type = "交易日早报"
+            style_requirement = """
+风格要求：
+- 这是早间版本，快节奏、信息密集
+- 聚焦当日操作建议，实用性强
+- 适合通勤路上收听
+- 字数要求：2500-3000字（约10-12分钟）
+- 开头可以结合天气聊几句，然后快速进入正题
+"""
+            time_context = "早上好"
+        
+        # 准备报告素材
+        core_opinions_str = ""
+        if hasattr(report, 'core_opinions') and report.core_opinions:
+            core_opinions_str = "\n".join([f"{i}. {op}" for i, op in enumerate(report.core_opinions, 1)])
+        
+        cross_border_str = ""
+        if hasattr(report, 'cross_border_events') and report.cross_border_events:
+            for event in report.cross_border_events:
+                category_name = {
+                    "geopolitical": "地缘政治",
+                    "tech": "科技圈",
+                    "social": "社会热点",
+                    "disaster": "自然灾害"
+                }.get(event.category.value, "其他")
+                cross_border_str += f"\n- [{category_name}] {event.title}: {event.summary}\n  市场影响: {event.market_impact_direct}"
+        
+        # 提取报告精华内容（限制长度避免 token 过多）
+        report_essence = self._extract_key_paragraphs(report.content)
+        if len(report_essence) > 2000:
+            report_essence = report_essence[:2000] + "..."
+        
+        # 构造 System Prompt
+        system_prompt = f"""你是"财经FM"的 AI 主播，正在为用户"{name}"录制{podcast_type}播客。
+
+## 你的人设
+- 你是一位亲切、专业的财经主播
+- 说话自然，像朋友聊天，不要过于官方或死板
+- 适当使用口语化表达（"说实话"、"坦白讲"、"我个人觉得"、"其实呢"等）
+- 有自己的见解和态度，不只是念稿
+
+## 核心原则
+1. 开场白必须每次都不一样，有创意，可以结合天气、日期、时事、节气等
+2. 过渡语要自然，不要机械地说"接下来"、"然后"
+3. 分析要有深度但表达要通俗
+4. 结束语要有温度，让用户感觉被关心
+
+## 技术要求
+- 用 [SECTION_BREAK] 标记分段（系统会在这些位置加入停顿）
+- 建议每 300-500 字加一个 [SECTION_BREAK]
+- 不要使用 Markdown 格式（粗体、列表等），要纯文本
+- 不要使用 emoji
+- 用户昵称"{name}"在播客中至少出现 3-4 次
+- 数字要适合朗读（"百分之三点五"而不是"3.5%"）
+
+{style_requirement}
+"""
+
+        # 构造 User Prompt
+        user_prompt = f"""请根据以下素材，生成一期完整的{podcast_type}播客脚本。
+
+## 基本信息
+- 日期：{report_date.strftime('%Y年%m月%d日')}，{weekday_name}
+- 天气：{weather_info if weather_info else "北京今天天气不错"}
+- 用户昵称：{name}
+- 市场数据来自：{date_description}（{data_date_str}的收盘数据）
+
+## 报告摘要
+{report.summary}
+
+## 核心操作建议
+{core_opinions_str if core_opinions_str else "暂无具体操作建议"}
+
+## 跨界热点
+{cross_border_str if cross_border_str else "今天没有特别重大的跨界事件"}
+
+## 报告正文精华
+{report_essence}
+
+---
+请直接输出播客脚本，不要输出任何解释或说明。脚本应该是可以直接朗读的纯文本。
+"""
+
+        # 调用 AI 生成
+        print(f"[播客] 正在调用 AI 生成{podcast_type}脚本...")
+        script = await self._call_ai_for_podcast(system_prompt, user_prompt, max_tokens=4000)
+        
+        if script:
+            # 清理可能的 Markdown 残留
+            script = self._clean_for_tts(script)
+            # 确保有分段标记
+            if "[SECTION_BREAK]" not in script:
+                # AI 可能没有加分段标记，手动添加一些
+                paragraphs = script.split("\n\n")
+                if len(paragraphs) > 3:
+                    # 每 2-3 个段落加一个分段
+                    new_paragraphs = []
+                    for i, p in enumerate(paragraphs):
+                        new_paragraphs.append(p)
+                        if (i + 1) % 3 == 0 and i < len(paragraphs) - 1:
+                            new_paragraphs.append("[SECTION_BREAK]")
+                    script = "\n\n".join(new_paragraphs)
+            return script
+        
+        return None
+    
+    # ==================== 备用模板方法（AI 生成失败时使用）====================
+    
+    def _prepare_morning_podcast_text_fallback(self, report: Report, weather_info: str, report_date: date) -> str:
+        """
+        【备用方案】准备交易日早报播客文本
+        
+        当 AI 生成失败时使用此模板方法
         """
         weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         weekday_name = weekday_names[report_date.weekday()]
@@ -550,14 +834,11 @@ class PodcastGeneratorService:
         
         return full_text
     
-    def _prepare_evening_podcast_text(self, report: Report, weather_info: str, report_date: date) -> str:
+    def _prepare_evening_podcast_text_fallback(self, report: Report, weather_info: str, report_date: date) -> str:
         """
-        准备交易日晚报播客文本
+        【备用方案】准备交易日晚报播客文本
         
-        特点：
-        - 深入复盘，回顾早报预测
-        - 稍慢节奏，更多分析
-        - 3000-4000字（约12-16分钟）
+        当 AI 生成失败时使用此模板方法
         """
         weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         weekday_name = weekday_names[report_date.weekday()]
@@ -647,14 +928,11 @@ class PodcastGeneratorService:
         
         return full_text
     
-    def _prepare_weekend_podcast_text(self, report: Report, weather_info: str, report_date: date) -> str:
+    def _prepare_weekend_podcast_text_fallback(self, report: Report, weather_info: str, report_date: date) -> str:
         """
-        准备非交易日深度版播客文本
+        【备用方案】准备非交易日深度版播客文本
         
-        特点：
-        - 深度科普，慢节奏
-        - 整周复盘 + 概念讲解 + 下周展望
-        - 4000-5000字（约16-20分钟）
+        当 AI 生成失败时使用此模板方法
         """
         weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         weekday_name = weekday_names[report_date.weekday()]
