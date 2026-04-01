@@ -351,8 +351,24 @@ class AIAnalyzerService:
   ],
   "market_score": 65,
   "position_advice": "6成",
-  "highlights": [...],
-  "watchlist_analysis": [...],
+  "highlights": [
+    {{
+      "title": "新闻标题",
+      "source": "来源",
+      "summary": "一句话摘要",
+      "sentiment": "positive/negative/neutral",
+      "related_stocks": ["股票代码"],
+      "historical_context": "历史参照（可选）"
+    }}
+  ],
+  "watchlist_analysis": [
+    {{
+      "code": "股票代码",
+      "name": "股票名称",
+      "action": "操作建议",
+      "reason": "理由"
+    }}
+  ],
   "market_analysis": {{
     "overall_sentiment": "positive/negative/neutral",
     "trend": "bullish/bearish/neutral",
@@ -1419,17 +1435,31 @@ class AIAnalyzerService:
         summary = json_data.get("summary", content[:200])
         core_opinions = json_data.get("core_opinions", [])
         
-        # 构建 highlights
+        # 构建 highlights（容错：AI 可能返回字符串数组而非对象数组）
         highlights = []
         for h in json_data.get("highlights", [])[:5]:
-            highlights.append(NewsHighlight(
-                title=h.get("title", ""),
-                source=h.get("source", ""),
-                summary=h.get("summary", ""),
-                sentiment=ReportSentiment(h.get("sentiment", "neutral")),
-                related_stocks=h.get("related_stocks", []),
-                historical_context=h.get("historical_context")
-            ))
+            try:
+                if isinstance(h, str):
+                    # AI 返回了字符串而非字典，转换为 NewsHighlight
+                    highlights.append(NewsHighlight(
+                        title=h,
+                        source="",
+                        summary=h,
+                        sentiment=ReportSentiment("neutral"),
+                        related_stocks=[],
+                        historical_context=None
+                    ))
+                elif isinstance(h, dict):
+                    highlights.append(NewsHighlight(
+                        title=h.get("title", ""),
+                        source=h.get("source", ""),
+                        summary=h.get("summary", ""),
+                        sentiment=ReportSentiment(h.get("sentiment", "neutral")),
+                        related_stocks=h.get("related_stocks", []),
+                        historical_context=h.get("historical_context")
+                    ))
+            except Exception as e:
+                print(f"[WARN] 解析 highlight 失败: {e}, 原始数据: {h}")
         
         # 如果没有解析出 highlights，从新闻列表生成
         if not highlights and news_list:
@@ -1442,37 +1472,57 @@ class AIAnalyzerService:
                     related_stocks=news.related_stocks
                 ))
         
-        # 构建跨界事件
+        # 构建跨界事件（容错：AI 可能返回字符串数组）
         cross_border_events = []
         for cb in json_data.get("cross_border_events", []):
-            category_str = cb.get("category", "tech")
             try:
-                category = CrossBorderCategory(category_str)
-            except:
-                category = CrossBorderCategory.TECH
-            
-            cross_border_events.append(CrossBorderEvent(
-                title=cb.get("title", ""),
-                category=category,
-                summary=cb.get("summary", ""),
-                market_impact_direct=cb.get("market_impact_direct", ""),
-                market_impact_indirect=cb.get("market_impact_indirect", ""),
-                historical_reference=cb.get("historical_reference", ""),
-                beneficiaries=cb.get("beneficiaries", []),
-                losers=cb.get("losers", []),
-                follow_up_advice=cb.get("follow_up_advice", "")
-            ))
+                if isinstance(cb, str):
+                    # AI 返回了字符串，跳过
+                    continue
+                if not isinstance(cb, dict):
+                    continue
+                category_str = cb.get("category", "tech")
+                try:
+                    category = CrossBorderCategory(category_str)
+                except:
+                    category = CrossBorderCategory.TECH
+                
+                cross_border_events.append(CrossBorderEvent(
+                    title=cb.get("title", ""),
+                    category=category,
+                    summary=cb.get("summary", ""),
+                    market_impact_direct=cb.get("market_impact_direct", ""),
+                    market_impact_indirect=cb.get("market_impact_indirect", ""),
+                    historical_reference=cb.get("historical_reference", ""),
+                    beneficiaries=cb.get("beneficiaries", []),
+                    losers=cb.get("losers", []),
+                    follow_up_advice=cb.get("follow_up_advice", "")
+                ))
+            except Exception as e:
+                print(f"[WARN] 解析 cross_border_event 失败: {e}")
         
-        # 构建市场分析
-        analysis_data = json_data.get("market_analysis", {})
-        analysis = MarketAnalysis(
-            overall_sentiment=ReportSentiment(analysis_data.get("overall_sentiment", "neutral")),
-            trend=MarketTrend(analysis_data.get("trend", "neutral")),
-            key_factors=analysis_data.get("key_factors", []),
-            opportunities=analysis_data.get("opportunities", []),
-            risks=analysis_data.get("risks", []),
-            indices=[]
-        )
+        # 构建市场分析（容错：market_analysis 可能不是字典）
+        raw_analysis = json_data.get("market_analysis", {})
+        analysis_data = raw_analysis if isinstance(raw_analysis, dict) else {}
+        try:
+            analysis = MarketAnalysis(
+                overall_sentiment=ReportSentiment(analysis_data.get("overall_sentiment", "neutral")),
+                trend=MarketTrend(analysis_data.get("trend", "neutral")),
+                key_factors=analysis_data.get("key_factors", []),
+                opportunities=analysis_data.get("opportunities", []),
+                risks=analysis_data.get("risks", []),
+                indices=[]
+            )
+        except Exception as e:
+            print(f"[WARN] 解析 market_analysis 失败: {e}")
+            analysis = MarketAnalysis(
+                overall_sentiment=ReportSentiment("neutral"),
+                trend=MarketTrend("neutral"),
+                key_factors=[],
+                opportunities=[],
+                risks=[],
+                indices=[]
+            )
         
         # 计算统计信息
         word_count = len(content)
