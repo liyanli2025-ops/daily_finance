@@ -12,6 +12,9 @@ node_modules/
 # 数据库和数据
 *.db
 data/audio/
+backend/data/podcasts/
+backend/data/reports/
+data/podcasts/
 
 # 系统文件
 Thumbs.db
