@@ -1268,11 +1268,16 @@ class AIAnalyzerService:
                         # OpenAI 官方服务
                         model = settings.ai_model if "gpt" in settings.ai_model.lower() else "gpt-4-turbo"
                     
-                    print(f"[AI] 调用模型: {model} (尝试 {attempt + 1}/{max_retries})")
+                    # DeepSeek max_tokens 上限 8192，自动适配
+                    actual_max_tokens = max_tokens
+                    if "deepseek" in (settings.openai_base_url or "").lower():
+                        actual_max_tokens = min(max_tokens, 8192)
+                    
+                    print(f"[AI] 调用模型: {model} (尝试 {attempt + 1}/{max_retries}), max_tokens={actual_max_tokens}")
                     
                     response = self.openai_client.chat.completions.create(
                         model=model,
-                        max_tokens=max_tokens,
+                        max_tokens=actual_max_tokens,
                         messages=[
                             {"role": "user", "content": prompt}
                         ]
