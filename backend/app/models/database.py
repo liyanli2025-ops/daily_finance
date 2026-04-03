@@ -171,6 +171,66 @@ class EventModel(Base):
     news_count = Column(Integer, default=0)
 
 
+class TechSignalHistoryModel(Base):
+    """技术信号历史记录表 — 用于追踪信号的历史胜率"""
+    __tablename__ = "tech_signal_history"
+    
+    id = Column(String(36), primary_key=True)
+    
+    # 信号发出日期和股票信息
+    signal_date = Column(Date, nullable=False)         # 信号触发日期
+    stock_code = Column(String(20), nullable=False)    # 股票代码
+    stock_name = Column(String(100), nullable=False)   # 股票名称
+    
+    # 信号详情
+    signal_type = Column(String(50), nullable=False)   # 信号类型（如 MACD金叉、均线多头排列）
+    signal_score = Column(Float, default=0)            # 信号综合得分
+    all_signals = Column(JSON, default=list)            # 当日触发的所有信号列表
+    
+    # 信号触发时的价格
+    entry_price = Column(Float, nullable=False)        # 信号触发日收盘价
+    
+    # 7日后评估结果（延迟填充）
+    eval_date = Column(Date)                           # 评估日期（信号日+7天）
+    exit_price = Column(Float)                         # 评估日收盘价
+    return_pct = Column(Float)                         # 7日收益率(%)
+    is_win = Column(Boolean)                           # 是否盈利（收益率>0）
+    is_evaluated = Column(Boolean, default=False)      # 是否已评估
+    
+    # 元数据
+    sector = Column(String(100))                       # 所属行业
+    volume_ratio = Column(Float)                       # 信号日量比
+    turnover_rate = Column(Float)                      # 信号日换手率
+    
+    created_at = Column(DateTime, default=datetime.now)
+    evaluated_at = Column(DateTime)                    # 评估完成时间
+
+
+class PredictionAccuracyModel(Base):
+    """预测准确度记录表 — 自动回测早报预测 vs 实际收盘"""
+    __tablename__ = "prediction_accuracy"
+    
+    id = Column(String(36), primary_key=True)
+    report_id = Column(String(36), nullable=False)     # 关联早报ID
+    report_date = Column(Date, nullable=False)         # 报告日期
+    
+    # 各维度评分
+    market_direction_hit = Column(Boolean)             # 大盘方向是否命中
+    sector_accuracy = Column(Float)                    # 板块推荐准确率 (0-1)
+    stock_accuracy = Column(Float)                     # 个股建议准确率 (0-1)
+    overall_accuracy = Column(Float)                   # 综合准确率 (0-1)
+    
+    # 详细数据（JSON）
+    predictions = Column(JSON)                         # 原始预测数据
+    actuals = Column(JSON)                             # 实际收盘数据
+    evaluation = Column(JSON)                          # 逐项评估结果
+    
+    # 经验教训（AI生成）
+    lessons_learned = Column(Text)
+    
+    created_at = Column(DateTime, default=datetime.now)
+
+
 # 数据库初始化函数
 def get_database_url(url: str) -> str:
     """转换数据库URL为异步版本"""

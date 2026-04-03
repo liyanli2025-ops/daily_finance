@@ -165,12 +165,32 @@ class NewsCollectorService:
         # 新闻去重缓存（基于标题哈希）
         self._seen_hashes: set = set()
         
+        # 【盘中预采集缓存】
+        # 交易日午间采集的新闻会暂存在这里，晚报生成时合并使用
+        self._midday_news_cache: List[News] = []
+        self._midday_cache_date: Optional[str] = None  # 缓存日期，避免跨日使用过期数据
+        
         # 中国相关关键词
         self.china_keywords = [
             "中国", "人民币", "央行", "A股", "沪深", "港股",
             "中美", "贸易", "发改委", "工信部", "财政部",
             "北京", "上海", "深圳", "香港", "内地",
             "国企", "民企", "科创板", "创业板", "北交所"
+        ]
+        
+        # 全球市场关键词（对A股有重大影响的国际市场信息）
+        self.global_market_keywords = [
+            # 大宗商品
+            "原油", "油价", "黄金", "金价", "白银", "铜", "铁矿石",
+            "大宗商品", "期货", "现货", "WTI", "布伦特", "OPEC",
+            # 外盘指数
+            "美股", "纳斯达克", "道琼斯", "标普", "恒指", "恒生",
+            "日经", "欧股", "富时",
+            # 宏观/央行
+            "美联储", "降息", "加息", "利率", "通胀", "CPI",
+            "美元", "汇率", "关税", "制裁",
+            # 其他影响A股的关键词
+            "MSCI", "北向资金", "外资", "离岸",
         ]
         
         # 检查 AKShare 是否可用
@@ -287,6 +307,105 @@ class NewsCollectorService:
         
         return filtered_news
     
+    async def collect_midday_cache(self, hours: int = 3) -> List[News]:
+        """
+        盘中预采集（交易日午间调用）
+        
+        采集上午开盘到午休期间的新闻和雪球讨论，
+        缓存在内存中，供晚报合并使用。
+        
+        Args:
+            hours: 采集最近几小时的新闻（默认3小时，覆盖9:30-11:30）
+            
+        Returns:
+            采集到的新闻列表（同时缓存在 _midday_news_cache 中）
+        """
+        from datetime import date as date_type
+        
+        today_str = date_type.today().strftime("%Y-%m-%d")
+        
+        print(f"\n[盘中预采集] 开始采集盘中新闻，时间窗口 {hours}h...")
+        
+        # 执行常规新闻采集
+        all_news = await self.collect_all(hours=hours)
+        
+        # 更新缓存
+        self._midday_news_cache = all_news
+        self._midday_cache_date = today_str
+        
+        print(f"[盘中预采集] 完成，缓存 {len(all_news)} 条盘中新闻（日期: {today_str}）")
+        
+        return all_news
+    
+    def get_midday_cache(self) -> List[News]:
+        """
+        获取盘中预采集的缓存新闻
+        
+        只有当天的缓存才有效，过期数据会被清空。
+        
+        Returns:
+            缓存的盘中新闻列表（可能为空）
+        """
+        from datetime import date as date_type
+        
+        today_str = date_type.today().strftime("%Y-%m-%d")
+        
+        if self._midday_cache_date != today_str:
+            # 缓存不是今天的，清空
+            if self._midday_news_cache:
+                print(f"[盘中缓存] 缓存日期 {self._midday_cache_date} 非今日，清空")
+            self._midday_news_cache = []
+            self._midday_cache_date = None
+            return []
+        
+        print(f"[盘中缓存] 返回今日 {len(self._midday_news_cache)} 条盘中缓存新闻")
+        return self._midday_news_cache
+    
+    def merge_with_midday_cache(self, evening_news: List[News]) -> List[News]:
+        """
+        将盘后新闻与盘中预采集缓存合并去重
+        
+        盘中新闻 + 盘后新闻 → 去重后的完整新闻列表
+        确保盘中的新闻不会因为被下午新闻冲掉而丢失。
+        
+        Args:
+            evening_news: 盘后采集的新闻列表
+            
+        Returns:
+            合并去重后的完整新闻列表
+        """
+        midday_news = self.get_midday_cache()
+        
+        if not midday_news:
+            print("[新闻合并] 无盘中缓存，使用盘后新闻")
+            return evening_news
+        
+        # 合并：盘后新闻优先（更新），盘中新闻补充
+        combined = list(evening_news)  # 先放入盘后新闻
+        
+        # 已有的标题哈希集合
+        import hashlib
+        existing_hashes = set()
+        for news in combined:
+            title_hash = hashlib.md5(news.title.encode()).hexdigest()
+            existing_hashes.add(title_hash)
+        
+        # 从盘中缓存中补充不重复的新闻
+        added_count = 0
+        for news in midday_news:
+            title_hash = hashlib.md5(news.title.encode()).hexdigest()
+            if title_hash not in existing_hashes:
+                existing_hashes.add(title_hash)
+                combined.append(news)
+                added_count += 1
+        
+        # 按重要性和时间重新排序
+        combined.sort(key=lambda x: (x.importance_score, x.published_at), reverse=True)
+        
+        print(f"[新闻合并] 盘后 {len(evening_news)} + 盘中补充 {added_count} = 合计 {len(combined)} 条")
+        
+        return combined
+
     async def _collect_xueqiu_hot(self) -> List[News]:
         """
         直接爬取雪球热帖
@@ -916,6 +1035,24 @@ class NewsCollectorService:
             if word in combined_text:
                 score += 0.15
         
+        # 🆕 大宗商品/外盘/宏观关键词加分
+        commodity_words = [
+            "油价", "原油", "黄金", "白银", "金价", "大宗商品", "期货",
+            "OPEC", "WTI", "布伦特", "铁矿石", "铜价",
+        ]
+        for word in commodity_words:
+            if word in combined_text:
+                score += 0.15
+        
+        global_market_words = [
+            "美股", "纳斯达克", "道琼斯", "标普", "恒生", "恒指",
+            "美联储", "降息", "加息", "通胀", "CPI", "非农",
+            "美元", "汇率", "关税", "制裁",
+        ]
+        for word in global_market_words:
+            if word in combined_text:
+                score += 0.12
+        
         # 跨界新闻特殊加分
         if news_type == NewsType.GEOPOLITICAL:
             # 地缘政治关键词
@@ -1045,9 +1182,12 @@ class NewsCollectorService:
     
     def filter_china_related(self, news_list: List[News], min_score: float = 0.5) -> List[News]:
         """
-        筛选中国相关新闻
+        筛选中国相关及对A股有影响的新闻
+        
+        扩展版：不仅筛选包含中国关键词的新闻，
+        也包含大宗商品、外盘、宏观经济等对A股有重大影响的国际新闻
         """
-        china_news = []
+        filtered_news = []
         
         for news in news_list:
             text = news.title + " " + news.content
@@ -1055,10 +1195,13 @@ class NewsCollectorService:
             # 检查是否包含中国相关关键词
             is_china_related = any(kw in text for kw in self.china_keywords)
             
-            if is_china_related and news.importance_score >= min_score:
-                china_news.append(news)
+            # 检查是否包含全球市场关键词（对A股有影响）
+            is_global_market = any(kw in text for kw in self.global_market_keywords)
+            
+            if (is_china_related or is_global_market) and news.importance_score >= min_score:
+                filtered_news.append(news)
         
-        return china_news
+        return filtered_news
     
     def filter_cross_border_news(self, news_list: List[News], min_score: float = 0.6) -> List[News]:
         """

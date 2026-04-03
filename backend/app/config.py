@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # 【新增】晚报采集开始时间（下午4点开始收集内容）
     evening_collection_hour: int = Field(default=16, ge=0, le=23, description="晚报采集开始小时")
     
+    # 【新增】盘中预采集时间（交易日午间，缓存上午新闻避免被下午新闻冲掉）
+    midday_collection_hour: int = Field(default=11, ge=0, le=23, description="盘中预采集小时")
+    midday_collection_minute: int = Field(default=35, ge=0, le=59, description="盘中预采集分钟")
+    
     # AI 服务配置
     # 优先级：Anthropic > OpenAI > 免费服务 (Pollinations.AI)
     # 

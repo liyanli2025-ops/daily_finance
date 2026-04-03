@@ -136,7 +136,12 @@ class AIAnalyzerService:
             print(f"[AI] 市场数据获取完成：{len(market_data.indices)} 个指数，{len(market_data.top_sectors)} 个热门板块，"
                   f"{len(market_data.concept_sectors)} 个概念板块，"
                   f"{len(market_data.consecutive_limit_stocks)} 只连板股，"
-                  f"{len(market_data.tech_signal_stocks)} 只技术信号股")
+                  f"{len(market_data.tech_signal_stocks)} 只技术信号股，"
+                  f"{len(market_data.commodities)} 个大宗商品，"
+                  f"{len(market_data.global_indices)} 个外盘指数，"
+                  f"{len(market_data.lhb_seats)} 条龙虎榜席位，"
+                  f"{len(market_data.block_trades)} 笔大宗交易，"
+                  f"融资融券{'有' if market_data.margin_data else '无'}数据")
         except Exception as e:
             print(f"[WARN] 市场数据获取失败，将使用空数据继续生成报告: {e}")
             market_data = MarketOverview(date=today.strftime("%Y-%m-%d"))
@@ -144,6 +149,27 @@ class AIAnalyzerService:
         
         # 【新增】计算市场情绪指数
         sentiment_index_text = self._prepare_sentiment_index(news_list, cross_border_news or [])
+        
+        # 【新增】获取信号胜率和回测数据
+        signal_win_rates_text = ""
+        backtest_summary_text = ""
+        try:
+            from .signal_tracker import get_signal_tracker
+            signal_tracker = get_signal_tracker()
+            signal_win_rates_text = await signal_tracker.get_signal_summary_text()
+            if signal_win_rates_text:
+                print("[AI] 信号胜率数据已加载")
+        except Exception as e:
+            print(f"[AI] 获取信号胜率失败（不影响报告生成）: {e}")
+        
+        try:
+            from .backtest_service import get_backtest_service
+            backtest_service = get_backtest_service()
+            backtest_summary_text = await backtest_service.get_backtest_summary_text()
+            if backtest_summary_text:
+                print("[AI] 回测准确度数据已加载")
+        except Exception as e:
+            print(f"[AI] 获取回测数据失败（不影响报告生成）: {e}")
         
         # 准备新闻摘要
         finance_summary = self._prepare_news_summary_with_sentiment(news_list)
@@ -157,7 +183,9 @@ class AIAnalyzerService:
                 watchlist_text, investment_style_desc,
                 market_data_text, sentiment_index_text,
                 finance_summary, cross_border_summary,
-                morning_report
+                morning_report,
+                backtest_summary_text=backtest_summary_text,
+                signal_win_rates_text=signal_win_rates_text,
             )
         elif not is_trading_day:
             # 非交易日深度版早报 prompt
@@ -165,7 +193,8 @@ class AIAnalyzerService:
                 today, weekday_name, last_trading_str,
                 watchlist_text, investment_style_desc,
                 market_data_text, sentiment_index_text,
-                finance_summary, cross_border_summary
+                finance_summary, cross_border_summary,
+                signal_win_rates_text=signal_win_rates_text,
             )
         else:
             # 交易日早报 prompt
@@ -173,10 +202,18 @@ class AIAnalyzerService:
                 today, weekday_name, last_trading_str,
                 watchlist_text, investment_style_desc,
                 market_data_text, sentiment_index_text,
-                finance_summary, cross_border_summary
+                finance_summary, cross_border_summary,
+                signal_win_rates_text=signal_win_rates_text,
             )
         
-        response = await self._call_ai(report_prompt, max_tokens=8000)
+        # 根据报告类型动态调整输出容量
+        # 晚报6模块+周末报告7模块需要更多空间
+        if report_type == ReportType.EVENING or not is_trading_day:
+            max_output_tokens = 16000
+        else:
+            max_output_tokens = 12000
+        
+        response = await self._call_ai(report_prompt, max_tokens=max_output_tokens)
         
         # 解析响应
         report = self._parse_enhanced_report_response(
@@ -189,7 +226,8 @@ class AIAnalyzerService:
         self, today, weekday_name, last_trading_str,
         watchlist_text, investment_style_desc,
         market_data_text, sentiment_index_text,
-        finance_summary, cross_border_summary
+        finance_summary, cross_border_summary,
+        signal_win_rates_text: str = "",
     ) -> str:
         """
         构建交易日早报 prompt
@@ -254,6 +292,8 @@ class AIAnalyzerService:
 
 {cross_border_summary if cross_border_summary else "暂无重大跨界热点"}
 
+{signal_win_rates_text}
+
 {topic_dedup}
 
 ---
@@ -274,16 +314,18 @@ class AIAnalyzerService:
 示例：
 > **建议一（置信度：高）**：今日逢低加仓半导体板块，重点关注北方华创（002371）、中微公司（688012），目标仓位从2成提到3成。理由：昨夜费城半导体指数大涨3.2%，情绪指数+0.45偏多。止损位：如果3日内板块跌超3%则减回2成。
 
-### 模块2：📈 市场全景：大盘+板块+资金
+### 模块2：📈 市场全景：大盘+外盘+大宗商品+板块+资金
 
 1. **大盘研判**：昨日收盘+隔夜外盘+今日预判→ **结论：今日大盘偏多还是偏空？给出具体点位区间**
-2. **隔夜外盘**：美股、港股夜盘、商品期货的表现→ **对A股的影响判断**
-3. **资金暗语**：北向资金+主力资金流向→ **结论：聪明钱在往哪个方向押注？**
-4. **板块机会**：
+2. **隔夜外盘**：美股三大指数、港股恒指、欧洲主要指数的表现→ **对A股的影响判断**
+3. **🛢️ 大宗商品**：原油、黄金、白银、铜等大宗商品行情→ **对A股哪些板块有影响？**（如油价暴涨利好石油股但利空航空股，金价下跌对黄金股的影响等）
+4. **资金暗语**：北向资金+主力资金流向→ **结论：聪明钱在往哪个方向押注？**
+5. **板块机会**：
+5. **板块机会**：
    - 今日看好的板块（带具体个股）：为什么看好？建议什么价位介入？
    - 今日需要回避的板块：为什么回避？
    - ⚠️ **概念板块**：市场数据中提供了概念板块排行（如有），结合行业板块一起分析，找出资金共识方向
-5. **连板龙头**：
+6. **连板龙头**：
    - 市场数据中提供了连板强势股（如有），分析连板股背后代表的市场主线和情绪
    - 判断哪些连板股是真龙头（有概念+资金共识），哪些是纯情绪投机
 
@@ -388,7 +430,9 @@ class AIAnalyzerService:
         watchlist_text, investment_style_desc,
         market_data_text, sentiment_index_text,
         finance_summary, cross_border_summary,
-        morning_report: Optional[Report] = None
+        morning_report: Optional[Report] = None,
+        backtest_summary_text: str = "",
+        signal_win_rates_text: str = "",
     ) -> str:
         """
         构建交易日晚报 prompt
@@ -470,11 +514,17 @@ class AIAnalyzerService:
 
 ## 📰 今日财经要闻
 
+> 💡 **数据来源说明**：以下新闻来自两轮采集——**盘中预采集**（午间11:35，锁定上午盘中突发消息、异动解读、投资者讨论）+ **盘后采集**（16:00，收盘后最新消息），已自动合并去重。因此你可以基于盘中+盘后的完整信息进行分析，包括盘中发生的事件和情绪变化。
+
 {finance_summary}
 
 ## 🌍 今日跨界热点
 
 {cross_border_summary if cross_border_summary else "暂无重大跨界热点"}
+
+{backtest_summary_text}
+
+{signal_win_rates_text}
 
 {topic_dedup}
 
@@ -496,12 +546,16 @@ class AIAnalyzerService:
 
 不要只罗列"涨了什么跌了什么"，要深入分析：
 1. **表面现象**：今天大盘涨跌了多少？哪些板块领涨领跌？
-2. **深层原因**：为什么涨？为什么跌？是政策驱动？资金驱动？消息驱动？
-3. **投资逻辑**：这背后反映了什么样的市场逻辑？对你未来的操作有什么启示？
-4. **资金面**：北向资金、主力资金今天怎么操作的？透露了什么信号？
-5. **概念板块暗线**：结合概念板块排行数据（如有），挖掘今天的隐藏主线——哪些概念在悄悄发酵？
-6. **连板股信号**：今天的连板股（如有）反映了市场什么样的投机情绪？连板股背后的题材是否有持续性？
-7. **技术信号机会股**：市场数据中提供了技术信号机会股（如有），点评信号得分最高的2-3只——技术信号验证了还是被打脸了？
+2. **盘中走势还原**：结合盘中预采集的新闻，还原今天的日内走势节奏——是高开低走？低开高走？早盘拉升午后跳水？V型反转？描述关键时间节点发生了什么（如"上午10点传出XX消息导致半导体集体跳水，午后资金抄底带动反弹"）
+3. **深层原因**：为什么涨？为什么跌？是政策驱动？资金驱动？消息驱动？
+3. **深层原因**：为什么涨？为什么跌？是政策驱动？资金驱动？消息驱动？
+4. **投资逻辑**：这背后反映了什么样的市场逻辑？对你未来的操作有什么启示？
+5. **🌍 外盘联动**：今天外盘（美股、港股）表现如何？对A股有什么传导效应？
+6. **🛢️ 大宗商品影响**：今天原油、黄金、白银等大宗商品走势如何？对A股哪些板块产生了实际影响？（如油价暴涨→石油股涨/航空股跌，金价下跌→黄金股承压等）
+7. **资金面**：北向资金、主力资金今天怎么操作的？透露了什么信号？
+8. **概念板块暗线**：结合概念板块排行数据（如有），挖掘今天的隐藏主线——哪些概念在悄悄发酵？
+9. **连板股信号**：今天的连板股（如有）反映了市场什么样的投机情绪？连板股背后的题材是否有持续性？
+10. **技术信号机会股**：市场数据中提供了技术信号机会股（如有），点评信号得分最高的2-3只——技术信号验证了还是被打脸了？
 
 如果今天早报有预判，在分析过程中自然穿插评价：
 - "今天早上我说会涨，确实涨了，但涨的原因和我预判的不太一样..."
@@ -556,6 +610,8 @@ class AIAnalyzerService:
 2. 需要注意的风险事件（明天的经济数据、财报、解禁等）
 3. 需要设置止损的持仓
 4. **今日早报预判综合评分**：X/10（一句话总结经验教训）
+5. **系统回测数据参考**：上方提供了系统自动回测的准确度追踪数据（如有），请参考这些客观数据进行评价，让评分有据可依
+6. **信号胜率参考**：上方提供了技术信号历史胜率（如有），在点评技术信号时引用胜率数据，让分析更有说服力
 
 ---
 
@@ -612,7 +668,8 @@ class AIAnalyzerService:
         self, today, weekday_name, last_trading_str,
         watchlist_text, investment_style_desc,
         market_data_text, sentiment_index_text,
-        finance_summary, cross_border_summary
+        finance_summary, cross_border_summary,
+        signal_win_rates_text: str = "",
     ) -> str:
         """
         构建非交易日深度早报 prompt
@@ -677,6 +734,8 @@ class AIAnalyzerService:
 ## 🌍 本周跨界热点
 
 {cross_border_summary if cross_border_summary else "暂无重大跨界热点"}
+
+{signal_win_rates_text}
 
 {topic_dedup}
 
@@ -897,26 +956,76 @@ class AIAnalyzerService:
 你不是在"填模板"或"分模块拼凑"，你是在写一篇有灵魂、有逻辑、有温度的投资分析文章。
 你是{settings.user_nickname}的私人投资顾问，有20年实战经验，有自己的判断框架和投资哲学。
 
-### 1. 逻辑链贯穿全文
+### 1. 你的投资哲学和分析框架（核心身份）
+
+你是一位**偏价值投资、兼顾趋势**的实战派投资顾问。你的核心信念：
+- **市场短期是投票机，长期是称重机**——但你不迂腐，懂得利用短期波动获利
+- **风控永远第一**——任何时候都先想"如果我错了怎么办"，再想"对了能赚多少"
+- **不追热点尾巴**——一个概念涨了3天再推荐没有意义，要么在启动前发现，要么等回调再介入
+- **仓位管理是投资成功的50%**——好股票买在错误的仓位也会亏钱
+
+你的分析必须基于**四维联动分析法**：
+| 维度 | 核心问题 | 权重 |
+|------|---------|------|
+| 📊 **资金面** | 钱在往哪流？北向资金、主力资金、融资余额变化 | 30% |
+| 📈 **基本面** | 公司/行业的基本面变了吗？盈利、估值、行业景气度 | 30% |
+| 📉 **技术面** | 价格在什么位置？支撑/阻力、趋势、量价关系 | 20% |
+| 🎭 **情绪面** | 市场参与者在想什么？恐慌/贪婪指数、情绪指数 | 20% |
+
+**每个重要结论都必须至少用2个维度交叉验证。**例如：
+- ❌ "半导体板块值得关注"（没有依据）
+- ✅ "半导体板块资金面+基本面共振：北向昨日净买入12亿半导体ETF（资金面），叠加费城半导体指数新高（基本面传导），技术面板块指数站上20日均线，四维中三维看多，建议加仓。"
+
+### 2. 产业链传导思维（必须体现！）
+
+分析大宗商品、宏观政策时，必须沿着**产业链上下游**推导传导路径：
+- 油价暴涨 → ①石油开采（中石油）利好 → ②化工原料涨价（万华化学承压） → ③航空公司成本飙升（利空） → ④物流运输成本上升 → ⑤终端消费品可能涨价
+- 美元走强 → ①出口企业短期汇兑收益 → ②进口成本上升 → ③北向资金可能回流 → ④大宗商品以美元计价承压
+- 降息预期 → ①银行净息差收窄（利空银行） → ②地产融资成本下降（利好地产） → ③成长股估值提升（利好科技）
+
+**不要只说"利好XX板块"就完了，要说清楚传导链条。**
+
+### 3. 概率思维与多情景推演
+
+你不做"一定会涨/跌"的断言，而是用**概率思维**：
+- "我认为明天上涨概率60%，震荡概率25%，下跌概率15%"
+- "如果走乐观情景（概率40%），操作建议是...；如果走悲观情景（概率20%），应该..."
+- 对每个重要预判给出**置信度**（高/中/低），并说明什么情况下会改变判断
+
+### 4. 历史类比与案例参照
+
+好的分析师善于用历史照进现实：
+- "当前市场情绪和2024年9月底反弹前夕非常相似——都是连续缩量后突然放量"
+- "上次出现类似的政策组合拳是2020年3月，当时市场先跌后涨，两个月内反弹了25%"
+- **注意**：历史不会简单重复，类比时必须指出"这次不同的地方是什么"
+
+### 5. 反共识机制（不是口号，是方法论）
+
+当你发现市场有强烈共识时，必须做以下分析：
+1. **共识是什么**：市场大多数人在想什么/做什么？
+2. **共识背后的逻辑**：这个共识站得住脚吗？
+3. **可能的逻辑漏洞**：共识忽略了什么？定价了什么风险？
+4. **反共识观点**：如果共识错了，会怎样？概率多大？
+5. **对冲建议**：即使你认同共识，也要给出"万一共识错了"的对冲方案
+
+### 6. 逻辑链贯穿全文
 - 各模块之间必须有**因果链条**串联，像讲故事一样层层推进
 - 复盘不是孤立的复盘，而是为后续分析铺垫
 - 投资课堂不是硬插入的科普，而是从今天的实际市场案例中**自然引出**
 - 明日预判不是拍脑袋猜，而是从今天的因果链条中**推导出来**
-- 错误示范：先讲大盘涨了，然后硬插一个无关概念，再讲明天预测
-- 正确示范：今天大盘大涨3%，主要因为XX政策 → 这让我想给你讲讲XX的投资逻辑 → 基于这个逻辑，明天XX板块大概率...
 
-### 2. 人格统一
+### 7. 人格统一
 - 你有自己的分析风格和口头禅，不要每段换一种说话方式
 - 敢于在不确定时说"我也不确定，但我倾向于..."
 - 有自己的判断，不做墙头草
 - 对{settings.user_nickname}有真诚的关心，把他的钱当自己的钱看待
 
-### 3. 因果呼应
+### 8. 因果呼应
 - 前面提到的数据、事件，后面的分析和建议必须回应
 - 不要"提了不管"——每个信息点都要有后续
 - 结尾的操作建议必须是全文分析的自然结论，而不是突然蹦出来的
 
-### 4. 过渡自然
+### 9. 过渡自然
 - 模块之间要有自然的过渡句，不要生硬地说"接下来看模块X"
 - 好的过渡："说完了大盘，我们自然要问一个问题：这波行情里，你的自选股表现怎么样？"
 - 差的过渡："接下来是自选股分析部分。"
@@ -1180,11 +1289,107 @@ class AIAnalyzerService:
         return self._prepare_news_summary_with_sentiment(news_list)
     
     def _prepare_news_summary_with_sentiment(self, news_list: List[News]) -> str:
-        """准备新闻摘要文本（增强版：包含情感分析标签）"""
+        """
+        准备新闻摘要文本（增强版：分类保底配额 + 情感分析标签）
+        
+        策略：不是简单按重要性取前N条，而是按分类保底配额，
+        确保每个维度的信息都有覆盖，避免同一热点的不同报道挤占所有名额。
+        
+        配额分配（总量上限40条）：
+        - A股/国内财经新闻：至少12条，上限18条
+        - 自选股相关新闻：至少5条（如有）
+        - 大宗商品/外盘/宏观新闻：至少5条
+        - 投资者观点（雪球等）：至少3条
+        - 其他财经新闻：填满剩余名额
+        """
         summary_parts = []
         
-        # 按重要性排序，取前20条
-        sorted_news = sorted(news_list, key=lambda x: x.importance_score, reverse=True)[:20]
+        # ===== 分类保底配额选取 =====
+        TOTAL_LIMIT = 40
+        
+        # 分类桶
+        a_stock_news = []       # A股/国内财经
+        watchlist_news = []     # 自选股相关
+        global_macro_news = []  # 大宗商品/外盘/宏观
+        investor_opinion = []   # 投资者观点（雪球等）
+        other_news = []         # 其他
+        
+        # 大宗商品/外盘/宏观关键词
+        global_keywords = [
+            "原油", "油价", "黄金", "金价", "白银", "铜", "铁矿石",
+            "大宗商品", "期货", "WTI", "布伦特", "OPEC",
+            "美股", "纳斯达克", "道琼斯", "标普", "恒指", "恒生",
+            "日经", "欧股", "富时",
+            "美联储", "降息", "加息", "通胀", "CPI", "非农",
+            "美元", "汇率", "关税", "制裁",
+        ]
+        
+        for news in news_list:
+            text = news.title + " " + (news.content[:200] if news.content else "")
+            category = getattr(news, 'category', '') or ''
+            source = news.source or ''
+            
+            # 自选股相关
+            if "自选股" in category or "自选股" in source:
+                watchlist_news.append(news)
+            # 投资者观点
+            elif "雪球" in source or "投资者观点" in category or "雪球讨论" in category:
+                investor_opinion.append(news)
+            # 大宗商品/外盘/宏观
+            elif any(kw in text for kw in global_keywords):
+                global_macro_news.append(news)
+            # A股/国内财经
+            else:
+                a_stock_news.append(news)
+        
+        # 每个桶内按重要性排序
+        a_stock_news.sort(key=lambda x: x.importance_score, reverse=True)
+        watchlist_news.sort(key=lambda x: x.importance_score, reverse=True)
+        global_macro_news.sort(key=lambda x: x.importance_score, reverse=True)
+        investor_opinion.sort(key=lambda x: x.importance_score, reverse=True)
+        
+        # 按保底配额选取
+        selected = []
+        seen_titles = set()  # 同义新闻去重（标题前20字相同视为重复）
+        
+        def add_news(source_list, quota, label):
+            added = 0
+            for n in source_list:
+                if added >= quota:
+                    break
+                title_key = n.title[:20]
+                if title_key not in seen_titles:
+                    seen_titles.add(title_key)
+                    selected.append(n)
+                    added += 1
+        
+        # 保底配额
+        add_news(watchlist_news, 5, "自选股")
+        add_news(global_macro_news, 5, "外盘/大宗")
+        add_news(investor_opinion, 3, "投资者观点")
+        add_news(a_stock_news, 12, "A股财经")
+        
+        # 剩余名额按重要性从所有未选中的新闻中填充
+        remaining_quota = TOTAL_LIMIT - len(selected)
+        if remaining_quota > 0:
+            all_remaining = []
+            for bucket in [a_stock_news, watchlist_news, global_macro_news, investor_opinion]:
+                for n in bucket:
+                    title_key = n.title[:20]
+                    if title_key not in seen_titles:
+                        all_remaining.append(n)
+            all_remaining.sort(key=lambda x: x.importance_score, reverse=True)
+            add_news(all_remaining, remaining_quota, "补充")
+        
+        # 最终按重要性排序
+        sorted_news = sorted(selected, key=lambda x: x.importance_score, reverse=True)
+        
+        print(f"[新闻配额] 总计 {len(sorted_news)} 条 | "
+              f"自选股 {min(5, len(watchlist_news))} | "
+              f"外盘/大宗 {min(5, len(global_macro_news))} | "
+              f"投资者观点 {min(3, len(investor_opinion))} | "
+              f"A股财经 {min(12, len(a_stock_news))} | "
+              f"原始池 {len(news_list)} 条")
         
         for i, news in enumerate(sorted_news, 1):
             # 增加内容截取长度到500字，提供更多上下文

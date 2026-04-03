@@ -18,6 +18,8 @@ from ..config import settings
 from .news_collector import get_news_collector
 from .ai_analyzer import get_ai_analyzer
 from .podcast_generator import get_podcast_generator
+from .signal_tracker import get_signal_tracker
+from .backtest_service import get_backtest_service
 from ..models.database import ReportModel, get_session_maker
 from ..models.report import ReportType, Report
 
@@ -64,6 +66,10 @@ class SchedulerService:
         """设置数据库连接"""
         self._db_engine = engine
         self._session_maker = session_maker
+        
+        # 同步数据库到信号追踪和回测服务
+        get_signal_tracker().set_db(session_maker)
+        get_backtest_service().set_db(session_maker)
     
     def is_trading_day(self, check_date: date = None) -> bool:
         """
@@ -150,6 +156,23 @@ class SchedulerService:
             replace_existing=True
         )
         
+        # ==================== 盘中预采集任务配置 ====================
+        midday_hour = settings.midday_collection_hour
+        midday_minute = settings.midday_collection_minute
+        
+        # 添加盘中预采集任务（交易日午间执行，缓存上午新闻）
+        self.scheduler.add_job(
+            self.midday_news_precollect,
+            CronTrigger(
+                hour=midday_hour,
+                minute=midday_minute,
+                day_of_week="mon-fri"  # 周一到周五触发，内部再判断是否真正的交易日
+            ),
+            id="midday_precollect",
+            name="盘中新闻预采集",
+            replace_existing=True
+        )
+        
         # ==================== 自选股更新任务 ====================
         self.scheduler.add_job(
             self.update_watchlist_data,
@@ -162,12 +185,43 @@ class SchedulerService:
             replace_existing=True
         )
         
+        # ==================== 盘后回测任务 ====================
+        # 在晚报采集前执行（15:30），回测今日早报的预测准确度
+        self.scheduler.add_job(
+            self.run_backtest,
+            CronTrigger(
+                hour=15,
+                minute=30,
+                day_of_week="mon-fri"
+            ),
+            id="backtest",
+            name="盘后回测（早报预测准确度）",
+            replace_existing=True
+        )
+        
+        # ==================== 信号追踪任务 ====================
+        # 15:35 记录今日技术信号 + 评估7天前的信号
+        self.scheduler.add_job(
+            self.run_signal_tracking,
+            CronTrigger(
+                hour=15,
+                minute=35,
+                day_of_week="mon-fri"
+            ),
+            id="signal_tracking",
+            name="技术信号追踪与胜率统计",
+            replace_existing=True
+        )
+        
         self.scheduler.start()
         self.is_running = True
         
         print(f"[SCHEDULER] 调度器已启动")
         print(f"   - 早报采集时间: {collection_hour:02d}:{collection_minute:02d}")
         print(f"   - 早报推送时间: {report_hour:02d}:{report_minute:02d}")
+        print(f"   - 盘中预采集时间: {midday_hour:02d}:{midday_minute:02d} (仅交易日)")
+        print(f"   - 盘后回测时间: 15:30 (仅交易日)")
+        print(f"   - 信号追踪时间: 15:35 (仅交易日)")
         print(f"   - 晚报采集时间: {evening_collection_hour:02d}:00 (仅交易日)")
         print(f"   - 晚报推送时间: {evening_hour:02d}:{evening_minute:02d} (仅交易日)")
     
@@ -219,7 +273,12 @@ class SchedulerService:
             
             # 筛选中国相关财经新闻
             china_news = collector.filter_china_related(finance_news)
-            print(f"   筛选出 {len(china_news)} 条中国相关财经新闻")
+            print(f"   筛选出 {len(china_news)} 条中国及全球市场相关财经新闻（含大宗商品/外盘）")
+            
+            # 如果筛选后新闻太少，放宽使用全部财经新闻
+            if len(china_news) < 5 and len(finance_news) > 0:
+                print(f"   [INFO] 筛选后新闻较少，补充使用全部 {len(finance_news)} 条财经新闻")
+                china_news = finance_news
             
             # 筛选跨界新闻
             cross_border_news = collector.filter_cross_border_news(all_news)
@@ -280,6 +339,45 @@ class SchedulerService:
             import traceback
             traceback.print_exc()
     
+    async def midday_news_precollect(self):
+        """
+        盘中新闻预采集（交易日午间执行）
+        
+        在交易日午休时（如 11:35）采集上午的新闻和雪球讨论，
+        缓存在内存中，供晚报生成时合并使用。
+        
+        这样做的目的：
+        - 锁定上午的盘中新闻（盘中突发消息、异动解读等）
+        - 捕获午间雪球最活跃的投资者观点
+        - 避免下午4点采集时，上午的热点新闻被下午新闻冲掉
+        """
+        import sys
+        today = date.today()
+        
+        # 非交易日不执行
+        if not self.is_trading_day(today):
+            print(f"[SKIP] 今天 {today} 不是交易日，跳过盘中预采集")
+            return
+        
+        print("\n" + "-"*40, flush=True)
+        print(f"[盘中预采集] 开始 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+        print("-"*40, flush=True)
+        sys.stdout.flush()
+        
+        try:
+            collector = get_news_collector()
+            
+            # 采集上午的新闻（开盘前2h + 盘中2h ≈ 4小时窗口）
+            midday_news = await collector.collect_midday_cache(hours=4)
+            
+            print(f"[盘中预采集] 完成，缓存了 {len(midday_news)} 条盘中新闻")
+            print("-"*40 + "\n", flush=True)
+            
+        except Exception as e:
+            print(f"\n[ERROR] 盘中预采集失败（不影响晚报生成）: {e}")
+            import traceback
+            traceback.print_exc()
+    
     async def generate_evening_report(self):
         """
         生成晚报的完整流程（仅交易日）
@@ -320,14 +418,24 @@ class SchedulerService:
             # 采集今天下午到现在的新闻
             all_news = await collector.collect_all(hours=8)  # 从早上9点到下午5点约8小时
             
+            # 【核心改动】合并盘中预采集缓存，确保盘中新闻不丢失
+            midday_cache = collector.get_midday_cache()
+            midday_cache_count = len(midday_cache)
+            all_news = collector.merge_with_midday_cache(all_news)
+            
             # 分离新闻
             news_by_type = collector.get_news_by_type(all_news)
             finance_news = news_by_type.get('finance', [])
             china_news = collector.filter_china_related(finance_news)
             cross_border_news = collector.filter_cross_border_news(all_news)
             
-            print(f"   筛选出 {len(china_news)} 条中国相关财经新闻")
+            print(f"   筛选出 {len(china_news)} 条中国及全球市场相关财经新闻（含大宗商品/外盘）")
             print(f"   筛选出 {len(cross_border_news)} 条跨界热点新闻")
+            
+            # 如果筛选后新闻太少，放宽使用全部财经新闻
+            if len(china_news) < 5 and len(finance_news) > 0:
+                print(f"   [INFO] 筛选后新闻较少，补充使用全部 {len(finance_news)} 条财经新闻")
+                china_news = finance_news
             
             if not all_news:
                 print("[WARN] 未能采集到新闻，将使用模拟数据")
@@ -524,6 +632,106 @@ class SchedulerService:
                 news_count=db_report.news_count,
                 created_at=db_report.created_at
             )
+    
+    async def run_backtest(self):
+        """
+        盘后回测任务（交易日15:30执行）
+        
+        自动对比今日早报的预测 vs 实际收盘数据，
+        计算预测准确率，保存结果。
+        """
+        import sys
+        today = date.today()
+        
+        if not self.is_trading_day(today):
+            print(f"[SKIP] 今天 {today} 不是交易日，跳过回测")
+            return
+        
+        print(f"\n[BACKTEST] 开始盘后回测 - {datetime.now().strftime('%H:%M:%S')}", flush=True)
+        sys.stdout.flush()
+        
+        try:
+            # Step 1: 获取今日早报
+            morning_report = await self._get_today_morning_report()
+            if not morning_report:
+                print("[BACKTEST] 未找到今日早报，跳过回测")
+                return
+            
+            # Step 2: 执行回测
+            backtest_service = get_backtest_service()
+            evaluation = await backtest_service.evaluate_morning_predictions(morning_report)
+            
+            if evaluation:
+                accuracy = evaluation.get("overall_accuracy", 0)
+                direction = evaluation.get("market_direction", {})
+                print(f"[BACKTEST] ✅ 回测完成！")
+                print(f"   综合准确率: {accuracy*100:.0f}%")
+                print(f"   大盘方向: {'✅ 命中' if direction.get('hit') else '❌ 失误'}")
+                print(f"   经验教训: {evaluation.get('lessons', 'N/A')}")
+            else:
+                print("[BACKTEST] 回测未能完成（数据不足）")
+                
+        except Exception as e:
+            print(f"[BACKTEST ERROR] 回测失败: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    async def run_signal_tracking(self):
+        """
+        技术信号追踪任务（交易日15:35执行）
+        
+        两件事：
+        1. 记录今日的技术信号机会股
+        2. 评估7天前的信号是否命中
+        """
+        import sys
+        today = date.today()
+        
+        if not self.is_trading_day(today):
+            print(f"[SKIP] 今天 {today} 不是交易日，跳过信号追踪")
+            return
+        
+        print(f"\n[SIGNAL] 开始信号追踪 - {datetime.now().strftime('%H:%M:%S')}", flush=True)
+        sys.stdout.flush()
+        
+        signal_tracker = get_signal_tracker()
+        
+        try:
+            # Step 1: 记录今日技术信号
+            print("[SIGNAL] Step 1: 记录今日技术信号...")
+            from .market_data_service import get_market_data_service
+            
+            market_service = get_market_data_service()
+            market_data = await market_service.get_market_overview(today)
+            
+            if market_data.tech_signal_stocks:
+                await signal_tracker.record_today_signals(market_data.tech_signal_stocks)
+            else:
+                print("[SIGNAL] 今日无技术信号机会股")
+            
+        except Exception as e:
+            print(f"[SIGNAL ERROR] 记录今日信号失败: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        try:
+            # Step 2: 评估7天前的信号
+            print("[SIGNAL] Step 2: 评估7天前的信号...")
+            await signal_tracker.evaluate_past_signals(days_back=7)
+            
+            # 打印当前胜率摘要
+            win_rates = await signal_tracker.get_signal_win_rates()
+            if win_rates:
+                print("[SIGNAL] 📊 当前各信号胜率：")
+                for signal_type, data in sorted(win_rates.items(), key=lambda x: x[1]["win_rate"], reverse=True):
+                    print(f"   - {signal_type}: {data['win_rate']*100:.0f}% ({data['sample_size']}次)")
+            
+        except Exception as e:
+            print(f"[SIGNAL ERROR] 评估历史信号失败: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        print(f"[SIGNAL] ✅ 信号追踪完成")
     
     async def update_watchlist_data(self):
         """

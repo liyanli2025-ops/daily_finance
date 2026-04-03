@@ -105,6 +105,63 @@ class TechSignalStock:
 
 
 @dataclass
+class LHBSeatData:
+    """龙虎榜席位明细"""
+    stock_code: str          # 股票代码
+    stock_name: str          # 股票名称
+    seat_name: str           # 席位名称
+    buy_amount: float = 0    # 买入金额（万元）
+    sell_amount: float = 0   # 卖出金额（万元）
+    net_amount: float = 0    # 净买入金额（万元）
+    is_institution: bool = False  # 是否机构席位
+    seat_type: str = ""      # 席位类型：机构/知名游资/普通营业部
+    reason: str = ""         # 上榜原因
+
+
+@dataclass
+class BlockTradeData:
+    """大宗交易数据"""
+    code: str                # 股票代码
+    name: str                # 股票名称
+    price: float = 0         # 成交价
+    close_price: float = 0   # 收盘价
+    discount_rate: float = 0 # 折价率(%)，负值=折价，正值=溢价
+    volume: float = 0        # 成交量（万股）
+    amount: float = 0        # 成交金额（万元）
+    buyer_seat: str = ""     # 买方营业部
+    seller_seat: str = ""    # 卖方营业部
+
+
+@dataclass
+class MarginTradingData:
+    """融资融券数据"""
+    total_margin_balance: float = 0      # 融资余额（亿元）
+    margin_buy_amount: float = 0         # 融资买入额（亿元）
+    total_short_balance: float = 0       # 融券余额（亿元）
+    margin_balance_change: float = 0     # 融资余额较前一日变化（亿元）
+    short_balance_change: float = 0      # 融券余额较前一日变化（亿元）
+    top_margin_stocks: List[Dict] = field(default_factory=list)  # 融资余额Top股票
+
+
+@dataclass
+class CommodityData:
+    """大宗商品数据"""
+    name: str           # 如"WTI原油"、"现货黄金"
+    price: float        # 当前价格
+    change_pct: float   # 涨跌幅(%)
+    unit: str = ""      # 单位（美元/桶、美元/盎司等）
+
+
+@dataclass
+class GlobalIndexData:
+    """全球指数数据（外盘）"""
+    name: str           # 如"道琼斯"、"纳斯达克"、"恒生指数"
+    current: float      # 当前点位
+    change_pct: float   # 涨跌幅(%)
+    region: str = ""    # 区域（美股/港股/欧洲/亚太）
+
+
+@dataclass
 class MarketOverview:
     """市场概览数据"""
     date: str
@@ -123,6 +180,13 @@ class MarketOverview:
     concept_sectors: List[ConceptSectorData] = field(default_factory=list)  # 概念板块排行
     consecutive_limit_stocks: List[ConsecutiveLimitStock] = field(default_factory=list)  # 连板强势股
     tech_signal_stocks: List[TechSignalStock] = field(default_factory=list)  # 技术信号机会股
+    # 🆕 大宗商品与外盘数据
+    commodities: List[CommodityData] = field(default_factory=list)          # 大宗商品（原油/黄金/白银等）
+    global_indices: List[GlobalIndexData] = field(default_factory=list)     # 外盘指数（美股/港股/欧洲等）
+    # 🆕 聪明钱数据（龙虎榜席位 + 大宗交易 + 融资融券）
+    lhb_seats: List[LHBSeatData] = field(default_factory=list)             # 龙虎榜席位明细
+    block_trades: List[BlockTradeData] = field(default_factory=list)       # 大宗交易
+    margin_data: Optional[MarginTradingData] = None                        # 融资融券
     
     def to_dict(self) -> Dict:
         """转换为字典"""
@@ -139,6 +203,32 @@ class MarketOverview:
             for idx in self.indices:
                 trend = "📈" if idx.change_pct > 0 else ("📉" if idx.change_pct < 0 else "➡️")
                 lines.append(f"- {idx.name}：{idx.current:.2f} {trend} {idx.change_pct:+.2f}%（成交额 {idx.amount/100000000:.0f}亿）")
+            lines.append("")
+        
+        # 1.5 外盘指数（全球市场）
+        if self.global_indices:
+            lines.append("### 🌍 外盘指数（全球市场）")
+            # 按区域分组
+            regions = {}
+            for gi in self.global_indices:
+                region = gi.region or "其他"
+                if region not in regions:
+                    regions[region] = []
+                regions[region].append(gi)
+            for region, indices in regions.items():
+                lines.append(f"**{region}：**")
+                for gi in indices:
+                    trend = "📈" if gi.change_pct > 0 else ("📉" if gi.change_pct < 0 else "➡️")
+                    lines.append(f"- {gi.name}：{gi.current:.2f} {trend} {gi.change_pct:+.2f}%")
+            lines.append("")
+        
+        # 1.8 大宗商品
+        if self.commodities:
+            lines.append("### 🛢️ 大宗商品行情")
+            for comm in self.commodities:
+                trend = "📈" if comm.change_pct > 0 else ("📉" if comm.change_pct < 0 else "➡️")
+                unit_str = f"（{comm.unit}）" if comm.unit else ""
+                lines.append(f"- {comm.name}：{comm.price:.2f}{unit_str} {trend} {comm.change_pct:+.2f}%")
             lines.append("")
         
         # 2. 涨跌家数
@@ -239,6 +329,88 @@ class MarketOverview:
                 )
             lines.append("")
         
+        # 11. 龙虎榜席位明细（聪明钱追踪）
+        if self.lhb_seats:
+            lines.append("### 🏛️ 龙虎榜席位明细（聪明钱追踪）")
+            lines.append("以下是龙虎榜上机构和知名游资的操作明细：\n")
+            
+            # 按股票分组
+            stocks_seats = {}
+            for seat in self.lhb_seats:
+                key = f"{seat.stock_code}_{seat.stock_name}"
+                if key not in stocks_seats:
+                    stocks_seats[key] = {"name": seat.stock_name, "code": seat.stock_code, "seats": [], "reason": seat.reason}
+                stocks_seats[key]["seats"].append(seat)
+            
+            for i, (key, info) in enumerate(list(stocks_seats.items())[:8], 1):
+                lines.append(f"{i}. **{info['name']}**（{info['code']}）— {info['reason']}")
+                # 分开显示机构和游资
+                inst_seats = [s for s in info["seats"] if s.is_institution]
+                famous_seats = [s for s in info["seats"] if s.seat_type == "知名游资"]
+                normal_seats = [s for s in info["seats"] if not s.is_institution and s.seat_type != "知名游资"]
+                
+                if inst_seats:
+                    total_buy = sum(s.buy_amount for s in inst_seats)
+                    total_sell = sum(s.sell_amount for s in inst_seats)
+                    lines.append(f"   🏦 机构席位：买入{total_buy:.0f}万 / 卖出{total_sell:.0f}万 / 净买入{total_buy-total_sell:.0f}万")
+                if famous_seats:
+                    for s in famous_seats[:3]:
+                        lines.append(f"   🔥 {s.seat_name}：买入{s.buy_amount:.0f}万 / 卖出{s.sell_amount:.0f}万")
+                if normal_seats:
+                    top_buyers = sorted(normal_seats, key=lambda x: x.buy_amount, reverse=True)[:2]
+                    for s in top_buyers:
+                        lines.append(f"   📍 {s.seat_name}：买入{s.buy_amount:.0f}万")
+            lines.append("")
+        
+        # 12. 大宗交易
+        if self.block_trades:
+            lines.append("### 📦 大宗交易（机构暗盘动向）")
+            # 分为折价交易和溢价交易
+            discount_trades = [t for t in self.block_trades if t.discount_rate < -2]
+            premium_trades = [t for t in self.block_trades if t.discount_rate > 0]
+            
+            if discount_trades:
+                lines.append("\n**⚠️ 大幅折价交易（可能有减持压力）：**")
+                for t in sorted(discount_trades, key=lambda x: x.discount_rate)[:5]:
+                    lines.append(
+                        f"- {t.name}（{t.code}）：成交价{t.price:.2f}元，折价{t.discount_rate:.1f}%，"
+                        f"成交{t.amount:.0f}万元"
+                    )
+            
+            if premium_trades:
+                lines.append("\n**✅ 溢价交易（机构看好信号）：**")
+                for t in sorted(premium_trades, key=lambda x: x.discount_rate, reverse=True)[:5]:
+                    lines.append(
+                        f"- {t.name}（{t.code}）：成交价{t.price:.2f}元，溢价+{t.discount_rate:.1f}%，"
+                        f"成交{t.amount:.0f}万元"
+                    )
+            
+            # 按成交金额排序的TOP5
+            top_amount = sorted(self.block_trades, key=lambda x: x.amount, reverse=True)[:5]
+            lines.append("\n**💰 成交金额TOP5：**")
+            for t in top_amount:
+                discount_str = f"折价{t.discount_rate:.1f}%" if t.discount_rate < 0 else f"溢价+{t.discount_rate:.1f}%"
+                lines.append(f"- {t.name}（{t.code}）：{t.amount:.0f}万元，{discount_str}")
+            lines.append("")
+        
+        # 13. 融资融券
+        if self.margin_data:
+            lines.append("### 💳 融资融券（杠杆资金动向）")
+            md = self.margin_data
+            
+            margin_trend = "📈 加杠杆" if md.margin_balance_change > 0 else "📉 降杠杆"
+            lines.append(f"- 融资余额：{md.total_margin_balance:.0f}亿元（较前日{md.margin_balance_change:+.2f}亿 {margin_trend}）")
+            lines.append(f"- 融资买入额：{md.margin_buy_amount:.0f}亿元")
+            if md.total_short_balance > 0:
+                short_trend = "📈" if md.short_balance_change > 0 else "📉"
+                lines.append(f"- 融券余额：{md.total_short_balance:.2f}亿元（较前日{md.short_balance_change:+.2f}亿 {short_trend}）")
+            
+            if md.top_margin_stocks:
+                lines.append("\n**融资余额Top股票（杠杆资金最看好）：**")
+                for s in md.top_margin_stocks[:5]:
+                    lines.append(f"- {s.get('name', '')}（{s.get('code', '')}）：融资余额{s.get('balance', 0):.2f}亿元，变化{s.get('change', 0):+.2f}亿")
+            lines.append("")
+        
         return "\n".join(lines)
 
 
@@ -312,6 +484,11 @@ class MarketDataService:
             ("概念板块", self._get_concept_sectors),
             ("连板强势股", lambda: self._get_consecutive_limit_stocks(target_date)),
             ("技术信号机会股", lambda: self._get_tech_signal_stocks(target_date)),
+            ("大宗商品", self._get_commodities),
+            ("外盘指数", self._get_global_indices),
+            ("龙虎榜席位", lambda: self._get_lhb_seats(target_date)),
+            ("大宗交易", lambda: self._get_block_trades(target_date)),
+            ("融资融券", lambda: self._get_margin_trading(target_date)),
         ]
         
         results = []
@@ -377,6 +554,33 @@ class MarketDataService:
             overview.tech_signal_stocks = results[8]
         else:
             print(f"获取技术信号机会股失败: {results[8]}")
+        
+        # 处理结果（大宗商品+外盘）
+        if not isinstance(results[9], Exception):
+            overview.commodities = results[9]
+        else:
+            print(f"获取大宗商品失败: {results[9]}")
+        
+        if not isinstance(results[10], Exception):
+            overview.global_indices = results[10]
+        else:
+            print(f"获取外盘指数失败: {results[10]}")
+        
+        # 处理结果（聪明钱数据）
+        if len(results) > 11 and not isinstance(results[11], Exception):
+            overview.lhb_seats = results[11]
+        elif len(results) > 11:
+            print(f"获取龙虎榜席位失败: {results[11]}")
+        
+        if len(results) > 12 and not isinstance(results[12], Exception):
+            overview.block_trades = results[12]
+        elif len(results) > 12:
+            print(f"获取大宗交易失败: {results[12]}")
+        
+        if len(results) > 13 and not isinstance(results[13], Exception):
+            overview.margin_data = results[13]
+        elif len(results) > 13:
+            print(f"获取融资融券失败: {results[13]}")
         
         # 计算市场情绪
         overview.market_sentiment = self._calculate_sentiment(overview)
@@ -947,6 +1151,469 @@ class MarketDataService:
         # 最终排序
         result = sorted(merged.values(), key=lambda x: x.signal_score, reverse=True)
         return result[:10]
+    
+    async def _get_commodities(self) -> List[CommodityData]:
+        """
+        获取大宗商品数据（原油、黄金、白银等）
+        
+        使用 AKShare 的现货/期货接口获取国际大宗商品行情
+        """
+        import akshare as ak
+        
+        commodities = []
+        
+        # 方案1：获取国际大宗商品现货报价
+        try:
+            df = await self._call_akshare_with_retry(ak.futures_foreign_commodity_realtime, symbol="全部")
+            if df is not None and not df.empty:
+                # 目标商品映射
+                target_commodities = {
+                    "WTI原油": {"keywords": ["WTI", "原油", "Crude"], "unit": "美元/桶"},
+                    "布伦特原油": {"keywords": ["布伦特", "Brent"], "unit": "美元/桶"},
+                    "现货黄金": {"keywords": ["黄金", "Gold", "XAUUSD"], "unit": "美元/盎司"},
+                    "现货白银": {"keywords": ["白银", "Silver", "XAGUSD"], "unit": "美元/盎司"},
+                    "COMEX铜": {"keywords": ["铜", "Copper"], "unit": "美元/磅"},
+                }
+                
+                for comm_name, config in target_commodities.items():
+                    for _, row in df.iterrows():
+                        name_col = str(row.get('名称', row.get('symbol', '')))
+                        if any(kw in name_col for kw in config["keywords"]):
+                            try:
+                                price = float(row.get('最新价', row.get('current_price', 0)))
+                                change_pct = float(row.get('涨跌幅', row.get('change_percent', 0)))
+                                if price > 0:
+                                    commodities.append(CommodityData(
+                                        name=comm_name,
+                                        price=price,
+                                        change_pct=change_pct,
+                                        unit=config["unit"]
+                                    ))
+                                    break
+                            except (ValueError, TypeError):
+                                continue
+                
+                if commodities:
+                    print(f"  [大宗商品] 方案1获取成功: {len(commodities)} 个品种")
+                    return commodities
+        except Exception as e:
+            print(f"  [大宗商品] 方案1失败: {e}")
+        
+        # 方案2：获取上海金/上海银 + 国内期货主力合约
+        try:
+            # 获取国内期货主力合约实时行情
+            df = await self._call_akshare_with_retry(ak.futures_zh_spot)
+            if df is not None and not df.empty:
+                target_map = {
+                    "沪金主力": {"name": "沪金（黄金期货）", "unit": "元/克"},
+                    "沪银主力": {"name": "沪银（白银期货）", "unit": "元/千克"},
+                    "原油主力": {"name": "原油期货（INE）", "unit": "元/桶"},
+                    "铜主力": {"name": "沪铜期货", "unit": "元/吨"},
+                    "铁矿石主力": {"name": "铁矿石期货", "unit": "元/吨"},
+                }
+                
+                for _, row in df.iterrows():
+                    symbol = str(row.get('symbol', row.get('名称', '')))
+                    for key, config in target_map.items():
+                        if key in symbol:
+                            try:
+                                price = float(row.get('最新价', row.get('current_price', 0)))
+                                change_pct = float(row.get('涨跌幅', row.get('change_percent', 0)))
+                                if price > 0:
+                                    commodities.append(CommodityData(
+                                        name=config["name"],
+                                        price=price,
+                                        change_pct=change_pct,
+                                        unit=config["unit"]
+                                    ))
+                            except (ValueError, TypeError):
+                                continue
+                
+                if commodities:
+                    print(f"  [大宗商品] 方案2获取成功: {len(commodities)} 个品种")
+        except Exception as e:
+            print(f"  [大宗商品] 方案2失败: {e}")
+        
+        # 方案3：尝试通过 spot_goods 接口获取
+        if not commodities:
+            try:
+                for symbol, name, unit in [
+                    ("Au99.99", "现货黄金（Au99.99）", "元/克"),
+                    ("Ag(T+D)", "现货白银（Ag T+D）", "元/千克"),
+                ]:
+                    try:
+                        df = await self._call_akshare_with_retry(ak.spot_goods, symbol=symbol)
+                        if df is not None and not df.empty:
+                            row = df.iloc[-1]
+                            price = float(row.get('最新价', 0))
+                            change_pct = float(row.get('涨跌幅', 0))
+                            if price > 0:
+                                commodities.append(CommodityData(
+                                    name=name, price=price,
+                                    change_pct=change_pct, unit=unit
+                                ))
+                    except Exception:
+                        continue
+                
+                if commodities:
+                    print(f"  [大宗商品] 方案3获取成功: {len(commodities)} 个品种")
+            except Exception as e:
+                print(f"  [大宗商品] 方案3失败: {e}")
+        
+        return commodities
+    
+    async def _get_global_indices(self) -> List[GlobalIndexData]:
+        """
+        获取全球主要指数（外盘）
+        
+        包括：美股三大指数、港股恒生指数、欧洲主要指数等
+        """
+        import akshare as ak
+        
+        global_indices = []
+        
+        # 方案1：获取全球指数实时行情
+        try:
+            # 使用国际指数实时行情接口
+            df = await self._call_akshare_with_retry(ak.index_global_em)
+            if df is not None and not df.empty:
+                # 目标指数映射
+                target_indices = {
+                    "道琼斯": {"keywords": ["道琼斯", "Dow Jones", "DJI"], "region": "美股"},
+                    "纳斯达克": {"keywords": ["纳斯达克", "NASDAQ", "纳指"], "region": "美股"},
+                    "标普500": {"keywords": ["标普500", "S&P 500", "标普"], "region": "美股"},
+                    "恒生指数": {"keywords": ["恒生指数", "HSI", "恒指"], "region": "港股"},
+                    "国企指数": {"keywords": ["国企指数", "H股指数"], "region": "港股"},
+                    "日经225": {"keywords": ["日经225", "日经", "Nikkei"], "region": "亚太"},
+                    "韩国综合": {"keywords": ["韩国综合", "KOSPI"], "region": "亚太"},
+                    "英国富时100": {"keywords": ["富时100", "FTSE", "英国"], "region": "欧洲"},
+                    "德国DAX": {"keywords": ["DAX", "德国"], "region": "欧洲"},
+                    "法国CAC40": {"keywords": ["CAC", "法国"], "region": "欧洲"},
+                }
+                
+                for idx_name, config in target_indices.items():
+                    for _, row in df.iterrows():
+                        name_col = str(row.get('名称', ''))
+                        if any(kw in name_col for kw in config["keywords"]):
+                            try:
+                                current = float(row.get('最新价', 0))
+                                change_pct = float(row.get('涨跌幅', 0))
+                                if current > 0:
+                                    global_indices.append(GlobalIndexData(
+                                        name=idx_name,
+                                        current=current,
+                                        change_pct=change_pct,
+                                        region=config["region"]
+                                    ))
+                                    break
+                            except (ValueError, TypeError):
+                                continue
+                
+                if global_indices:
+                    print(f"  [外盘指数] 方案1获取成功: {len(global_indices)} 个指数")
+                    return global_indices
+        except Exception as e:
+            print(f"  [外盘指数] 方案1失败: {e}")
+        
+        # 方案2：分别获取美股和港股
+        try:
+            # 获取美股三大指数
+            try:
+                df_us = await self._call_akshare_with_retry(ak.index_us_stock_sina)
+                if df_us is not None and not df_us.empty:
+                    us_targets = {
+                        ".DJI": ("道琼斯", "美股"),
+                        ".IXIC": ("纳斯达克", "美股"),
+                        ".INX": ("标普500", "美股"),
+                    }
+                    for _, row in df_us.iterrows():
+                        code = str(row.get('代码', row.get('code', '')))
+                        if code in us_targets:
+                            name, region = us_targets[code]
+                            try:
+                                current = float(row.get('最新价', row.get('current', 0)))
+                                change_pct = float(row.get('涨跌幅', row.get('change_percent', 0)))
+                                if current > 0:
+                                    global_indices.append(GlobalIndexData(
+                                        name=name, current=current,
+                                        change_pct=change_pct, region=region
+                                    ))
+                            except (ValueError, TypeError):
+                                continue
+            except Exception as e:
+                print(f"  [外盘] 美股指数获取失败: {e}")
+            
+            await asyncio.sleep(1)
+            
+            # 获取港股指数
+            try:
+                df_hk = await self._call_akshare_with_retry(ak.stock_hk_index_spot_em)
+                if df_hk is not None and not df_hk.empty:
+                    hk_targets = {
+                        "恒生指数": "港股",
+                        "国企指数": "港股",
+                        "恒生科技指数": "港股",
+                    }
+                    for _, row in df_hk.iterrows():
+                        name_col = str(row.get('名称', ''))
+                        for target_name, region in hk_targets.items():
+                            if target_name in name_col:
+                                try:
+                                    current = float(row.get('最新价', 0))
+                                    change_pct = float(row.get('涨跌幅', 0))
+                                    if current > 0:
+                                        global_indices.append(GlobalIndexData(
+                                            name=target_name, current=current,
+                                            change_pct=change_pct, region=region
+                                        ))
+                                except (ValueError, TypeError):
+                                    continue
+            except Exception as e:
+                print(f"  [外盘] 港股指数获取失败: {e}")
+            
+            if global_indices:
+                print(f"  [外盘指数] 方案2获取成功: {len(global_indices)} 个指数")
+        except Exception as e:
+            print(f"  [外盘指数] 方案2失败: {e}")
+        
+        return global_indices
+    
+    async def _get_lhb_seats(self, target_date: date) -> List[LHBSeatData]:
+        """
+        获取龙虎榜席位明细（聪明钱追踪）
+        
+        解析龙虎榜中的机构席位和知名游资席位，
+        识别「聪明钱」的真实动向。
+        """
+        import akshare as ak
+        
+        seats = []
+        date_str = target_date.strftime("%Y%m%d")
+        
+        # 知名游资席位关键词（用于识别顶级游资）
+        famous_traders = [
+            "赵老哥", "炒股养家", "章盟主", "小鳄鱼",
+            "佛山无影脚", "作手新一", "深股通", "沪股通",
+            "华鑫证券上海宛平南路",  # 知名游资据点
+            "国泰君安上海江苏路",    # 知名游资据点
+            "华泰证券深圳益田路",    # 知名游资据点
+            "中信证券上海溧阳路",    # 著名机构席位
+            "东方财富拉萨",          # 拉萨帮
+            "西藏东方财富",          # 拉萨帮
+        ]
+        
+        try:
+            # 获取龙虎榜明细数据
+            df = await self._call_akshare_with_retry(
+                ak.stock_lhb_detail_em, start_date=date_str, end_date=date_str
+            )
+            
+            if df is not None and not df.empty:
+                for _, row in df.iterrows():
+                    seat_name = str(row.get('营业部名称', row.get('买方营业部', '')))
+                    buy_amount = float(row.get('买入金额', row.get('买入额', 0))) / 10000  # 转万元
+                    sell_amount = float(row.get('卖出金额', row.get('卖出额', 0))) / 10000
+                    
+                    # 判断席位类型
+                    is_institution = "机构" in seat_name or "专用" in seat_name
+                    seat_type = "机构" if is_institution else "普通营业部"
+                    
+                    # 识别知名游资
+                    for trader_kw in famous_traders:
+                        if trader_kw in seat_name:
+                            seat_type = "知名游资"
+                            break
+                    
+                    seats.append(LHBSeatData(
+                        stock_code=str(row.get('代码', '')),
+                        stock_name=str(row.get('名称', '')),
+                        seat_name=seat_name,
+                        buy_amount=buy_amount,
+                        sell_amount=sell_amount,
+                        net_amount=buy_amount - sell_amount,
+                        is_institution=is_institution,
+                        seat_type=seat_type,
+                        reason=str(row.get('上榜原因', '异动'))
+                    ))
+                
+                print(f"  [龙虎榜席位] 共解析 {len(seats)} 条席位记录，"
+                      f"机构 {sum(1 for s in seats if s.is_institution)} 条，"
+                      f"知名游资 {sum(1 for s in seats if s.seat_type == '知名游资')} 条")
+        except Exception as e:
+            print(f"获取龙虎榜席位异常（可能非交易日或无数据）: {e}")
+        
+        return seats
+    
+    async def _get_block_trades(self, target_date: date) -> List[BlockTradeData]:
+        """
+        获取大宗交易数据
+        
+        关注：
+        - 大幅折价交易（可能有减持压力）
+        - 溢价交易（机构看好信号）
+        - 连续大宗买入的股票
+        """
+        import akshare as ak
+        
+        trades = []
+        date_str = target_date.strftime("%Y%m%d")
+        
+        try:
+            # 方案1：获取大宗交易每日统计
+            try:
+                df = await self._call_akshare_with_retry(
+                    ak.stock_dzjy_sctj, start_date=date_str, end_date=date_str
+                )
+                if df is not None and not df.empty:
+                    for _, row in df.iterrows():
+                        try:
+                            close_price = float(row.get('收盘价', 0))
+                            trade_price = float(row.get('成交价', row.get('加权平均价', 0)))
+                            
+                            # 计算折价率
+                            discount_rate = 0
+                            if close_price > 0 and trade_price > 0:
+                                discount_rate = (trade_price - close_price) / close_price * 100
+                            
+                            trades.append(BlockTradeData(
+                                code=str(row.get('证券代码', row.get('代码', ''))),
+                                name=str(row.get('证券简称', row.get('名称', ''))),
+                                price=trade_price,
+                                close_price=close_price,
+                                discount_rate=round(discount_rate, 2),
+                                volume=float(row.get('成交量', 0)) / 10000,  # 转万股
+                                amount=float(row.get('成交金额', row.get('成交总额', 0))) / 10000,  # 转万元
+                            ))
+                        except (ValueError, TypeError):
+                            continue
+                    
+                    if trades:
+                        print(f"  [大宗交易] 方案1获取成功: {len(trades)} 笔交易")
+                        return trades
+            except Exception as e:
+                print(f"  [大宗交易] 方案1失败: {e}")
+            
+            # 方案2：获取大宗交易明细
+            try:
+                df = await self._call_akshare_with_retry(
+                    ak.stock_dzjy_mrmx, symbol="A股", start_date=date_str, end_date=date_str
+                )
+                if df is not None and not df.empty:
+                    for _, row in df.iterrows():
+                        try:
+                            close_price = float(row.get('收盘价', 0))
+                            trade_price = float(row.get('成交价', 0))
+                            
+                            discount_rate = 0
+                            if close_price > 0 and trade_price > 0:
+                                discount_rate = (trade_price - close_price) / close_price * 100
+                            
+                            trades.append(BlockTradeData(
+                                code=str(row.get('证券代码', row.get('代码', ''))),
+                                name=str(row.get('证券简称', row.get('名称', ''))),
+                                price=trade_price,
+                                close_price=close_price,
+                                discount_rate=round(discount_rate, 2),
+                                volume=float(row.get('成交量', 0)) / 10000,
+                                amount=float(row.get('成交额', row.get('成交金额', 0))) / 10000,
+                                buyer_seat=str(row.get('买方营业部', '')),
+                                seller_seat=str(row.get('卖方营业部', '')),
+                            ))
+                        except (ValueError, TypeError):
+                            continue
+                    
+                    if trades:
+                        print(f"  [大宗交易] 方案2获取成功: {len(trades)} 笔交易")
+            except Exception as e:
+                print(f"  [大宗交易] 方案2也失败: {e}")
+        except Exception as e:
+            print(f"获取大宗交易异常: {e}")
+        
+        return trades
+    
+    async def _get_margin_trading(self, target_date: date) -> Optional[MarginTradingData]:
+        """
+        获取融资融券数据
+        
+        关注：
+        - 融资余额变化趋势（加杠杆 or 降杠杆）
+        - 融券余额异常变动（做空力量）
+        - 融资余额Top股票（杠杆资金最看好的标的）
+        """
+        import akshare as ak
+        
+        date_str = target_date.strftime("%Y%m%d")
+        
+        try:
+            # 方案1：获取融资融券汇总数据
+            try:
+                df = await self._call_akshare_with_retry(ak.stock_margin_sse, start_date=date_str, end_date=date_str)
+                if df is not None and not df.empty:
+                    row = df.iloc[-1]
+                    
+                    margin_balance = float(row.get('融资余额', 0)) / 100000000  # 转亿元
+                    margin_buy = float(row.get('融资买入额', 0)) / 100000000
+                    short_balance = float(row.get('融券余额', 0)) / 100000000
+                    
+                    # 计算变化量（如果有前一天数据）
+                    margin_change = 0
+                    short_change = 0
+                    if len(df) >= 2:
+                        prev_row = df.iloc[-2]
+                        prev_margin = float(prev_row.get('融资余额', 0)) / 100000000
+                        prev_short = float(prev_row.get('融券余额', 0)) / 100000000
+                        margin_change = margin_balance - prev_margin
+                        short_change = short_balance - prev_short
+                    
+                    result = MarginTradingData(
+                        total_margin_balance=margin_balance,
+                        margin_buy_amount=margin_buy,
+                        total_short_balance=short_balance,
+                        margin_balance_change=margin_change,
+                        short_balance_change=short_change,
+                    )
+                    
+                    print(f"  [融资融券] 方案1获取成功: 融资余额{margin_balance:.0f}亿")
+                    return result
+            except Exception as e:
+                print(f"  [融资融券] 方案1失败: {e}")
+            
+            # 方案2：获取深交所融资融券数据
+            try:
+                df = await self._call_akshare_with_retry(ak.stock_margin_underlying_info_szse, date=date_str)
+                if df is not None and not df.empty:
+                    total_margin = df['融资余额'].sum() / 100000000 if '融资余额' in df.columns else 0
+                    total_margin_buy = df['融资买入额'].sum() / 100000000 if '融资买入额' in df.columns else 0
+                    total_short = df['融券余额'].sum() / 100000000 if '融券余额' in df.columns else 0
+                    
+                    # 获取融资余额Top10股票
+                    top_stocks = []
+                    if '融资余额' in df.columns:
+                        top_df = df.nlargest(10, '融资余额')
+                        for _, r in top_df.iterrows():
+                            top_stocks.append({
+                                "code": str(r.get('证券代码', '')),
+                                "name": str(r.get('证券简称', '')),
+                                "balance": float(r.get('融资余额', 0)) / 100000000,
+                                "change": float(r.get('融资余额差额', 0)) / 100000000 if '融资余额差额' in df.columns else 0,
+                            })
+                    
+                    result = MarginTradingData(
+                        total_margin_balance=total_margin,
+                        margin_buy_amount=total_margin_buy,
+                        total_short_balance=total_short,
+                        top_margin_stocks=top_stocks,
+                    )
+                    
+                    print(f"  [融资融券] 方案2获取成功: 融资余额{total_margin:.0f}亿，Top股票{len(top_stocks)}只")
+                    return result
+            except Exception as e:
+                print(f"  [融资融券] 方案2也失败: {e}")
+                
+        except Exception as e:
+            print(f"获取融资融券异常: {e}")
+        
+        return None
     
     def _calculate_sentiment(self, overview: MarketOverview) -> str:
         """根据数据计算市场情绪"""
