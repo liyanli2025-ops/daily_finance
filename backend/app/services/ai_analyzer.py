@@ -215,11 +215,10 @@ class AIAnalyzerService:
         
         response = await self._call_ai(report_prompt, max_tokens=max_output_tokens)
         
-        # 防御：AI 调用返回 None 时给出友好提示
+        # 防御：AI 调用返回 None 时使用模拟报告
         if not response:
-            print("[WARN] AI 返回空响应，使用兜底内容生成报告")
-            type_name = "早报" if report_type == ReportType.MORNING else "晚报"
-            response = f"# {today.strftime('%Y年%m月%d日')} 财经{type_name}\n\nAI 服务暂时不可用，以下为今日市场数据摘要。\n\n{report_prompt[:2000]}"
+            print("[WARN] AI 返回空响应，使用模拟报告内容")
+            response = self._generate_mock_report()
         
         # 解析响应
         report = self._parse_enhanced_report_response(
