@@ -524,28 +524,77 @@ class PodcastGeneratorService:
             await communicate.save(output_path)
             return
         
+        # 超长段落自动切割（Edge TTS 对单次超过 ~2000 字的文本不稳定）
+        MAX_SEGMENT_CHARS = 1500
+        final_segments = []
+        for seg in segments:
+            if len(seg) <= MAX_SEGMENT_CHARS:
+                final_segments.append(seg)
+            else:
+                # 按句号/问号/感叹号切割
+                sub_parts = re.split(r'(?<=[。！？])', seg)
+                current_chunk = ""
+                for part in sub_parts:
+                    if len(current_chunk) + len(part) > MAX_SEGMENT_CHARS and current_chunk:
+                        final_segments.append(current_chunk.strip())
+                        current_chunk = part
+                    else:
+                        current_chunk += part
+                if current_chunk.strip():
+                    final_segments.append(current_chunk.strip())
+                print(f"[TTS] 超长段落已切割为 {len(final_segments)} 个子段")
+        segments = final_segments
+        
+        print(f"[TTS] 最终 {len(segments)} 个音频段落，最长 {max(len(s) for s in segments)} 字")
+        
         # 创建临时目录存放分段音频
         temp_dir = Path(tempfile.gettempdir()) / f"podcast_segments_{uuid.uuid4().hex[:8]}"
         temp_dir.mkdir(exist_ok=True)
         
         try:
-            # 生成每个段落的音频
+            # 生成每个段落的音频（带重试和容错）
             segment_files = []
+            failed_count = 0
             for i, segment in enumerate(segments):
                 if not segment:
                     continue
                     
                 segment_path = temp_dir / f"segment_{i:02d}.mp3"
-                print(f"[TTS] 正在生成第 {i+1}/{len(segments)} 段...")
+                print(f"[TTS] 正在生成第 {i+1}/{len(segments)} 段（{len(segment)}字）...")
                 
-                communicate = edge_tts.Communicate(
-                    text=segment,
-                    voice=self.voice,
-                    rate=self.rate,
-                    volume=self.volume
-                )
-                await communicate.save(str(segment_path))
-                segment_files.append(segment_path)
+                # 重试机制：Edge TTS 偶尔会返回空音频
+                success = False
+                for retry in range(3):
+                    try:
+                        communicate = edge_tts.Communicate(
+                            text=segment,
+                            voice=self.voice,
+                            rate=self.rate,
+                            volume=self.volume
+                        )
+                        await communicate.save(str(segment_path))
+                        
+                        # 验证文件是否有效（大于 1KB）
+                        if segment_path.exists() and segment_path.stat().st_size > 1024:
+                            segment_files.append(segment_path)
+                            success = True
+                            break
+                        else:
+                            print(f"[TTS] 第 {i+1} 段生成了空文件，重试 ({retry+1}/3)...")
+                            await asyncio.sleep(2)
+                    except Exception as e:
+                        print(f"[TTS] 第 {i+1} 段失败: {e}，重试 ({retry+1}/3)...")
+                        await asyncio.sleep(3)
+                
+                if not success:
+                    failed_count += 1
+                    print(f"[TTS] ⚠️ 第 {i+1} 段最终失败，跳过")
+            
+            if not segment_files:
+                raise Exception("所有 TTS 段落都失败了，无法生成播客音频")
+            
+            if failed_count > 0:
+                print(f"[TTS] ⚠️ {failed_count} 个段落失败，使用 {len(segment_files)} 个成功段落继续合成")
             
             # 合并所有段落，中间加入停顿
             print(f"[TTS] 正在合并音频段落...")
