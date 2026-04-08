@@ -213,17 +213,27 @@ class AIAnalyzerService:
         else:
             max_output_tokens = 12000
         
+        # 重置模拟数据标记
+        self._last_call_was_mock = False
+        
         response = await self._call_ai(report_prompt, max_tokens=max_output_tokens)
         
         # 防御：AI 调用返回 None 时使用模拟报告
         if not response:
-            print("[WARN] AI 返回空响应，使用模拟报告内容")
+            print("[WARN] AI 返回空响应，使用模拟报告内容", flush=True)
             response = self._generate_mock_report()
+            self._last_call_was_mock = True
         
         # 解析响应
         report = self._parse_enhanced_report_response(
             response, today, news_list, cross_border_news or [], report_type
         )
+        
+        # ====== 关键：如果使用了模拟数据，在标题中明确标记 ======
+        if getattr(self, '_last_call_was_mock', False):
+            report.title = f"⚠️ [AI不可用-模拟数据] {report.title}"
+            report.summary = f"⚠️ 注意：本期报告因AI服务不可用，使用了模拟数据生成，内容不真实。请等待服务恢复后重新生成。\n\n{report.summary}"
+            print(f"[WARN] ⚠️ 报告已标记为模拟数据: {report.title}", flush=True)
         
         return report
     
@@ -1218,46 +1228,60 @@ class AIAnalyzerService:
         """
         调用 AI 模型
         优先使用 Anthropic，失败则尝试 OpenAI/兼容服务
+        
+        增强版：
+        - 添加超时保护（防止进程卡死）
+        - AI 失败时明确标记报告为模拟数据
         """
         import asyncio
+        import sys
         
-        print(f"[AI DEBUG] 准备调用 AI，客户端状态:")
-        print(f"   - Anthropic: {'已初始化' if self.anthropic_client else '未初始化'}")
-        print(f"   - OpenAI: {'已初始化' if self.openai_client else '未初始化'}")
-        print(f"   - 使用免费服务: {self.using_free_service}")
-        print(f"   - 配置的模型: {settings.ai_model}")
-        print(f"   - 配置的 Base URL: {settings.openai_base_url}")
+        # 单次 AI 调用的超时时间（秒）
+        AI_CALL_TIMEOUT = 180  # 3 分钟
         
-        # 尝试 Anthropic
+        print(f"[AI DEBUG] 准备调用 AI，客户端状态:", flush=True)
+        print(f"   - Anthropic: {'已初始化' if self.anthropic_client else '未初始化'}", flush=True)
+        print(f"   - OpenAI: {'已初始化' if self.openai_client else '未初始化'}", flush=True)
+        print(f"   - 使用免费服务: {self.using_free_service}", flush=True)
+        print(f"   - 配置的模型: {settings.ai_model}", flush=True)
+        print(f"   - 配置的 Base URL: {settings.openai_base_url}", flush=True)
+        sys.stdout.flush()
+        
+        # 尝试 Anthropic（带超时保护）
         if self.anthropic_client:
             try:
-                message = self.anthropic_client.messages.create(
-                    model=settings.ai_model,  # 使用配置文件中的模型
-                    max_tokens=max_tokens,
-                    messages=[
-                        {"role": "user", "content": prompt}
-                    ]
+                print(f"[AI] 尝试 Anthropic (超时 {AI_CALL_TIMEOUT}s)...", flush=True)
+                message = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: self.anthropic_client.messages.create(
+                            model=settings.ai_model,
+                            max_tokens=max_tokens,
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                    ),
+                    timeout=AI_CALL_TIMEOUT
                 )
+                print(f"[AI] ✅ Anthropic 调用成功", flush=True)
                 return message.content[0].text
+            except asyncio.TimeoutError:
+                print(f"[AI] ⚠️ Anthropic 调用超时 ({AI_CALL_TIMEOUT}s)!", flush=True)
             except Exception as e:
-                print(f"Anthropic 调用失败: {e}")
+                print(f"[AI] ❌ Anthropic 调用失败: {e}", flush=True)
         
-        # 尝试 OpenAI/兼容服务
+        # 尝试 OpenAI/兼容服务（带超时保护）
         if self.openai_client:
-            # 免费服务可能不稳定，添加重试机制
             max_retries = 3 if self.using_free_service else 2
             
             for attempt in range(max_retries):
                 try:
                     # 智能选择模型
                     if self.using_free_service:
-                        model = "openai"  # Pollinations 默认使用 openai
+                        model = "openai"
                     elif settings.openai_base_url:
-                        # 使用兼容服务时，优先使用配置的模型
                         if settings.ai_model and "claude" not in settings.ai_model.lower():
                             model = settings.ai_model
                         else:
-                            # 根据 base_url 智能推断模型
                             if "deepseek" in settings.openai_base_url.lower():
                                 model = "deepseek-chat"
                             elif "siliconflow" in settings.openai_base_url.lower():
@@ -1265,7 +1289,6 @@ class AIAnalyzerService:
                             else:
                                 model = "gpt-4-turbo"
                     else:
-                        # OpenAI 官方服务
                         model = settings.ai_model if "gpt" in settings.ai_model.lower() else "gpt-4-turbo"
                     
                     # DeepSeek max_tokens 上限 8192，自动适配
@@ -1273,25 +1296,46 @@ class AIAnalyzerService:
                     if "deepseek" in (settings.openai_base_url or "").lower():
                         actual_max_tokens = min(max_tokens, 8192)
                     
-                    print(f"[AI] 调用模型: {model} (尝试 {attempt + 1}/{max_retries}), max_tokens={actual_max_tokens}")
+                    print(f"[AI] 调用模型: {model} (尝试 {attempt + 1}/{max_retries}), max_tokens={actual_max_tokens}, 超时={AI_CALL_TIMEOUT}s", flush=True)
                     
-                    response = self.openai_client.chat.completions.create(
-                        model=model,
-                        max_tokens=actual_max_tokens,
-                        messages=[
-                            {"role": "user", "content": prompt}
-                        ]
+                    # 用 asyncio 超时包装同步调用，防止进程卡死
+                    response = await asyncio.wait_for(
+                        asyncio.get_event_loop().run_in_executor(
+                            None,
+                            lambda: self.openai_client.chat.completions.create(
+                                model=model,
+                                max_tokens=actual_max_tokens,
+                                messages=[{"role": "user", "content": prompt}],
+                                timeout=AI_CALL_TIMEOUT  # OpenAI SDK 自带的超时
+                            )
+                        ),
+                        timeout=AI_CALL_TIMEOUT + 10  # asyncio 超时比 SDK 超时多 10 秒作为安全余量
                     )
+                    print(f"[AI] ✅ {model} 调用成功", flush=True)
                     return response.choices[0].message.content
+                except asyncio.TimeoutError:
+                    print(f"[AI] ⚠️ {model} 调用超时 (尝试 {attempt + 1})!", flush=True)
                 except Exception as e:
-                    print(f"OpenAI/兼容服务调用失败 (尝试 {attempt + 1}): {e}")
-                    if attempt < max_retries - 1:
-                        wait_time = (attempt + 1) * 5  # 递增等待时间
-                        print(f"   等待 {wait_time} 秒后重试...")
-                        await asyncio.sleep(wait_time)
+                    print(f"[AI] ❌ OpenAI/兼容服务调用失败 (尝试 {attempt + 1}): {e}", flush=True)
+                
+                if attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 5
+                    print(f"   等待 {wait_time} 秒后重试...", flush=True)
+                    await asyncio.sleep(wait_time)
         
-        # 都失败了，返回模拟数据
-        print("[AI] 所有 AI 服务调用失败，使用模拟报告")
+        # ========== 都失败了 ==========
+        print("", flush=True)
+        print("=" * 60, flush=True)
+        print("[AI] 🚨🚨🚨 严重告警：所有 AI 服务调用全部失败！", flush=True)
+        print("[AI] 报告将使用模拟数据生成，内容不真实！", flush=True)
+        print("[AI] 请检查：1) API Key是否有效  2) 网络连接  3) DeepSeek服务状态", flush=True)
+        print("=" * 60, flush=True)
+        print("", flush=True)
+        sys.stdout.flush()
+        
+        # 标记本次生成使用了模拟数据
+        self._last_call_was_mock = True
+        
         return self._generate_mock_report()
     
     def _prepare_news_summary(self, news_list: List[News]) -> str:

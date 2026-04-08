@@ -259,13 +259,22 @@ class SchedulerService:
         sys.stdout.flush()
         
         try:
-            # Step 1: 采集新闻
-            print("\n[Step 1] 采集新闻...")
+            # Step 1: 采集新闻（带超时保护，防止某个数据源卡住导致进程假死）
+            NEWS_COLLECT_TIMEOUT = 300  # 5 分钟超时
+            print(f"\n[Step 1] 采集新闻（超时 {NEWS_COLLECT_TIMEOUT}s）...", flush=True)
             collector = get_news_collector()
             
             # 非交易日采集更长时间的新闻（整周）
             hours = 168 if not is_trading else 24  # 非交易日采集7天，交易日采集24小时
-            all_news = await collector.collect_all(hours=hours)
+            
+            try:
+                all_news = await asyncio.wait_for(
+                    collector.collect_all(hours=hours),
+                    timeout=NEWS_COLLECT_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                print(f"[WARN] ⚠️ 新闻采集超时 ({NEWS_COLLECT_TIMEOUT}s)！将使用已采集到的数据或模拟数据", flush=True)
+                all_news = []
             
             # 分离财经新闻和跨界新闻
             news_by_type = collector.get_news_by_type(all_news)
@@ -292,20 +301,36 @@ class SchedulerService:
                 china_news, cross_border_news = self._generate_mock_news()
             
             # Step 2: AI 分析生成早报
-            print(f"\n[Step 2] AI 分析生成{report_type_str}...")
+            # Step 2: AI 分析生成早报（带超时保护）
+            AI_REPORT_TIMEOUT = 600  # 10 分钟超时
+            print(f"\n[Step 2] AI 分析生成{report_type_str}（超时 {AI_REPORT_TIMEOUT}s）...", flush=True)
             analyzer = get_ai_analyzer(force_reinit=True)
             
-            # 对重要新闻进行情绪分析
+            # 对重要新闻进行情绪分析（单条超时30秒，失败跳过）
             for news in china_news[:10]:
-                news.sentiment = await analyzer.analyze_news_sentiment(news)
+                try:
+                    news.sentiment = await asyncio.wait_for(
+                        analyzer.analyze_news_sentiment(news),
+                        timeout=30
+                    )
+                except (asyncio.TimeoutError, Exception) as e:
+                    print(f"   [WARN] 情绪分析跳过: {str(e)[:50]}", flush=True)
             
             # 生成早报（传入报告类型和是否交易日）
-            report = await analyzer.generate_daily_report(
-                china_news if china_news else finance_news,
-                cross_border_news,
-                report_type=ReportType.MORNING,
-                is_trading_day=is_trading
-            )
+            try:
+                report = await asyncio.wait_for(
+                    analyzer.generate_daily_report(
+                        china_news if china_news else finance_news,
+                        cross_border_news,
+                        report_type=ReportType.MORNING,
+                        is_trading_day=is_trading
+                    ),
+                    timeout=AI_REPORT_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                print(f"\n[ERROR] ⚠️ AI 报告生成超时 ({AI_REPORT_TIMEOUT}s)！跳过本次生成", flush=True)
+                return
+            
             print(f"   报告生成完成: {report.title}")
             print(f"   字数: {report.word_count}, 预计阅读时间: {report.reading_time} 分钟")
             print(f"   核心观点: {len(report.core_opinions)} 条")
@@ -411,12 +436,20 @@ class SchedulerService:
             else:
                 print("   [WARN] 未找到今日早报，将独立生成晚报")
             
-            # Step 2: 采集盘后新闻和当日市场数据
-            print("\n[Step 2] 采集盘后数据...")
+            # Step 2: 采集盘后新闻和当日市场数据（带超时保护）
+            NEWS_COLLECT_TIMEOUT = 300  # 5 分钟超时
+            print(f"\n[Step 2] 采集盘后数据（超时 {NEWS_COLLECT_TIMEOUT}s）...", flush=True)
             collector = get_news_collector()
             
             # 采集今天下午到现在的新闻
-            all_news = await collector.collect_all(hours=8)  # 从早上9点到下午5点约8小时
+            try:
+                all_news = await asyncio.wait_for(
+                    collector.collect_all(hours=8),
+                    timeout=NEWS_COLLECT_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                print(f"[WARN] ⚠️ 晚报新闻采集超时 ({NEWS_COLLECT_TIMEOUT}s)！", flush=True)
+                all_news = []
             
             # 【核心改动】合并盘中预采集缓存，确保盘中新闻不丢失
             midday_cache = collector.get_midday_cache()
@@ -441,22 +474,37 @@ class SchedulerService:
                 print("[WARN] 未能采集到新闻，将使用模拟数据")
                 china_news, cross_border_news = self._generate_mock_news()
             
-            # Step 3: AI 分析生成晚报
-            print("\n[Step 3] AI 分析生成晚报...")
+            # Step 3: AI 分析生成晚报（带超时保护）
+            AI_REPORT_TIMEOUT = 600  # 10 分钟超时
+            print(f"\n[Step 3] AI 分析生成晚报（超时 {AI_REPORT_TIMEOUT}s）...", flush=True)
             analyzer = get_ai_analyzer(force_reinit=True)
             
-            # 对重要新闻进行情绪分析
+            # 对重要新闻进行情绪分析（单条超时30秒，失败跳过）
             for news in china_news[:10]:
-                news.sentiment = await analyzer.analyze_news_sentiment(news)
+                try:
+                    news.sentiment = await asyncio.wait_for(
+                        analyzer.analyze_news_sentiment(news),
+                        timeout=30
+                    )
+                except (asyncio.TimeoutError, Exception) as e:
+                    print(f"   [WARN] 情绪分析跳过: {str(e)[:50]}", flush=True)
             
             # 生成晚报（传入今日早报用于回顾对比）
-            report = await analyzer.generate_daily_report(
-                china_news if china_news else finance_news,
-                cross_border_news,
-                report_type=ReportType.EVENING,
-                is_trading_day=True,
-                morning_report=morning_report  # 传入早报用于对比
-            )
+            try:
+                report = await asyncio.wait_for(
+                    analyzer.generate_daily_report(
+                        china_news if china_news else finance_news,
+                        cross_border_news,
+                        report_type=ReportType.EVENING,
+                        is_trading_day=True,
+                        morning_report=morning_report
+                    ),
+                    timeout=AI_REPORT_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                print(f"\n[ERROR] ⚠️ 晚报 AI 报告生成超时 ({AI_REPORT_TIMEOUT}s)！跳过本次生成", flush=True)
+                return
+            
             print(f"   报告生成完成: {report.title}")
             print(f"   字数: {report.word_count}, 预计阅读时间: {report.reading_time} 分钟")
             
