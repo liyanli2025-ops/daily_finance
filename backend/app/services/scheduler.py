@@ -654,10 +654,10 @@ class SchedulerService:
                     ReportModel.report_date == today,
                     ReportModel.report_type == "morning"
                 )
-            ).order_by(ReportModel.created_at.desc())
+            ).order_by(ReportModel.created_at.desc()).limit(1)
             
             result = await session.execute(query)
-            db_report = result.scalar_one_or_none()
+            db_report = result.scalars().first()
             
             if not db_report:
                 return None
