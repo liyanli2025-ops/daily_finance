@@ -860,38 +860,80 @@ class SchedulerService:
             traceback.print_exc()
     
     async def _save_report(self, report):
-        """保存报告到数据库"""
+        """
+        保存报告到数据库（同日同类型覆盖模式）
+        
+        逻辑：
+        - 检查今天是否已有同类型（morning/evening）的报告
+        - 如果有，覆盖更新内容（保留原记录ID，避免数据库膨胀）
+        - 如果没有，新增一条记录
+        - 早报和晚报互不干扰：早报多次生成只覆盖早报，不影响晚报
+        """
         from ..models.database import ReportModel
+        from sqlalchemy import select, and_
         
         if not self._session_maker:
             print("[WARN] 数据库未初始化")
             return
         
+        report_type_str = report.report_type.value if hasattr(report, 'report_type') and report.report_type else "morning"
+        
         async with self._session_maker() as session:
-            db_report = ReportModel(
-                id=report.id,
-                title=report.title,
-                summary=report.summary,
-                content=report.content,
-                report_date=report.report_date,
-                # 报告类型（早报/晚报）
-                report_type=report.report_type.value if hasattr(report, 'report_type') and report.report_type else "morning",
-                # 新增字段
-                core_opinions=report.core_opinions if hasattr(report, 'core_opinions') else [],
-                highlights=[h.model_dump() for h in report.highlights],
-                cross_border_events=[e.model_dump() for e in report.cross_border_events] if hasattr(report, 'cross_border_events') else [],
-                analysis=report.analysis.model_dump() if report.analysis else None,
-                podcast_url=report.podcast_url,
-                podcast_duration=report.podcast_duration,
-                podcast_status=report.podcast_status,
-                word_count=report.word_count,
-                reading_time=report.reading_time,
-                news_count=report.news_count,
-                cross_border_count=report.cross_border_count if hasattr(report, 'cross_border_count') else 0,
-                created_at=report.created_at
-            )
+            # 检查同日同类型的旧报告
+            existing_query = select(ReportModel).where(
+                and_(
+                    ReportModel.report_date == report.report_date,
+                    ReportModel.report_type == report_type_str
+                )
+            ).order_by(ReportModel.created_at.desc()).limit(1)
             
-            session.add(db_report)
+            result = await session.execute(existing_query)
+            existing_report = result.scalars().first()
+            
+            if existing_report:
+                # 覆盖更新已有报告
+                print(f"   [INFO] 发现同日{'早报' if report_type_str == 'morning' else '晚报'}，覆盖更新（旧ID: {existing_report.id}）")
+                existing_report.title = report.title
+                existing_report.summary = report.summary
+                existing_report.content = report.content
+                existing_report.core_opinions = report.core_opinions if hasattr(report, 'core_opinions') else []
+                existing_report.highlights = [h.model_dump() for h in report.highlights]
+                existing_report.cross_border_events = [e.model_dump() for e in report.cross_border_events] if hasattr(report, 'cross_border_events') else []
+                existing_report.analysis = report.analysis.model_dump() if report.analysis else None
+                existing_report.podcast_url = report.podcast_url
+                existing_report.podcast_duration = report.podcast_duration
+                existing_report.podcast_status = report.podcast_status
+                existing_report.word_count = report.word_count
+                existing_report.reading_time = report.reading_time
+                existing_report.news_count = report.news_count
+                existing_report.cross_border_count = report.cross_border_count if hasattr(report, 'cross_border_count') else 0
+                existing_report.updated_at = datetime.now()
+                # 更新 report 对象的 id 以匹配数据库记录（保持一致性）
+                report.id = existing_report.id
+            else:
+                # 新增报告
+                db_report = ReportModel(
+                    id=report.id,
+                    title=report.title,
+                    summary=report.summary,
+                    content=report.content,
+                    report_date=report.report_date,
+                    report_type=report_type_str,
+                    core_opinions=report.core_opinions if hasattr(report, 'core_opinions') else [],
+                    highlights=[h.model_dump() for h in report.highlights],
+                    cross_border_events=[e.model_dump() for e in report.cross_border_events] if hasattr(report, 'cross_border_events') else [],
+                    analysis=report.analysis.model_dump() if report.analysis else None,
+                    podcast_url=report.podcast_url,
+                    podcast_duration=report.podcast_duration,
+                    podcast_status=report.podcast_status,
+                    word_count=report.word_count,
+                    reading_time=report.reading_time,
+                    news_count=report.news_count,
+                    cross_border_count=report.cross_border_count if hasattr(report, 'cross_border_count') else 0,
+                    created_at=report.created_at
+                )
+                session.add(db_report)
+            
             await session.commit()
     
     async def _get_report(self, report_id: str):
