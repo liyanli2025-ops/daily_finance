@@ -168,7 +168,7 @@ class PodcastGeneratorService:
         providers = [item[0] for item in self.ai_clients]
         print(f"[播客] 降级链路: {' → '.join(providers) if providers else '⚠️ 无可用AI! 将使用备用模板'}")
     
-    def _select_podcast_model(self, base_url: Optional[str], ai_model: Optional[str]) -> str:
+    def _select_podcast_model(self, base_url: str, ai_model: str) -> str:
         """为播客选择模型"""
         if ai_model and "claude" not in ai_model.lower():
             return ai_model
@@ -340,9 +340,20 @@ class PodcastGeneratorService:
 
     async def get_beijing_weather(self) -> str:
         """
-        获取北京当天的天气情况
+        获取北京当天的天气情况（带 asyncio 级超时保护）
         输出格式：北京今天天气x，气温x摄氏度到x摄氏度，空气质量指数x
         """
+        try:
+            return await asyncio.wait_for(self._get_beijing_weather_impl(), timeout=15)
+        except asyncio.TimeoutError:
+            print("[天气] ⚠️ 天气获取超时（15s），使用默认值", flush=True)
+            return "北京今天天气不错。"
+        except Exception as e:
+            print(f"[天气] 获取失败: {e}", flush=True)
+            return "北京今天天气不错。"
+    
+    async def _get_beijing_weather_impl(self) -> str:
+        """get_beijing_weather 的实际实现"""
         weather_desc = ""
         max_temp = ""
         min_temp = ""
@@ -373,7 +384,7 @@ class PodcastGeneratorService:
                     weather_desc = self._translate_weather(en_desc)
 
         except Exception as e:
-            print(f"[天气] 获取天气失败: {e}")
+            print(f"[天气] 获取天气失败: {e}", flush=True)
 
         # 获取空气质量指数
         aqi = await self._get_aqi()
@@ -471,10 +482,14 @@ class PodcastGeneratorService:
             (音频文件路径, 时长秒数)
         """
         # 获取北京天气
+        print("[播客] 正在获取北京天气...", flush=True)
         weather_info = await self.get_beijing_weather()
+        print(f"[播客] 天气: {weather_info[:30]}...", flush=True)
         
         # 准备播客文本（使用 AI 生成脚本）
+        print("[播客] 正在生成播客脚本...", flush=True)
         podcast_text = await self._prepare_podcast_text(report, weather_info)
+        print(f"[播客] 脚本生成完成，{len(podcast_text)} 字", flush=True)
         
         # 生成音频文件名
         filename = f"{report.id}.mp3"

@@ -344,18 +344,25 @@ class SchedulerService:
             print(f"   核心观点: {len(report.core_opinions)} 条")
             print(f"   跨界事件: {len(report.cross_border_events)} 条")
             
-            # Step 3: 生成播客
-            print(f"\n[Step 3] 生成播客音频...")
+            # Step 3: 生成播客（带超时保护）
+            PODCAST_TIMEOUT = 600  # 10 分钟
+            print(f"\n[Step 3] 生成播客音频（超时 {PODCAST_TIMEOUT}s）...", flush=True)
             podcast_gen = get_podcast_generator()
             
             try:
-                audio_path, duration = await podcast_gen.generate_podcast(report)
+                audio_path, duration = await asyncio.wait_for(
+                    podcast_gen.generate_podcast(report),
+                    timeout=PODCAST_TIMEOUT
+                )
                 report.podcast_url = f"/podcasts/{report.id}.mp3"
                 report.podcast_duration = duration
                 report.podcast_status = "ready"
-                print(f"   播客生成完成: 时长 {duration // 60} 分钟")
+                print(f"   播客生成完成: 时长 {duration // 60} 分钟", flush=True)
+            except asyncio.TimeoutError:
+                print(f"   [WARN] ⚠️ 播客生成超时 ({PODCAST_TIMEOUT}s)，跳过播客", flush=True)
+                report.podcast_status = "failed"
             except Exception as e:
-                print(f"   [WARN] 播客生成失败: {e}")
+                print(f"   [WARN] 播客生成失败: {e}", flush=True)
                 report.podcast_status = "failed"
             
             # Step 4: 保存到数据库
@@ -516,18 +523,25 @@ class SchedulerService:
             print(f"   报告生成完成: {report.title}")
             print(f"   字数: {report.word_count}, 预计阅读时间: {report.reading_time} 分钟")
             
-            # Step 4: 生成播客（晚报版可以更长）
-            print("\n[Step 4] 生成播客音频...")
+            # Step 4: 生成播客（晚报版，带超时保护）
+            PODCAST_TIMEOUT = 600  # 10 分钟
+            print(f"\n[Step 4] 生成播客音频（超时 {PODCAST_TIMEOUT}s）...", flush=True)
             podcast_gen = get_podcast_generator()
             
             try:
-                audio_path, duration = await podcast_gen.generate_podcast(report)
+                audio_path, duration = await asyncio.wait_for(
+                    podcast_gen.generate_podcast(report),
+                    timeout=PODCAST_TIMEOUT
+                )
                 report.podcast_url = f"/podcasts/{report.id}.mp3"
                 report.podcast_duration = duration
                 report.podcast_status = "ready"
-                print(f"   播客生成完成: 时长 {duration // 60} 分钟")
+                print(f"   播客生成完成: 时长 {duration // 60} 分钟", flush=True)
+            except asyncio.TimeoutError:
+                print(f"   [WARN] ⚠️ 播客生成超时 ({PODCAST_TIMEOUT}s)，跳过播客", flush=True)
+                report.podcast_status = "failed"
             except Exception as e:
-                print(f"   [WARN] 播客生成失败: {e}")
+                print(f"   [WARN] 播客生成失败: {e}", flush=True)
                 report.podcast_status = "failed"
             
             # Step 5: 保存到数据库
