@@ -157,6 +157,31 @@ async def trigger_report_generation():
     return {"status": "error", "message": "调度器未运行"}
 
 
+@app.post("/api/trigger-evening-report")
+async def trigger_evening_report_generation():
+    """
+    手动触发晚报生成
+    """
+    print(f"\n[API] /api/trigger-evening-report 被调用！时间: {datetime.now()}")
+    if scheduler_service:
+        print("[API] 创建晚报生成任务...")
+        
+        async def generate_evening_with_error_handling():
+            try:
+                await scheduler_service.generate_evening_report()
+                print("[API] 晚报生成任务完成！")
+            except Exception as e:
+                print(f"[API] ❌ 晚报生成任务失败: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        asyncio.create_task(generate_evening_with_error_handling())
+        print("[API] 晚报任务已创建，立即返回")
+        return {"status": "started", "message": "晚报生成任务已启动"}
+    print("[API] 调度器未运行！")
+    return {"status": "error", "message": "调度器未运行"}
+
+
 @app.post("/api/generate-report-sync")
 async def generate_report_sync():
     """
