@@ -6,10 +6,18 @@
 - 交易日：早报（凌晨） + 晚报（下午5点）
 - 非交易日：仅早报（深度周报版）
 """
+import sys
 import asyncio
 from datetime import datetime, timedelta, date
 from typing import Optional
 import uuid
+
+# 强制行缓冲，让 print 立即写入日志文件（nohup 重定向时默认是全缓冲）
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except Exception:
+    pass  # Python < 3.7 或特殊环境下可能不支持
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger

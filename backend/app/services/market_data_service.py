@@ -8,6 +8,40 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field, asdict
 import traceback
 
+# ── 给 requests 全局加超时，防止 AKShare 底层 HTTP 请求永久挂起 ──
+try:
+    import requests
+    from requests.adapters import HTTPAdapter
+    
+    class _TimeoutHTTPAdapter(HTTPAdapter):
+        """强制所有 requests 请求带超时"""
+        def __init__(self, timeout=30, *args, **kwargs):
+            self.timeout = timeout
+            super().__init__(*args, **kwargs)
+        
+        def send(self, request, **kwargs):
+            kwargs.setdefault('timeout', self.timeout)
+            return super().send(request, **kwargs)
+    
+    # Monkey-patch requests.Session 的默认适配器
+    _timeout_adapter = _TimeoutHTTPAdapter(timeout=30)
+    _session = requests.Session()
+    _session.mount('http://', _timeout_adapter)
+    _session.mount('https://', _timeout_adapter)
+    # 替换 requests 模块的默认 session（AKShare 内部用 requests.get 时生效）
+    requests.adapters.DEFAULT_RETRIES = 2
+    
+    # 同时 patch requests.get/post 等快捷方法的默认超时
+    _original_request = requests.Session.request
+    def _patched_request(self, method, url, **kwargs):
+        kwargs.setdefault('timeout', 30)
+        return _original_request(self, method, url, **kwargs)
+    requests.Session.request = _patched_request
+    
+    print("[MarketData] ✅ 已为 requests 全局设置 30 秒超时", flush=True)
+except Exception as e:
+    print(f"[MarketData] ⚠️ 设置 requests 超时失败: {e}", flush=True)
+
 
 @dataclass
 class IndexData:
@@ -436,19 +470,36 @@ class MarketDataService:
         
         AKShare 底层用 requests 调东方财富接口，凌晨时段经常被限流/断连。
         这里加重试 + 延迟，避免一次网络闪断就导致整个任务失败。
+        
+        三重超时保护：
+        1. requests 全局 30 秒超时（模块级 monkey-patch）
+        2. asyncio.wait_for 45 秒超时（本函数）
+        3. scheduler 层 10 分钟总超时（外层兜底）
         """
+        SINGLE_CALL_TIMEOUT = 45  # 单次调用超时（秒），比 requests 的 30 秒略长留缓冲
         last_error = None
+        
         for attempt in range(max_retries):
             try:
                 # AKShare 是同步库，在线程池中执行避免阻塞事件循环
                 loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(None, lambda: func(*args, **kwargs))
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: func(*args, **kwargs)),
+                    timeout=SINGLE_CALL_TIMEOUT
+                )
                 return result
+            except asyncio.TimeoutError:
+                last_error = TimeoutError(f"{func.__name__} 超时 ({SINGLE_CALL_TIMEOUT}s)")
+                print(f"  [AKShare] {func.__name__} 第{attempt+1}次超时({SINGLE_CALL_TIMEOUT}s)", flush=True)
+                if attempt < max_retries - 1:
+                    wait = (attempt + 1) * 2
+                    print(f"  [AKShare] {wait}秒后重试...", flush=True)
+                    await asyncio.sleep(wait)
             except Exception as e:
                 last_error = e
                 if attempt < max_retries - 1:
                     wait = (attempt + 1) * 3  # 3秒、6秒、9秒递增
-                    print(f"  [AKShare] {func.__name__} 第{attempt+1}次失败: {type(e).__name__}, {wait}秒后重试...")
+                    print(f"  [AKShare] {func.__name__} 第{attempt+1}次失败: {type(e).__name__}, {wait}秒后重试...", flush=True)
                     await asyncio.sleep(wait)
         
         raise last_error
