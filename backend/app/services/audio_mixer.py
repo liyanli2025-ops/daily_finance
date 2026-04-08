@@ -236,18 +236,33 @@ class AudioMixerService:
         """
         准备背景音乐轨道，在停顿处加入渐强效果
         
+        修复：先生成一条完整的连续 BGM 循环轨道，再对不同区间应用音量变化，
+        避免分段各自独立循环导致 BGM 每个段都从头开始播放的问题。
+        
         结构：
         [正常音量 intro] -> [淡入降低] -> [低音量循环(停顿处渐强)] -> [淡出升高] -> [正常音量 outro]
         """
-        # 创建降低音量的背景音乐版本
-        bgm_low = bgm_original + self.bgm_volume_reduction  # 降低 15dB
+        # === 第一步：生成一条完整的、连续的 BGM 循环轨道 ===
+        bgm_full = self._loop_audio(bgm_original, total_duration)
         
-        # === 开头部分：正常音量 ===
-        intro_full = self.intro_duration - self.fade_duration
-        bgm_intro = self._loop_audio(bgm_original, intro_full)
+        # === 第二步：计算各段的时间边界 ===
+        intro_full = self.intro_duration - self.fade_duration  # 正常音量 intro 时长
         
-        # === 淡入降低部分 ===
-        fade_down_segment = self._loop_audio(bgm_original, self.fade_duration)
+        t0 = 0                                          # intro 开始
+        t1 = intro_full                                 # intro 结束 / fade_down 开始
+        t2 = t1 + self.fade_duration                    # fade_down 结束 / middle 开始
+        t3 = t2 + podcast_duration                      # middle 结束 / fade_up 开始
+        t4 = t3 + self.fade_duration                    # fade_up 结束 / outro 开始
+        outro_full = self.outro_duration - self.fade_duration
+        t5 = t4 + outro_full                            # outro 结束
+        
+        # === 第三步：从连续轨道中切出各段并应用音量变化 ===
+        
+        # 开头部分：保持正常音量，不需要处理
+        bgm_intro = bgm_full[t0:t1]
+        
+        # 淡入降低部分：从正常音量渐弱到低音量
+        fade_down_segment = bgm_full[t1:t2]
         fade_down_segment = fade_down_segment.fade(
             from_gain=0,
             to_gain=self.bgm_volume_reduction,
@@ -255,16 +270,15 @@ class AudioMixerService:
             duration=self.fade_duration
         )
         
-        # === 中间低音量部分（播客播放期间）===
-        # 先生成基础的低音量背景音乐
-        bgm_middle = self._loop_audio(bgm_low, podcast_duration)
+        # 中间低音量部分（播客播放期间）：整体降低音量
+        bgm_middle = bgm_full[t2:t3] + self.bgm_volume_reduction
         
         # 在停顿位置应用渐强效果
         if pause_positions:
             bgm_middle = self._apply_pause_effects(bgm_middle, bgm_original, pause_positions)
         
-        # === 淡出升高部分 ===
-        fade_up_segment = self._loop_audio(bgm_low, self.fade_duration)
+        # 淡出升高部分：从低音量渐强回正常音量
+        fade_up_segment = bgm_full[t3:t4] + self.bgm_volume_reduction
         fade_up_segment = fade_up_segment.fade(
             from_gain=0,
             to_gain=-self.bgm_volume_reduction,  # 升回正常
@@ -272,11 +286,10 @@ class AudioMixerService:
             duration=self.fade_duration
         )
         
-        # === 结尾部分：正常音量 ===
-        outro_full = self.outro_duration - self.fade_duration
-        bgm_outro = self._loop_audio(bgm_original, outro_full)
+        # 结尾部分：保持正常音量
+        bgm_outro = bgm_full[t4:t5]
         
-        # === 拼接所有部分 ===
+        # === 第四步：拼接所有部分 ===
         bgm_track = bgm_intro + fade_down_segment + bgm_middle + fade_up_segment + bgm_outro
         
         return bgm_track
