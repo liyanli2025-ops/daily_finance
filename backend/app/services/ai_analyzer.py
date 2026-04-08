@@ -32,12 +32,13 @@ class AIAnalyzerService:
     def __init__(self):
         self.anthropic_client = None
         self.openai_client = None
+        self.backup_client = None  # 备用 AI 客户端
         self.using_free_service = False  # 是否使用免费服务
         self._init_clients()
     
     def _init_clients(self):
-        """初始化 AI 客户端"""
-        # 尝试初始化 Anthropic
+        """初始化 AI 客户端（含备用服务）"""
+        # 1. 尝试初始化 Anthropic（最高优先级）
         if settings.anthropic_api_key:
             try:
                 from anthropic import Anthropic
@@ -46,7 +47,7 @@ class AIAnalyzerService:
             except Exception as e:
                 print(f"[WARN] Anthropic 初始化失败: {e}")
         
-        # 尝试初始化 OpenAI（备选）
+        # 2. 尝试初始化 OpenAI/DeepSeek（主服务）
         if settings.openai_api_key:
             try:
                 from openai import OpenAI
@@ -58,11 +59,22 @@ class AIAnalyzerService:
             except Exception as e:
                 print(f"[WARN] OpenAI 初始化失败: {e}")
         
-        # 如果没有配置任何 API，自动使用免费的 Pollinations.AI
-        if not self.anthropic_client and not self.openai_client:
+        # 3. 尝试初始化备用 AI 服务（主服务挂了时自动切换）
+        if settings.backup_ai_api_key:
             try:
                 from openai import OpenAI
-                # Pollinations.AI 免费服务，无需 API Key
+                kwargs = {"api_key": settings.backup_ai_api_key}
+                if settings.backup_ai_base_url:
+                    kwargs["base_url"] = settings.backup_ai_base_url
+                self.backup_client = OpenAI(**kwargs)
+                print(f"[OK] 备用 AI 客户端初始化成功 (base_url: {settings.backup_ai_base_url or 'default'})")
+            except Exception as e:
+                print(f"[WARN] 备用 AI 初始化失败: {e}")
+        
+        # 4. 如果没有配置任何 API，自动使用免费的 Pollinations.AI
+        if not self.anthropic_client and not self.openai_client and not self.backup_client:
+            try:
+                from openai import OpenAI
                 self.openai_client = OpenAI(
                     api_key="free",
                     base_url="https://text.pollinations.ai/openai"
@@ -71,6 +83,18 @@ class AIAnalyzerService:
                 print("[OK] 使用免费 Pollinations.AI 服务（无需配置）")
             except Exception as e:
                 print(f"[WARN] Pollinations.AI 初始化失败: {e}")
+        
+        # 打印降级链路
+        providers = []
+        if self.anthropic_client:
+            providers.append("Anthropic")
+        if self.openai_client and not self.using_free_service:
+            providers.append(f"OpenAI/DeepSeek({settings.openai_base_url or 'default'})")
+        if self.backup_client:
+            providers.append(f"备用({settings.backup_ai_base_url or 'default'})")
+        if self.using_free_service:
+            providers.append("Pollinations(免费)")
+        print(f"[AI] 降级链路: {' → '.join(providers) if providers else '⚠️ 无可用AI服务!'}")
     
     async def analyze_news_sentiment(self, news: News) -> SentimentType:
         """
@@ -218,11 +242,9 @@ class AIAnalyzerService:
         
         response = await self._call_ai(report_prompt, max_tokens=max_output_tokens)
         
-        # 防御：AI 调用返回 None 时使用模拟报告
+        # 防御：AI 调用返回空响应时直接失败
         if not response:
-            print("[WARN] AI 返回空响应，使用模拟报告内容", flush=True)
-            response = self._generate_mock_report()
-            self._last_call_was_mock = True
+            raise Exception("AI 返回空响应，本次报告不生成")
         
         # 解析响应
         report = self._parse_enhanced_report_response(
@@ -1226,31 +1248,31 @@ class AIAnalyzerService:
     
     async def _call_ai(self, prompt: str, max_tokens: int = 4000) -> str:
         """
-        调用 AI 模型
-        优先使用 Anthropic，失败则尝试 OpenAI/兼容服务
+        调用 AI 模型（多提供商自动降级，绝不使用模拟数据）
         
-        增强版：
-        - 添加超时保护（防止进程卡死）
-        - AI 失败时明确标记报告为模拟数据
+        降级链路：Anthropic → OpenAI/DeepSeek → 备用AI → Pollinations免费服务
+        全部失败 → 抛出异常，本次报告不生成
         """
         import asyncio
         import sys
         
-        # 单次 AI 调用的超时时间（秒）
         AI_CALL_TIMEOUT = 180  # 3 分钟
         
         print(f"[AI DEBUG] 准备调用 AI，客户端状态:", flush=True)
         print(f"   - Anthropic: {'已初始化' if self.anthropic_client else '未初始化'}", flush=True)
         print(f"   - OpenAI: {'已初始化' if self.openai_client else '未初始化'}", flush=True)
+        print(f"   - 备用 AI: {'已初始化' if self.backup_client else '未初始化'}", flush=True)
         print(f"   - 使用免费服务: {self.using_free_service}", flush=True)
         print(f"   - 配置的模型: {settings.ai_model}", flush=True)
         print(f"   - 配置的 Base URL: {settings.openai_base_url}", flush=True)
         sys.stdout.flush()
         
-        # 尝试 Anthropic（带超时保护）
+        errors = []  # 收集所有错误信息
+        
+        # ========== 第1层：Anthropic ==========
         if self.anthropic_client:
             try:
-                print(f"[AI] 尝试 Anthropic (超时 {AI_CALL_TIMEOUT}s)...", flush=True)
+                print(f"[AI] 🔵 尝试 Anthropic (超时 {AI_CALL_TIMEOUT}s)...", flush=True)
                 message = await asyncio.wait_for(
                     asyncio.get_event_loop().run_in_executor(
                         None,
@@ -1265,40 +1287,23 @@ class AIAnalyzerService:
                 print(f"[AI] ✅ Anthropic 调用成功", flush=True)
                 return message.content[0].text
             except asyncio.TimeoutError:
-                print(f"[AI] ⚠️ Anthropic 调用超时 ({AI_CALL_TIMEOUT}s)!", flush=True)
+                msg = f"Anthropic 超时 ({AI_CALL_TIMEOUT}s)"
+                errors.append(msg)
+                print(f"[AI] ⚠️ {msg}", flush=True)
             except Exception as e:
-                print(f"[AI] ❌ Anthropic 调用失败: {e}", flush=True)
+                msg = f"Anthropic 失败: {e}"
+                errors.append(msg)
+                print(f"[AI] ❌ {msg}", flush=True)
         
-        # 尝试 OpenAI/兼容服务（带超时保护）
-        if self.openai_client:
-            max_retries = 3 if self.using_free_service else 2
-            
-            for attempt in range(max_retries):
+        # ========== 第2层：OpenAI/DeepSeek（主服务）==========
+        if self.openai_client and not self.using_free_service:
+            for attempt in range(2):
                 try:
-                    # 智能选择模型
-                    if self.using_free_service:
-                        model = "openai"
-                    elif settings.openai_base_url:
-                        if settings.ai_model and "claude" not in settings.ai_model.lower():
-                            model = settings.ai_model
-                        else:
-                            if "deepseek" in settings.openai_base_url.lower():
-                                model = "deepseek-chat"
-                            elif "siliconflow" in settings.openai_base_url.lower():
-                                model = "deepseek-ai/DeepSeek-V3"
-                            else:
-                                model = "gpt-4-turbo"
-                    else:
-                        model = settings.ai_model if "gpt" in settings.ai_model.lower() else "gpt-4-turbo"
+                    model = self._select_model(settings.openai_base_url, settings.ai_model)
+                    actual_max_tokens = self._adapt_max_tokens(model, settings.openai_base_url, max_tokens)
                     
-                    # DeepSeek max_tokens 上限 8192，自动适配
-                    actual_max_tokens = max_tokens
-                    if "deepseek" in (settings.openai_base_url or "").lower():
-                        actual_max_tokens = min(max_tokens, 8192)
+                    print(f"[AI] 🔵 尝试主服务 {model} (尝试 {attempt + 1}/2, 超时 {AI_CALL_TIMEOUT}s)...", flush=True)
                     
-                    print(f"[AI] 调用模型: {model} (尝试 {attempt + 1}/{max_retries}), max_tokens={actual_max_tokens}, 超时={AI_CALL_TIMEOUT}s", flush=True)
-                    
-                    # 用 asyncio 超时包装同步调用，防止进程卡死
                     response = await asyncio.wait_for(
                         asyncio.get_event_loop().run_in_executor(
                             None,
@@ -1306,37 +1311,123 @@ class AIAnalyzerService:
                                 model=model,
                                 max_tokens=actual_max_tokens,
                                 messages=[{"role": "user", "content": prompt}],
-                                timeout=AI_CALL_TIMEOUT  # OpenAI SDK 自带的超时
+                                timeout=AI_CALL_TIMEOUT
                             )
                         ),
-                        timeout=AI_CALL_TIMEOUT + 10  # asyncio 超时比 SDK 超时多 10 秒作为安全余量
+                        timeout=AI_CALL_TIMEOUT + 10
                     )
-                    print(f"[AI] ✅ {model} 调用成功", flush=True)
+                    print(f"[AI] ✅ 主服务 {model} 调用成功", flush=True)
                     return response.choices[0].message.content
                 except asyncio.TimeoutError:
-                    print(f"[AI] ⚠️ {model} 调用超时 (尝试 {attempt + 1})!", flush=True)
+                    msg = f"主服务 {model} 超时 (尝试 {attempt + 1})"
+                    errors.append(msg)
+                    print(f"[AI] ⚠️ {msg}", flush=True)
                 except Exception as e:
-                    print(f"[AI] ❌ OpenAI/兼容服务调用失败 (尝试 {attempt + 1}): {e}", flush=True)
+                    msg = f"主服务调用失败 (尝试 {attempt + 1}): {e}"
+                    errors.append(msg)
+                    print(f"[AI] ❌ {msg}", flush=True)
                 
-                if attempt < max_retries - 1:
-                    wait_time = (attempt + 1) * 5
+                if attempt < 1:
+                    wait_time = 5
                     print(f"   等待 {wait_time} 秒后重试...", flush=True)
                     await asyncio.sleep(wait_time)
         
-        # ========== 都失败了 ==========
+        # ========== 第3层：备用 AI 服务 ==========
+        if self.backup_client:
+            for attempt in range(2):
+                try:
+                    backup_model = settings.backup_ai_model or "deepseek-chat"
+                    backup_max_tokens = self._adapt_max_tokens(backup_model, settings.backup_ai_base_url, max_tokens)
+                    
+                    print(f"[AI] 🟡 尝试备用服务 {backup_model} (尝试 {attempt + 1}/2, 超时 {AI_CALL_TIMEOUT}s)...", flush=True)
+                    
+                    response = await asyncio.wait_for(
+                        asyncio.get_event_loop().run_in_executor(
+                            None,
+                            lambda: self.backup_client.chat.completions.create(
+                                model=backup_model,
+                                max_tokens=backup_max_tokens,
+                                messages=[{"role": "user", "content": prompt}],
+                                timeout=AI_CALL_TIMEOUT
+                            )
+                        ),
+                        timeout=AI_CALL_TIMEOUT + 10
+                    )
+                    print(f"[AI] ✅ 备用服务 {backup_model} 调用成功（降级成功！）", flush=True)
+                    return response.choices[0].message.content
+                except asyncio.TimeoutError:
+                    msg = f"备用服务 {backup_model} 超时 (尝试 {attempt + 1})"
+                    errors.append(msg)
+                    print(f"[AI] ⚠️ {msg}", flush=True)
+                except Exception as e:
+                    msg = f"备用服务调用失败 (尝试 {attempt + 1}): {e}"
+                    errors.append(msg)
+                    print(f"[AI] ❌ {msg}", flush=True)
+                
+                if attempt < 1:
+                    await asyncio.sleep(3)
+        
+        # ========== 第4层：Pollinations 免费服务（最后防线）==========
+        if self.using_free_service and self.openai_client:
+            for attempt in range(3):
+                try:
+                    print(f"[AI] 🟠 尝试免费服务 Pollinations (尝试 {attempt + 1}/3)...", flush=True)
+                    response = await asyncio.wait_for(
+                        asyncio.get_event_loop().run_in_executor(
+                            None,
+                            lambda: self.openai_client.chat.completions.create(
+                                model="openai",
+                                max_tokens=min(max_tokens, 4000),
+                                messages=[{"role": "user", "content": prompt}],
+                                timeout=120
+                            )
+                        ),
+                        timeout=130
+                    )
+                    print(f"[AI] ✅ 免费服务调用成功（最后防线命中！）", flush=True)
+                    return response.choices[0].message.content
+                except Exception as e:
+                    msg = f"免费服务失败 (尝试 {attempt + 1}): {e}"
+                    errors.append(msg)
+                    print(f"[AI] ❌ {msg}", flush=True)
+                
+                if attempt < 2:
+                    await asyncio.sleep(3)
+        
+        # ========== 全部失败：不生成报告，不用模拟数据 ==========
         print("", flush=True)
         print("=" * 60, flush=True)
         print("[AI] 🚨🚨🚨 严重告警：所有 AI 服务调用全部失败！", flush=True)
-        print("[AI] 报告将使用模拟数据生成，内容不真实！", flush=True)
-        print("[AI] 请检查：1) API Key是否有效  2) 网络连接  3) DeepSeek服务状态", flush=True)
+        print("[AI] 本次报告将不会生成（拒绝使用模拟数据）", flush=True)
+        print(f"[AI] 失败详情（共 {len(errors)} 次尝试）:", flush=True)
+        for i, err in enumerate(errors, 1):
+            print(f"   {i}. {err}", flush=True)
+        print("[AI] 请检查：1) API Key是否有效  2) 网络连接  3) AI服务状态  4) 是否配置了备用AI", flush=True)
         print("=" * 60, flush=True)
         print("", flush=True)
         sys.stdout.flush()
         
-        # 标记本次生成使用了模拟数据
-        self._last_call_was_mock = True
-        
-        return self._generate_mock_report()
+        # 抛出异常，让调用方知道本次生成失败
+        raise Exception(f"所有AI服务全部失败（尝试了 {len(errors)} 次），本次报告不生成。请配置备用AI服务。")
+    
+    def _select_model(self, base_url: str, ai_model: str) -> str:
+        """根据 base_url 智能选择模型"""
+        if ai_model and "claude" not in ai_model.lower():
+            return ai_model
+        if base_url:
+            if "deepseek" in base_url.lower():
+                return "deepseek-chat"
+            elif "siliconflow" in base_url.lower():
+                return "deepseek-ai/DeepSeek-V3"
+            else:
+                return "gpt-4-turbo"
+        return ai_model if "gpt" in ai_model.lower() else "gpt-4-turbo"
+    
+    def _adapt_max_tokens(self, model: str, base_url: str, max_tokens: int) -> int:
+        """根据模型自动适配 max_tokens"""
+        if "deepseek" in (base_url or "").lower():
+            return min(max_tokens, 8192)
+        return max_tokens
     
     def _prepare_news_summary(self, news_list: List[News]) -> str:
         """准备新闻摘要文本（旧版兼容）"""

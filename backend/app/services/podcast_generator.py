@@ -105,105 +105,152 @@ class PodcastGeneratorService:
         self.weekday_openings = self.morning_openings
     
     def _init_ai_client(self):
-        """初始化 AI 客户端（用于生成播客脚本）"""
-        # 尝试使用 Anthropic
+        """初始化 AI 客户端（用于生成播客脚本，含备用服务）"""
+        # 构建 AI 客户端列表（按优先级排序）
+        self.ai_clients = []  # [(名称, 类型, 客户端, 模型)]
+        
+        # 1. Anthropic
         if settings.anthropic_api_key:
             try:
                 from anthropic import Anthropic
-                self.ai_client = ("anthropic", Anthropic(api_key=settings.anthropic_api_key))
+                client = Anthropic(api_key=settings.anthropic_api_key)
+                self.ai_clients.append(("Anthropic", "anthropic", client, settings.ai_model or "claude-sonnet-4-20250514"))
                 print("[播客] AI 客户端初始化成功 (Anthropic)")
-                return
             except Exception as e:
                 print(f"[播客] Anthropic 初始化失败: {e}")
         
-        # 尝试使用 OpenAI/兼容服务
+        # 2. OpenAI/DeepSeek（主服务）
         if settings.openai_api_key:
             try:
                 from openai import OpenAI
                 base_url = settings.openai_base_url or "https://api.openai.com/v1"
-                self.ai_client = ("openai", OpenAI(api_key=settings.openai_api_key, base_url=base_url))
+                client = OpenAI(api_key=settings.openai_api_key, base_url=base_url)
+                model = self._select_podcast_model(settings.openai_base_url, settings.ai_model)
+                self.ai_clients.append((f"主服务({base_url})", "openai", client, model))
+                # 兼容旧属性
+                self.ai_client = ("openai", client)
                 print(f"[播客] AI 客户端初始化成功 (OpenAI/兼容服务: {base_url})")
-                return
             except Exception as e:
                 print(f"[播客] OpenAI 初始化失败: {e}")
         
-        # 尝试使用免费服务
-        try:
-            from openai import OpenAI
-            self.ai_client = ("openai", OpenAI(
-                api_key="dummy",
-                base_url="https://text.pollinations.ai/openai"
-            ))
-            self.using_free_service = True
-            print("[播客] AI 客户端初始化成功 (免费服务 Pollinations)")
-        except Exception as e:
-            print(f"[播客] 免费服务初始化失败: {e}，将使用备用模板")
-            self.ai_client = None
+        # 3. 备用 AI 服务
+        if settings.backup_ai_api_key:
+            try:
+                from openai import OpenAI
+                base_url = settings.backup_ai_base_url or "https://api.openai.com/v1"
+                client = OpenAI(api_key=settings.backup_ai_api_key, base_url=base_url)
+                model = settings.backup_ai_model or "deepseek-chat"
+                self.ai_clients.append((f"备用({base_url})", "openai", client, model))
+                print(f"[播客] 备用 AI 初始化成功 ({base_url})")
+            except Exception as e:
+                print(f"[播客] 备用 AI 初始化失败: {e}")
+        
+        # 4. Pollinations 免费服务（最后防线）
+        if not self.ai_clients:
+            try:
+                from openai import OpenAI
+                client = OpenAI(api_key="dummy", base_url="https://text.pollinations.ai/openai")
+                self.ai_clients.append(("Pollinations免费", "openai", client, "openai"))
+                self.using_free_service = True
+                self.ai_client = ("openai", client)
+                print("[播客] AI 客户端初始化成功 (免费服务 Pollinations)")
+            except Exception as e:
+                print(f"[播客] 免费服务初始化失败: {e}，将使用备用模板")
+        
+        # 兼容旧属性
+        if not hasattr(self, 'ai_client') or self.ai_client is None:
+            if self.ai_clients:
+                name, ctype, client, model = self.ai_clients[0]
+                self.ai_client = (ctype, client)
+            else:
+                self.ai_client = None
+        
+        providers = [item[0] for item in self.ai_clients]
+        print(f"[播客] 降级链路: {' → '.join(providers) if providers else '⚠️ 无可用AI! 将使用备用模板'}")
+    
+    def _select_podcast_model(self, base_url: Optional[str], ai_model: Optional[str]) -> str:
+        """为播客选择模型"""
+        if ai_model and "claude" not in ai_model.lower():
+            return ai_model
+        if base_url:
+            if "deepseek" in base_url.lower():
+                return "deepseek-chat"
+            elif "siliconflow" in base_url.lower():
+                return "deepseek-ai/DeepSeek-V3"
+        return "gpt-4-turbo"
     
     async def _call_ai_for_podcast(self, system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> Optional[str]:
         """
-        调用 AI 生成播客脚本
+        调用 AI 生成播客脚本（多提供商自动降级）
         
-        Args:
-            system_prompt: 系统提示词（定义 AI 主播人设）
-            user_prompt: 用户提示词（包含报告内容等素材）
-            max_tokens: 最大输出 token 数
-            
-        Returns:
-            AI 生成的播客脚本，失败返回 None
+        降级链路：按 ai_clients 列表依次尝试
+        全部失败 → 返回 None，使用备用模板
         """
-        if not self.ai_client:
-            print("[播客] AI 客户端未初始化，无法生成脚本")
+        if not self.ai_clients:
+            print("[播客] 无可用 AI 客户端，将使用备用模板")
             return None
         
-        client_type, client = self.ai_client
-        max_retries = 3 if self.using_free_service else 2
+        AI_TIMEOUT = 180  # 3 分钟
         
-        for attempt in range(max_retries):
-            try:
-                if client_type == "anthropic":
-                    message = client.messages.create(
-                        model=settings.ai_model if settings.ai_model else "claude-sonnet-4-20250514",
-                        max_tokens=max_tokens,
-                        system=system_prompt,
-                        messages=[{"role": "user", "content": user_prompt}]
-                    )
-                    return message.content[0].text
-                else:
-                    # OpenAI/兼容服务
-                    if self.using_free_service:
-                        model = "openai"
-                    elif settings.ai_model and "claude" not in settings.ai_model.lower():
-                        model = settings.ai_model
-                    elif settings.openai_base_url:
-                        if "deepseek" in settings.openai_base_url.lower():
-                            model = "deepseek-chat"
-                        elif "siliconflow" in settings.openai_base_url.lower():
-                            model = "deepseek-ai/DeepSeek-V3"
-                        else:
-                            model = "gpt-4-turbo"
+        for provider_name, client_type, client, model in self.ai_clients:
+            retries = 3 if "pollinations" in provider_name.lower() else 2
+            
+            for attempt in range(retries):
+                try:
+                    print(f"[播客] 🔵 尝试 {provider_name} / {model} (尝试 {attempt + 1}/{retries})")
+                    
+                    if client_type == "anthropic":
+                        message = await asyncio.wait_for(
+                            asyncio.get_event_loop().run_in_executor(
+                                None,
+                                lambda c=client, m=model: c.messages.create(
+                                    model=m,
+                                    max_tokens=max_tokens,
+                                    system=system_prompt,
+                                    messages=[{"role": "user", "content": user_prompt}]
+                                )
+                            ),
+                            timeout=AI_TIMEOUT
+                        )
+                        print(f"[播客] ✅ {provider_name} 调用成功")
+                        return message.content[0].text
                     else:
-                        model = "gpt-4-turbo"
-                    
-                    print(f"[播客] 调用 AI 生成脚本: {model} (尝试 {attempt + 1}/{max_retries})")
-                    
-                    response = client.chat.completions.create(
-                        model=model,
-                        max_tokens=max_tokens,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ]
-                    )
-                    return response.choices[0].message.content
-                    
-            except Exception as e:
-                print(f"[播客] AI 调用失败 (尝试 {attempt + 1}): {e}")
-                if attempt < max_retries - 1:
+                        # DeepSeek max_tokens 适配
+                        actual_max_tokens = max_tokens
+                        if "deepseek" in model.lower():
+                            actual_max_tokens = min(max_tokens, 8192)
+                        
+                        response = await asyncio.wait_for(
+                            asyncio.get_event_loop().run_in_executor(
+                                None,
+                                lambda c=client, m=model, mt=actual_max_tokens: c.chat.completions.create(
+                                    model=m,
+                                    max_tokens=mt,
+                                    messages=[
+                                        {"role": "system", "content": system_prompt},
+                                        {"role": "user", "content": user_prompt}
+                                    ],
+                                    timeout=AI_TIMEOUT
+                                )
+                            ),
+                            timeout=AI_TIMEOUT + 10
+                        )
+                        print(f"[播客] ✅ {provider_name} 调用成功")
+                        return response.choices[0].message.content
+                        
+                except asyncio.TimeoutError:
+                    print(f"[播客] ⚠️ {provider_name} 超时 (尝试 {attempt + 1})")
+                except Exception as e:
+                    print(f"[播客] ❌ {provider_name} 失败 (尝试 {attempt + 1}): {e}")
+                
+                if attempt < retries - 1:
                     wait_time = (attempt + 1) * 3
                     print(f"   等待 {wait_time} 秒后重试...")
                     await asyncio.sleep(wait_time)
+            
+            print(f"[播客] ⚠️ {provider_name} 全部失败，尝试下一个提供商...")
         
+        print("[播客] 🚨 所有 AI 提供商都失败了，将使用备用模板")
         return None
     
     async def _get_http_client(self):
