@@ -370,6 +370,14 @@ class SchedulerService:
             await self._save_report(report)
             print(f"   报告已保存，ID: {report.id}")
             
+            # Step 5: 自动更新自选股 AI 预测（交易日才执行）
+            if is_trading:
+                print("\n[Step 5] 自动更新自选股 AI 预测...")
+                try:
+                    await self._update_watchlist_predictions()
+                except Exception as pred_e:
+                    print(f"   [WARN] 自选股预测更新失败（不影响报告）: {pred_e}")
+            
             print("\n" + "="*50)
             print(f"[DONE] {report_type_str}生成完成！")
             print("="*50 + "\n")
@@ -548,6 +556,13 @@ class SchedulerService:
             print("\n[Step 5] 保存到数据库...")
             await self._save_report(report)
             print(f"   报告已保存，ID: {report.id}")
+            
+            # Step 6: 自动更新自选股 AI 预测
+            print("\n[Step 6] 自动更新自选股 AI 预测...")
+            try:
+                await self._update_watchlist_predictions()
+            except Exception as pred_e:
+                print(f"   [WARN] 自选股预测更新失败（不影响报告）: {pred_e}")
             
             print("\n" + "="*50)
             print(f"[DONE] 交易日晚报生成完成！")
@@ -1013,6 +1028,95 @@ class SchedulerService:
                 report.podcast_status = status
                 report.updated_at = datetime.now()
                 await session.commit()
+    
+    async def _update_watchlist_predictions(self):
+        """
+        自动为所有自选股更新 AI 预测
+        
+        在早报/晚报生成后调用，确保用户看到的预测是最新的
+        """
+        if not self._session_maker:
+            print("   [WARN] 数据库未初始化，跳过自选股预测更新")
+            return
+        
+        try:
+            from sqlalchemy import select
+            from ..models.database import StockModel, StockPredictionModel
+            from .ai_analyzer import AIAnalyzerService
+            import uuid as uuid_mod
+            
+            async with self._session_maker() as session:
+                # 获取所有自选股
+                query = select(StockModel)
+                result = await session.execute(query)
+                stocks = result.scalars().all()
+                
+                if not stocks:
+                    print("   没有自选股，跳过 AI 预测")
+                    return
+                
+                print(f"   开始为 {len(stocks)} 只自选股生成 AI 预测...")
+                
+                ai_analyzer = AIAnalyzerService()
+                predicted_count = 0
+                
+                for stock in stocks:
+                    try:
+                        prediction = await asyncio.wait_for(
+                            ai_analyzer.analyze_stock_simple(
+                                code=stock.code,
+                                name=stock.name,
+                                market=stock.market,
+                                current_price=stock.current_price or 0,
+                                change_percent=stock.change_percent or 0
+                            ),
+                            timeout=60  # 单只股票分析超时60秒
+                        )
+                        
+                        # 更新 stocks 表的预测字段
+                        stock.latest_prediction = prediction.prediction.value
+                        stock.latest_confidence = prediction.confidence
+                        stock.last_updated = datetime.now()
+                        
+                        # 写入 stock_predictions 表（保存详细预测记录）
+                        pred_record = StockPredictionModel(
+                            id=str(uuid_mod.uuid4()),
+                            stock_code=stock.code,
+                            stock_name=stock.name,
+                            market=stock.market,
+                            current_price=stock.current_price or 0,
+                            prediction=prediction.prediction.value,
+                            confidence=prediction.confidence,
+                            target_price=prediction.target_price,
+                            stop_loss=prediction.stop_loss,
+                            reasoning=prediction.reasoning,
+                            fundamental_score=prediction.fundamental_score,
+                            technical_score=prediction.technical_score,
+                            sentiment_score=prediction.sentiment_score,
+                            overall_score=prediction.overall_score,
+                            fundamentals=None,
+                            technicals=None,
+                            sentiment=None,
+                            generated_at=datetime.now()
+                        )
+                        session.add(pred_record)
+                        
+                        predicted_count += 1
+                        print(f"   ✅ {stock.name}({stock.code}): {prediction.prediction.value} "
+                              f"(置信度 {prediction.confidence*100:.0f}%)")
+                        
+                    except asyncio.TimeoutError:
+                        print(f"   ⏰ {stock.name}({stock.code}): AI 分析超时，跳过")
+                    except Exception as e:
+                        print(f"   ❌ {stock.name}({stock.code}): 预测失败 - {str(e)[:50]}")
+                
+                await session.commit()
+                print(f"   自选股 AI 预测完成：{predicted_count}/{len(stocks)} 只成功")
+                
+        except Exception as e:
+            print(f"   [ERROR] 自选股预测更新出错: {e}")
+            import traceback
+            traceback.print_exc()
 
 
 # 单例实例

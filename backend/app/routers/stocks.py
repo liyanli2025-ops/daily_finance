@@ -533,7 +533,7 @@ async def get_stock_kline(
     return list(reversed(klines))
 
 
-@router.get("/{stock_code}/prediction", response_model=StockPrediction)
+@router.get("/{stock_code}/prediction")
 async def get_stock_prediction(
     stock_code: str,
     market: str = Query("A", description="市场类型"),
@@ -542,6 +542,10 @@ async def get_stock_prediction(
 ):
     """
     获取股票投资预判
+    
+    返回字段新增：
+    - is_expired: 预测是否已过期（超过24小时）
+    - hours_since_generated: 距离预测生成已过去多少小时
     """
     # 先查询是否有缓存的预测
     query = (
@@ -554,10 +558,15 @@ async def get_stock_prediction(
     prediction_record = result.scalar_one_or_none()
     
     if prediction_record:
+        # 计算过期状态
+        generated_at = prediction_record.generated_at or datetime.now()
+        hours_since = (datetime.now() - generated_at).total_seconds() / 3600
+        is_expired = hours_since > 24  # 超过24小时视为过期
+        
         # 返回已有预测
         from ..models.stock import FundamentalData, TechnicalData, SentimentData
         
-        return StockPrediction(
+        prediction_data = StockPrediction(
             code=prediction_record.stock_code,
             name=prediction_record.stock_name,
             market=MarketType(prediction_record.market),
@@ -576,11 +585,19 @@ async def get_stock_prediction(
             overall_score=prediction_record.overall_score or 0.5,
             generated_at=prediction_record.generated_at
         )
+        
+        # 转换为 dict 并附加过期信息
+        resp = prediction_data.model_dump()
+        resp["is_expired"] = is_expired
+        resp["hours_since_generated"] = round(hours_since, 1)
+        if is_expired:
+            resp["expire_hint"] = "预测已过期，建议点击「重新分析」获取最新结果"
+        return resp
     
     # 如果没有预测记录，返回模拟数据（实际应该触发生成）
     from ..models.stock import FundamentalData, TechnicalData, SentimentData
     
-    return StockPrediction(
+    prediction_data = StockPrediction(
         code=stock_code,
         name="待获取",
         market=MarketType(market),
@@ -597,6 +614,12 @@ async def get_stock_prediction(
         overall_score=0.5,
         generated_at=datetime.now()
     )
+    
+    resp = prediction_data.model_dump()
+    resp["is_expired"] = True
+    resp["hours_since_generated"] = 0
+    resp["expire_hint"] = "暂无预测数据，请点击「重新分析」生成"
+    return resp
 
 
 @router.post("/{stock_code}/analyze")
@@ -604,15 +627,91 @@ async def trigger_stock_analysis(
     stock_code: str,
     market: str = Query("A", description="市场类型"),
     background_tasks: BackgroundTasks = None,
-    request: Request = None
+    request: Request = None,
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    触发股票分析
+    触发单只股票的 AI 分析
+    
+    在后台执行 AI 分析，分析完成后将结果写入 stock_predictions 表
+    同时更新 stocks 表的 latest_prediction 字段
     """
-    # TODO: 在后台执行分析任务
+    from ..services.ai_analyzer import AIAnalyzerService
+    
+    # 获取股票信息
+    stock_query = select(StockModel).where(
+        StockModel.code == stock_code,
+        StockModel.market == market
+    )
+    result = await db.execute(stock_query)
+    stock = result.scalar_one_or_none()
+    
+    stock_name = stock.name if stock else stock_code
+    current_price = stock.current_price if stock else 0
+    change_percent = stock.change_percent if stock else 0
+    
+    async def _run_analysis():
+        """后台执行 AI 分析"""
+        try:
+            ai_analyzer = AIAnalyzerService()
+            prediction = await ai_analyzer.analyze_stock_simple(
+                code=stock_code,
+                name=stock_name,
+                market=market,
+                current_price=current_price or 0,
+                change_percent=change_percent or 0
+            )
+            
+            # 写入数据库
+            session_maker = request.app.state.session_maker
+            async with session_maker() as session:
+                # 写入 stock_predictions 表
+                pred_record = StockPredictionModel(
+                    id=str(uuid.uuid4()),
+                    stock_code=stock_code,
+                    stock_name=stock_name,
+                    market=market,
+                    current_price=current_price or 0,
+                    prediction=prediction.prediction.value,
+                    confidence=prediction.confidence,
+                    target_price=prediction.target_price,
+                    stop_loss=prediction.stop_loss,
+                    reasoning=prediction.reasoning,
+                    fundamental_score=prediction.fundamental_score,
+                    technical_score=prediction.technical_score,
+                    sentiment_score=prediction.sentiment_score,
+                    overall_score=prediction.overall_score,
+                    fundamentals=None,
+                    technicals=None,
+                    sentiment=None,
+                    generated_at=datetime.now()
+                )
+                session.add(pred_record)
+                
+                # 更新 stocks 表的预测字段（如果股票在自选列表中）
+                stock_update_query = select(StockModel).where(
+                    StockModel.code == stock_code,
+                    StockModel.market == market
+                )
+                stock_result = await session.execute(stock_update_query)
+                stock_record = stock_result.scalar_one_or_none()
+                if stock_record:
+                    stock_record.latest_prediction = prediction.prediction.value
+                    stock_record.latest_confidence = prediction.confidence
+                    stock_record.last_updated = datetime.now()
+                
+                await session.commit()
+                print(f"[AI] ✅ 单股分析完成: {stock_name}({stock_code}) → {prediction.prediction.value}")
+                
+        except Exception as e:
+            print(f"[AI] ❌ 单股分析失败: {stock_code} - {e}")
+    
+    # 在后台执行分析（不阻塞响应）
+    background_tasks.add_task(_run_analysis)
+    
     return {
         "status": "started",
-        "message": f"已开始分析 {stock_code}",
+        "message": f"已开始分析 {stock_name}({stock_code})，预计 30-60 秒完成",
         "stock_code": stock_code,
         "market": market
     }
@@ -784,10 +883,33 @@ async def generate_watchlist_predictions(
                 change_percent=stock.change_percent or 0
             )
             
-            # 更新数据库
+            # 更新 stocks 表
             stock.latest_prediction = prediction.prediction.value
             stock.latest_confidence = prediction.confidence
             stock.last_updated = datetime.now()
+            
+            # 写入 stock_predictions 表（保存详细预测记录）
+            pred_record = StockPredictionModel(
+                id=str(uuid.uuid4()),
+                stock_code=stock.code,
+                stock_name=stock.name,
+                market=stock.market,
+                current_price=stock.current_price or 0,
+                prediction=prediction.prediction.value,
+                confidence=prediction.confidence,
+                target_price=prediction.target_price,
+                stop_loss=prediction.stop_loss,
+                reasoning=prediction.reasoning,
+                fundamental_score=prediction.fundamental_score,
+                technical_score=prediction.technical_score,
+                sentiment_score=prediction.sentiment_score,
+                overall_score=prediction.overall_score,
+                fundamentals=None,
+                technicals=None,
+                sentiment=None,
+                generated_at=datetime.now()
+            )
+            db.add(pred_record)
             
             predicted_count += 1
             results.append({
