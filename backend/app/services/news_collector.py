@@ -45,25 +45,34 @@ class NewsCollectorService:
             }
         )
         
-        # RSS 源配置（只保留经过测试可用的源）
+        # RSSHub 备用节点（主节点挂掉时自动切换）
+        self._rsshub_nodes = [
+            "https://rsshub.rssforever.com",
+            "https://rsshub.app",
+            "https://rsshub.pseudoyu.com",
+        ]
+        self._current_rsshub_node = self._rsshub_nodes[0]
+        
+        # RSS 源配置
+        # url 中包含 {RSSHUB} 占位符的会自动替换为当前可用的 RSSHub 节点
         self.rss_feeds = [
             # ==========================================
-            # 财经类新闻（国内）
+            # 财经类新闻（国内 — 核心信源）
             # ==========================================
             {
-                "url": "https://rsshub.rssforever.com/cls/telegraph",
+                "url": "{RSSHUB}/cls/telegraph",
                 "name": "财联社电报",
                 "category": "快讯",
                 "news_type": "finance"
             },
             {
-                "url": "https://rsshub.rssforever.com/jin10/flash",
+                "url": "{RSSHUB}/jin10/flash",
                 "name": "金十数据",
                 "category": "快讯",
                 "news_type": "finance"
             },
             {
-                "url": "https://rsshub.rssforever.com/eastmoney/report/strategyreport",
+                "url": "{RSSHUB}/eastmoney/report/strategyreport",
                 "name": "东方财富研报",
                 "category": "研报",
                 "news_type": "finance"
@@ -82,22 +91,44 @@ class NewsCollectorService:
             },
             
             # ==========================================
+            # 【新增】权威财经媒体（差异化覆盖深度分析）
+            # ==========================================
+            {
+                "url": "{RSSHUB}/caixin/latest",
+                "name": "财新网",
+                "category": "深度财经",
+                "news_type": "finance"
+            },
+            {
+                "url": "{RSSHUB}/stcn/kuaixun",
+                "name": "证券时报快讯",
+                "category": "A股快讯",
+                "news_type": "finance"
+            },
+            {
+                "url": "{RSSHUB}/cs/news/rolling",
+                "name": "中证网滚动新闻",
+                "category": "A股综合",
+                "news_type": "finance"
+            },
+            
+            # ==========================================
             # 国际财经新闻
             # ==========================================
             {
-                "url": "https://rsshub.rssforever.com/wallstreetcn/news/global",
+                "url": "{RSSHUB}/wallstreetcn/news/global",
                 "name": "华尔街见闻-全球",
                 "category": "国际财经",
                 "news_type": "finance"
             },
             {
-                "url": "https://rsshub.rssforever.com/bloomberg",
+                "url": "{RSSHUB}/bloomberg",
                 "name": "彭博社",
                 "category": "国际财经",
                 "news_type": "finance"
             },
             {
-                "url": "https://rsshub.rssforever.com/finviz/news",
+                "url": "{RSSHUB}/finviz/news",
                 "name": "Finviz美股新闻",
                 "category": "美股",
                 "news_type": "finance"
@@ -107,13 +138,13 @@ class NewsCollectorService:
             # 港股/日股
             # ==========================================
             {
-                "url": "https://rsshub.rssforever.com/hkej/index",
+                "url": "{RSSHUB}/hkej/index",
                 "name": "香港经济日报",
                 "category": "港股",
                 "news_type": "finance"
             },
             {
-                "url": "https://rsshub.rssforever.com/nikkei/index",
+                "url": "{RSSHUB}/nikkei/index",
                 "name": "日经新闻",
                 "category": "日股",
                 "news_type": "finance"
@@ -133,7 +164,7 @@ class NewsCollectorService:
             # 科技新闻（跨界）
             # ==========================================
             {
-                "url": "https://rsshub.rssforever.com/36kr/newsflashes",
+                "url": "{RSSHUB}/36kr/newsflashes",
                 "name": "36氪快讯",
                 "category": "科技突破",
                 "news_type": "tech"
@@ -145,7 +176,7 @@ class NewsCollectorService:
                 "news_type": "tech"
             },
             {
-                "url": "https://rsshub.rssforever.com/ithome/it",
+                "url": "{RSSHUB}/ithome/it",
                 "name": "IT之家",
                 "category": "科技突破",
                 "news_type": "tech"
@@ -383,19 +414,33 @@ class NewsCollectorService:
         # 合并：盘后新闻优先（更新），盘中新闻补充
         combined = list(evening_news)  # 先放入盘后新闻
         
-        # 已有的标题哈希集合
+        # 构建已有标题的标准化列表（用于相似度比较）
         import hashlib
         existing_hashes = set()
+        existing_norm_titles = []
         for news in combined:
             title_hash = hashlib.md5(news.title.encode()).hexdigest()
             existing_hashes.add(title_hash)
+            existing_norm_titles.append(self._normalize_title(news.title))
         
-        # 从盘中缓存中补充不重复的新闻
+        # 从盘中缓存中补充不重复的新闻（MD5 + 相似度双重检查）
         added_count = 0
         for news in midday_news:
             title_hash = hashlib.md5(news.title.encode()).hexdigest()
-            if title_hash not in existing_hashes:
+            if title_hash in existing_hashes:
+                continue
+            
+            # 相似度检查
+            norm_title = self._normalize_title(news.title)
+            is_dup = False
+            for existing_norm in existing_norm_titles:
+                if self._title_similarity(norm_title, existing_norm) > 0.7:
+                    is_dup = True
+                    break
+            
+            if not is_dup:
                 existing_hashes.add(title_hash)
+                existing_norm_titles.append(norm_title)
                 combined.append(news)
                 added_count += 1
         
@@ -408,22 +453,108 @@ class NewsCollectorService:
 
     async def _collect_xueqiu_hot(self) -> List[News]:
         """
-        直接爬取雪球热帖
+        采集雪球热帖（投资者观点/小道消息）
         
-        雪球是国内最大的投资者社区，很多"小道消息"和个人分析观点在这里流传
+        策略：优先使用 RSSHub 雪球源（稳定），失败再回退直接 API
+        """
+        # 方案 A：通过 RSSHub 获取雪球热帖（推荐，不被 WAF 拦截）
+        rsshub_urls = [
+            "https://rsshub.rssforever.com/xueqiu/hots",
+            "https://rsshub.app/xueqiu/hots",
+        ]
+        
+        for rsshub_url in rsshub_urls:
+            try:
+                news_list = await self._collect_xueqiu_via_rsshub(rsshub_url)
+                if news_list:
+                    print(f"  [雪球] RSSHub 获取热帖 {len(news_list)} 条（{rsshub_url}）")
+                    return news_list
+            except Exception as e:
+                print(f"  [雪球] RSSHub 源失败 ({rsshub_url}): {e}")
+        
+        # 方案 B：直接 API（加强反爬）
+        try:
+            news_list = await self._collect_xueqiu_hot_direct()
+            if news_list:
+                print(f"  [雪球] 直接 API 获取热帖 {len(news_list)} 条")
+                return news_list
+        except Exception as e:
+            print(f"  [雪球] 直接 API 失败: {e}")
+        
+        print("  [雪球] 所有方式均失败，跳过")
+        return []
+    
+    async def _collect_xueqiu_via_rsshub(self, rsshub_url: str) -> List[News]:
+        """通过 RSSHub 获取雪球热帖"""
+        news_list = []
+        
+        feed_response = await self.client.get(rsshub_url, timeout=15.0)
+        if feed_response.status_code != 200:
+            return news_list
+        
+        feed = feedparser.parse(feed_response.text)
+        
+        for entry in feed.entries[:20]:
+            title = entry.get("title", "")
+            content = entry.get("summary", entry.get("description", ""))
+            
+            # 清理 HTML
+            content = self._clean_html(content) if content else ""
+            
+            if not title:
+                continue
+            
+            # 解析时间
+            try:
+                published = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') and entry.published_parsed else datetime.now()
+            except:
+                published = datetime.now()
+            
+            news_list.append(News(
+                id=str(uuid.uuid4()),
+                title=title,
+                content=content[:1000],
+                summary=content[:200] if content else title,
+                source="雪球热帖",
+                source_url=entry.get("link", "https://xueqiu.com"),
+                published_at=published,
+                news_type=NewsType.FINANCE,
+                sentiment=SentimentType.NEUTRAL,
+                importance_score=0.7,
+                is_china_related=True,
+                category="投资者观点"
+            ))
+        
+        return news_list
+    
+    async def _collect_xueqiu_hot_direct(self) -> List[News]:
+        """
+        直接爬取雪球热帖（备用方案，加强反爬）
         """
         news_list = []
         
         try:
-            # 雪球热门话题 API
+            # 雪球热门话题 API（加强 headers 模拟真实浏览器）
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept": "application/json",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
                 "Referer": "https://xueqiu.com/",
+                "Origin": "https://xueqiu.com",
+                "X-Requested-With": "XMLHttpRequest",
             }
             
-            # 需要先获取 cookie
-            await self.client.get("https://xueqiu.com/", headers=headers)
+            # 先访问首页获取 cookie（关键！）
+            try:
+                home_resp = await self.client.get("https://xueqiu.com/", headers={
+                    "User-Agent": headers["User-Agent"],
+                    "Accept": "text/html,application/xhtml+xml",
+                })
+                # 小延迟模拟真人行为
+                await asyncio.sleep(0.5)
+            except:
+                pass
             
             # 热门帖子 API
             hot_url = "https://xueqiu.com/statuses/hot/listV2.json?since_id=-1&max_id=-1&size=30"
@@ -758,81 +889,145 @@ class NewsCollectorService:
         """
         采集雪球个股讨论
         
-        雪球是投资者社区，可以获取市场观点和小道消息
+        雪球是投资者社区，可以获取市场观点和小道消息。
+        先尝试 RSSHub 源，失败回退直接 API。
         """
         news_list = []
         
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json",
-            "Referer": "https://xueqiu.com/",
-        }
-        
-        try:
-            # 先获取 cookie
-            await self.client.get("https://xueqiu.com/", headers=headers)
-        except:
-            return news_list
-        
-        for stock in stocks[:5]:  # 限制最多5只股票
-            try:
-                # 构造雪球股票代码
-                if stock.market == "A":
-                    if stock.code.startswith("6"):
-                        xq_symbol = f"SH{stock.code}"
-                    else:
-                        xq_symbol = f"SZ{stock.code}"
-                else:
-                    xq_symbol = stock.code
-                
-                # 获取个股讨论
-                url = f"https://xueqiu.com/query/v1/symbol/search/status.json?symbol={xq_symbol}&count=10&page=1"
-                
+        # 方案 A：通过 RSSHub 获取个股讨论
+        for stock in stocks[:5]:
+            xq_symbol = self._get_xueqiu_symbol(stock)
+            rsshub_urls = [
+                f"https://rsshub.rssforever.com/xueqiu/stock_comments/{xq_symbol}",
+                f"https://rsshub.app/xueqiu/stock_comments/{xq_symbol}",
+            ]
+            
+            fetched = False
+            for rsshub_url in rsshub_urls:
                 try:
-                    response = await self.client.get(url, headers=headers)
-                    if response.status_code == 200:
-                        data = response.json()
-                        items = data.get("list", [])
-                        
-                        for item in items[:3]:  # 每只股票最多3条
-                            text = item.get("text", "")
-                            text = self._clean_html(text)
+                    resp = await self.client.get(rsshub_url, timeout=10.0)
+                    if resp.status_code == 200:
+                        feed = feedparser.parse(resp.text)
+                        for entry in feed.entries[:3]:
+                            title = entry.get("title", "")
+                            content = entry.get("summary", entry.get("description", ""))
+                            content = self._clean_html(content) if content else ""
                             
-                            if len(text) < 20:  # 过短的跳过
+                            if not title or len(title) < 10:
                                 continue
                             
-                            user = item.get("user", {})
-                            author = user.get("screen_name", "雪球用户")
-                            followers = user.get("followers_count", 0)
-                            
-                            # 大V的观点权重更高
-                            importance = 0.65 if followers > 10000 else 0.55
-                            
-                            title = text[:50] + "..." if len(text) > 50 else text
+                            try:
+                                published = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') and entry.published_parsed else datetime.now()
+                            except:
+                                published = datetime.now()
                             
                             news_list.append(News(
                                 id=str(uuid.uuid4()),
-                                title=f"[{stock.name}] {author}: {title}",
-                                content=text[:1000],
-                                summary=text[:200],
+                                title=f"[{stock.name}] {title}",
+                                content=content[:1000],
+                                summary=content[:200] if content else title,
                                 source=f"雪球-{stock.name}",
-                                source_url=f"https://xueqiu.com/{user.get('id', '')}/post/{item.get('id', '')}",
-                                published_at=datetime.fromtimestamp(item.get("created_at", 0) / 1000) if item.get("created_at") else datetime.now(),
+                                source_url=entry.get("link", f"https://xueqiu.com/S/{xq_symbol}"),
+                                published_at=published,
                                 news_type=NewsType.FINANCE,
                                 sentiment=SentimentType.NEUTRAL,
-                                importance_score=importance,
+                                importance_score=0.65,
                                 is_china_related=True,
                                 category=f"雪球讨论-{stock.name}",
                                 related_stocks=[stock.code]
                             ))
+                        fetched = True
+                        break
                 except Exception as e:
-                    print(f"    [雪球] {stock.name} 讨论采集失败: {e}")
+                    pass
+            
+            if not fetched:
+                # 方案 B：直接 API 获取
+                try:
+                    direct_news = await self._collect_xueqiu_stock_direct(stock)
+                    news_list.extend(direct_news)
+                except:
+                    pass
+            
+            await asyncio.sleep(0.3)
+        
+        if news_list:
+            print(f"  [雪球] 个股讨论共 {len(news_list)} 条")
+        return news_list
+    
+    @staticmethod
+    def _get_xueqiu_symbol(stock) -> str:
+        """构造雪球股票代码"""
+        if stock.market == "A":
+            return f"SH{stock.code}" if stock.code.startswith("6") else f"SZ{stock.code}"
+        return stock.code
+    
+    async def _collect_xueqiu_stock_direct(self, stock) -> List[News]:
+        """直接 API 获取单只股票的雪球讨论（备用）"""
+        news_list = []
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+            "Referer": "https://xueqiu.com/",
+            "Origin": "https://xueqiu.com",
+        }
+        
+        try:
+            # 先获取 cookie
+            await self.client.get("https://xueqiu.com/", headers={
+                "User-Agent": headers["User-Agent"],
+                "Accept": "text/html",
+            })
+            await asyncio.sleep(0.3)
+            
+            xq_symbol = self._get_xueqiu_symbol(stock)
+            
+            # 获取个股讨论
+            url = f"https://xueqiu.com/query/v1/symbol/search/status.json?symbol={xq_symbol}&count=10&page=1"
+            
+            response = await self.client.get(url, headers=headers)
+            if response.status_code == 200:
+                # 防止返回 HTML 而非 JSON
+                content_type = response.headers.get("content-type", "")
+                if "json" not in content_type and "text/html" in content_type:
+                    return news_list
                 
-                # 避免请求过快
-                await asyncio.sleep(0.5)
+                data = response.json()
+                items = data.get("list", [])
                 
-            except Exception as e:
-                print(f"    [雪球] {stock.name} 异常: {e}")
+                for item in items[:3]:
+                    text = item.get("text", "")
+                    text = self._clean_html(text)
+                    
+                    if len(text) < 20:
+                        continue
+                    
+                    user = item.get("user", {})
+                    author = user.get("screen_name", "雪球用户")
+                    followers = user.get("followers_count", 0)
+                    
+                    importance = 0.65 if followers > 10000 else 0.55
+                    title = text[:50] + "..." if len(text) > 50 else text
+                    
+                    news_list.append(News(
+                        id=str(uuid.uuid4()),
+                        title=f"[{stock.name}] {author}: {title}",
+                        content=text[:1000],
+                        summary=text[:200],
+                        source=f"雪球-{stock.name}",
+                        source_url=f"https://xueqiu.com/{user.get('id', '')}/post/{item.get('id', '')}",
+                        published_at=datetime.fromtimestamp(item.get("created_at", 0) / 1000) if item.get("created_at") else datetime.now(),
+                        news_type=NewsType.FINANCE,
+                        sentiment=SentimentType.NEUTRAL,
+                        importance_score=importance,
+                        is_china_related=True,
+                        category=f"雪球讨论-{stock.name}",
+                        related_stocks=[stock.code]
+                    ))
+        except Exception as e:
+            print(f"    [雪球] {stock.name} 直接API讨论采集失败: {e}")
         
         return news_list
     
@@ -897,30 +1092,70 @@ class NewsCollectorService:
         
         return news_list
     
+    def _resolve_rss_url(self, url: str, node: str = None) -> str:
+        """将 {RSSHUB} 占位符替换为实际的 RSSHub 节点地址"""
+        if "{RSSHUB}" in url:
+            return url.replace("{RSSHUB}", node or self._current_rsshub_node)
+        return url
+    
     async def _collect_rss(self, feed_config: Dict[str, str]) -> List[News]:
-        """采集单个 RSS 源"""
-        news_list = []
+        """
+        采集单个 RSS 源
         
-        try:
-            response = await self.client.get(feed_config["url"])
-            response.raise_for_status()
-            
-            # 解析 RSS
-            feed = feedparser.parse(response.text)
-            
-            for entry in feed.entries:
-                try:
-                    news = self._parse_rss_entry(entry, feed_config)
-                    if news:
-                        news_list.append(news)
-                except Exception as e:
-                    print(f"解析条目失败: {e}")
+        对于 RSSHub 源，如果主节点失败，自动切换到备用节点
+        """
+        news_list = []
+        url_template = feed_config["url"]
+        last_error = None
+        
+        # 确定要尝试的 URL 列表
+        if "{RSSHUB}" in url_template:
+            urls_to_try = [
+                self._resolve_rss_url(url_template, node) 
+                for node in self._rsshub_nodes
+            ]
+        else:
+            urls_to_try = [url_template]
+        
+        for url in urls_to_try:
+            try:
+                response = await self.client.get(url, timeout=15.0)
+                response.raise_for_status()
+                
+                # 解析 RSS
+                feed = feedparser.parse(response.text)
+                
+                if not feed.entries:
                     continue
-            
-            print(f"[OK] {feed_config['name']}: 获取 {len(news_list)} 条")
-            
-        except Exception as e:
-            print(f"[FAIL] {feed_config['name']} 采集失败: {e}")
+                
+                for entry in feed.entries:
+                    try:
+                        news = self._parse_rss_entry(entry, feed_config)
+                        if news:
+                            news_list.append(news)
+                    except Exception as e:
+                        print(f"解析条目失败: {e}")
+                        continue
+                
+                # 成功获取到数据，更新当前可用节点
+                if "{RSSHUB}" in url_template:
+                    node = url.split("/")[2]
+                    if node != self._current_rsshub_node.split("//")[1]:
+                        # 切换到成功的节点
+                        for n in self._rsshub_nodes:
+                            if node in n:
+                                self._current_rsshub_node = n
+                                break
+                
+                print(f"[OK] {feed_config['name']}: 获取 {len(news_list)} 条")
+                return news_list  # 成功就返回
+                
+            except Exception as e:
+                last_error = e
+                continue
+        
+        # 所有节点都失败了
+        print(f"[FAIL] {feed_config['name']} 采集失败: {last_error or '未知错误'}")
         
         return news_list
     
@@ -1166,17 +1401,86 @@ class NewsCollectorService:
         
         return list(set(beneficiaries)), list(set(affected))
     
+    @staticmethod
+    def _normalize_title(title: str) -> str:
+        """
+        标准化标题：去除来源前缀、标点、空白，统一小写
+        例如 "[张三] 标题..." -> "张三标题"
+        """
+        import re
+        # 去掉 [...] 开头的来源前缀（如 [雪球用户] [公司名]）
+        text = re.sub(r'^\[.*?\]\s*', '', title)
+        # 去除所有标点符号和空白
+        text = re.sub(r'[^\w\u4e00-\u9fff]', '', text)
+        return text.lower()
+    
+    @staticmethod
+    def _title_similarity(a: str, b: str) -> float:
+        """
+        计算两个标准化标题的 Jaccard 字符级相似度
+        比编辑距离更快，适合大批量去重
+        """
+        if not a or not b:
+            return 0.0
+        # 使用字符 bigram（二元组）做 Jaccard 相似度
+        def bigrams(s):
+            return set(s[i:i+2] for i in range(len(s) - 1)) if len(s) > 1 else {s}
+        set_a = bigrams(a)
+        set_b = bigrams(b)
+        if not set_a or not set_b:
+            return 1.0 if a == b else 0.0
+        intersection = set_a & set_b
+        union = set_a | set_b
+        return len(intersection) / len(union)
+    
     def _deduplicate(self, news_list: List[News]) -> List[News]:
-        """新闻去重"""
+        """
+        智能新闻去重（MD5 精确 + Jaccard 相似度双重去重）
+        
+        第一层：MD5 哈希精确匹配（零成本过滤完全相同标题）
+        第二层：标准化后的 Jaccard bigram 相似度 > 0.7 视为重复
+                保留重要性评分更高的那条
+        """
         unique = []
+        # 用于相似度比较的标准化标题列表
+        normalized_titles = []
+        
+        dup_exact = 0
+        dup_similar = 0
         
         for news in news_list:
-            # 基于标题生成哈希
+            # 第一层：MD5 精确去重
             title_hash = hashlib.md5(news.title.encode()).hexdigest()
+            if title_hash in self._seen_hashes:
+                dup_exact += 1
+                continue
             
-            if title_hash not in self._seen_hashes:
+            # 第二层：相似度去重
+            norm_title = self._normalize_title(news.title)
+            is_duplicate = False
+            
+            for i, existing_norm in enumerate(normalized_titles):
+                sim = self._title_similarity(norm_title, existing_norm)
+                if sim > 0.7:
+                    # 相似度超过阈值，保留重要性更高的
+                    if news.importance_score > unique[i].importance_score:
+                        # 新的更重要，替换旧的
+                        old_hash = hashlib.md5(unique[i].title.encode()).hexdigest()
+                        self._seen_hashes.discard(old_hash)
+                        self._seen_hashes.add(title_hash)
+                        unique[i] = news
+                        normalized_titles[i] = norm_title
+                    is_duplicate = True
+                    dup_similar += 1
+                    break
+            
+            if not is_duplicate:
                 self._seen_hashes.add(title_hash)
                 unique.append(news)
+                normalized_titles.append(norm_title)
+        
+        if dup_exact or dup_similar:
+            print(f"[去重] 精确重复 {dup_exact} 条，相似重复 {dup_similar} 条，保留 {len(unique)} 条")
         
         return unique
     

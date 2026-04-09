@@ -1507,16 +1507,35 @@ class AIAnalyzerService:
         
         # 按保底配额选取
         selected = []
-        seen_titles = set()  # 同义新闻去重（标题前20字相同视为重复）
+        seen_norm_titles = []  # 标准化标题列表，用于相似度去重
+        
+        def _normalize_for_dedup(title: str) -> str:
+            """标准化标题用于去重"""
+            import re
+            text = re.sub(r'^\[.*?\]\s*', '', title)
+            text = re.sub(r'[^\w\u4e00-\u9fff]', '', text)
+            return text.lower()
+        
+        def _jaccard_sim(a: str, b: str) -> float:
+            """Jaccard bigram 相似度"""
+            if not a or not b:
+                return 0.0
+            def bigrams(s):
+                return set(s[i:i+2] for i in range(len(s) - 1)) if len(s) > 1 else {s}
+            sa, sb = bigrams(a), bigrams(b)
+            if not sa or not sb:
+                return 1.0 if a == b else 0.0
+            return len(sa & sb) / len(sa | sb)
         
         def add_news(source_list, quota, label):
             added = 0
             for n in source_list:
                 if added >= quota:
                     break
-                title_key = n.title[:20]
-                if title_key not in seen_titles:
-                    seen_titles.add(title_key)
+                norm = _normalize_for_dedup(n.title)
+                is_dup = any(_jaccard_sim(norm, existing) > 0.7 for existing in seen_norm_titles)
+                if not is_dup:
+                    seen_norm_titles.append(norm)
                     selected.append(n)
                     added += 1
         
@@ -1532,8 +1551,9 @@ class AIAnalyzerService:
             all_remaining = []
             for bucket in [a_stock_news, watchlist_news, global_macro_news, investor_opinion]:
                 for n in bucket:
-                    title_key = n.title[:20]
-                    if title_key not in seen_titles:
+                    norm = _normalize_for_dedup(n.title)
+                    is_dup = any(_jaccard_sim(norm, existing) > 0.7 for existing in seen_norm_titles)
+                    if not is_dup:
                         all_remaining.append(n)
             all_remaining.sort(key=lambda x: x.importance_score, reverse=True)
             add_news(all_remaining, remaining_quota, "补充")

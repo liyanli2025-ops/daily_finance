@@ -812,30 +812,62 @@ class MarketDataService:
         date_str = target_date.strftime("%Y%m%d")
         
         try:
-            # 尝试获取龙虎榜数据
+            # 尝试获取龙虎榜数据（兼容多个 AKShare 版本）
+            lhb_df = None
+            
+            # 尝试方式1：新版 AKShare 参数格式
             try:
-                df = await self._call_akshare_with_retry(ak.stock_lhb_detail_em, start_date=date_str, end_date=date_str)
-                if df is not None and not df.empty:
-                    # 去重，保留每只股票第一条
-                    df_unique = df.drop_duplicates(subset=['代码'], keep='first')
-                    
-                    for _, row in df_unique.head(10).iterrows():
-                        hot_stocks.append(HotStockData(
-                            code=row['代码'],
-                            name=row['名称'],
-                            price=float(row.get('收盘价', 0)),
-                            change_pct=float(row.get('涨跌幅', 0)),
-                            reason=f"龙虎榜：{row.get('上榜原因', '异动')}"
-                        ))
-            except Exception as e:
-                print(f"获取龙虎榜异常（可能无数据）: {e}")
+                lhb_df = await self._call_akshare_with_retry(
+                    ak.stock_lhb_detail_em, 
+                    start_date=date_str, end_date=date_str
+                )
+            except TypeError:
+                pass
+            
+            # 尝试方式2：部分版本只接受 date 参数
+            if lhb_df is None:
+                try:
+                    lhb_df = await self._call_akshare_with_retry(
+                        ak.stock_lhb_detail_em, 
+                        date=date_str
+                    )
+                except (TypeError, Exception):
+                    pass
+            
+            # 尝试方式3：使用备选接口 stock_lhb_jgmmtj_em（机构买卖统计）
+            if lhb_df is None:
+                try:
+                    if hasattr(ak, 'stock_lhb_jgmmtj_em'):
+                        lhb_df = await self._call_akshare_with_retry(
+                            ak.stock_lhb_jgmmtj_em,
+                            start_date=date_str, end_date=date_str
+                        )
+                except (TypeError, Exception):
+                    pass
+            
+            if lhb_df is not None and not lhb_df.empty:
+                # 去重，保留每只股票第一条
+                code_col = '代码' if '代码' in lhb_df.columns else lhb_df.columns[0]
+                name_col = '名称' if '名称' in lhb_df.columns else lhb_df.columns[1]
+                lhb_df_unique = lhb_df.drop_duplicates(subset=[code_col], keep='first')
+                
+                for _, row in lhb_df_unique.head(10).iterrows():
+                    hot_stocks.append(HotStockData(
+                        code=str(row[code_col]),
+                        name=str(row[name_col]),
+                        price=float(row.get('收盘价', row.get('最新价', 0))),
+                        change_pct=float(row.get('涨跌幅', 0)),
+                        reason=f"龙虎榜：{row.get('上榜原因', '异动')}"
+                    ))
+                print(f"  [龙虎榜] 获取 {len(hot_stocks)} 只热门股票")
+            else:
+                print(f"  [龙虎榜] {date_str} 无数据（可能非交易日）")
             
             # 如果龙虎榜没数据，获取换手率最高的股票
             if not hot_stocks:
                 try:
                     df = await self._call_akshare_with_retry(ak.stock_zh_a_spot_em)
                     if df is not None and not df.empty:
-                        # 按换手率排序
                         df_sorted = df.sort_values('换手率', ascending=False)
                         for _, row in df_sorted.head(5).iterrows():
                             hot_stocks.append(HotStockData(
@@ -846,8 +878,8 @@ class MarketDataService:
                                 turnover_rate=float(row.get('换手率', 0)),
                                 reason=f"换手率 {row.get('换手率', 0):.1f}%"
                             ))
-                except:
-                    pass
+                except Exception as e:
+                    print(f"  [换手率] 获取失败: {e}")
                     
         except Exception as e:
             print(f"获取热门股票异常: {e}")
@@ -1454,10 +1486,23 @@ class MarketDataService:
         ]
         
         try:
-            # 获取龙虎榜明细数据
-            df = await self._call_akshare_with_retry(
-                ak.stock_lhb_detail_em, start_date=date_str, end_date=date_str
-            )
+            # 获取龙虎榜明细数据（兼容多个 AKShare 版本）
+            df = None
+            
+            try:
+                df = await self._call_akshare_with_retry(
+                    ak.stock_lhb_detail_em, start_date=date_str, end_date=date_str
+                )
+            except TypeError:
+                pass
+            
+            if df is None:
+                try:
+                    df = await self._call_akshare_with_retry(
+                        ak.stock_lhb_detail_em, date=date_str
+                    )
+                except (TypeError, Exception):
+                    pass
             
             if df is not None and not df.empty:
                 for _, row in df.iterrows():
