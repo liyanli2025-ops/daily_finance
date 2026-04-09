@@ -6,6 +6,7 @@ import {
   RefreshControl,
   Text,
   TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   Platform,
   Dimensions,
@@ -294,13 +295,13 @@ export default function StocksScreen() {
             {watchlist.map((stock) => {
               const priceColor = (stock.change_percent ?? 0) >= 0 ? '#F44336' : '#4CAF50';
               return (
-                <TouchableOpacity
+                <Pressable
                   key={stock.id}
-                  activeOpacity={0.7}
-                  onPress={() => router.push(`/stock/${stock.code}?market=${stock.market}`)}
-                  style={[styles.stockCard, {
+                  onPress={() => router.push({ pathname: '/stock/[code]', params: { code: stock.code, market: stock.market } })}
+                  style={({ pressed }) => [styles.stockCard, {
                     backgroundColor: isDark ? colors.glassBackground : colors.glassBackground,
                     borderColor: isDark ? colors.glassBorder : colors.glassBorder,
+                    opacity: pressed ? 0.7 : 1,
                   }]}
                 >
                   <View style={styles.stockMain}>
@@ -350,11 +351,19 @@ export default function StocksScreen() {
                         </Text>
                       )}
                     </View>
-                    <TouchableOpacity onPress={(e) => { e.stopPropagation(); removeFromWatchlist(stock.id); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault?.();
+                        removeFromWatchlist(stock.id);
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                    >
                       <MaterialCommunityIcons name="close" size={16} color={colors.onSurfaceVariant} />
-                    </TouchableOpacity>
+                    </Pressable>
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               );
             })}
           </View>
