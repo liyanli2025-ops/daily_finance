@@ -51,6 +51,66 @@ interface StockDetail {
   };
 }
 
+// 底部 Tab 栏组件（stock/[code] 不在 tabs 路由下，需要自行渲染）
+function BottomTabBar({ colors, isDark }: { colors: any; isDark: boolean }) {
+  const tabs = [
+    { key: 'index', label: '首页', icon: 'newspaper-variant-outline', route: '/(tabs)/' },
+    { key: 'podcast', label: '播客', icon: 'play-circle-outline', route: '/(tabs)/podcast' },
+    { key: 'stocks', label: '股票', icon: 'chart-line', route: '/(tabs)/stocks' },
+    { key: 'settings', label: '设置', icon: 'cog-outline', route: '/(tabs)/settings' },
+  ];
+
+  const tabBarPaddingBottom = Platform.OS === 'ios' ? 28 : isIOSWeb ? 12 : 8;
+
+  return (
+    <View style={{
+      flexDirection: 'row',
+      backgroundColor: colors.tabBarBackground,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.tabBarBorder,
+      height: TAB_BAR_HEIGHT,
+      paddingBottom: tabBarPaddingBottom,
+      paddingTop: 8,
+    }}>
+      {tabs.map((tab) => {
+        const isActive = tab.key === 'stocks';
+        const color = isActive ? colors.tabBarActive : colors.tabBarInactive;
+        const handlePress = () => {
+          router.push(tab.route as any);
+        };
+
+        if (Platform.OS === 'web') {
+          return (
+            <div
+              key={tab.key}
+              onClick={handlePress}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <MaterialCommunityIcons name={tab.icon as any} size={22} color={color} />
+              <Text style={{ fontSize: 9, fontWeight: '700', letterSpacing: 1.2, color, marginTop: 2, textTransform: 'uppercase' }}>
+                {tab.label}
+              </Text>
+            </div>
+          );
+        }
+
+        return (
+          <TouchableOpacity
+            key={tab.key}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+            onPress={handlePress}
+          >
+            <MaterialCommunityIcons name={tab.icon as any} size={22} color={color} />
+            <Text style={{ fontSize: 9, fontWeight: '700', letterSpacing: 1.2, color, marginTop: 2 }}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function StockDetailScreen() {
   const { colors, isDark } = useAppTheme();
   const { code, market } = useLocalSearchParams<{ code: string; market: string }>();
@@ -64,6 +124,14 @@ export default function StockDetailScreen() {
 
   const isInWatchlist = watchlist.some((s) => s.code === code && s.market === market);
   const showMiniPlayer = !!currentReportId;
+
+  const handleGoBack = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+    } else {
+      router.push('/(tabs)/stocks');
+    }
+  };
 
   useEffect(() => {
     fetchStockDetail();
@@ -171,6 +239,27 @@ export default function StockDetailScreen() {
 
   const styles = createStyles(colors, isDark);
 
+  // 渲染返回按钮（Web 端用原生 div 确保点击生效）
+  const renderBackButton = () => {
+    const btn = (
+      <View style={styles.backButton}>
+        <MaterialCommunityIcons name="chevron-left" size={28} color={colors.onSurface} />
+      </View>
+    );
+    if (Platform.OS === 'web') {
+      return (
+        <div onClick={handleGoBack} style={{ cursor: 'pointer' }}>
+          {btn}
+        </div>
+      );
+    }
+    return (
+      <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
+        <MaterialCommunityIcons name="chevron-left" size={28} color={colors.onSurface} />
+      </TouchableOpacity>
+    );
+  };
+
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -180,9 +269,7 @@ export default function StockDetailScreen() {
         </View>
         <SafeAreaView edges={['top']} style={styles.headerSafe}>
           <View style={styles.navBar}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <MaterialCommunityIcons name="chevron-left" size={28} color={colors.onSurface} />
-            </TouchableOpacity>
+            {renderBackButton()}
             <Text style={[styles.navTitle, { color: colors.onSurface }]}>股票详情</Text>
             <View style={{ width: 40 }} />
           </View>
@@ -191,6 +278,7 @@ export default function StockDetailScreen() {
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.onSurfaceVariant }]}>正在加载股票数据...</Text>
         </View>
+        <BottomTabBar colors={colors} isDark={isDark} />
       </View>
     );
   }
@@ -204,9 +292,7 @@ export default function StockDetailScreen() {
         </View>
         <SafeAreaView edges={['top']} style={styles.headerSafe}>
           <View style={styles.navBar}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <MaterialCommunityIcons name="chevron-left" size={28} color={colors.onSurface} />
-            </TouchableOpacity>
+            {renderBackButton()}
             <Text style={[styles.navTitle, { color: colors.onSurface }]}>股票详情</Text>
             <View style={{ width: 40 }} />
           </View>
@@ -215,6 +301,7 @@ export default function StockDetailScreen() {
           <MaterialCommunityIcons name="chart-line" size={64} color={colors.onSurfaceVariant} />
           <Text style={[styles.emptyTitle, { color: colors.onSurfaceVariant }]}>股票数据加载失败</Text>
         </View>
+        <BottomTabBar colors={colors} isDark={isDark} />
       </View>
     );
   }
@@ -232,9 +319,7 @@ export default function StockDetailScreen() {
       {/* 顶部导航栏 */}
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
         <View style={styles.navBar}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <MaterialCommunityIcons name="chevron-left" size={28} color={colors.onSurface} />
-          </TouchableOpacity>
+          {renderBackButton()}
           <Text style={[styles.navTitle, { color: colors.onSurface }]}>{stock.name}</Text>
           <TouchableOpacity style={styles.starButton} onPress={handleToggleWatchlist}>
             <MaterialCommunityIcons
@@ -420,16 +505,19 @@ export default function StockDetailScreen() {
           )}
         </View>
 
-        {/* 底部安全区域 */}
-        <View style={{ height: showMiniPlayer ? 120 : 60 }} />
+        {/* 底部安全区域 - 给 Tab 栏 + MiniPlayer 留空间 */}
+        <View style={{ height: TAB_BAR_HEIGHT + (showMiniPlayer ? MINI_PLAYER_HEIGHT : 0) + 20 }} />
       </ScrollView>
 
-      {/* MiniPlayer 浮层 */}
+      {/* MiniPlayer - 在 Tab 栏上方 */}
       {showMiniPlayer && (
-        <View style={styles.miniPlayerContainer}>
+        <View style={[styles.miniPlayerContainer, { bottom: TAB_BAR_HEIGHT }]}>
           <MiniPlayer />
         </View>
       )}
+
+      {/* 底部 Tab 栏 */}
+      <BottomTabBar colors={colors} isDark={isDark} />
     </View>
   );
 }
@@ -701,7 +789,6 @@ function createStyles(colors: any, isDark: boolean) {
       position: 'absolute',
       left: 0,
       right: 0,
-      bottom: 0,
       zIndex: 100,
     },
   });
