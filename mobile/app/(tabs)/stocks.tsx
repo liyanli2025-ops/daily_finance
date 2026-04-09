@@ -293,20 +293,17 @@ export default function StocksScreen() {
           <View style={styles.stockList}>
             {watchlist.map((stock) => {
               const priceColor = (stock.change_percent ?? 0) >= 0 ? '#F44336' : '#4CAF50';
-              return (
-                <TouchableOpacity
-                  key={stock.id}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    console.log('[Stocks] 点击自选股:', stock.code, stock.market);
-                    router.push({ pathname: '/stock/[code]', params: { code: stock.code, market: stock.market } });
-                  }}
-                  style={[styles.stockCard, {
-                    backgroundColor: isDark ? colors.glassBackground : colors.glassBackground,
-                    borderColor: isDark ? colors.glassBorder : colors.glassBorder,
-                    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
-                  }]}
-                >
+              const handleCardPress = () => {
+                console.log('[Stocks] 点击自选股:', stock.code, stock.market);
+                router.push({ pathname: '/stock/[code]', params: { code: stock.code, market: stock.market } });
+              };
+              const cardStyle = [styles.stockCard, {
+                backgroundColor: isDark ? colors.glassBackground : colors.glassBackground,
+                borderColor: isDark ? colors.glassBorder : colors.glassBorder,
+              }];
+
+              const cardContent = (
+                <>
                   <View style={styles.stockMain}>
                     <View style={styles.stockInfo}>
                       <Text style={[styles.stockName, { color: colors.onSurface }]}>{stock.name}</Text>
@@ -365,6 +362,32 @@ export default function StocksScreen() {
                       <MaterialCommunityIcons name="close" size={16} color={colors.onSurfaceVariant} />
                     </TouchableOpacity>
                   </View>
+                </>
+              );
+
+              // Web 平台用原生 div onClick 确保点击一定能触发
+              if (Platform.OS === 'web') {
+                return (
+                  <div
+                    key={stock.id}
+                    onClick={handleCardPress}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <View style={cardStyle}>
+                      {cardContent}
+                    </View>
+                  </div>
+                );
+              }
+
+              return (
+                <TouchableOpacity
+                  key={stock.id}
+                  activeOpacity={0.7}
+                  onPress={handleCardPress}
+                  style={cardStyle}
+                >
+                  {cardContent}
                 </TouchableOpacity>
               );
             })}
