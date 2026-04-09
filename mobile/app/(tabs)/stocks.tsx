@@ -294,8 +294,10 @@ export default function StocksScreen() {
             {watchlist.map((stock) => {
               const priceColor = (stock.change_percent ?? 0) >= 0 ? '#F44336' : '#4CAF50';
               return (
-                <View
+                <TouchableOpacity
                   key={stock.id}
+                  activeOpacity={0.7}
+                  onPress={() => router.push(`/stock/${stock.code}?market=${stock.market}`)}
                   style={[styles.stockCard, {
                     backgroundColor: isDark ? colors.glassBackground : colors.glassBackground,
                     borderColor: isDark ? colors.glassBorder : colors.glassBorder,
@@ -348,11 +350,11 @@ export default function StocksScreen() {
                         </Text>
                       )}
                     </View>
-                    <TouchableOpacity onPress={() => removeFromWatchlist(stock.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity onPress={(e) => { e.stopPropagation(); removeFromWatchlist(stock.id); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <MaterialCommunityIcons name="close" size={16} color={colors.onSurfaceVariant} />
                     </TouchableOpacity>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>

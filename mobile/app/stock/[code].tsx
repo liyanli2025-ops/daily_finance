@@ -19,19 +19,20 @@ import { api } from '@/services/api';
 interface StockDetail {
   code: string;
   name: string;
-  market: 'A' | 'HK';
+  market: string;
   current_price: number;
-  change_amount: number;
+  change: number;
   change_percent: number;
-  open: number;
-  high: number;
-  low: number;
-  previous_close: number;
+  open_price: number;
+  high_price: number;
+  low_price: number;
+  prev_close: number;
   volume: number;
   amount: number;
   pe_ratio?: number;
   pb_ratio?: number;
   market_cap?: number;
+  update_time?: string;
   prediction?: {
     signal: 'bullish' | 'neutral' | 'bearish';
     confidence: number;
@@ -60,35 +61,56 @@ export default function StockDetailScreen() {
   const fetchStockDetail = async () => {
     setIsLoading(true);
     try {
-      const data = await api.getStockQuote(code!, market!);
-      setStock(data);
+      // 获取实时行情
+      const quoteData = await api.getStockQuote(code!, market!);
+      
+      // 尝试获取 AI 预测（不影响主流程）
+      let prediction = undefined;
+      try {
+        const predData = await api.getStockPrediction(code!, market!);
+        if (predData && predData.prediction && predData.prediction !== 'neutral') {
+          prediction = {
+            signal: predData.prediction as 'bullish' | 'neutral' | 'bearish',
+            confidence: predData.confidence || 0.5,
+            reasoning: predData.reasoning || '',
+            target_price: predData.target_price,
+            stop_loss: predData.stop_loss,
+          };
+        } else if (predData && predData.prediction) {
+          prediction = {
+            signal: predData.prediction as 'bullish' | 'neutral' | 'bearish',
+            confidence: predData.confidence || 0.5,
+            reasoning: predData.reasoning || '暂无分析数据',
+            target_price: predData.target_price,
+            stop_loss: predData.stop_loss,
+          };
+        }
+      } catch (e) {
+        console.log('获取 AI 预测失败，跳过:', e);
+      }
+      
+      setStock({
+        code: quoteData.code,
+        name: quoteData.name,
+        market: market || 'A',
+        current_price: quoteData.current_price,
+        change: quoteData.change,
+        change_percent: quoteData.change_percent,
+        open_price: quoteData.open_price,
+        high_price: quoteData.high_price,
+        low_price: quoteData.low_price,
+        prev_close: quoteData.prev_close,
+        volume: quoteData.volume,
+        amount: quoteData.amount,
+        pe_ratio: quoteData.pe_ratio,
+        pb_ratio: quoteData.pb_ratio,
+        market_cap: quoteData.market_cap,
+        update_time: quoteData.update_time,
+        prediction,
+      });
     } catch (error) {
       console.error('获取股票详情失败:', error);
-      // 使用模拟数据
-      setStock({
-        code: code!,
-        name: code === '600519' ? '贵州茅台' : code === '00700' ? '腾讯控股' : '未知股票',
-        market: market as 'A' | 'HK',
-        current_price: 1688.88,
-        change_amount: 12.56,
-        change_percent: 0.75,
-        open: 1678.00,
-        high: 1695.00,
-        low: 1672.00,
-        previous_close: 1676.32,
-        volume: 3256800,
-        amount: 5489230000,
-        pe_ratio: 38.5,
-        pb_ratio: 12.3,
-        market_cap: 2123400000000,
-        prediction: {
-          signal: 'bullish',
-          confidence: 0.72,
-          reasoning: '技术面显示股价突破20日均线，成交量放大，MACD金叉形成。基本面方面，公司Q1营收同比增长15%，毛利率稳定。市场情绪偏乐观，建议持有或小幅加仓。',
-          target_price: 1780,
-          stop_loss: 1620,
-        },
-      });
+      setStock(null);
     }
     setIsLoading(false);
   };
@@ -239,8 +261,8 @@ export default function StockDetailScreen() {
               </Text>
               <View style={styles.changeInfo}>
                 <Text style={[styles.changeText, { color: priceColor }]}>
-                  {stock.change_amount >= 0 ? '+' : ''}
-                  {stock.change_amount.toFixed(2)}
+                  {stock.change >= 0 ? '+' : ''}
+                  {stock.change.toFixed(2)}
                 </Text>
                 <Text style={[styles.changeText, { color: priceColor }]}>
                   {stock.change_percent >= 0 ? '+' : ''}
@@ -256,29 +278,29 @@ export default function StockDetailScreen() {
                 <Text variant="labelSmall" style={{ color: theme.colors.outline }}>
                   今开
                 </Text>
-                <Text variant="bodyMedium">{stock.open.toFixed(2)}</Text>
+                <Text variant="bodyMedium">{stock.open_price.toFixed(2)}</Text>
               </View>
               <View style={styles.detailItem}>
                 <Text variant="labelSmall" style={{ color: theme.colors.outline }}>
                   最高
                 </Text>
-                <Text variant="bodyMedium" style={{ color: '#22C55E' }}>
-                  {stock.high.toFixed(2)}
+                <Text variant="bodyMedium" style={{ color: '#EF4444' }}>
+                  {stock.high_price.toFixed(2)}
                 </Text>
               </View>
               <View style={styles.detailItem}>
                 <Text variant="labelSmall" style={{ color: theme.colors.outline }}>
                   最低
                 </Text>
-                <Text variant="bodyMedium" style={{ color: '#EF4444' }}>
-                  {stock.low.toFixed(2)}
+                <Text variant="bodyMedium" style={{ color: '#22C55E' }}>
+                  {stock.low_price.toFixed(2)}
                 </Text>
               </View>
               <View style={styles.detailItem}>
                 <Text variant="labelSmall" style={{ color: theme.colors.outline }}>
                   昨收
                 </Text>
-                <Text variant="bodyMedium">{stock.previous_close.toFixed(2)}</Text>
+                <Text variant="bodyMedium">{stock.prev_close.toFixed(2)}</Text>
               </View>
               <View style={styles.detailItem}>
                 <Text variant="labelSmall" style={{ color: theme.colors.outline }}>
@@ -297,7 +319,7 @@ export default function StockDetailScreen() {
         </Card>
 
         {/* K线图 */}
-        <ChartView stockCode={stock.code} stockName={stock.name} />
+        <ChartView stockCode={stock.code} stockName={stock.name} market={market || 'A'} />
 
         {/* 基本面数据 */}
         <Card style={[styles.fundamentalCard, { backgroundColor: theme.colors.surface }]}>

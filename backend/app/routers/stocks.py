@@ -476,23 +476,138 @@ async def get_stock_quote(
     market: str = Query("A", description="市场类型: A 或 HK")
 ):
     """
-    获取股票实时行情
-    TODO: 接入真实行情API
+    获取股票实时行情（腾讯财经真实数据）
     """
-    # 模拟行情数据
+    import asyncio
+    import urllib.request
+    import ssl
+    
+    def _fetch_single_quote(code: str, mkt: str):
+        """从腾讯财经获取单只股票的详细行情"""
+        if mkt == 'A':
+            if code.startswith('6') or code.startswith('9'):
+                symbol = f"sh{code}"
+            else:
+                symbol = f"sz{code}"
+        elif mkt == 'HK':
+            symbol = f"hk{code.zfill(5)}"
+        else:
+            return None
+        
+        url = f"http://qt.gtimg.cn/q={symbol}"
+        
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'Mozilla/5.0')
+        
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as response:
+            content = response.read().decode('gbk')
+        
+        for line in content.strip().split(';'):
+            if '=' not in line or '~' not in line:
+                continue
+            data_str = line.split('"')[1] if '"' in line else ""
+            if not data_str:
+                continue
+            
+            parts = data_str.split('~')
+            # 腾讯财经字段说明（A股/港股通用）：
+            # parts[1]=名称, parts[2]=代码, parts[3]=当前价, parts[4]=昨收
+            # parts[5]=开盘价, parts[6]=成交量(手), parts[7]=外盘, parts[8]=内盘
+            # parts[9]=买一价 ... parts[19]=卖五量
+            # parts[30]=涨跌额, parts[31]=涨跌幅%, parts[32]=最高价?, parts[33]=最低价?
+            # 更准确的: parts[31]=涨跌额, parts[32]=涨跌幅%
+            # parts[33]=最高价, parts[34]=最低价, parts[35]=价格/成交量/成交额
+            # parts[44]=流通市值, parts[45]=总市值
+            # parts[46]=PB, parts[39]=PE(动态)
+            if len(parts) >= 35:
+                try:
+                    name = parts[1]
+                    current_price = float(parts[3]) if parts[3] else 0
+                    prev_close = float(parts[4]) if parts[4] else 0
+                    open_price = float(parts[5]) if parts[5] else 0
+                    volume = float(parts[6]) if parts[6] else 0  # 手
+                    high_price = float(parts[33]) if parts[33] else 0
+                    low_price = float(parts[34]) if parts[34] else 0
+                    
+                    # 涨跌额和涨跌幅
+                    change = float(parts[31]) if len(parts) > 31 and parts[31] else 0
+                    change_pct = float(parts[32]) if len(parts) > 32 and parts[32] else 0
+                    
+                    # 成交额（万元）
+                    amount = float(parts[37]) if len(parts) > 37 and parts[37] else 0
+                    
+                    # PE、PB、总市值
+                    pe_ratio = None
+                    pb_ratio = None
+                    market_cap = None
+                    if len(parts) > 39 and parts[39]:
+                        try:
+                            pe_ratio = float(parts[39])
+                        except:
+                            pass
+                    if len(parts) > 46 and parts[46]:
+                        try:
+                            pb_ratio = float(parts[46])
+                        except:
+                            pass
+                    if len(parts) > 45 and parts[45]:
+                        try:
+                            market_cap = float(parts[45])  # 亿
+                        except:
+                            pass
+                    
+                    return {
+                        "name": name,
+                        "current_price": current_price,
+                        "open_price": open_price,
+                        "high_price": high_price,
+                        "low_price": low_price,
+                        "prev_close": prev_close,
+                        "change": change,
+                        "change_percent": change_pct,
+                        "volume": volume,
+                        "amount": amount,
+                        "pe_ratio": pe_ratio,
+                        "pb_ratio": pb_ratio,
+                        "market_cap": market_cap,
+                    }
+                except (ValueError, IndexError) as e:
+                    print(f"[QUOTE] 解析 {symbol} 失败: {e}")
+                    return None
+        return None
+    
+    try:
+        loop = asyncio.get_event_loop()
+        quote = await asyncio.wait_for(
+            loop.run_in_executor(None, _fetch_single_quote, stock_code, market),
+            timeout=10
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"获取行情失败: {str(e)}")
+    
+    if not quote:
+        raise HTTPException(status_code=404, detail=f"未找到 {stock_code} 的行情数据")
+    
     return StockQuote(
         code=stock_code,
-        name="测试股票",
-        current_price=100.00,
-        open_price=99.50,
-        high_price=101.20,
-        low_price=98.80,
-        prev_close=99.00,
-        change=1.00,
-        change_percent=1.01,
-        volume=123456.0,
-        amount=12345678.0,
-        update_time=datetime.now()
+        name=quote["name"],
+        current_price=quote["current_price"],
+        open_price=quote["open_price"],
+        high_price=quote["high_price"],
+        low_price=quote["low_price"],
+        prev_close=quote["prev_close"],
+        change=quote["change"],
+        change_percent=quote["change_percent"],
+        volume=quote["volume"],
+        amount=quote["amount"],
+        update_time=datetime.now(),
+        pe_ratio=quote.get("pe_ratio"),
+        pb_ratio=quote.get("pb_ratio"),
+        market_cap=quote.get("market_cap"),
     )
 
 
@@ -504,33 +619,121 @@ async def get_stock_kline(
     limit: int = Query(60, ge=1, le=250, description="返回数据条数")
 ):
     """
-    获取K线数据
-    TODO: 接入真实K线数据API
+    获取K线数据（腾讯财经真实数据）
+    
+    使用腾讯财经 web.ifzq.gtimg.cn 接口获取真实 K 线
     """
-    from datetime import date, timedelta
+    import asyncio
+    import urllib.request
+    import ssl
+    import json
+    from datetime import date as dt_date_local
     
-    # 模拟K线数据
-    klines = []
-    base_date = date.today()
-    base_price = 100.0
-    
-    for i in range(limit):
-        d = base_date - timedelta(days=i)
-        open_p = base_price + (i % 5 - 2)
-        close_p = open_p + (i % 3 - 1)
-        high_p = max(open_p, close_p) + (i % 2)
-        low_p = min(open_p, close_p) - (i % 2)
+    def _fetch_kline(code: str, mkt: str, prd: str, lmt: int):
+        """从腾讯财经获取 K 线数据"""
+        # 构建腾讯财经代码
+        if mkt == 'A':
+            if code.startswith('6') or code.startswith('9'):
+                symbol = f"sh{code}"
+            else:
+                symbol = f"sz{code}"
+        elif mkt == 'HK':
+            symbol = f"hk{code.zfill(5)}"
+        else:
+            return []
         
-        klines.append(KlineData(
-            date=d,
-            open=round(open_p, 2),
-            high=round(high_p, 2),
-            low=round(low_p, 2),
-            close=round(close_p, 2),
-            volume=float(100000 + i * 1000)
-        ))
+        # 周期映射：腾讯接口使用 day/week/month
+        period_map = {"daily": "day", "weekly": "week", "monthly": "month"}
+        qq_period = period_map.get(prd, "day")
+        
+        # 腾讯财经 K 线接口
+        url = (
+            f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?"
+            f"param={symbol},{qq_period},,{lmt},qfq"
+        )
+        
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'Mozilla/5.0')
+        
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as response:
+            content = response.read().decode('utf-8')
+        
+        data = json.loads(content)
+        
+        # 解析响应数据
+        # 结构: {"code":0,"msg":"","data":{"sh600519":{"day":[["2024-01-02","1680.00","1695.00","1698.00","1675.50","12345"], ...]}}}
+        klines = []
+        stock_data = data.get("data", {})
+        
+        # 找到股票数据
+        for key in stock_data:
+            stock_info = stock_data[key]
+            
+            # 尝试获取对应周期的数据
+            # 前复权数据在 qfqday/qfqweek/qfqmonth 或者直接 day/week/month
+            kline_data = None
+            for kline_key in [f"qfq{qq_period}", qq_period]:
+                if kline_key in stock_info:
+                    kline_data = stock_info[kline_key]
+                    break
+            
+            if not kline_data:
+                continue
+            
+            for item in kline_data:
+                # item: ["日期", "开盘", "收盘", "最高", "最低", "成交量"]
+                if len(item) >= 6:
+                    try:
+                        trade_date = dt_date_local.fromisoformat(item[0])
+                        open_price = float(item[1])
+                        close_price = float(item[2])
+                        high_price = float(item[3])
+                        low_price = float(item[4])
+                        volume = float(item[5])
+                        
+                        klines.append({
+                            "trade_date": trade_date,
+                            "open_price": open_price,
+                            "close_price": close_price,
+                            "high_price": high_price,
+                            "low_price": low_price,
+                            "volume": volume,
+                        })
+                    except (ValueError, IndexError) as e:
+                        continue
+        
+        return klines
     
-    return list(reversed(klines))
+    try:
+        loop = asyncio.get_event_loop()
+        kline_data = await asyncio.wait_for(
+            loop.run_in_executor(None, _fetch_kline, stock_code, market, period, limit),
+            timeout=15
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"获取K线数据失败: {str(e)}")
+    
+    if not kline_data:
+        raise HTTPException(status_code=404, detail=f"未找到 {stock_code} 的K线数据")
+    
+    # 返回最近 limit 条
+    kline_data = kline_data[-limit:]
+    
+    return [
+        KlineData(
+            trade_date=k["trade_date"],
+            open_price=k["open_price"],
+            high_price=k["high_price"],
+            low_price=k["low_price"],
+            close_price=k["close_price"],
+            volume=k["volume"],
+        )
+        for k in kline_data
+    ]
 
 
 @router.get("/{stock_code}/prediction")

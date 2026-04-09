@@ -102,6 +102,9 @@ class StockQuote(BaseModel):
     volume: float = Field(..., description="成交量（手）")
     amount: float = Field(..., description="成交额（万元）")
     update_time: dt = Field(..., description="更新时间")
+    pe_ratio: Optional[float] = Field(default=None, description="市盈率(动态)")
+    pb_ratio: Optional[float] = Field(default=None, description="市净率")
+    market_cap: Optional[float] = Field(default=None, description="总市值(亿)")
 
 
 class StockPrediction(BaseModel):
