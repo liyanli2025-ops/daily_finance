@@ -206,6 +206,7 @@ class PodcastGeneratorService:
                                 lambda c=client, m=model: c.messages.create(
                                     model=m,
                                     max_tokens=max_tokens,
+                                    temperature=0.5,
                                     system=system_prompt,
                                     messages=[{"role": "user", "content": user_prompt}]
                                 )
@@ -227,6 +228,7 @@ class PodcastGeneratorService:
                                 lambda c=client, m=model, mt=actual_max_tokens: c.chat.completions.create(
                                     model=m,
                                     max_tokens=mt,
+                                    temperature=0.5,
                                     messages=[
                                         {"role": "system", "content": system_prompt},
                                         {"role": "user", "content": user_prompt}
@@ -830,6 +832,14 @@ class PodcastGeneratorService:
         # 构造 System Prompt
         system_prompt = f"""你正在用**聊天的方式**和{name}分享你对市场的分析和见解。这是一期{podcast_type}播客。
 
+## ⛔ 内容真实性铁律（最高优先级！）
+
+1. **你的所有分析、数据和观点必须严格来自下方用户消息中提供的报告内容**，不要添加报告中没有提到的新闻事件、数据、政策或公司信息。
+2. 你可以用更口语化、更生动的方式**转述**报告内容，但不能**添加**报告中不存在的信息。
+3. 如果报告对某个话题的分析不够深入，你可以坦诚地说"这个话题今天的报告提得不多"，**严禁自行补充未经验证的信息**。
+4. 引用具体数字（涨跌幅、点位、资金流向）时，必须与报告中的数据一致，不可四舍五入或凭记忆修改。
+5. 如果引用历史案例做类比，不确定具体数字时使用"大约""左右"等模糊表述。
+
 ## 你的人设
 - 你有20年实战投资经验，说话有分量
 - 你和{name}很熟悉，说话自然亲切，像老朋友聊天
@@ -907,6 +917,7 @@ class PodcastGeneratorService:
 3. 不要有模块编号，不要说"第一部分""模块一"——直接自然地聊
 4. 请直接输出播客脚本，不要输出任何解释或说明
 5. 脚本应该是可以直接朗读的纯文本
+6. **⚠️ 所有分析和数据必须严格基于上方提供的报告内容，不要添加报告中未提及的信息**
 """
 
         # 根据播客类型动态设置 max_tokens

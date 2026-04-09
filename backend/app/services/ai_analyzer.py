@@ -251,6 +251,16 @@ class AIAnalyzerService:
             response, today, news_list, cross_border_news or [], report_type
         )
         
+        # ====== 报告数据一致性校验 ======
+        consistency_warnings = self._check_report_consistency(response, market_data_text)
+        if consistency_warnings:
+            warning_text = "\n".join(consistency_warnings)
+            print(f"[AI] ⚠️ 报告数据一致性校验发现 {len(consistency_warnings)} 个疑点:", flush=True)
+            for w in consistency_warnings:
+                print(f"   - {w}", flush=True)
+            # 在报告末尾追加校验提示（不阻断生成，但记录警告）
+            report.content += f"\n\n---\n*⚠️ 数据校验提示：AI生成内容中检测到 {len(consistency_warnings)} 处数据可能与原始数据不一致，请留意核实。*"
+        
         # ====== 关键：如果使用了模拟数据，在标题中明确标记 ======
         if getattr(self, '_last_call_was_mock', False):
             report.title = f"⚠️ [AI不可用-模拟数据] {report.title}"
@@ -994,6 +1004,16 @@ class AIAnalyzerService:
         一篇浑然一体的文章，而不是拼凑的模块。
         """
         return f"""
+## ⛔ 反幻觉铁律（最高优先级，违反等于失职！）
+
+你是金融分析师，不是小说家。以下规则的优先级高于一切写作风格要求：
+
+1. **严禁编造**：你只能基于本提示中提供的新闻、市场数据和跨界热点进行分析。绝对不要引用、杜撰或"回忆"任何未在本提示中出现的信息（包括新闻事件、政策文件、公司公告、研报观点等）。
+2. **信息不足时坦诚说明**：如果提供的数据不足以支撑某个分析，直接说"目前数据有限，暂不做判断"，**严禁用猜测填补空白**。
+3. **历史类比需谨慎**：引用历史案例时，如果你不确定具体数字（涨跌幅、日期、点位），必须使用"大约""左右""约"等模糊词，或明确说"具体数据需核实"。**严禁编造精确的历史数字。**
+4. **股票代码必须真实**：提及具体股票时，代码和名称必须匹配且真实存在。如果不确定某只股票的代码，只写名称不写代码。
+5. **数据锚定检查**：你引用的所有指数点位、涨跌幅、资金流向数据必须与下方"市场数据"部分完全一致，不可自行修改、四舍五入或"凭印象"写数字。
+
 ## 写作核心原则：一气呵成的整体性（极其重要！）
 
 你不是在"填模板"或"分模块拼凑"，你是在写一篇有灵魂、有逻辑、有温度的投资分析文章。
@@ -1038,9 +1058,10 @@ class AIAnalyzerService:
 ### 4. 历史类比与案例参照
 
 好的分析师善于用历史照进现实：
-- "当前市场情绪和2024年9月底反弹前夕非常相似——都是连续缩量后突然放量"
-- "上次出现类似的政策组合拳是2020年3月，当时市场先跌后涨，两个月内反弹了25%"
+- "当前市场情绪和2024年9月底反弹前夕有些相似——都是连续缩量后突然放量"
+- "上次出现类似的政策组合拳大约是2020年3月前后，当时市场先跌后涨"
 - **注意**：历史不会简单重复，类比时必须指出"这次不同的地方是什么"
+- **⚠️ 准确性要求**：引用历史数据时，如果你不确定精确数字，使用"大约""左右""约"等模糊表述，不要编造具体涨跌幅或点位。例如：✅ "反弹了约25%左右" ❌ "反弹了25.3%"
 
 ### 5. 反共识机制（不是口号，是方法论）
 
@@ -1090,6 +1111,109 @@ class AIAnalyzerService:
         except Exception as e:
             print(f"[AI] 话题去重服务异常，跳过: {e}")
             return ""
+    
+    def _check_report_consistency(self, report_text: str, market_data_text: str) -> list:
+        """
+        报告数据一致性校验
+        
+        从原始市场数据中提取关键数字，检查AI生成的报告是否篡改了数据。
+        不阻断生成流程，只返回警告列表。
+        """
+        import re
+        warnings = []
+        
+        if not market_data_text or not report_text:
+            return warnings
+        
+        try:
+            # 提取原始数据中的关键指数涨跌幅（格式如：涨跌幅: +1.23% 或 -0.45%）
+            # 匹配 "指数名 ... 涨跌幅: ±X.XX%" 或 "涨跌: ±X.XX%" 的模式
+            data_numbers = {}
+            
+            # 提取涨跌幅数据
+            change_patterns = re.findall(
+                r'(上证指数|深证成指|创业板指|沪深300|科创50|恒生指数|恒生科技|北证50)[^\n]*?涨跌[幅]?[：:]\s*([+-]?\d+\.?\d*%)',
+                market_data_text
+            )
+            for index_name, change_val in change_patterns:
+                data_numbers[index_name] = change_val
+            
+            # 提取收盘点位
+            point_patterns = re.findall(
+                r'(上证指数|深证成指|创业板指|沪深300|科创50|恒生指数|恒生科技|北证50)[^\n]*?(?:收盘|收于|报)[：:]?\s*(\d{3,6}\.?\d*)',
+                market_data_text
+            )
+            for index_name, point_val in point_patterns:
+                key = f"{index_name}_点位"
+                data_numbers[key] = point_val
+            
+            # 提取北向资金数据
+            north_patterns = re.findall(
+                r'北向资金[^\n]*?([+-]?\d+\.?\d*)\s*亿',
+                market_data_text
+            )
+            if north_patterns:
+                data_numbers['北向资金'] = north_patterns[0]
+            
+            # 对比报告中的数据
+            for index_name, original_val in data_numbers.items():
+                if '点位' in index_name:
+                    # 点位校验：检查报告中引用的点位
+                    base_name = index_name.replace('_点位', '')
+                    # 在报告中找该指数相关的数字
+                    report_mentions = re.findall(
+                        rf'{base_name}[^\n]{{0,50}}?(\d{{3,6}}\.\d+)',
+                        report_text
+                    )
+                    for mentioned in report_mentions:
+                        try:
+                            orig_f = float(original_val)
+                            mentioned_f = float(mentioned)
+                            # 允许 0.5% 误差（可能是四舍五入）
+                            if abs(orig_f - mentioned_f) / orig_f > 0.005:
+                                warnings.append(
+                                    f"{base_name}点位不一致：原始数据 {original_val}，报告引用 {mentioned}"
+                                )
+                        except (ValueError, ZeroDivisionError):
+                            pass
+                elif '北向资金' in index_name:
+                    # 北向资金校验
+                    report_north = re.findall(
+                        r'北向资金[^\n]{0,30}?([+-]?\d+\.?\d*)\s*亿',
+                        report_text
+                    )
+                    for mentioned in report_north:
+                        try:
+                            orig_f = float(original_val)
+                            mentioned_f = float(mentioned)
+                            if abs(orig_f - mentioned_f) > 1.0:  # 允许1亿误差
+                                warnings.append(
+                                    f"北向资金数据不一致：原始数据 {original_val}亿，报告引用 {mentioned}亿"
+                                )
+                        except ValueError:
+                            pass
+                else:
+                    # 涨跌幅校验
+                    clean_val = original_val.replace('%', '').replace('+', '')
+                    report_mentions = re.findall(
+                        rf'{index_name}[^\n]{{0,40}}?([+-]?\d+\.?\d*)%',
+                        report_text
+                    )
+                    for mentioned in report_mentions:
+                        try:
+                            orig_f = float(clean_val)
+                            mentioned_f = float(mentioned.replace('+', ''))
+                            if abs(orig_f - mentioned_f) > 0.05:  # 允许0.05%误差
+                                warnings.append(
+                                    f"{index_name}涨跌幅不一致：原始数据 {original_val}，报告引用 {mentioned}%"
+                                )
+                        except ValueError:
+                            pass
+            
+        except Exception as e:
+            print(f"[AI] 数据一致性校验出错（不影响报告）: {e}", flush=True)
+        
+        return warnings
     
     async def analyze_stock(self, code: str, name: str, market: str,
                            fundamentals: Dict, technicals: Dict, 
@@ -1197,10 +1321,12 @@ class AIAnalyzerService:
 
 ## 要求
 
-基于你对这只股票的了解（公司基本面、行业地位、近期消息等），给出：
+**仅基于以上提供的价格和涨跌数据**进行分析，给出：
 1. 投资评级：看多(bullish) / 中性(neutral) / 看空(bearish)
 2. 置信度：0-100 分
 3. 简短理由：50字以内
+
+⚠️ 注意：你只能基于提供的价格涨跌数据做判断。如果仅凭价格数据无法做出明确判断，请给出"中性(neutral)"评级并说明数据不足。不要编造或引用任何未提供的信息。
 
 请以 JSON 格式输出：
 ```json
@@ -1285,6 +1411,7 @@ class AIAnalyzerService:
                         lambda: self.anthropic_client.messages.create(
                             model=settings.ai_model,
                             max_tokens=max_tokens,
+                            temperature=0.3,
                             messages=[{"role": "user", "content": prompt}]
                         )
                     ),
@@ -1316,6 +1443,7 @@ class AIAnalyzerService:
                             lambda: self.openai_client.chat.completions.create(
                                 model=model,
                                 max_tokens=actual_max_tokens,
+                                temperature=0.3,
                                 messages=[{"role": "user", "content": prompt}],
                                 timeout=AI_CALL_TIMEOUT
                             )
@@ -1353,6 +1481,7 @@ class AIAnalyzerService:
                             lambda: self.backup_client.chat.completions.create(
                                 model=backup_model,
                                 max_tokens=backup_max_tokens,
+                                temperature=0.3,
                                 messages=[{"role": "user", "content": prompt}],
                                 timeout=AI_CALL_TIMEOUT
                             )
@@ -1384,6 +1513,7 @@ class AIAnalyzerService:
                             lambda: self.openai_client.chat.completions.create(
                                 model="openai",
                                 max_tokens=min(max_tokens, 4000),
+                                temperature=0.3,
                                 messages=[{"role": "user", "content": prompt}],
                                 timeout=120
                             )
