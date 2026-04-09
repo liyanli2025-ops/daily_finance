@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Dimensions, ActivityIndicator, Platform } from 'react-native';
 import { Text, SegmentedButtons, useTheme } from 'react-native-paper';
-import { LineChart, BarChart } from 'react-native-chart-kit';
+import Svg, { Rect, Line, Path, Text as SvgText } from 'react-native-svg';
 import { api } from '@/services/api';
+import { useAppTheme } from '@/theme/ThemeContext';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -23,14 +24,249 @@ interface ChartViewProps {
   compact?: boolean;
 }
 
+// 计算 MA 均线
+function calcMA(closes: number[], n: number): (number | null)[] {
+  const result: (number | null)[] = [];
+  for (let i = 0; i < closes.length; i++) {
+    if (i < n - 1) {
+      result.push(null);
+    } else {
+      const sum = closes.slice(i - n + 1, i + 1).reduce((a, b) => a + b, 0);
+      result.push(sum / n);
+    }
+  }
+  return result;
+}
+
+// 蜡烛图组件
+function CandlestickChart({
+  data,
+  width,
+  height,
+  colors: themeColors,
+  isDark,
+}: {
+  data: KLineItem[];
+  width: number;
+  height: number;
+  colors: any;
+  isDark: boolean;
+}) {
+  if (data.length === 0) return null;
+
+  const candleAreaHeight = height * 0.65;
+  const volumeAreaHeight = height * 0.25;
+  const gapHeight = height * 0.04;
+  const labelHeight = height * 0.06;
+  const paddingLeft = 45;
+  const paddingRight = 10;
+  const paddingTop = 8;
+  const chartWidth = width - paddingLeft - paddingRight;
+
+  const candleWidth = Math.max(2, Math.min(8, (chartWidth / data.length) * 0.6));
+  const candleGap = chartWidth / data.length;
+
+  // 价格范围
+  const allHigh = data.map((d) => d.high_price);
+  const allLow = data.map((d) => d.low_price);
+  const priceMax = Math.max(...allHigh);
+  const priceMin = Math.min(...allLow);
+  const pricePadding = (priceMax - priceMin) * 0.08 || 1;
+  const yMax = priceMax + pricePadding;
+  const yMin = priceMin - pricePadding;
+
+  // 成交量范围
+  const volMax = Math.max(...data.map((d) => d.volume)) || 1;
+
+  // MA 均线
+  const closes = data.map((d) => d.close_price);
+  const ma5 = calcMA(closes, 5);
+  const ma10 = calcMA(closes, 10);
+  const ma20 = calcMA(closes, 20);
+
+  const priceToY = (p: number) =>
+    paddingTop + ((yMax - p) / (yMax - yMin)) * candleAreaHeight;
+
+  const volToY = (v: number) =>
+    paddingTop + candleAreaHeight + gapHeight + volumeAreaHeight * (1 - v / volMax);
+
+  const idxToX = (i: number) => paddingLeft + candleGap * i + candleGap / 2;
+
+  // 生成 MA 路径
+  const buildMAPath = (maData: (number | null)[]) => {
+    let path = '';
+    for (let i = 0; i < maData.length; i++) {
+      const val = maData[i];
+      if (val === null) continue;
+      const x = idxToX(i);
+      const y = priceToY(val);
+      path += path === '' ? `M${x},${y}` : `L${x},${y}`;
+    }
+    return path;
+  };
+
+  // 价格网格线
+  const gridLines = 4;
+  const gridPrices: number[] = [];
+  for (let i = 0; i <= gridLines; i++) {
+    gridPrices.push(yMin + ((yMax - yMin) * i) / gridLines);
+  }
+
+  // 日期标签
+  const labelStep = Math.max(1, Math.ceil(data.length / 5));
+  const dateLabels: { x: number; label: string }[] = [];
+  for (let i = 0; i < data.length; i += labelStep) {
+    const d = data[i].trade_date;
+    if (d && d.includes('-')) {
+      const parts = d.split('-');
+      dateLabels.push({
+        x: idxToX(i),
+        label: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+      });
+    }
+  }
+
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const labelColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)';
+  const upColor = '#EF4444';
+  const downColor = '#22C55E';
+
+  return (
+    <Svg width={width} height={height}>
+      {/* 价格区网格线 */}
+      {gridPrices.map((price, i) => (
+        <React.Fragment key={`grid-${i}`}>
+          <Line
+            x1={paddingLeft}
+            y1={priceToY(price)}
+            x2={width - paddingRight}
+            y2={priceToY(price)}
+            stroke={gridColor}
+            strokeWidth={1}
+          />
+          <SvgText
+            x={paddingLeft - 4}
+            y={priceToY(price) + 3}
+            fontSize={9}
+            fill={labelColor}
+            textAnchor="end"
+          >
+            {price.toFixed(2)}
+          </SvgText>
+        </React.Fragment>
+      ))}
+
+      {/* 成交量区分隔线 */}
+      <Line
+        x1={paddingLeft}
+        y1={paddingTop + candleAreaHeight + gapHeight}
+        x2={width - paddingRight}
+        y2={paddingTop + candleAreaHeight + gapHeight}
+        stroke={gridColor}
+        strokeWidth={1}
+      />
+
+      {/* MA 均线 */}
+      {ma20.some((v) => v !== null) && (
+        <Path d={buildMAPath(ma20)} stroke="rgba(147,51,234,0.5)" strokeWidth={1} fill="none" />
+      )}
+      {ma10.some((v) => v !== null) && (
+        <Path d={buildMAPath(ma10)} stroke="rgba(239,68,68,0.6)" strokeWidth={1} fill="none" />
+      )}
+      {ma5.some((v) => v !== null) && (
+        <Path d={buildMAPath(ma5)} stroke="rgba(245,158,11,0.7)" strokeWidth={1.2} fill="none" />
+      )}
+
+      {/* 蜡烛图 */}
+      {data.map((item, i) => {
+        const x = idxToX(i);
+        const isUp = item.close_price >= item.open_price;
+        const color = isUp ? upColor : downColor;
+        const bodyTop = priceToY(Math.max(item.open_price, item.close_price));
+        const bodyBottom = priceToY(Math.min(item.open_price, item.close_price));
+        const bodyHeight = Math.max(1, bodyBottom - bodyTop);
+
+        return (
+          <React.Fragment key={`candle-${i}`}>
+            {/* 上影线 */}
+            <Line
+              x1={x}
+              y1={priceToY(item.high_price)}
+              x2={x}
+              y2={bodyTop}
+              stroke={color}
+              strokeWidth={1}
+            />
+            {/* 下影线 */}
+            <Line
+              x1={x}
+              y1={bodyBottom}
+              x2={x}
+              y2={priceToY(item.low_price)}
+              stroke={color}
+              strokeWidth={1}
+            />
+            {/* 实体 */}
+            <Rect
+              x={x - candleWidth / 2}
+              y={bodyTop}
+              width={candleWidth}
+              height={bodyHeight}
+              fill={isUp ? color : color}
+              stroke={color}
+              strokeWidth={0.5}
+              rx={0.5}
+            />
+          </React.Fragment>
+        );
+      })}
+
+      {/* 成交量柱状图 */}
+      {data.map((item, i) => {
+        const x = idxToX(i);
+        const isUp = item.close_price >= item.open_price;
+        const color = isUp ? 'rgba(239,68,68,0.5)' : 'rgba(34,197,94,0.5)';
+        const barTop = volToY(item.volume);
+        const barBottom = paddingTop + candleAreaHeight + gapHeight + volumeAreaHeight;
+        const barHeight = Math.max(1, barBottom - barTop);
+
+        return (
+          <Rect
+            key={`vol-${i}`}
+            x={x - candleWidth / 2}
+            y={barTop}
+            width={candleWidth}
+            height={barHeight}
+            fill={color}
+            rx={0.5}
+          />
+        );
+      })}
+
+      {/* 日期标签 */}
+      {dateLabels.map((dl, i) => (
+        <SvgText
+          key={`date-${i}`}
+          x={dl.x}
+          y={height - 2}
+          fontSize={9}
+          fill={labelColor}
+          textAnchor="middle"
+        >
+          {dl.label}
+        </SvgText>
+      ))}
+    </Svg>
+  );
+}
+
 export default function ChartView({
   stockCode,
   stockName,
   market = 'A',
   compact = false,
 }: ChartViewProps) {
-  const theme = useTheme();
-  const [chartType, setChartType] = useState<string>('price');
+  const { colors, isDark } = useAppTheme();
   const [period, setPeriod] = useState<string>('daily');
   const [klineData, setKlineData] = useState<KLineItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,85 +293,26 @@ export default function ChartView({
     setIsLoading(false);
   };
 
-  // 从 K 线数据中提取图表所需格式
-  const getChartData = () => {
-    if (klineData.length === 0) {
-      return { labels: [], prices: [], volumes: [], ma5: [], ma10: [] };
-    }
+  const displayData = klineData.slice(compact ? -15 : -40);
+  const chartWidth = compact ? screenWidth - 64 : screenWidth - 40;
+  const chartHeight = compact ? 150 : 260;
 
-    // 取最近的数据点（紧凑模式取 15，正常取最多 30 以保持可读性）
-    const displayCount = compact ? 15 : Math.min(klineData.length, 30);
-    const sliced = klineData.slice(-displayCount);
-
-    const labels = sliced.map((k) => {
-      const d = k.trade_date;
-      // 格式化日期 "2025-04-09" → "4/9"
-      if (d && d.includes('-')) {
-        const parts = d.split('-');
-        return `${parseInt(parts[1])}/${parseInt(parts[2])}`;
-      }
-      return d;
-    });
-
-    const prices = sliced.map((k) => k.close_price);
-    const volumes = sliced.map((k) => k.volume);
-
-    // 计算 MA5 和 MA10
-    const allClose = klineData.map((k) => k.close_price);
-    const calcMA = (data: number[], n: number) => {
-      const result: number[] = [];
-      for (let i = 0; i < data.length; i++) {
-        if (i < n - 1) {
-          result.push(data[i]);
-        } else {
-          const sum = data.slice(i - n + 1, i + 1).reduce((a, b) => a + b, 0);
-          result.push(sum / n);
-        }
-      }
-      return result.slice(-displayCount);
-    };
-
-    const ma5 = calcMA(allClose, 5);
-    const ma10 = calcMA(allClose, 10);
-
-    // 只在标签数较多时每隔几个显示
-    const step = labels.length > 10 ? Math.ceil(labels.length / 6) : 1;
-    const sparseLabels = labels.map((l, i) => (i % step === 0 ? l : ''));
-
-    return { labels: sparseLabels, prices, volumes, ma5, ma10 };
-  };
-
-  const chartData = getChartData();
-
-  const chartConfig = {
-    backgroundColor: theme.colors.surface,
-    backgroundGradientFrom: theme.colors.surface,
-    backgroundGradientTo: theme.colors.surface,
-    decimalPlaces: 2,
-    color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(148, 163, 184, ${opacity})`,
-    style: {
-      borderRadius: 12,
-    },
-    propsForDots: {
-      r: '3',
-      strokeWidth: '1.5',
-      stroke: '#2563EB',
-    },
-    propsForBackgroundLines: {
-      stroke: 'rgba(148, 163, 184, 0.2)',
-    },
-  };
-
-  const chartWidth = compact ? screenWidth - 64 : screenWidth - 32;
-  const chartHeight = compact ? 150 : 220;
+  // MA 计算（用全部数据计算，只取显示部分）
+  const allCloses = klineData.map((d) => d.close_price);
+  const allMA5 = calcMA(allCloses, 5);
+  const allMA10 = calcMA(allCloses, 10);
+  const latestMA5 = allMA5[allMA5.length - 1];
+  const latestMA10 = allMA10[allMA10.length - 1];
 
   if (isLoading) {
     return (
-      <View style={[compact ? styles.compactContainer : styles.container, { backgroundColor: theme.colors.surface }]}>
+      <View style={[compact ? styles.compactContainer : styles.container, {
+        backgroundColor: isDark ? colors.glassBackground : colors.glassBackground,
+        borderColor: isDark ? colors.glassBorder : colors.glassBorder,
+      }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-          <Text variant="bodySmall" style={{ color: theme.colors.outline, marginTop: 8 }}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={{ color: colors.onSurfaceVariant, marginTop: 8, fontSize: 12 }}>
             加载K线数据...
           </Text>
         </View>
@@ -143,11 +320,14 @@ export default function ChartView({
     );
   }
 
-  if (error || chartData.prices.length === 0) {
+  if (error || displayData.length === 0) {
     return (
-      <View style={[compact ? styles.compactContainer : styles.container, { backgroundColor: theme.colors.surface }]}>
+      <View style={[compact ? styles.compactContainer : styles.container, {
+        backgroundColor: isDark ? colors.glassBackground : colors.glassBackground,
+        borderColor: isDark ? colors.glassBorder : colors.glassBorder,
+      }]}>
         <View style={styles.loadingContainer}>
-          <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
+          <Text style={{ color: colors.onSurfaceVariant, fontSize: 12 }}>
             {error || '暂无K线数据'}
           </Text>
         </View>
@@ -157,51 +337,28 @@ export default function ChartView({
 
   if (compact) {
     return (
-      <View style={[styles.compactContainer, { backgroundColor: theme.colors.surface }]}>
-        <View style={styles.compactHeader}>
-          <Text variant="titleSmall" style={styles.stockName}>
-            {stockName}
-          </Text>
-          <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
-            {stockCode}
-          </Text>
-        </View>
-        <LineChart
-          data={{
-            labels: chartData.labels,
-            datasets: [
-              {
-                data: chartData.prices,
-                color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
-                strokeWidth: 2,
-              },
-            ],
-          }}
+      <View style={[styles.compactContainer, {
+        backgroundColor: isDark ? colors.glassBackground : colors.glassBackground,
+        borderColor: isDark ? colors.glassBorder : colors.glassBorder,
+      }]}>
+        <CandlestickChart
+          data={displayData}
           width={chartWidth}
           height={chartHeight}
-          chartConfig={chartConfig}
-          bezier
-          withHorizontalLabels={false}
-          withVerticalLabels={false}
-          withDots={false}
-          withInnerLines={false}
-          withOuterLines={false}
-          style={styles.chart}
+          colors={colors}
+          isDark={isDark}
         />
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-      {/* 标题栏 */}
-      <View style={styles.header}>
-        <View>
-          <Text variant="titleMedium" style={styles.stockName}>
-            📈 K线走势
-          </Text>
-        </View>
-      </View>
+    <View style={[styles.container, {
+      backgroundColor: isDark ? colors.glassBackground : colors.glassBackground,
+      borderColor: isDark ? colors.glassBorder : colors.glassBorder,
+    }]}>
+      {/* 标题 */}
+      <Text style={[styles.title, { color: colors.onSurface }]}>📈 K线走势</Text>
 
       {/* 周期选择 */}
       <View style={styles.periodSelector}>
@@ -218,127 +375,65 @@ export default function ChartView({
         />
       </View>
 
-      {/* 图表类型选择 */}
-      <View style={styles.chartTypeSelector}>
-        <SegmentedButtons
-          value={chartType}
-          onValueChange={setChartType}
-          buttons={[
-            { value: 'price', label: '价格' },
-            { value: 'volume', label: '成交量' },
-          ]}
-          density="small"
-          style={styles.segmentedButton}
-        />
+      {/* 均线图例 */}
+      <View style={styles.legendContainer}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendLine, { backgroundColor: 'rgba(245,158,11,0.8)' }]} />
+          <Text style={[styles.legendText, { color: colors.onSurfaceVariant }]}>MA5</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendLine, { backgroundColor: 'rgba(239,68,68,0.7)' }]} />
+          <Text style={[styles.legendText, { color: colors.onSurfaceVariant }]}>MA10</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendLine, { backgroundColor: 'rgba(147,51,234,0.6)' }]} />
+          <Text style={[styles.legendText, { color: colors.onSurfaceVariant }]}>MA20</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
+          <Text style={[styles.legendText, { color: colors.onSurfaceVariant }]}>涨</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#22C55E' }]} />
+          <Text style={[styles.legendText, { color: colors.onSurfaceVariant }]}>跌</Text>
+        </View>
       </View>
 
-      {/* 图表展示 */}
-      {chartType === 'price' && (
-        <View style={styles.chartSection}>
-          <LineChart
-            data={{
-              labels: chartData.labels,
-              datasets: [
-                {
-                  data: chartData.prices,
-                  color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
-                  strokeWidth: 2,
-                },
-                {
-                  data: chartData.ma5,
-                  color: (opacity = 1) => `rgba(245, 158, 11, ${opacity})`,
-                  strokeWidth: 1,
-                },
-                {
-                  data: chartData.ma10,
-                  color: (opacity = 1) => `rgba(239, 68, 68, ${opacity})`,
-                  strokeWidth: 1,
-                },
-              ],
-              legend: ['收盘价', 'MA5', 'MA10'],
-            }}
-            width={chartWidth}
-            height={chartHeight}
-            chartConfig={chartConfig}
-            bezier
-            style={styles.chart}
-          />
-          <View style={styles.legendContainer}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#2563EB' }]} />
-              <Text variant="labelSmall">收盘价</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
-              <Text variant="labelSmall">MA5</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
-              <Text variant="labelSmall">MA10</Text>
-            </View>
-          </View>
-        </View>
-      )}
+      {/* 蜡烛图 */}
+      <CandlestickChart
+        data={displayData}
+        width={chartWidth}
+        height={chartHeight}
+        colors={colors}
+        isDark={isDark}
+      />
 
-      {chartType === 'volume' && (
-        <View style={styles.chartSection}>
-          <BarChart
-            data={{
-              labels: chartData.labels,
-              datasets: [
-                {
-                  data: chartData.volumes.map(v => v > 0 ? v / 10000 : 0),
-                },
-              ],
-            }}
-            width={chartWidth}
-            height={chartHeight}
-            chartConfig={{
-              ...chartConfig,
-              color: (opacity = 1) => `rgba(34, 197, 94, ${opacity})`,
-            }}
-            yAxisLabel=""
-            yAxisSuffix="万"
-            style={styles.chart}
-          />
-          <Text variant="bodySmall" style={styles.volumeHint}>
-            单位：万手
-          </Text>
-        </View>
-      )}
-
-      {/* 技术指标摘要（从真实数据计算） */}
+      {/* 技术指标摘要 */}
       {klineData.length > 0 && (
-        <View style={styles.indicatorSummary}>
+        <View style={[styles.indicatorSummary, {
+          borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+        }]}>
           <View style={styles.indicatorItem}>
-            <Text variant="labelSmall" style={{ color: theme.colors.outline }}>
-              MA5
-            </Text>
-            <Text variant="bodyMedium" style={{ fontWeight: '600' }}>
-              {chartData.ma5.length > 0 ? chartData.ma5[chartData.ma5.length - 1].toFixed(2) : '--'}
+            <Text style={[styles.indicatorLabel, { color: colors.onSurfaceVariant }]}>MA5</Text>
+            <Text style={[styles.indicatorValue, { color: colors.onSurface }]}>
+              {latestMA5 !== null ? latestMA5.toFixed(2) : '--'}
             </Text>
           </View>
           <View style={styles.indicatorItem}>
-            <Text variant="labelSmall" style={{ color: theme.colors.outline }}>
-              MA10
-            </Text>
-            <Text variant="bodyMedium" style={{ fontWeight: '600' }}>
-              {chartData.ma10.length > 0 ? chartData.ma10[chartData.ma10.length - 1].toFixed(2) : '--'}
+            <Text style={[styles.indicatorLabel, { color: colors.onSurfaceVariant }]}>MA10</Text>
+            <Text style={[styles.indicatorValue, { color: colors.onSurface }]}>
+              {latestMA10 !== null ? latestMA10.toFixed(2) : '--'}
             </Text>
           </View>
           <View style={styles.indicatorItem}>
-            <Text variant="labelSmall" style={{ color: theme.colors.outline }}>
-              最新收盘
-            </Text>
-            <Text variant="bodyMedium" style={{ fontWeight: '600' }}>
+            <Text style={[styles.indicatorLabel, { color: colors.onSurfaceVariant }]}>最新收盘</Text>
+            <Text style={[styles.indicatorValue, { color: colors.onSurface }]}>
               {klineData[klineData.length - 1].close_price.toFixed(2)}
             </Text>
           </View>
           <View style={styles.indicatorItem}>
-            <Text variant="labelSmall" style={{ color: theme.colors.outline }}>
-              成交量
-            </Text>
-            <Text variant="bodyMedium" style={{ fontWeight: '600' }}>
+            <Text style={[styles.indicatorLabel, { color: colors.onSurfaceVariant }]}>成交量</Text>
+            <Text style={[styles.indicatorValue, { color: colors.onSurface }]}>
               {(klineData[klineData.length - 1].volume / 10000).toFixed(0)}万
             </Text>
           </View>
@@ -351,76 +446,74 @@ export default function ChartView({
 const styles = StyleSheet.create({
   container: {
     padding: 16,
-    borderRadius: 12,
-    marginVertical: 8,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 16,
+    ...Platform.select({
+      web: { boxShadow: '0 4px 20px rgba(0,0,0,0.06)' },
+    }),
   },
   compactContainer: {
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  compactHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  title: {
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.3,
     marginBottom: 12,
-  },
-  stockName: {
-    fontWeight: '600',
   },
   periodSelector: {
-    marginBottom: 12,
-  },
-  chartTypeSelector: {
     marginBottom: 12,
   },
   segmentedButton: {
     borderRadius: 8,
   },
-  chartSection: {
-    alignItems: 'center',
-    marginVertical: 8,
-  },
-  chart: {
-    borderRadius: 8,
-    marginVertical: 8,
-  },
   legendContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20,
-    marginTop: 8,
+    gap: 14,
+    marginBottom: 8,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
+  legendLine: {
+    width: 14,
+    height: 2,
+    borderRadius: 1,
+  },
   legendDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: 1,
   },
-  volumeHint: {
-    textAlign: 'center',
-    opacity: 0.6,
-    marginTop: 4,
+  legendText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   indicatorSummary: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingTop: 16,
+    paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
     marginTop: 8,
   },
   indicatorItem: {
     alignItems: 'center',
+  },
+  indicatorLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  indicatorValue: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   loadingContainer: {
     alignItems: 'center',
