@@ -115,9 +115,9 @@ class NewsCollectorService:
                 "news_type": "finance"
             },
             {
-                "url": "{RSSHUB}/bloomberg",
-                "name": "彭博社",
-                "category": "国际财经",
+                "url": "{RSSHUB}/wallstreetcn/news/shares",
+                "name": "华尔街见闻-股市",
+                "category": "全球股市",
                 "news_type": "finance"
             },
             {
@@ -133,6 +133,12 @@ class NewsCollectorService:
             {
                 "url": "{RSSHUB}/hkej/index",
                 "name": "香港经济日报",
+                "category": "港股",
+                "news_type": "finance"
+            },
+            {
+                "url": "{RSSHUB}/gelonghui/subject/3",
+                "name": "格隆汇港股",
                 "category": "港股",
                 "news_type": "finance"
             },
