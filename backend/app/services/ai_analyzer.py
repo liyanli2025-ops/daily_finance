@@ -313,6 +313,8 @@ class AIAnalyzerService:
 
 ## 📊 真实市场数据（上一交易日收盘）
 
+⚠️ **【强制数据锚定】以下是系统自动采集的真实收盘数据，你在报告中引用的所有指数点位、涨跌幅、资金数据必须与此完全一致，严禁修改、四舍五入或凭记忆编造。如果某项数据缺失，直接说"数据暂缺"，不要编造。**
+
 {market_data_text}
 
 ---
@@ -541,6 +543,8 @@ class AIAnalyzerService:
 
 ## 📊 今日市场数据
 
+⚠️ **【强制数据锚定】以下是系统自动采集的真实收盘数据，你在报告中引用的所有指数点位、涨跌幅、资金数据必须与此完全一致，严禁修改、四舍五入或凭记忆编造。如果某项数据缺失，直接说"数据暂缺"，不要编造。**
+
 {market_data_text}
 
 ---
@@ -755,6 +759,8 @@ class AIAnalyzerService:
 ---
 
 ## 📊 本周市场数据
+
+⚠️ **【强制数据锚定】以下是系统自动采集的真实收盘数据，你在报告中引用的所有指数点位、涨跌幅、资金数据必须与此完全一致，严禁修改、四舍五入或凭记忆编造。如果某项数据缺失，直接说"数据暂缺"，不要编造。**
 
 {market_data_text}
 
@@ -1302,7 +1308,7 @@ class AIAnalyzerService:
                     model = self._select_model(settings.openai_base_url, settings.ai_model)
                     actual_max_tokens = self._adapt_max_tokens(model, settings.openai_base_url, max_tokens)
                     
-                    print(f"[AI] 🔵 尝试主服务 {model} (尝试 {attempt + 1}/2, 超时 {AI_CALL_TIMEOUT}s)...", flush=True)
+                    print(f"[AI] 🔵 尝试主服务 {model} (尝试 {attempt + 1}/2, 超时 {AI_CALL_TIMEOUT}s, max_tokens: {max_tokens}→{actual_max_tokens})...", flush=True)
                     
                     response = await asyncio.wait_for(
                         asyncio.get_event_loop().run_in_executor(
@@ -1339,7 +1345,7 @@ class AIAnalyzerService:
                     backup_model = settings.backup_ai_model or "deepseek-chat"
                     backup_max_tokens = self._adapt_max_tokens(backup_model, settings.backup_ai_base_url, max_tokens)
                     
-                    print(f"[AI] 🟡 尝试备用服务 {backup_model} (尝试 {attempt + 1}/2, 超时 {AI_CALL_TIMEOUT}s)...", flush=True)
+                    print(f"[AI] 🟡 尝试备用服务 {backup_model} (尝试 {attempt + 1}/2, 超时 {AI_CALL_TIMEOUT}s, max_tokens: {max_tokens}→{backup_max_tokens})...", flush=True)
                     
                     response = await asyncio.wait_for(
                         asyncio.get_event_loop().run_in_executor(
@@ -1424,9 +1430,15 @@ class AIAnalyzerService:
         return ai_model if "gpt" in ai_model.lower() else "gpt-4-turbo"
     
     def _adapt_max_tokens(self, model: str, base_url: str, max_tokens: int) -> int:
-        """根据模型自动适配 max_tokens"""
+        """根据模型自动适配 max_tokens
+        
+        DeepSeek-V3 / deepseek-chat 支持最大 16384 output tokens（2025年3月后已升级）。
+        之前硬编码 8192 导致晚报（需要16000 tokens）被截断，AI 无法完整输出，
+        造成大盘数据不准确的问题。
+        """
         if "deepseek" in (base_url or "").lower():
-            return min(max_tokens, 8192)
+            # DeepSeek-V3 支持 16384 output tokens
+            return min(max_tokens, 16384)
         return max_tokens
     
     def _prepare_news_summary(self, news_list: List[News]) -> str:
