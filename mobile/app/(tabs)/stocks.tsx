@@ -6,7 +6,6 @@ import {
   RefreshControl,
   Text,
   TouchableOpacity,
-  Pressable,
   ActivityIndicator,
   Platform,
   Dimensions,
@@ -295,13 +294,17 @@ export default function StocksScreen() {
             {watchlist.map((stock) => {
               const priceColor = (stock.change_percent ?? 0) >= 0 ? '#F44336' : '#4CAF50';
               return (
-                <Pressable
+                <TouchableOpacity
                   key={stock.id}
-                  onPress={() => router.push({ pathname: '/stock/[code]', params: { code: stock.code, market: stock.market } })}
-                  style={({ pressed }) => [styles.stockCard, {
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    console.log('[Stocks] 点击自选股:', stock.code, stock.market);
+                    router.push({ pathname: '/stock/[code]', params: { code: stock.code, market: stock.market } });
+                  }}
+                  style={[styles.stockCard, {
                     backgroundColor: isDark ? colors.glassBackground : colors.glassBackground,
                     borderColor: isDark ? colors.glassBorder : colors.glassBorder,
-                    opacity: pressed ? 0.7 : 1,
+                    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
                   }]}
                 >
                   <View style={styles.stockMain}>
@@ -351,19 +354,18 @@ export default function StocksScreen() {
                         </Text>
                       )}
                     </View>
-                    <Pressable
+                    <TouchableOpacity
                       onPress={(e) => {
                         e.stopPropagation();
-                        e.preventDefault?.();
                         removeFromWatchlist(stock.id);
                       }}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                      activeOpacity={0.5}
                     >
                       <MaterialCommunityIcons name="close" size={16} color={colors.onSurfaceVariant} />
-                    </Pressable>
+                    </TouchableOpacity>
                   </View>
-                </Pressable>
+                </TouchableOpacity>
               );
             })}
           </View>
