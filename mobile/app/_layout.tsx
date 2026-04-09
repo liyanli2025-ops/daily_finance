@@ -88,13 +88,6 @@ function RootNavigator() {
       >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
-          name="report/[id]"
-          options={{
-            title: '报告详情',
-            presentation: 'card',
-          }}
-        />
-        <Stack.Screen
           name="stock/[code]"
           options={{
             title: '股票详情',
