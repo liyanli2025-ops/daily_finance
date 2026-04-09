@@ -48,7 +48,6 @@ class NewsCollectorService:
         # RSSHub 备用节点（主节点挂掉时自动切换）
         self._rsshub_nodes = [
             "https://rsshub.rssforever.com",
-            "https://rsshub.app",
             "https://rsshub.pseudoyu.com",
         ]
         self._current_rsshub_node = self._rsshub_nodes[0]
@@ -91,24 +90,18 @@ class NewsCollectorService:
             },
             
             # ==========================================
-            # 【新增】权威财经媒体（差异化覆盖深度分析）
+            # 【新增】差异化财经信源（实测可用）
             # ==========================================
             {
-                "url": "{RSSHUB}/caixin/latest",
-                "name": "财新网",
-                "category": "深度财经",
+                "url": "{RSSHUB}/gelonghui/live",
+                "name": "格隆汇7x24快讯",
+                "category": "全球快讯",
                 "news_type": "finance"
             },
             {
-                "url": "{RSSHUB}/stcn/kuaixun",
-                "name": "证券时报快讯",
-                "category": "A股快讯",
-                "news_type": "finance"
-            },
-            {
-                "url": "{RSSHUB}/cs/news/rolling",
-                "name": "中证网滚动新闻",
-                "category": "A股综合",
+                "url": "{RSSHUB}/cls/depth/1000",
+                "name": "财联社深度",
+                "category": "深度分析",
                 "news_type": "finance"
             },
             
@@ -460,7 +453,7 @@ class NewsCollectorService:
         # 方案 A：通过 RSSHub 获取雪球热帖（推荐，不被 WAF 拦截）
         rsshub_urls = [
             "https://rsshub.rssforever.com/xueqiu/hots",
-            "https://rsshub.app/xueqiu/hots",
+            "https://rsshub.pseudoyu.com/xueqiu/hots",
         ]
         
         for rsshub_url in rsshub_urls:
@@ -899,7 +892,7 @@ class NewsCollectorService:
             xq_symbol = self._get_xueqiu_symbol(stock)
             rsshub_urls = [
                 f"https://rsshub.rssforever.com/xueqiu/stock_comments/{xq_symbol}",
-                f"https://rsshub.app/xueqiu/stock_comments/{xq_symbol}",
+                f"https://rsshub.pseudoyu.com/xueqiu/stock_comments/{xq_symbol}",
             ]
             
             fetched = False
