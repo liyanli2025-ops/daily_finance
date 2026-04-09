@@ -619,9 +619,9 @@ async def get_stock_kline(
     limit: int = Query(60, ge=1, le=250, description="返回数据条数")
 ):
     """
-    获取K线数据（腾讯财经真实数据）
+    获取K线数据
     
-    使用腾讯财经 web.ifzq.gtimg.cn 接口获取真实 K 线
+    数据源优先级：腾讯财经 → 东方财富 → 新浪财经
     """
     import asyncio
     import urllib.request
@@ -629,24 +629,26 @@ async def get_stock_kline(
     import json
     from datetime import date as dt_date_local
     
-    def _fetch_kline(code: str, mkt: str, prd: str, lmt: int):
-        """从腾讯财经获取 K 线数据"""
-        # 构建腾讯财经代码
+    def _build_symbol(code: str, mkt: str):
+        """构建股票代码"""
         if mkt == 'A':
             if code.startswith('6') or code.startswith('9'):
-                symbol = f"sh{code}"
+                return f"sh{code}", "1"  # 返回腾讯格式和东方财富市场代码
             else:
-                symbol = f"sz{code}"
+                return f"sz{code}", "0"
         elif mkt == 'HK':
-            symbol = f"hk{code.zfill(5)}"
-        else:
+            return f"hk{code.zfill(5)}", "116"
+        return None, None
+    
+    def _fetch_kline_qq(code: str, mkt: str, prd: str, lmt: int):
+        """数据源1：腾讯财经 K 线"""
+        symbol, _ = _build_symbol(code, mkt)
+        if not symbol:
             return []
         
-        # 周期映射：腾讯接口使用 day/week/month
         period_map = {"daily": "day", "weekly": "week", "monthly": "month"}
         qq_period = period_map.get(prd, "day")
         
-        # 腾讯财经 K 线接口
         url = (
             f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?"
             f"param={symbol},{qq_period},,{lmt},qfq"
@@ -657,24 +659,22 @@ async def get_stock_kline(
         ctx.verify_mode = ssl.CERT_NONE
         
         req = urllib.request.Request(url)
-        req.add_header('User-Agent', 'Mozilla/5.0')
+        req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
         
-        with urllib.request.urlopen(req, timeout=15, context=ctx) as response:
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as response:
             content = response.read().decode('utf-8')
         
         data = json.loads(content)
+        print(f"[KLINE-QQ] {symbol} 响应 keys: {list(data.get('data', {}).keys())}")
         
-        # 解析响应数据
-        # 结构: {"code":0,"msg":"","data":{"sh600519":{"day":[["2024-01-02","1680.00","1695.00","1698.00","1675.50","12345"], ...]}}}
         klines = []
         stock_data = data.get("data", {})
         
-        # 找到股票数据
         for key in stock_data:
             stock_info = stock_data[key]
+            if not isinstance(stock_info, dict):
+                continue
             
-            # 尝试获取对应周期的数据
-            # 前复权数据在 qfqday/qfqweek/qfqmonth 或者直接 day/week/month
             kline_data = None
             for kline_key in [f"qfq{qq_period}", qq_period]:
                 if kline_key in stock_info:
@@ -682,39 +682,113 @@ async def get_stock_kline(
                     break
             
             if not kline_data:
+                print(f"[KLINE-QQ] {symbol} 可用 keys: {list(stock_info.keys())}")
                 continue
             
             for item in kline_data:
-                # item: ["日期", "开盘", "收盘", "最高", "最低", "成交量"]
                 if len(item) >= 6:
                     try:
                         trade_date = dt_date_local.fromisoformat(item[0])
-                        open_price = float(item[1])
-                        close_price = float(item[2])
-                        high_price = float(item[3])
-                        low_price = float(item[4])
-                        volume = float(item[5])
-                        
                         klines.append({
                             "trade_date": trade_date,
-                            "open_price": open_price,
-                            "close_price": close_price,
-                            "high_price": high_price,
-                            "low_price": low_price,
-                            "volume": volume,
+                            "open_price": float(item[1]),
+                            "close_price": float(item[2]),
+                            "high_price": float(item[3]),
+                            "low_price": float(item[4]),
+                            "volume": float(item[5]),
                         })
-                    except (ValueError, IndexError) as e:
+                    except (ValueError, IndexError):
                         continue
         
         return klines
     
+    def _fetch_kline_eastmoney(code: str, mkt: str, prd: str, lmt: int):
+        """数据源2：东方财富 K 线"""
+        _, secid_market = _build_symbol(code, mkt)
+        if secid_market is None:
+            return []
+        
+        # 东方财富周期映射
+        period_map = {"daily": "101", "weekly": "102", "monthly": "103"}
+        klt = period_map.get(prd, "101")
+        
+        secid = f"{secid_market}.{code}"
+        
+        url = (
+            f"https://push2his.eastmoney.com/api/qt/stock/kline/get?"
+            f"secid={secid}&fields1=f1,f2,f3,f4,f5,f6&"
+            f"fields2=f51,f52,f53,f54,f55,f56,f57&"
+            f"klt={klt}&fqt=1&end=20500101&lmt={lmt}"
+        )
+        
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+        req.add_header('Referer', 'https://quote.eastmoney.com/')
+        
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as response:
+            content = response.read().decode('utf-8')
+        
+        data = json.loads(content)
+        kline_list = data.get("data", {}).get("klines", []) if data.get("data") else []
+        
+        print(f"[KLINE-EM] {secid} 获取到 {len(kline_list)} 条K线")
+        
+        klines = []
+        for line in kline_list:
+            # 格式: "2025-04-09,39.50,39.26,39.68,39.12,534978,2102563872.00"
+            parts = line.split(",")
+            if len(parts) >= 6:
+                try:
+                    trade_date = dt_date_local.fromisoformat(parts[0])
+                    klines.append({
+                        "trade_date": trade_date,
+                        "open_price": float(parts[1]),
+                        "close_price": float(parts[2]),
+                        "high_price": float(parts[3]),
+                        "low_price": float(parts[4]),
+                        "volume": float(parts[5]),
+                    })
+                except (ValueError, IndexError):
+                    continue
+        
+        return klines
+    
+    def _fetch_kline_with_fallback(code: str, mkt: str, prd: str, lmt: int):
+        """按优先级尝试多个数据源"""
+        # 数据源1：腾讯财经
+        try:
+            result = _fetch_kline_qq(code, mkt, prd, lmt)
+            if result:
+                print(f"[KLINE] ✅ 腾讯源成功: {code}, {len(result)}条")
+                return result
+            print(f"[KLINE] ⚠️ 腾讯源返回空数据: {code}")
+        except Exception as e:
+            print(f"[KLINE] ❌ 腾讯源失败: {code} - {e}")
+        
+        # 数据源2：东方财富
+        try:
+            result = _fetch_kline_eastmoney(code, mkt, prd, lmt)
+            if result:
+                print(f"[KLINE] ✅ 东方财富源成功: {code}, {len(result)}条")
+                return result
+            print(f"[KLINE] ⚠️ 东方财富源返回空数据: {code}")
+        except Exception as e:
+            print(f"[KLINE] ❌ 东方财富源失败: {code} - {e}")
+        
+        return []
+    
     try:
         loop = asyncio.get_event_loop()
         kline_data = await asyncio.wait_for(
-            loop.run_in_executor(None, _fetch_kline, stock_code, market, period, limit),
-            timeout=15
+            loop.run_in_executor(None, _fetch_kline_with_fallback, stock_code, market, period, limit),
+            timeout=20
         )
     except Exception as e:
+        print(f"[KLINE] ❌ 所有数据源超时: {stock_code} - {e}")
         raise HTTPException(status_code=502, detail=f"获取K线数据失败: {str(e)}")
     
     if not kline_data:
