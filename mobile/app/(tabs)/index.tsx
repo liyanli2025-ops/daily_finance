@@ -54,7 +54,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       {/* 氛围背景 */}
-      <View style={styles.atmosphereContainer}>
+      <View style={styles.atmosphereContainer} pointerEvents="none">
         <View style={[styles.blob, styles.blobPrimary]} />
         <View style={[styles.blob, styles.blobSecondary]} />
       </View>
