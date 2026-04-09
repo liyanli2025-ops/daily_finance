@@ -434,7 +434,7 @@ export default function ChartView({
           <View style={styles.indicatorItem}>
             <Text style={[styles.indicatorLabel, { color: colors.onSurfaceVariant }]}>成交量</Text>
             <Text style={[styles.indicatorValue, { color: colors.onSurface }]}>
-              {(klineData[klineData.length - 1].volume / 10000).toFixed(0)}万
+              {(klineData[klineData.length - 1].volume / 10000).toFixed(0)}万手
             </Text>
           </View>
         </View>

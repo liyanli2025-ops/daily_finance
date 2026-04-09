@@ -221,6 +221,12 @@ export default function StockDetailScreen() {
     return num.toFixed(2);
   };
 
+  // 成交额单位是万元，需要特殊处理
+  const formatAmount = (amountInWan: number) => {
+    if (amountInWan >= 10000) return `${(amountInWan / 10000).toFixed(2)}亿`;
+    return `${amountInWan.toFixed(0)}万`;
+  };
+
   const getPredictionColor = (signal?: string) => {
     switch (signal) {
       case 'bullish': return colors.bullish || '#22C55E';
@@ -384,8 +390,8 @@ export default function StockDetailScreen() {
               { label: '最高', value: stock.high_price.toFixed(2), color: colors.bearish || '#EF4444' },
               { label: '最低', value: stock.low_price.toFixed(2), color: colors.bullish || '#22C55E' },
               { label: '昨收', value: stock.prev_close.toFixed(2) },
-              { label: '成交量', value: formatNumber(stock.volume) },
-              { label: '成交额', value: formatNumber(stock.amount) },
+              { label: '成交量', value: formatNumber(stock.volume) + '手' },
+              { label: '成交额', value: formatAmount(stock.amount) },
             ].map((item, idx) => (
               <View key={idx} style={styles.detailItem}>
                 <Text style={[styles.detailLabel, { color: colors.onSurfaceVariant }]}>{item.label}</Text>
