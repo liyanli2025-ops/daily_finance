@@ -215,10 +215,11 @@ class PodcastGeneratorService:
                         print(f"[播客] ✅ {provider_name} 调用成功")
                         return message.content[0].text
                     else:
-                        # DeepSeek max_tokens 适配
+                        # DeepSeek max_tokens 适配（播客最多需要8000，DeepSeek上限16384足够）
                         actual_max_tokens = max_tokens
                         if "deepseek" in model.lower():
-                            actual_max_tokens = min(max_tokens, 8192)
+                            actual_max_tokens = min(max_tokens, 16384)
+                        print(f"[播客] max_tokens: {max_tokens}→{actual_max_tokens}")
                         
                         response = await asyncio.wait_for(
                             asyncio.get_event_loop().run_in_executor(
@@ -772,7 +773,7 @@ class PodcastGeneratorService:
 - 这是周末/非交易日版本，你和用户坐在咖啡馆里深度聊天
 - 节奏放慢，像和老朋友娓娓道来
 - 内容更深入，做整周复盘和概念科普，但科普要从本周实际案例中引出，不要硬插
-- 字数要求：4000-5000字（约16-20分钟）
+- 字数要求：根据报告内容量自适应，内容丰富就充分展开（可到5000字/20分钟），内容较少就精炼表达（3000字/12分钟即可），不要为了凑时长说废话，也不要因为怕长而省略重要内容
 - 开头要提醒今天是非交易日，市场休市
 - **关键：全程是一个连贯的故事线，从"本周发生了什么"→"为什么"→"我学到什么可以教你"→"下周怎么做"**
 - 模块之间用自然的过渡，不要说"接下来我们看模块X"
@@ -908,9 +909,18 @@ class PodcastGeneratorService:
 5. 脚本应该是可以直接朗读的纯文本
 """
 
+        # 根据播客类型动态设置 max_tokens
+        # 早报内容紧凑→5000，晚报/非交易日内容丰富→8000
+        if is_weekend:
+            podcast_max_tokens = 8000
+        elif report_type == ReportType.EVENING:
+            podcast_max_tokens = 8000
+        else:
+            podcast_max_tokens = 5000
+        
         # 调用 AI 生成
-        print(f"[播客] 正在调用 AI 生成{podcast_type}脚本...")
-        script = await self._call_ai_for_podcast(system_prompt, user_prompt, max_tokens=4000)
+        print(f"[播客] 正在调用 AI 生成{podcast_type}脚本（max_tokens={podcast_max_tokens}）...")
+        script = await self._call_ai_for_podcast(system_prompt, user_prompt, max_tokens=podcast_max_tokens)
         
         if script:
             # 清理可能的 Markdown 残留
@@ -1191,9 +1201,9 @@ class PodcastGeneratorService:
         
         full_text = opening + summary_text + core_opinions_text + concept_text + industry_text + key_content + cross_border_text + closing
         
-        # 控制字数（深度版可以更长）
-        if len(full_text) > 5000:
-            full_text = full_text[:4500] + f"""
+        # 控制字数（深度版内容最丰富，给足空间）
+        if len(full_text) > 7000:
+            full_text = full_text[:6500] + f"""
 
 {name}，今天内容确实很多，更详细的分析请在App里查看完整报告。
 
