@@ -261,6 +261,16 @@ class AIAnalyzerService:
             # 在报告末尾追加校验提示（不阻断生成，但记录警告）
             report.content += f"\n\n---\n*⚠️ 数据校验提示：AI生成内容中检测到 {len(consistency_warnings)} 处数据可能与原始数据不一致，请留意核实。*"
         
+        # ====== 方案B：AI 审查 + 智能修复 ======
+        try:
+            report = await self._review_and_fix_report(
+                report, response, market_data_text, 
+                finance_summary, cross_border_summary,
+                report_type
+            )
+        except Exception as e:
+            print(f"[AI] ⚠️ 审查修复环节异常（不影响报告输出）: {e}", flush=True)
+        
         # ====== 关键：如果使用了模拟数据，在标题中明确标记 ======
         if getattr(self, '_last_call_was_mock', False):
             report.title = f"⚠️ [AI不可用-模拟数据] {report.title}"
@@ -1214,6 +1224,321 @@ class AIAnalyzerService:
             print(f"[AI] 数据一致性校验出错（不影响报告）: {e}", flush=True)
         
         return warnings
+    
+    async def _review_and_fix_report(
+        self, report: Report, raw_response: str, 
+        market_data_text: str, finance_summary: str, 
+        cross_border_summary: str, report_type: ReportType
+    ) -> Report:
+        """
+        方案B：AI 审查 + 智能修复
+        
+        第一步：AI 审查员角色，专注找问题，输出结构化问题清单
+        第二步：根据问题数量和严重程度，决定修复方式
+          - 问题少且轻微 → 正则/字符串替换（零 token 成本）
+          - 问题多或有逻辑问题 → AI 完整修复
+        """
+        import re
+        
+        print("\n[AI] 🔍 === 开始报告审查（方案B）===", flush=True)
+        
+        # === 第一步：AI 审查 ===
+        review_prompt = self._build_review_prompt(
+            report.content, market_data_text, finance_summary, 
+            cross_border_summary, report_type
+        )
+        
+        print("[AI] 🔍 第一步：AI 审查员正在检查报告...", flush=True)
+        review_response = await self._call_ai(review_prompt, max_tokens=2000)
+        
+        if not review_response:
+            print("[AI] ⚠️ 审查返回空响应，跳过修复", flush=True)
+            return report
+        
+        # 解析审查结果
+        review_data = self._extract_json(review_response)
+        issues = review_data.get("issues", [])
+        overall_quality = review_data.get("overall_quality", 8)
+        
+        print(f"[AI] 🔍 审查完成：质量评分 {overall_quality}/10，发现 {len(issues)} 个问题", flush=True)
+        
+        if not issues:
+            print("[AI] ✅ 审查通过，无需修复", flush=True)
+            return report
+        
+        # 打印问题清单
+        for i, issue in enumerate(issues, 1):
+            severity = issue.get("severity", "low")
+            issue_type = issue.get("type", "未知")
+            detail = issue.get("detail", "")[:80]
+            print(f"   {i}. [{severity}] {issue_type}: {detail}", flush=True)
+        
+        # === 第二步：智能决策修复方式 ===
+        severe_issues = [i for i in issues if i.get("severity") in ("high", "critical")]
+        logic_issues = [i for i in issues if i.get("type") in ("逻辑矛盾", "信息编造", "观点矛盾", "数据编造")]
+        
+        needs_ai_fix = (
+            len(issues) >= 3 or 
+            len(severe_issues) >= 1 or 
+            len(logic_issues) >= 1 or 
+            overall_quality <= 6
+        )
+        
+        if needs_ai_fix:
+            # AI 完整修复
+            print(f"[AI] 🔧 第二步：问题较多/严重，启动 AI 深度修复...", flush=True)
+            report = await self._ai_fix_report(
+                report, raw_response, issues, market_data_text,
+                report_type
+            )
+        else:
+            # 轻量级正则修复
+            print(f"[AI] 🔧 第二步：问题较少，使用轻量级修复...", flush=True)
+            report = self._lightweight_fix_report(report, issues, market_data_text)
+        
+        print("[AI] ✅ === 审查修复完成 ===\n", flush=True)
+        return report
+    
+    def _build_review_prompt(
+        self, report_content: str, market_data_text: str,
+        finance_summary: str, cross_border_summary: str,
+        report_type: ReportType
+    ) -> str:
+        """
+        构建 AI 审查员 prompt
+        
+        审查员只负责找问题，不需要修复。
+        专注于批判性审查，输出结构化问题清单。
+        """
+        type_name = "早报" if report_type == ReportType.MORNING else "晚报" if report_type == ReportType.EVENING else "非交易日深度早报"
+        
+        return f"""你是一位资深财经编审，拥有25年金融媒体从业经验。你的**唯一任务**是审查以下财经报告，找出所有问题。
+
+⚠️ **你只需要找问题，不需要修改报告。越严格越好。**
+
+## 审查对象
+
+这是一份给个人投资者的{type_name}。
+
+### 报告正文（待审查）
+
+{report_content[:8000]}
+
+### 原始市场数据（真实数据源）
+
+{market_data_text[:3000]}
+
+### 原始新闻素材
+
+{finance_summary[:2000]}
+
+{f"### 跨界新闻素材" + chr(10) + cross_border_summary[:1000] if cross_border_summary else ""}
+
+---
+
+## 审查维度（逐项检查）
+
+### 1. 数据准确性（最高优先级）
+- 报告中引用的指数点位、涨跌幅是否与原始市场数据一致？
+- 北向资金、成交量等数据是否准确？
+- 是否有四舍五入导致的偏差？
+
+### 2. 信息真实性
+- 报告中的新闻事件是否都能在原始新闻素材中找到依据？
+- 是否有**编造**的新闻、政策、公告、研报观点？
+- 历史数据引用（涨跌幅、日期）是否可信？
+
+### 3. 逻辑一致性
+- 报告内部观点是否自相矛盾？（如前面看多某板块，后面又说回避）
+- 操作建议是否与分析结论一致？
+- 风险提示是否与看多观点形成合理平衡？
+
+### 4. 交易日/时间错误
+- 日期、星期是否正确？
+- 是否有"明天开盘"但实际明天是周末的错误？
+- 早报/晚报的时间定位是否正确？
+
+### 5. 内容完整性
+- 各模块是否都有实质内容（不是敷衍了事）？
+- 自选股分析是否覆盖了所有自选股？
+- 操作建议是否具体可执行（有标的、有价位）？
+
+### 6. 表述问题
+- 是否有模板化表述（"值得关注""密切跟踪"等模糊表达）？
+- 是否有过度使用AI腔调的痕迹？
+
+---
+
+## 输出要求
+
+**只输出 JSON，不要有任何其他内容。**
+
+```json
+{{
+  "overall_quality": 8,
+  "issues": [
+    {{
+      "type": "数据不一致|信息编造|逻辑矛盾|交易日错误|内容缺失|表述模糊|观点矛盾|数据编造",
+      "severity": "critical|high|medium|low",
+      "location": "问题出现在报告的哪个位置（模块名或段落描述）",
+      "detail": "具体描述问题是什么",
+      "evidence": "原始数据中的正确信息（如适用）",
+      "suggested_fix": "建议如何修复（简短描述）"
+    }}
+  ],
+  "summary": "一句话总结审查结果"
+}}
+```
+
+注意：
+- overall_quality 是 1-10 的评分，10 分最高
+- severity 等级：critical（必须修复否则误导投资者）、high（应该修复）、medium（建议修复）、low（瑕疵）
+- 如果没有问题，issues 返回空数组 []
+- 宁可多报几个疑点，也不要遗漏重要问题"""
+    
+    async def _ai_fix_report(
+        self, report: Report, raw_response: str,
+        issues: list, market_data_text: str,
+        report_type: ReportType
+    ) -> Report:
+        """
+        AI 深度修复：将问题清单交给 AI，让其修复报告
+        """
+        # 构建问题清单文本
+        issues_text = json.dumps(issues, ensure_ascii=False, indent=2)
+        
+        type_name = "早报" if report_type == ReportType.MORNING else "晚报" if report_type == ReportType.EVENING else "非交易日深度早报"
+        
+        fix_prompt = f"""你是一位资深财经报告编辑。以下是一份已生成的{type_name}，经过审查发现了一些问题。
+
+**你的唯一任务**：根据问题清单，对报告进行精准修复。
+
+## 修复原则
+
+1. **最小改动原则**：只修复问题清单中指出的问题，不要重写整篇报告
+2. **数据锚定**：修正数据时必须使用下方提供的原始市场数据
+3. **保持风格**：修复后的文本风格要与原文保持一致
+4. **不引入新问题**：修复一个问题时不要引入新的错误
+5. **信息不足时坦诚**：如果无法确认某条信息的准确性，改为"据市场消息""有待确认"等表述，而不是编造
+
+## 问题清单
+
+{issues_text}
+
+## 原始市场数据（以此为准）
+
+{market_data_text[:3000]}
+
+## 待修复的报告全文
+
+{report.content[:12000]}
+
+---
+
+## 输出要求
+
+直接输出修复后的**完整报告正文**（不需要 JSON 包裹，不需要解释你改了什么）。
+
+如果原报告末尾有 ```json 结构化数据块，也一并输出（修正其中的错误数据）。
+
+开始输出修复后的报告："""
+        
+        # 根据报告类型动态调整输出容量
+        if report_type == ReportType.EVENING:
+            max_output_tokens = 16000
+        elif report_type == ReportType.MORNING:
+            max_output_tokens = 12000
+        else:
+            max_output_tokens = 16000
+        
+        fixed_response = await self._call_ai(fix_prompt, max_tokens=max_output_tokens)
+        
+        if not fixed_response or len(fixed_response) < len(report.content) * 0.5:
+            # 修复后的报告太短，可能出错了，保留原报告
+            print("[AI] ⚠️ AI 修复输出异常（过短），保留原报告", flush=True)
+            return report
+        
+        # 更新报告内容
+        old_content_len = len(report.content)
+        
+        # 提取修复后的 JSON 数据（如果有）
+        fixed_json = self._extract_json(fixed_response)
+        if fixed_json:
+            # 更新结构化字段
+            if fixed_json.get("title"):
+                report.title = fixed_json["title"]
+            if fixed_json.get("summary"):
+                report.summary = fixed_json["summary"]
+            if fixed_json.get("core_opinions"):
+                report.core_opinions = fixed_json["core_opinions"]
+        
+        # 更新正文
+        if "```json" in fixed_response:
+            report.content = fixed_response.split("```json")[0].strip()
+        else:
+            report.content = fixed_response.strip()
+        
+        # 更新字数统计
+        report.word_count = len(report.content)
+        report.reading_time = max(1, report.word_count // 400)
+        
+        print(f"[AI] 🔧 AI 深度修复完成：{old_content_len} → {report.word_count} 字", flush=True)
+        return report
+    
+    def _lightweight_fix_report(
+        self, report: Report, issues: list, market_data_text: str
+    ) -> Report:
+        """
+        轻量级修复：用正则/字符串替换处理简单问题
+        零 token 成本，适用于问题少且轻微的情况
+        """
+        import re
+        
+        content = report.content
+        fix_count = 0
+        
+        for issue in issues:
+            issue_type = issue.get("type", "")
+            evidence = issue.get("evidence", "")
+            detail = issue.get("detail", "")
+            suggested_fix = issue.get("suggested_fix", "")
+            
+            if issue_type == "数据不一致" and evidence:
+                # 尝试从 evidence 中提取正确数据并替换
+                # 例如：evidence="上证指数涨跌幅: +0.52%"，detail 中有错误值
+                # 提取 detail 中的错误值
+                error_numbers = re.findall(r'报告引用\s*["\']?([+-]?\d+\.?\d*%?)["\']?', detail)
+                correct_numbers = re.findall(r'([+-]?\d+\.?\d*%)', evidence)
+                
+                if error_numbers and correct_numbers:
+                    old_val = error_numbers[0]
+                    new_val = correct_numbers[0]
+                    if old_val in content:
+                        content = content.replace(old_val, new_val, 1)
+                        fix_count += 1
+                        print(f"   ✅ 修复数据：{old_val} → {new_val}", flush=True)
+            
+            elif issue_type == "交易日错误" and suggested_fix:
+                # 尝试从 suggested_fix 中提取替换信息
+                # 这类问题通常很具体，如"明天"→"下周一"
+                fix_pairs = re.findall(r'[""](.+?)[""].*?(?:改为|替换为|应为).*?[""](.+?)[""]', suggested_fix)
+                for old_text, new_text in fix_pairs:
+                    if old_text in content:
+                        content = content.replace(old_text, new_text, 1)
+                        fix_count += 1
+                        print(f"   ✅ 修复交易日：{old_text} → {new_text}", flush=True)
+        
+        if fix_count > 0:
+            report.content = content
+            report.word_count = len(content)
+            print(f"[AI] 🔧 轻量级修复完成：修复了 {fix_count} 处", flush=True)
+        else:
+            print(f"[AI] ℹ️ 轻量级修复未能自动处理（问题可能需要人工核实）", flush=True)
+            # 在报告末尾追加审查提示
+            issue_summaries = [f"- {i.get('type','')}: {i.get('detail','')[:50]}" for i in issues]
+            report.content += f"\n\n---\n*🔍 AI审查提示：审查发现以下待确认事项（建议人工核实）：*\n" + "\n".join(issue_summaries)
+        
+        return report
     
     async def analyze_stock(self, code: str, name: str, market: str,
                            fundamentals: Dict, technicals: Dict, 
