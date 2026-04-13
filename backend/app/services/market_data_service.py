@@ -3,10 +3,93 @@
 使用 AKShare 获取 A股市场全面数据，为 AI 报告生成提供真实数据支撑
 """
 import asyncio
+import time
 from datetime import datetime, date
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field, asdict
 import traceback
+
+
+# ── 全局令牌桶限流器：控制对东方财富 API 的请求频率 ──
+class _AKShareRateLimiter:
+    """
+    令牌桶限流器（进程全局单例）
+    
+    所有通过 _call_akshare_with_retry 发起的 AKShare 调用
+    都要先从这个桶里取令牌，取不到就等。
+    确保全局请求频率不超过 1 次/1.5秒，避免被东方财富反爬封IP。
+    """
+    def __init__(self, rate: float = 0.67, burst: int = 2):
+        """
+        Args:
+            rate: 每秒补充的令牌数（0.67 = 每 1.5 秒 1 个请求）
+            burst: 令牌桶最大容量（允许短暂突发）
+        """
+        self._rate = rate
+        self._burst = burst
+        self._tokens = float(burst)
+        self._last_refill = time.monotonic()
+        self._lock = asyncio.Lock()
+    
+    async def acquire(self):
+        """获取一个令牌，如果桶空则等待"""
+        async with self._lock:
+            now = time.monotonic()
+            elapsed = now - self._last_refill
+            self._tokens = min(self._burst, self._tokens + elapsed * self._rate)
+            self._last_refill = now
+            
+            if self._tokens < 1:
+                wait_time = (1 - self._tokens) / self._rate
+                await asyncio.sleep(wait_time)
+                self._tokens = 0
+            else:
+                self._tokens -= 1
+
+
+# 全局限流器实例（所有 MarketDataService / NewsCollector 共用）
+_akshare_rate_limiter = _AKShareRateLimiter(rate=0.67, burst=2)
+
+
+# ── 当日数据缓存：同一交易日同一接口只调一次 ──
+class _MarketDataCache:
+    """
+    市场数据缓存（内存 + 可选磁盘持久化）
+    
+    同一交易日内，相同的 AKShare 接口只调用一次，
+    后续复用缓存结果，大幅减少对东方财富的请求次数。
+    """
+    def __init__(self):
+        self._cache: Dict[str, Any] = {}
+        self._cache_date: Optional[str] = None
+    
+    def get(self, key: str) -> Optional[Any]:
+        """获取缓存数据，如果日期不匹配则清空"""
+        today = date.today().isoformat()
+        if self._cache_date != today:
+            self._cache.clear()
+            self._cache_date = today
+            return None
+        return self._cache.get(key)
+    
+    def set(self, key: str, value: Any):
+        """设置缓存数据"""
+        today = date.today().isoformat()
+        if self._cache_date != today:
+            self._cache.clear()
+            self._cache_date = today
+        self._cache[key] = value
+    
+    def has(self, key: str) -> bool:
+        """检查是否有缓存"""
+        today = date.today().isoformat()
+        if self._cache_date != today:
+            return False
+        return key in self._cache
+
+
+# 全局缓存实例
+_market_data_cache = _MarketDataCache()
 
 # ── 给 requests 全局加超时，防止 AKShare 底层 HTTP 请求永久挂起 ──
 try:
@@ -464,41 +547,64 @@ class MarketDataService:
         except ImportError:
             print("⚠️ MarketDataService: AKShare 不可用")
     
-    async def _call_akshare_with_retry(self, func, *args, max_retries: int = 3, **kwargs):
+    async def _call_akshare_with_retry(self, func, *args, max_retries: int = 2, use_cache: bool = True, cache_key: str = None, **kwargs):
         """
-        带重试的 AKShare 调用包装
+        带重试 + 全局限流 + 缓存的 AKShare 调用包装
         
-        AKShare 底层用 requests 调东方财富接口，凌晨时段经常被限流/断连。
-        这里加重试 + 延迟，避免一次网络闪断就导致整个任务失败。
+        四重保护：
+        1. 全局令牌桶限流（每 1.5 秒最多 1 个请求）
+        2. requests 全局 30 秒超时（模块级 monkey-patch）
+        3. asyncio.wait_for 45 秒超时（本函数）
+        4. scheduler 层 10 分钟总超时（外层兜底）
         
-        三重超时保护：
-        1. requests 全局 30 秒超时（模块级 monkey-patch）
-        2. asyncio.wait_for 45 秒超时（本函数）
-        3. scheduler 层 10 分钟总超时（外层兜底）
+        缓存机制：
+        - 同一交易日内，相同接口调用直接返回缓存结果
+        - 大幅减少对东方财富的重复请求
         """
-        SINGLE_CALL_TIMEOUT = 45  # 单次调用超时（秒），比 requests 的 30 秒略长留缓冲
+        global _akshare_rate_limiter, _market_data_cache
+        
+        # 生成缓存 key
+        if cache_key is None:
+            cache_key = f"{func.__name__}_{str(args)}_{str(sorted(kwargs.items()))}"
+        
+        # 检查缓存
+        if use_cache:
+            cached = _market_data_cache.get(cache_key)
+            if cached is not None:
+                print(f"  [AKShare] {func.__name__} 命中缓存，跳过网络请求", flush=True)
+                return cached
+        
+        SINGLE_CALL_TIMEOUT = 45
         last_error = None
         
         for attempt in range(max_retries):
             try:
+                # 全局限流：等待令牌
+                await _akshare_rate_limiter.acquire()
+                
                 # AKShare 是同步库，在线程池中执行避免阻塞事件循环
                 loop = asyncio.get_event_loop()
                 result = await asyncio.wait_for(
                     loop.run_in_executor(None, lambda: func(*args, **kwargs)),
                     timeout=SINGLE_CALL_TIMEOUT
                 )
+                
+                # 成功后写入缓存
+                if use_cache and result is not None:
+                    _market_data_cache.set(cache_key, result)
+                
                 return result
             except asyncio.TimeoutError:
                 last_error = TimeoutError(f"{func.__name__} 超时 ({SINGLE_CALL_TIMEOUT}s)")
                 print(f"  [AKShare] {func.__name__} 第{attempt+1}次超时({SINGLE_CALL_TIMEOUT}s)", flush=True)
                 if attempt < max_retries - 1:
-                    wait = (attempt + 1) * 2
+                    wait = (attempt + 1) * 3
                     print(f"  [AKShare] {wait}秒后重试...", flush=True)
                     await asyncio.sleep(wait)
             except Exception as e:
                 last_error = e
                 if attempt < max_retries - 1:
-                    wait = (attempt + 1) * 3  # 3秒、6秒、9秒递增
+                    wait = (attempt + 1) * 4  # 4秒、8秒递增（更长的间隔降低被封风险）
                     print(f"  [AKShare] {func.__name__} 第{attempt+1}次失败: {type(e).__name__}, {wait}秒后重试...", flush=True)
                     await asyncio.sleep(wait)
         
@@ -551,7 +657,7 @@ class MarketDataService:
             except Exception as e:
                 results.append(e)
                 print(f"  [FAIL] {name} 获取失败: {e}")
-            await asyncio.sleep(1)  # 间隔 1 秒，避免限流
+            await asyncio.sleep(2)  # 间隔 2 秒，配合全局令牌桶避免限流
         
         # 处理结果（原有6个）
         if not isinstance(results[0], Exception):
@@ -1239,7 +1345,11 @@ class MarketDataService:
         """
         获取大宗商品数据（原油、黄金、白银等）
         
-        使用 AKShare 的现货/期货接口获取国际大宗商品行情
+        多方案兜底，兼容 AKShare 新旧版本：
+        - 方案1: futures_foreign_commodity_realtime（外盘商品）
+        - 方案2: futures_main_sina（新浪主力合约）
+        - 方案3: index_global_em 中提取商品相关指数
+        - 方案4: 硬编码"暂无数据"占位，不影响报告生成
         """
         import akshare as ak
         
@@ -1247,9 +1357,11 @@ class MarketDataService:
         
         # 方案1：获取国际大宗商品现货报价
         try:
-            df = await self._call_akshare_with_retry(ak.futures_foreign_commodity_realtime, symbol="全部")
+            df = await self._call_akshare_with_retry(
+                ak.futures_foreign_commodity_realtime, symbol="全部",
+                use_cache=True, cache_key="commodities_foreign"
+            )
             if df is not None and not df.empty:
-                # 目标商品映射
                 target_commodities = {
                     "WTI原油": {"keywords": ["WTI", "原油", "Crude"], "unit": "美元/桶"},
                     "布伦特原油": {"keywords": ["布伦特", "Brent"], "unit": "美元/桶"},
@@ -1260,17 +1372,23 @@ class MarketDataService:
                 
                 for comm_name, config in target_commodities.items():
                     for _, row in df.iterrows():
-                        name_col = str(row.get('名称', row.get('symbol', '')))
+                        name_col = str(row.iloc[0]) if len(row) > 0 else ""
                         if any(kw in name_col for kw in config["keywords"]):
                             try:
-                                price = float(row.get('最新价', row.get('current_price', 0)))
-                                change_pct = float(row.get('涨跌幅', row.get('change_percent', 0)))
+                                # 自适应列名（兼容不同版本）
+                                price = 0
+                                change_pct = 0
+                                for col in df.columns:
+                                    col_str = str(col)
+                                    if '最新' in col_str or 'price' in col_str.lower() or 'current' in col_str.lower():
+                                        price = float(row[col]) if row[col] else 0
+                                    if '涨跌幅' in col_str or 'change' in col_str.lower() or 'percent' in col_str.lower():
+                                        change_pct = float(row[col]) if row[col] else 0
+                                
                                 if price > 0:
                                     commodities.append(CommodityData(
-                                        name=comm_name,
-                                        price=price,
-                                        change_pct=change_pct,
-                                        unit=config["unit"]
+                                        name=comm_name, price=price,
+                                        change_pct=change_pct, unit=config["unit"]
                                     ))
                                     break
                             except (ValueError, TypeError):
@@ -1282,66 +1400,81 @@ class MarketDataService:
         except Exception as e:
             print(f"  [大宗商品] 方案1失败: {e}")
         
-        # 方案2：获取上海金/上海银 + 国内期货主力合约
+        # 方案2：通过新浪期货主力合约获取国内商品
         try:
-            # 获取国内期货主力合约实时行情
-            df = await self._call_akshare_with_retry(ak.futures_zh_spot)
+            # 使用 futures_main_sina 获取国内期货主力合约
+            sina_contracts = {
+                "AU0": {"name": "沪金（黄金期货）", "unit": "元/克"},
+                "AG0": {"name": "沪银（白银期货）", "unit": "元/千克"},
+                "SC0": {"name": "原油期货（INE）", "unit": "元/桶"},
+                "CU0": {"name": "沪铜期货", "unit": "元/吨"},
+                "I0": {"name": "铁矿石期货", "unit": "元/吨"},
+            }
+            
+            for symbol, config in sina_contracts.items():
+                try:
+                    df = await self._call_akshare_with_retry(
+                        ak.futures_main_sina, symbol=symbol, start_date="20260401",
+                        max_retries=1, use_cache=True, cache_key=f"commodity_sina_{symbol}"
+                    )
+                    if df is not None and not df.empty:
+                        row = df.iloc[-1]
+                        close = float(row.get('收盘价', row.get('close', 0)))
+                        # 计算涨跌幅
+                        if len(df) >= 2:
+                            prev_close = float(df.iloc[-2].get('收盘价', df.iloc[-2].get('close', 0)))
+                            change_pct = ((close - prev_close) / prev_close * 100) if prev_close > 0 else 0
+                        else:
+                            change_pct = 0
+                        
+                        if close > 0:
+                            commodities.append(CommodityData(
+                                name=config["name"], price=close,
+                                change_pct=round(change_pct, 2), unit=config["unit"]
+                            ))
+                except Exception:
+                    continue
+            
+            if commodities:
+                print(f"  [大宗商品] 方案2获取成功: {len(commodities)} 个品种")
+                return commodities
+        except Exception as e:
+            print(f"  [大宗商品] 方案2失败: {e}")
+        
+        # 方案3：尝试从全球指数接口中提取商品相关数据
+        try:
+            df = await self._call_akshare_with_retry(
+                ak.index_global_em,
+                max_retries=1, use_cache=True, cache_key="index_global_for_commodities"
+            )
             if df is not None and not df.empty:
-                target_map = {
-                    "沪金主力": {"name": "沪金（黄金期货）", "unit": "元/克"},
-                    "沪银主力": {"name": "沪银（白银期货）", "unit": "元/千克"},
-                    "原油主力": {"name": "原油期货（INE）", "unit": "元/桶"},
-                    "铜主力": {"name": "沪铜期货", "unit": "元/吨"},
-                    "铁矿石主力": {"name": "铁矿石期货", "unit": "元/吨"},
+                commodity_indices = {
+                    "COMEX黄金": {"keywords": ["黄金", "Gold"], "unit": "美元/盎司"},
+                    "WTI原油": {"keywords": ["原油", "WTI", "Oil"], "unit": "美元/桶"},
                 }
-                
-                for _, row in df.iterrows():
-                    symbol = str(row.get('symbol', row.get('名称', '')))
-                    for key, config in target_map.items():
-                        if key in symbol:
+                for comm_name, config in commodity_indices.items():
+                    for _, row in df.iterrows():
+                        name_col = str(row.get('名称', ''))
+                        if any(kw in name_col for kw in config["keywords"]):
                             try:
-                                price = float(row.get('最新价', row.get('current_price', 0)))
-                                change_pct = float(row.get('涨跌幅', row.get('change_percent', 0)))
+                                price = float(row.get('最新价', 0))
+                                change_pct = float(row.get('涨跌幅', 0))
                                 if price > 0:
                                     commodities.append(CommodityData(
-                                        name=config["name"],
-                                        price=price,
-                                        change_pct=change_pct,
-                                        unit=config["unit"]
+                                        name=comm_name, price=price,
+                                        change_pct=change_pct, unit=config["unit"]
                                     ))
+                                    break
                             except (ValueError, TypeError):
                                 continue
                 
                 if commodities:
-                    print(f"  [大宗商品] 方案2获取成功: {len(commodities)} 个品种")
-        except Exception as e:
-            print(f"  [大宗商品] 方案2失败: {e}")
-        
-        # 方案3：尝试通过 spot_goods 接口获取
-        if not commodities:
-            try:
-                for symbol, name, unit in [
-                    ("Au99.99", "现货黄金（Au99.99）", "元/克"),
-                    ("Ag(T+D)", "现货白银（Ag T+D）", "元/千克"),
-                ]:
-                    try:
-                        df = await self._call_akshare_with_retry(ak.spot_goods, symbol=symbol)
-                        if df is not None and not df.empty:
-                            row = df.iloc[-1]
-                            price = float(row.get('最新价', 0))
-                            change_pct = float(row.get('涨跌幅', 0))
-                            if price > 0:
-                                commodities.append(CommodityData(
-                                    name=name, price=price,
-                                    change_pct=change_pct, unit=unit
-                                ))
-                    except Exception:
-                        continue
-                
-                if commodities:
                     print(f"  [大宗商品] 方案3获取成功: {len(commodities)} 个品种")
-            except Exception as e:
-                print(f"  [大宗商品] 方案3失败: {e}")
+        except Exception as e:
+            print(f"  [大宗商品] 方案3失败: {e}")
+        
+        if not commodities:
+            print("  [大宗商品] 所有方案均失败，本次无大宗商品数据")
         
         return commodities
     

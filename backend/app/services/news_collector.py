@@ -736,32 +736,28 @@ class NewsCollectorService:
     
     async def _collect_individual_stock_news(self, stocks: List[WatchlistStock]) -> List[News]:
         """
-        采集个股新闻
-        
-        使用东方财富个股新闻接口
+        采集个股新闻（走全局限流器）
         """
         import akshare as ak
+        from .market_data_service import _akshare_rate_limiter
+        
         news_list = []
         
-        for stock in stocks[:10]:  # 限制最多采集10只股票，避免请求过多
+        for stock in stocks[:10]:
             try:
-                # 尝试获取个股新闻
-                # 注意：AKShare 的接口可能会变化，这里使用 stock_news_em
                 code = stock.code
-                
-                # A股需要处理代码格式
                 if stock.market == "A":
-                    # 东方财富接口需要完整代码
-                    if code.startswith("6"):
-                        full_code = f"{code}"
-                    else:
-                        full_code = f"{code}"
+                    full_code = f"{code}"
                 else:
                     full_code = code
                 
                 try:
-                    # 尝试使用东方财富个股新闻
-                    df = ak.stock_news_em(symbol=full_code)
+                    await _akshare_rate_limiter.acquire()
+                    loop = asyncio.get_event_loop()
+                    df = await asyncio.wait_for(
+                        loop.run_in_executor(None, lambda c=full_code: ak.stock_news_em(symbol=c)),
+                        timeout=30
+                    )
                     if df is not None and not df.empty:
                         for _, row in df.head(5).iterrows():  # 每只股票最多5条
                             title = str(row.get('新闻标题', ''))
@@ -808,14 +804,14 @@ class NewsCollectorService:
     
     async def _collect_sector_news(self, sectors: List[str]) -> List[News]:
         """
-        采集行业板块新闻
-        
-        行业已经去重，每个行业只采集一次
+        采集行业板块新闻（走全局限流器）
         """
         import akshare as ak
+        from .market_data_service import _akshare_rate_limiter
+        
         news_list = []
         
-        # 行业板块名称映射（映射到东方财富板块名）
+        # 行业板块名称映射
         sector_name_map = {
             "白酒": "白酒",
             "新能源": "新能源汽车",
@@ -839,46 +835,50 @@ class NewsCollectorService:
             "AI软件": "软件开发",
         }
         
+        # 一次性获取概念板块数据（走限流器），而不是每个行业调一次
+        df = None
+        try:
+            await _akshare_rate_limiter.acquire()
+            loop = asyncio.get_event_loop()
+            df = await asyncio.wait_for(
+                loop.run_in_executor(None, ak.stock_board_concept_name_em),
+                timeout=30
+            )
+        except Exception as e:
+            print(f"    [板块新闻] 获取概念板块失败: {e}")
+            return news_list
+        
+        if df is None or df.empty:
+            return news_list
+        
         for sector in sectors:
             try:
                 sector_name = sector_name_map.get(sector, sector)
                 
-                # 尝试获取板块新闻（通过板块相关的热门股票新闻）
-                # 这里使用板块涨幅榜来获取板块热度信息
-                try:
-                    # 获取概念板块涨幅
-                    df = ak.stock_board_concept_name_em()
-                    if df is not None and not df.empty:
-                        # 查找相关板块
-                        for _, row in df.iterrows():
-                            board_name = str(row.get('板块名称', ''))
-                            if sector in board_name or sector_name in board_name:
-                                change = row.get('涨跌幅', 0)
-                                leader_stock = str(row.get('领涨股票', ''))
-                                
-                                news_list.append(News(
-                                    id=str(uuid.uuid4()),
-                                    title=f"[{sector}板块] 今日涨跌幅 {change}%，领涨股 {leader_stock}",
-                                    content=f"{sector}板块今日涨跌幅为{change}%，领涨股票为{leader_stock}。板块整体表现{'强势' if float(change) > 1 else '弱势' if float(change) < -1 else '平稳'}。",
-                                    summary=f"{sector}板块涨跌幅{change}%",
-                                    source=f"东方财富-{sector}板块",
-                                    source_url="https://data.eastmoney.com/bkzj/BK0493.html",
-                                    published_at=datetime.now(),
-                                    news_type=NewsType.FINANCE,
-                                    sentiment=SentimentType.POSITIVE if float(change) > 0 else SentimentType.NEGATIVE if float(change) < 0 else SentimentType.NEUTRAL,
-                                    importance_score=0.7,
-                                    is_china_related=True,
-                                    category=f"行业板块-{sector}",
-                                    beneficiary_sectors=[sector] if float(change) > 0 else [],
-                                    affected_sectors=[sector] if float(change) < 0 else []
-                                ))
-                                break  # 找到就跳出
-                except Exception as e:
-                    print(f"    [板块新闻] {sector} 采集失败: {e}")
-                
-                # 避免请求过快
-                await asyncio.sleep(0.3)
-                
+                for _, row in df.iterrows():
+                    board_name = str(row.get('板块名称', ''))
+                    if sector in board_name or sector_name in board_name:
+                        change = row.get('涨跌幅', 0)
+                        leader_stock = str(row.get('领涨股票', ''))
+                        
+                        news_list.append(News(
+                            id=str(uuid.uuid4()),
+                            title=f"[{sector}板块] 今日涨跌幅 {change}%，领涨股 {leader_stock}",
+                            content=f"{sector}板块今日涨跌幅为{change}%，领涨股票为{leader_stock}。板块整体表现{'强势' if float(change) > 1 else '弱势' if float(change) < -1 else '平稳'}。",
+                            summary=f"{sector}板块涨跌幅{change}%",
+                            source=f"东方财富-{sector}板块",
+                            source_url="https://data.eastmoney.com/bkzj/BK0493.html",
+                            published_at=datetime.now(),
+                            news_type=NewsType.FINANCE,
+                            sentiment=SentimentType.POSITIVE if float(change) > 0 else SentimentType.NEGATIVE if float(change) < 0 else SentimentType.NEUTRAL,
+                            importance_score=0.7,
+                            is_china_related=True,
+                            category=f"行业板块-{sector}",
+                            beneficiary_sectors=[sector] if float(change) > 0 else [],
+                            affected_sectors=[sector] if float(change) < 0 else []
+                        ))
+                        break
+                        
             except Exception as e:
                 print(f"    [板块新闻] {sector} 异常: {e}")
         
@@ -1034,15 +1034,23 @@ class NewsCollectorService:
         """
         使用 AKShare 采集财经新闻
         
-        AKShare 提供的新闻接口比 RSS 更稳定，可作为主要数据源的补充
+        AKShare 提供的新闻接口比 RSS 更稳定，可作为主要数据源的补充。
+        所有调用走全局限流器，避免被东方财富封IP。
         """
         import akshare as ak
+        from .market_data_service import _akshare_rate_limiter
+        
         news_list = []
         
         try:
             # 1. 采集东方财富快讯（股票相关新闻）
             try:
-                df = ak.stock_info_global_em()  # 全球财经快讯
+                await _akshare_rate_limiter.acquire()
+                loop = asyncio.get_event_loop()
+                df = await asyncio.wait_for(
+                    loop.run_in_executor(None, ak.stock_info_global_em),
+                    timeout=30
+                )
                 if df is not None and not df.empty:
                     for _, row in df.head(30).iterrows():
                         news_list.append(News(
@@ -1051,7 +1059,7 @@ class NewsCollectorService:
                             content=str(row.get('内容', '')),
                             source="东方财富",
                             source_url="https://www.eastmoney.com",
-                            published_at=datetime.now(),  # AKShare 通常不返回精确时间
+                            published_at=datetime.now(),
                             news_type=NewsType.FINANCE,
                             sentiment=SentimentType.NEUTRAL,
                             importance_score=0.6,
@@ -1061,11 +1069,17 @@ class NewsCollectorService:
             except Exception as e:
                 print(f"  [AKShare] 全球财经快讯采集失败: {e}")
             
+            await asyncio.sleep(2)  # 接口间隔
+            
             # 2. 采集 CCTV 新闻（央视财经相关）
             try:
-                df_cctv = ak.news_cctv(date=datetime.now().strftime("%Y%m%d"))
+                await _akshare_rate_limiter.acquire()
+                loop = asyncio.get_event_loop()
+                df_cctv = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: ak.news_cctv(date=datetime.now().strftime("%Y%m%d"))),
+                    timeout=30
+                )
                 if df_cctv is not None and not df_cctv.empty:
-                    # 过滤财经相关新闻
                     finance_keywords = ["经济", "金融", "股市", "央行", "货币", "贸易", "GDP", "通胀", "利率"]
                     for _, row in df_cctv.iterrows():
                         title = str(row.get('title', ''))
@@ -1079,7 +1093,7 @@ class NewsCollectorService:
                                 published_at=datetime.now(),
                                 news_type=NewsType.FINANCE,
                                 sentiment=SentimentType.NEUTRAL,
-                                importance_score=0.8,  # 央视新闻权重较高
+                                importance_score=0.8,
                                 is_china_related=True
                             ))
                     print(f"  [AKShare] 央视财经新闻: 筛选到 {sum(1 for n in news_list if n.source == '央视新闻')} 条")

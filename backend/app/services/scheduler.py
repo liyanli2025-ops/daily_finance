@@ -822,7 +822,7 @@ class SchedulerService:
         """
         更新自选股数据
         - 获取所有自选股
-        - 批量获取实时行情
+        - 使用限流方式批量获取实时行情
         - 更新数据库中的价格和涨跌幅
         """
         print(f"[STOCK] 开始更新自选股数据 - {datetime.now().strftime('%H:%M:%S')}")
@@ -834,6 +834,7 @@ class SchedulerService:
         try:
             from sqlalchemy import select
             from ..models.database import StockModel
+            from .market_data_service import get_market_data_service
             
             async with self._session_maker() as session:
                 # 1. 获取所有自选股
@@ -847,22 +848,31 @@ class SchedulerService:
                 
                 print(f"[STOCK] 开始更新 {len(stocks)} 只自选股")
                 
-                # 2. 批量获取实时行情
+                # 2. 通过 MarketDataService 的带限流方法获取行情
+                market_service = get_market_data_service()
                 import akshare as ak
                 
-                # 获取 A股实时行情（一次性获取所有）
+                # 获取 A股实时行情（使用带限流+缓存的方式）
+                a_share_df = None
                 try:
-                    a_share_df = ak.stock_zh_a_spot_em()
+                    a_share_df = await market_service._call_akshare_with_retry(
+                        ak.stock_zh_a_spot_em,
+                        use_cache=True, cache_key="watchlist_a_share_spot"
+                    )
                 except Exception as e:
                     print(f"[STOCK] 获取A股行情失败: {e}")
-                    a_share_df = None
                 
                 # 获取港股实时行情
-                try:
-                    hk_df = ak.stock_hk_spot_em()
-                except Exception as e:
-                    print(f"[STOCK] 获取港股行情失败: {e}")
-                    hk_df = None
+                hk_df = None
+                hk_stocks = [s for s in stocks if s.market == 'HK']
+                if hk_stocks:
+                    try:
+                        hk_df = await market_service._call_akshare_with_retry(
+                            ak.stock_hk_spot_em,
+                            use_cache=True, cache_key="watchlist_hk_spot"
+                        )
+                    except Exception as e:
+                        print(f"[STOCK] 获取港股行情失败: {e}")
                 
                 # 3. 更新每只股票
                 updated_count = 0
