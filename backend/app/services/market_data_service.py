@@ -742,6 +742,13 @@ class MarketDataService:
         # 计算市场情绪
         overview.market_sentiment = self._calculate_sentiment(overview)
         
+        # 汇总日志：哪些数据成功，哪些失败
+        success_count = sum(1 for r in results if not isinstance(r, Exception))
+        fail_count = sum(1 for r in results if isinstance(r, Exception))
+        fail_names = [task_configs[i][0] for i, r in enumerate(results) if isinstance(r, Exception)]
+        print(f"\n  [市场数据汇总] {success_count}/{len(results)} 项成功"
+              f"{f'，失败项: {', '.join(fail_names)}' if fail_names else ''}")
+        
         return overview
     
     async def _get_indices(self) -> List[IndexData]:
@@ -1114,7 +1121,7 @@ class MarketDataService:
                                 sector=str(row.get('所属行业', '')),
                                 source=signal_name,
                             )
-                await asyncio.sleep(1)  # 避免限流
+                await asyncio.sleep(2)  # 避免限流（同花顺接口间隔2秒）
             except Exception as e:
                 print(f"  [THS技术选股] {signal_name} 获取失败: {e}")
         
@@ -1157,9 +1164,9 @@ class MarketDataService:
                 print("  [技术扫描] 初筛无符合条件股票")
                 return []
             
-            # 按 量比*涨幅 综合分排序，取Top20
+            # 按 量比*涨幅 综合分排序，取Top8（减少K线请求量，避免触发反爬）
             filtered['_score'] = filtered['量比'] * filtered['涨跌幅']
-            filtered = filtered.sort_values('_score', ascending=False).head(20)
+            filtered = filtered.sort_values('_score', ascending=False).head(8)
             
             print(f"  [技术扫描] 初筛出 {len(filtered)} 只候选股，开始深度分析...")
         except Exception as e:
@@ -1292,7 +1299,7 @@ class MarketDataService:
                         source="多因子扫描",
                     ))
                 
-                await asyncio.sleep(0.5)  # K线接口限流控制
+                await asyncio.sleep(2)  # K线接口限流控制（每只股票间隔2秒）
                 
             except Exception as e:
                 print(f"  [技术扫描] {code} {name} 分析失败: {e}")
