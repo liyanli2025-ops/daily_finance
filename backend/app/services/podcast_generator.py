@@ -633,25 +633,33 @@ class PodcastGeneratorService:
             await communicate.save(output_path)
             return
         
-        # 超长段落自动切割（Edge TTS 对长文本不稳定，控制在300字以内）
-        MAX_SEGMENT_CHARS = 300
+        # 超长段落自动切割（Edge TTS 对当前服务器有文本长度限制，控制在60字以内）
+        MAX_SEGMENT_CHARS = 60
         final_segments = []
         for seg in segments:
             if len(seg) <= MAX_SEGMENT_CHARS:
                 final_segments.append(seg)
             else:
-                # 按句号/问号/感叹号切割
+                # 先按句号/问号/感叹号切割
                 sub_parts = re.split(r'(?<=[。！？\n])', seg)
-                current_chunk = ""
                 for part in sub_parts:
-                    if len(current_chunk) + len(part) > MAX_SEGMENT_CHARS and current_chunk:
-                        final_segments.append(current_chunk.strip())
-                        current_chunk = part
+                    part = part.strip()
+                    if not part:
+                        continue
+                    if len(part) <= MAX_SEGMENT_CHARS:
+                        final_segments.append(part)
                     else:
-                        current_chunk += part
-                if current_chunk.strip():
-                    final_segments.append(current_chunk.strip())
-                print(f"[TTS] 长段落已切割为 {len(final_segments)} 个子段")
+                        # 单句还是太长，按逗号/分号继续切
+                        sub_sub = re.split(r'(?<=[，；、])', part)
+                        current_chunk = ""
+                        for ss in sub_sub:
+                            if len(current_chunk) + len(ss) > MAX_SEGMENT_CHARS and current_chunk:
+                                final_segments.append(current_chunk.strip())
+                                current_chunk = ss
+                            else:
+                                current_chunk += ss
+                        if current_chunk.strip():
+                            final_segments.append(current_chunk.strip())
         segments = final_segments
         
         # 【关键】对每个段落做 TTS 安全清洗
@@ -735,8 +743,8 @@ class PodcastGeneratorService:
             # 合并所有段落，中间加入停顿
             print(f"[TTS] 正在合并音频段落...")
             
-            # 1.5 秒的静音停顿
-            pause_duration = 1500  # 毫秒
+            # 段间停顿：短停顿（因为段数多了，每段间不需要长停顿）
+            pause_duration = 300  # 毫秒（0.3秒，自然呼吸间隔）
             pause = AudioSegment.silent(duration=pause_duration)
             
             # 合并
