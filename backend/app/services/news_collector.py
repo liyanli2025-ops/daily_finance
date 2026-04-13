@@ -1497,26 +1497,68 @@ class NewsCollectorService:
         
         return unique
     
-    def filter_china_related(self, news_list: List[News], min_score: float = 0.5) -> List[News]:
+    def filter_china_related(self, news_list: List[News], min_score: float = 0.3) -> List[News]:
         """
         筛选中国相关及对A股有影响的新闻
         
-        扩展版：不仅筛选包含中国关键词的新闻，
-        也包含大宗商品、外盘、宏观经济等对A股有重大影响的国际新闻
+        v2 修复版：
+        - 来自国内财经源的新闻直接放行（不做关键词过滤，避免误杀）
+        - 其他来源的新闻仍需包含中国/全球市场关键词
+        - 降低 min_score 默认值到 0.3（之前 0.5 太严格）
+        - 扩大关键词覆盖面
         """
+        # 国内财经源白名单——来自这些源的新闻一定是中国相关的，不需要关键词过滤
+        domestic_sources = {
+            "财联社电报", "财联社深度", "金十数据", "东方财富研报",
+            "百度财经焦点", "百度股票焦点", "格隆汇7x24快讯",
+            "东方财富", "同花顺快讯", "央视新闻",
+            "华尔街见闻-股市", "格隆汇港股", "香港经济日报",
+        }
+        # 自选股/雪球/行业板块来源也直接放行
+        domestic_source_keywords = ["自选股", "雪球", "行业板块", "东方财富-"]
+        
+        # 扩展的关键词列表（补充更多常见财经用语）
+        extended_china_keywords = self.china_keywords + [
+            "涨停", "跌停", "板块", "龙头", "主力", "散户",
+            "融资", "融券", "基金", "ETF", "公募", "私募",
+            "IPO", "减持", "增持", "回购", "分红", "业绩",
+            "营收", "净利润", "同比", "环比", "预告", "快报",
+            "监管", "证监会", "银保监", "国务院", "两会",
+            "光伏", "新能源", "半导体", "芯片", "AI", "人工智能",
+            "白酒", "医药", "银行", "保险", "证券", "地产",
+            "涨幅", "跌幅", "成交", "放量", "缩量",
+            "沪指", "深成指", "创业板", "科创", "北证",
+            "券商", "研报", "评级", "目标价",
+        ]
+        
         filtered_news = []
+        bypass_count = 0
+        keyword_match_count = 0
         
         for news in news_list:
+            source = news.source or ""
+            
+            # 规则1：国内财经源白名单直接放行
+            is_domestic = source in domestic_sources
+            if not is_domestic:
+                is_domestic = any(kw in source for kw in domestic_source_keywords)
+            
+            if is_domestic and news.importance_score >= min_score:
+                filtered_news.append(news)
+                bypass_count += 1
+                continue
+            
+            # 规则2：其他来源需要关键词匹配
             text = news.title + " " + news.content
             
-            # 检查是否包含中国相关关键词
-            is_china_related = any(kw in text for kw in self.china_keywords)
-            
-            # 检查是否包含全球市场关键词（对A股有影响）
+            is_china_related = any(kw in text for kw in extended_china_keywords)
             is_global_market = any(kw in text for kw in self.global_market_keywords)
             
             if (is_china_related or is_global_market) and news.importance_score >= min_score:
                 filtered_news.append(news)
+                keyword_match_count += 1
+        
+        print(f"   [filter_china_related] 白名单放行 {bypass_count} + 关键词匹配 {keyword_match_count} = 共 {len(filtered_news)} 条（原始 {len(news_list)} 条）")
         
         return filtered_news
     

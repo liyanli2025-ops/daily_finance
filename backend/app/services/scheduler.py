@@ -288,13 +288,21 @@ class SchedulerService:
             news_by_type = collector.get_news_by_type(all_news)
             finance_news = news_by_type.get('finance', [])
             
+            # 详细日志：各类型新闻数量
+            print(f"   [新闻分类] 总 {len(all_news)} 条 → "
+                  f"finance={len(news_by_type.get('finance', []))} | "
+                  f"tech={len(news_by_type.get('tech', []))} | "
+                  f"geopolitical={len(news_by_type.get('geopolitical', []))} | "
+                  f"social={len(news_by_type.get('social', []))} | "
+                  f"disaster={len(news_by_type.get('disaster', []))}")
+            
             # 筛选中国相关财经新闻
             china_news = collector.filter_china_related(finance_news)
             print(f"   筛选出 {len(china_news)} 条中国及全球市场相关财经新闻（含大宗商品/外盘）")
             
             # 如果筛选后新闻太少，放宽使用全部财经新闻
-            if len(china_news) < 5 and len(finance_news) > 0:
-                print(f"   [INFO] 筛选后新闻较少，补充使用全部 {len(finance_news)} 条财经新闻")
+            if len(china_news) < 20 and len(finance_news) > len(china_news):
+                print(f"   [INFO] 筛选后新闻不足20条（{len(china_news)}），补充使用全部 {len(finance_news)} 条财经新闻")
                 china_news = finance_news
             
             # 筛选跨界新闻
@@ -482,6 +490,15 @@ class SchedulerService:
             # 分离新闻
             news_by_type = collector.get_news_by_type(all_news)
             finance_news = news_by_type.get('finance', [])
+            
+            # 详细日志：各类型新闻数量
+            print(f"   [新闻分类] 总 {len(all_news)} 条 → "
+                  f"finance={len(news_by_type.get('finance', []))} | "
+                  f"tech={len(news_by_type.get('tech', []))} | "
+                  f"geopolitical={len(news_by_type.get('geopolitical', []))} | "
+                  f"social={len(news_by_type.get('social', []))} | "
+                  f"disaster={len(news_by_type.get('disaster', []))}")
+            
             china_news = collector.filter_china_related(finance_news)
             cross_border_news = collector.filter_cross_border_news(all_news)
             
@@ -489,8 +506,8 @@ class SchedulerService:
             print(f"   筛选出 {len(cross_border_news)} 条跨界热点新闻")
             
             # 如果筛选后新闻太少，放宽使用全部财经新闻
-            if len(china_news) < 5 and len(finance_news) > 0:
-                print(f"   [INFO] 筛选后新闻较少，补充使用全部 {len(finance_news)} 条财经新闻")
+            if len(china_news) < 20 and len(finance_news) > len(china_news):
+                print(f"   [INFO] 筛选后新闻不足20条（{len(china_news)}），补充使用全部 {len(finance_news)} 条财经新闻")
                 china_news = finance_news
             
             if not all_news:
