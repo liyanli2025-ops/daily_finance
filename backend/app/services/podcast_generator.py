@@ -633,15 +633,15 @@ class PodcastGeneratorService:
             await communicate.save(output_path)
             return
         
-        # 超长段落自动切割（Edge TTS 对单次超过 ~2000 字的文本不稳定）
-        MAX_SEGMENT_CHARS = 1500
+        # 超长段落自动切割（Edge TTS 对长文本不稳定，控制在300字以内）
+        MAX_SEGMENT_CHARS = 300
         final_segments = []
         for seg in segments:
             if len(seg) <= MAX_SEGMENT_CHARS:
                 final_segments.append(seg)
             else:
                 # 按句号/问号/感叹号切割
-                sub_parts = re.split(r'(?<=[。！？])', seg)
+                sub_parts = re.split(r'(?<=[。！？\n])', seg)
                 current_chunk = ""
                 for part in sub_parts:
                     if len(current_chunk) + len(part) > MAX_SEGMENT_CHARS and current_chunk:
@@ -651,7 +651,7 @@ class PodcastGeneratorService:
                         current_chunk += part
                 if current_chunk.strip():
                     final_segments.append(current_chunk.strip())
-                print(f"[TTS] 超长段落已切割为 {len(final_segments)} 个子段")
+                print(f"[TTS] 长段落已切割为 {len(final_segments)} 个子段")
         segments = final_segments
         
         # 【关键】对每个段落做 TTS 安全清洗
