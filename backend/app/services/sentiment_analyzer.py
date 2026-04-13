@@ -133,32 +133,10 @@ class SentimentAnalyzerService:
     
     def _init_models(self):
         """初始化情感分析模型"""
-        # 尝试加载 FinBERT
-        try:
-            from transformers import AutoModelForSequenceClassification, AutoTokenizer
-            import torch
-            
-            print("[SentimentAnalyzer] 正在加载 FinBERT 模型...")
-            self.finbert_tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
-            self.finbert_model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert")
-            self.finbert_model.eval()  # 设置为评估模式
-            self.use_finbert = True
-            print("[OK] FinBERT 模型加载成功")
-            
-        except ImportError:
-            print("[WARN] transformers 未安装，将使用规则引擎进行情感分析")
-            print("[TIP] 安装命令: pip install transformers torch")
-        except Exception as e:
-            print(f"[WARN] FinBERT 加载失败: {e}")
-            print("[TIP] 首次运行需要下载模型，请确保网络畅通")
-        
-        # 尝试加载中文 BERT（可选）
-        try:
-            # 这里可以加载中文金融情感模型
-            # 暂时使用规则引擎处理中文
-            pass
-        except:
-            pass
+        # FinBERT 是英文模型，对中文财经新闻无实际价值
+        # 且服务器无法访问 HuggingFace，每次启动会因重试超时浪费 20-60 秒
+        # 直接使用中文规则引擎，效果更好且无网络依赖
+        print("[SentimentAnalyzer] 使用中文金融规则引擎进行情感分析（已禁用 FinBERT）")
     
     def _load_sentiment_lexicons(self):
         """加载情感词典"""
