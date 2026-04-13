@@ -1887,12 +1887,15 @@ class AIAnalyzerService:
     def _adapt_max_tokens(self, model: str, base_url: str, max_tokens: int) -> int:
         """根据模型自动适配 max_tokens
         
-        DeepSeek-V3 / deepseek-chat 支持最大 16384 output tokens（2025年3月后已升级）。
-        之前硬编码 8192 导致晚报（需要16000 tokens）被截断，AI 无法完整输出，
-        造成大盘数据不准确的问题。
+        DeepSeek 官方 API (api.deepseek.com) 的 deepseek-chat 最大输出 8192 tokens。
+        硅基流动等第三方托管的 DeepSeek-V3 可能支持更高上限。
         """
-        if "deepseek" in (base_url or "").lower():
-            # DeepSeek-V3 支持 16384 output tokens
+        base_url_lower = (base_url or "").lower()
+        if "deepseek.com" in base_url_lower:
+            # DeepSeek 官方 API: max_tokens 上限 8192
+            return min(max_tokens, 8192)
+        elif "siliconflow" in base_url_lower:
+            # 硅基流动托管的 DeepSeek-V3: 上限更高
             return min(max_tokens, 16384)
         return max_tokens
     
