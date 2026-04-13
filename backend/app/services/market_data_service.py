@@ -314,6 +314,27 @@ class MarketOverview:
         lines = []
         lines.append(f"## 📊 市场数据（{self.date}）\n")
         
+        # 数据缺失警告（让 AI 知道哪些数据不可用，避免编造）
+        missing = []
+        if not self.indices:
+            missing.append("大盘指数")
+        if not self.top_sectors:
+            missing.append("行业板块排行")
+        if not self.concept_sectors:
+            missing.append("概念板块")
+        if not self.global_indices:
+            missing.append("外盘指数")
+        if not self.commodities:
+            missing.append("大宗商品")
+        if not self.fund_flow:
+            missing.append("资金流向")
+        if not self.margin_data:
+            missing.append("融资融券")
+        
+        if missing:
+            lines.append(f"⚠️ **以下数据因接口异常暂不可用：{', '.join(missing)}**")
+            lines.append(f"**对于缺失的数据项，请直接说\"数据暂缺\"，严禁编造任何数字或趋势。**\n")
+        
         # 1. 大盘指数
         if self.indices:
             lines.append("### 主要指数")
@@ -653,7 +674,17 @@ class MarketDataService:
             try:
                 result = await task_func()
                 results.append(result)
-                print(f"  [OK] {name} 获取成功")
+                # 检查返回值是否为空数据（空列表/空元组/None/空字典）
+                is_empty = (
+                    result is None or 
+                    result == [] or 
+                    result == ([], []) or 
+                    (isinstance(result, dict) and all(v == 0 for v in result.values()))
+                )
+                if is_empty:
+                    print(f"  [WARN] {name} 返回空数据（接口可能异常）")
+                else:
+                    print(f"  [OK] {name} 获取成功")
             except Exception as e:
                 results.append(e)
                 print(f"  [FAIL] {name} 获取失败: {e}")
@@ -752,16 +783,15 @@ class MarketDataService:
         return overview
     
     async def _get_indices(self) -> List[IndexData]:
-        """获取主要指数数据"""
+        """获取主要指数数据（双方案兜底）"""
         import akshare as ak
         
         indices = []
         
+        # 方案1：东方财富指数行情
         try:
-            # 获取 A股主要指数实时行情（带重试）
             df = await self._call_akshare_with_retry(ak.stock_zh_index_spot_em)
             
-            # 筛选主要指数
             main_indices = {
                 "000001": "上证指数",
                 "399001": "深证成指",
@@ -786,28 +816,60 @@ class MarketDataService:
                         low=float(r.get('最低', 0)),
                         open=float(r.get('今开', 0)),
                     ))
+            if indices:
+                return indices
         except Exception as e:
-            print(f"获取指数数据异常: {e}")
-            traceback.print_exc()
+            print(f"获取指数数据异常（方案1东方财富）: {e}")
+        
+        # 方案2：新浪指数（备用）
+        try:
+            sina_indices = {
+                "sh000001": ("000001", "上证指数"),
+                "sz399001": ("399001", "深证成指"),
+                "sz399006": ("399006", "创业板指"),
+                "sh000300": ("000300", "沪深300"),
+            }
+            for sina_code, (code, name) in sina_indices.items():
+                try:
+                    df = await self._call_akshare_with_retry(
+                        ak.stock_zh_index_daily, symbol=sina_code,
+                        max_retries=1, cache_key=f"index_sina_{sina_code}"
+                    )
+                    if df is not None and not df.empty:
+                        row = df.iloc[-1]
+                        close_val = float(row.get('close', 0))
+                        open_val = float(row.get('open', 0))
+                        change_pct = ((close_val - open_val) / open_val * 100) if open_val > 0 else 0
+                        if close_val > 0:
+                            indices.append(IndexData(
+                                code=code, name=name, current=close_val,
+                                change=close_val - open_val, change_pct=round(change_pct, 2),
+                                high=float(row.get('high', 0)), low=float(row.get('low', 0)),
+                                open=open_val, volume=float(row.get('volume', 0)),
+                            ))
+                except Exception:
+                    continue
+            if indices:
+                print(f"  [指数] 方案2（新浪）获取成功: {len(indices)} 个指数")
+        except Exception as e:
+            print(f"获取指数数据异常（方案2新浪）: {e}")
         
         return indices
     
     async def _get_sector_ranking(self) -> tuple:
-        """获取板块涨跌排行"""
+        """获取板块涨跌排行（双方案兜底）"""
         import akshare as ak
         
         top_sectors = []
         bottom_sectors = []
         
+        # 方案1：东方财富行业板块
         try:
-            # 获取行业板块行情（带重试）
             df = await self._call_akshare_with_retry(ak.stock_board_industry_name_em)
             
             if df is not None and not df.empty:
-                # 按涨跌幅排序
                 df_sorted = df.sort_values('涨跌幅', ascending=False)
                 
-                # 涨幅前5
                 for _, row in df_sorted.head(5).iterrows():
                     top_sectors.append(SectorData(
                         name=row['板块名称'],
@@ -816,16 +878,51 @@ class MarketDataService:
                         leader_change=float(row.get('领涨股票-涨跌幅', 0)),
                     ))
                 
-                # 跌幅前5
                 for _, row in df_sorted.tail(5).iterrows():
                     bottom_sectors.append(SectorData(
                         name=row['板块名称'],
                         change_pct=float(row['涨跌幅']),
                     ))
                     
+                if top_sectors:
+                    return top_sectors, bottom_sectors
         except Exception as e:
-            print(f"获取板块排行异常: {e}")
-            traceback.print_exc()
+            print(f"获取板块排行异常（方案1东方财富）: {e}")
+        
+        # 方案2：同花顺行业板块
+        try:
+            if hasattr(ak, 'stock_board_industry_name_ths'):
+                df = await self._call_akshare_with_retry(
+                    ak.stock_board_industry_name_ths, max_retries=1
+                )
+                if df is not None and not df.empty:
+                    change_col = None
+                    for col in df.columns:
+                        if '涨跌' in str(col) or 'change' in str(col).lower():
+                            change_col = col
+                            break
+                    name_col = None
+                    for col in df.columns:
+                        if '名称' in str(col) or '板块' in str(col):
+                            name_col = col
+                            break
+                    
+                    if change_col and name_col:
+                        df_sorted = df.sort_values(change_col, ascending=False)
+                        for _, row in df_sorted.head(5).iterrows():
+                            top_sectors.append(SectorData(
+                                name=str(row[name_col]),
+                                change_pct=float(row[change_col]),
+                            ))
+                        for _, row in df_sorted.tail(5).iterrows():
+                            bottom_sectors.append(SectorData(
+                                name=str(row[name_col]),
+                                change_pct=float(row[change_col]),
+                            ))
+                        if top_sectors:
+                            print(f"  [板块排行] 方案2（同花顺）获取成功")
+        except Exception as e:
+            print(f"获取板块排行异常（方案2同花顺）: {e}")
         
         return top_sectors, bottom_sectors
     
@@ -1693,13 +1790,35 @@ class MarketDataService:
         
         trades = []
         date_str = target_date.strftime("%Y%m%d")
+        date_str_dash = target_date.strftime("%Y-%m-%d")
         
         try:
-            # 方案1：获取大宗交易每日统计
+            # 方案1：获取大宗交易每日统计（兼容多种参数格式）
             try:
-                df = await self._call_akshare_with_retry(
-                    ak.stock_dzjy_sctj, start_date=date_str, end_date=date_str
-                )
+                df = None
+                for params in [
+                    {"start_date": date_str, "end_date": date_str},
+                    {"start_date": date_str_dash, "end_date": date_str_dash},
+                ]:
+                    try:
+                        df = await self._call_akshare_with_retry(
+                            ak.stock_dzjy_sctj, max_retries=1, **params
+                        )
+                        if df is not None and not df.empty:
+                            break
+                        df = None
+                    except TypeError:
+                        df = None
+                        continue
+                
+                # 如果带参数都失败，尝试无参数调用（部分版本不需要日期）
+                if df is None:
+                    try:
+                        df = await self._call_akshare_with_retry(
+                            ak.stock_dzjy_sctj, max_retries=1
+                        )
+                    except Exception:
+                        df = None
                 if df is not None and not df.empty:
                     for _, row in df.iterrows():
                         try:
@@ -1769,38 +1888,65 @@ class MarketDataService:
     
     async def _get_margin_trading(self, target_date: date) -> Optional[MarginTradingData]:
         """
-        获取融资融券数据
-        
-        关注：
-        - 融资余额变化趋势（加杠杆 or 降杠杆）
-        - 融券余额异常变动（做空力量）
-        - 融资余额Top股票（杠杆资金最看好的标的）
+        获取融资融券数据（兼容 AKShare 新旧版本参数格式）
         """
         import akshare as ak
         
         date_str = target_date.strftime("%Y%m%d")
+        date_str_dash = target_date.strftime("%Y-%m-%d")
         
         try:
-            # 方案1：获取融资融券汇总数据
-            try:
-                df = await self._call_akshare_with_retry(ak.stock_margin_sse, start_date=date_str, end_date=date_str)
-                if df is not None and not df.empty:
-                    row = df.iloc[-1]
-                    
-                    margin_balance = float(row.get('融资余额', 0)) / 100000000  # 转亿元
-                    margin_buy = float(row.get('融资买入额', 0)) / 100000000
-                    short_balance = float(row.get('融券余额', 0)) / 100000000
-                    
-                    # 计算变化量（如果有前一天数据）
-                    margin_change = 0
-                    short_change = 0
-                    if len(df) >= 2:
-                        prev_row = df.iloc[-2]
-                        prev_margin = float(prev_row.get('融资余额', 0)) / 100000000
-                        prev_short = float(prev_row.get('融券余额', 0)) / 100000000
-                        margin_change = margin_balance - prev_margin
-                        short_change = short_balance - prev_short
-                    
+            # 方案1：获取融资融券汇总数据（兼容多种参数格式）
+            df = None
+            for params in [
+                {"start_date": date_str, "end_date": date_str},
+                {"start_date": date_str_dash, "end_date": date_str_dash},
+                {"date": date_str},
+            ]:
+                try:
+                    df = await self._call_akshare_with_retry(
+                        ak.stock_margin_sse, max_retries=1, **params
+                    )
+                    if df is not None and not df.empty:
+                        break
+                    df = None
+                except (TypeError, ValueError):
+                    df = None
+                    continue
+                except Exception:
+                    df = None
+                    continue
+            
+            if df is not None and not df.empty:
+                row = df.iloc[-1]
+                
+                # 自适应列名
+                margin_balance = 0
+                margin_buy = 0
+                short_balance = 0
+                for col in df.columns:
+                    col_str = str(col)
+                    if '融资余额' in col_str and '买' not in col_str:
+                        margin_balance = float(row[col]) / 100000000
+                    elif '融资买入' in col_str:
+                        margin_buy = float(row[col]) / 100000000
+                    elif '融券余额' in col_str:
+                        short_balance = float(row[col]) / 100000000
+                
+                margin_change = 0
+                short_change = 0
+                if len(df) >= 2:
+                    prev_row = df.iloc[-2]
+                    for col in df.columns:
+                        col_str = str(col)
+                        if '融资余额' in col_str and '买' not in col_str:
+                            prev_margin = float(prev_row[col]) / 100000000
+                            margin_change = margin_balance - prev_margin
+                        elif '融券余额' in col_str:
+                            prev_short = float(prev_row[col]) / 100000000
+                            short_change = short_balance - prev_short
+                
+                if margin_balance > 0:
                     result = MarginTradingData(
                         total_margin_balance=margin_balance,
                         margin_buy_amount=margin_buy,
@@ -1808,43 +1954,70 @@ class MarketDataService:
                         margin_balance_change=margin_change,
                         short_balance_change=short_change,
                     )
-                    
                     print(f"  [融资融券] 方案1获取成功: 融资余额{margin_balance:.0f}亿")
                     return result
-            except Exception as e:
-                print(f"  [融资融券] 方案1失败: {e}")
             
-            # 方案2：获取深交所融资融券数据
-            try:
-                df = await self._call_akshare_with_retry(ak.stock_margin_underlying_info_szse, date=date_str)
-                if df is not None and not df.empty:
-                    total_margin = df['融资余额'].sum() / 100000000 if '融资余额' in df.columns else 0
-                    total_margin_buy = df['融资买入额'].sum() / 100000000 if '融资买入额' in df.columns else 0
-                    total_short = df['融券余额'].sum() / 100000000 if '融券余额' in df.columns else 0
-                    
-                    # 获取融资余额Top10股票
-                    top_stocks = []
-                    if '融资余额' in df.columns:
-                        top_df = df.nlargest(10, '融资余额')
+            print(f"  [融资融券] 方案1无有效数据")
+            
+            # 方案2：获取深交所融资融券数据（兼容参数格式）
+            df2 = None
+            for params in [
+                {"date": date_str},
+                {"date": date_str_dash},
+            ]:
+                try:
+                    df2 = await self._call_akshare_with_retry(
+                        ak.stock_margin_underlying_info_szse, max_retries=1, **params
+                    )
+                    if df2 is not None and not df2.empty:
+                        break
+                    df2 = None
+                except (TypeError, ValueError):
+                    df2 = None
+                    continue
+                except Exception:
+                    df2 = None
+                    continue
+            
+            if df2 is not None and not df2.empty:
+                total_margin = 0
+                total_margin_buy = 0
+                total_short = 0
+                for col in df2.columns:
+                    col_str = str(col)
+                    if '融资余额' in col_str and '买' not in col_str:
+                        total_margin = df2[col].sum() / 100000000
+                    elif '融资买入' in col_str:
+                        total_margin_buy = df2[col].sum() / 100000000
+                    elif '融券余额' in col_str:
+                        total_short = df2[col].sum() / 100000000
+                
+                top_stocks = []
+                margin_col = next((c for c in df2.columns if '融资余额' in str(c) and '买' not in str(c)), None)
+                if margin_col:
+                    top_df = df2.nlargest(10, margin_col)
+                    code_col = next((c for c in df2.columns if '代码' in str(c)), None)
+                    name_col = next((c for c in df2.columns if '简称' in str(c) or '名称' in str(c)), None)
+                    if code_col and name_col:
                         for _, r in top_df.iterrows():
                             top_stocks.append({
-                                "code": str(r.get('证券代码', '')),
-                                "name": str(r.get('证券简称', '')),
-                                "balance": float(r.get('融资余额', 0)) / 100000000,
-                                "change": float(r.get('融资余额差额', 0)) / 100000000 if '融资余额差额' in df.columns else 0,
+                                "code": str(r[code_col]),
+                                "name": str(r[name_col]),
+                                "balance": float(r[margin_col]) / 100000000,
+                                "change": 0,
                             })
-                    
+                
+                if total_margin > 0:
                     result = MarginTradingData(
                         total_margin_balance=total_margin,
                         margin_buy_amount=total_margin_buy,
                         total_short_balance=total_short,
                         top_margin_stocks=top_stocks,
                     )
-                    
                     print(f"  [融资融券] 方案2获取成功: 融资余额{total_margin:.0f}亿，Top股票{len(top_stocks)}只")
                     return result
-            except Exception as e:
-                print(f"  [融资融券] 方案2也失败: {e}")
+            
+            print(f"  [融资融券] 方案2也无有效数据")
                 
         except Exception as e:
             print(f"获取融资融券异常: {e}")

@@ -141,21 +141,35 @@ class SentimentAnalyzerService:
     def _load_sentiment_lexicons(self):
         """加载情感词典"""
         
+        # ============ 负面组合短语（优先匹配，权重 1.5）============
+        # 这些组合词必须在单词匹配之前处理，避免"增长放缓"被拆成"增长"(正面)+"放缓"
+        self.negative_phrases = [
+            "增长放缓", "增速放缓", "增长乏力", "负增长", "增速下滑",
+            "高位回落", "冲高回落", "获利了结", "获利回吐",
+            "估值偏高", "泡沫", "套牢", "踩雷", "爆雷",
+            "商誉减值", "业绩变脸", "业绩不达预期", "大幅低于预期",
+            "难以突破", "未能突破", "突破失败", "假突破",
+            "缩量反弹", "无量上涨", "量价背离",
+            "资金出逃", "资金撤离", "外资撤离",
+            "紧张局势", "冲突升级", "制裁加码",
+        ]
+        self.negative_phrase_weight = 1.5
+        
         # ============ 正面词汇（金融领域）============
         self.positive_words = {
             # 强正面（权重 2.0）
             "strong": [
                 "暴涨", "涨停", "大涨", "飙升", "井喷", "狂飙", "爆发",
-                "突破", "新高", "创历史新高", "强势", "大幅上涨",
+                "新高", "创历史新高", "强势", "大幅上涨",
                 "重大利好", "超预期", "业绩暴增", "翻倍", "历史最好",
                 "里程碑", "重大突破", "颠覆性", "划时代"
             ],
-            # 中等正面（权重 1.0）
+            # 中等正面（权重 1.0）— 移除了"增长""机会""积极""突破""创新"等过于泛化的词
             "moderate": [
-                "上涨", "走高", "反弹", "回升", "企稳", "站稳",
-                "利好", "增长", "盈利", "增持", "加仓", "买入",
-                "看多", "乐观", "积极", "改善", "提升", "扩大",
-                "受益", "机会", "突破", "创新", "领先", "龙头",
+                "上涨", "走高", "反弹", "回升", "站稳",
+                "利好", "盈利", "增持", "加仓", "买入",
+                "看多", "乐观", "改善", "提升",
+                "受益", "龙头",
                 "景气", "复苏", "回暖", "向好", "超额收益"
             ],
             # 弱正面（权重 0.5）
@@ -174,18 +188,20 @@ class SentimentAnalyzerService:
                 "业绩暴雷", "财务造假", "退市", "ST", "*ST",
                 "强制平仓", "清盘", "破产", "倒闭", "违约"
             ],
-            # 中等负面（权重 1.0）
+            # 中等负面（权重 1.0）— 新增"震荡""波动""分化""谨慎"从weak提升
             "moderate": [
                 "下跌", "走低", "回调", "回落", "承压", "疲软",
                 "利空", "下滑", "亏损", "减持", "抛售", "卖出",
                 "看空", "悲观", "担忧", "警惕", "风险", "压力",
                 "收缩", "萎缩", "恶化", "下修", "不及预期",
-                "减仓", "清仓", "撤退", "离场", "见顶"
+                "减仓", "清仓", "撤退", "离场", "见顶",
+                "震荡", "波动", "分化", "谨慎", "观望",
+                "流出", "净流出", "撤退", "恐慌", "避险"
             ],
             # 弱负面（权重 0.5）
             "weak": [
-                "震荡", "波动", "分化", "观望", "谨慎",
-                "小幅下跌", "微跌", "略跌", "温和下滑"
+                "小幅下跌", "微跌", "略跌", "温和下滑",
+                "不确定", "存疑", "待观察"
             ]
         }
         
@@ -443,12 +459,20 @@ class SentimentAnalyzerService:
         )
     
     def _analyze_with_rules(self, text: str, is_chinese: bool = True) -> SentimentResult:
-        """使用规则引擎分析（增强版）"""
+        """使用规则引擎分析（增强版 v2）"""
         
         positive_score = 0.0
         negative_score = 0.0
         keywords_pos = []
         keywords_neg = []
+        
+        # === 第0步：优先匹配负面组合短语（防止子串误触发） ===
+        matched_phrases = set()
+        for phrase in self.negative_phrases:
+            if phrase in text:
+                negative_score += self.negative_phrase_weight
+                keywords_neg.append(phrase)
+                matched_phrases.add(phrase)
         
         # 分词（简单按标点和空格分割）
         pattern = r'[，。！？、；：""''（）' + r'\s]+'
@@ -459,15 +483,18 @@ class SentimentAnalyzerService:
         for i, word in enumerate(words):
             if any(neg in word for neg in self.negation_words):
                 negation_positions.add(i)
-                negation_positions.add(i + 1)  # 否定词后一个词
-                negation_positions.add(i + 2)  # 否定词后两个词
+                negation_positions.add(i + 1)
+                negation_positions.add(i + 2)
         
         # 遍历文本匹配情感词
         for level, word_list in self.positive_words.items():
             weight = {"strong": 2.0, "moderate": 1.0, "weak": 0.5}[level]
             for word in word_list:
                 if word in text:
-                    # 检查是否被否定
+                    # 跳过已被组合短语覆盖的词（如"增长"在"增长放缓"中）
+                    if any(word in phrase for phrase in matched_phrases):
+                        continue
+                    
                     word_idx = None
                     for i, w in enumerate(words):
                         if word in w:
@@ -475,7 +502,6 @@ class SentimentAnalyzerService:
                             break
                     
                     if word_idx in negation_positions:
-                        # 被否定，转为负面
                         negative_score += weight * 0.8
                         keywords_neg.append(f"不{word}")
                     else:
@@ -486,7 +512,10 @@ class SentimentAnalyzerService:
             weight = {"strong": 2.0, "moderate": 1.0, "weak": 0.5}[level]
             for word in word_list:
                 if word in text:
-                    # 检查是否被否定
+                    # 跳过已被组合短语覆盖的词
+                    if any(word in phrase for phrase in matched_phrases):
+                        continue
+                    
                     word_idx = None
                     for i, w in enumerate(words):
                         if word in w:
@@ -494,7 +523,6 @@ class SentimentAnalyzerService:
                             break
                     
                     if word_idx in negation_positions:
-                        # 被否定，转为正面（如"不担忧"）
                         positive_score += weight * 0.5
                         keywords_pos.append(f"不{word}")
                     else:
@@ -504,7 +532,6 @@ class SentimentAnalyzerService:
         # 计算最终得分
         total = positive_score + negative_score
         if total == 0:
-            # 没有匹配到任何情感词
             return SentimentResult(
                 sentiment=SentimentType.NEUTRAL,
                 confidence=0.5,
@@ -522,11 +549,11 @@ class SentimentAnalyzerService:
         # 计算净情感得分 (-1 到 1)
         net_score = pos_ratio - neg_ratio
         
-        # 确定情感类型
-        if net_score > 0.2:
+        # 确定情感类型（v2：降低阈值 0.2 → 0.1，让更多偏负面新闻被识别）
+        if net_score > 0.15:
             sentiment = SentimentType.POSITIVE
             confidence = min(0.95, 0.5 + pos_ratio * 0.5)
-        elif net_score < -0.2:
+        elif net_score < -0.1:
             sentiment = SentimentType.NEGATIVE
             confidence = min(0.95, 0.5 + neg_ratio * 0.5)
         else:
