@@ -546,6 +546,50 @@ class PodcastGeneratorService:
         
         return str(output_path), duration_seconds
 
+    def _sanitize_for_tts(self, text: str) -> str:
+        """
+        TTS 安全清洗：移除会导致 Edge TTS "No audio was received" 的特殊字符
+        
+        Edge TTS 对某些 Unicode 字符非常敏感，包括：
+        - 零宽空格、零宽连接符等不可见字符
+        - 特殊数学符号、箭头符号
+        - 某些CJK扩展字符
+        - 连续多个换行或空白
+        """
+        if not text:
+            return text
+        
+        # 1. 移除零宽字符和不可见控制字符
+        text = re.sub(r'[\u200b\u200c\u200d\u200e\u200f\ufeff\u00ad]', '', text)
+        # 移除其他不可见控制字符（保留换行\n和空格）
+        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', text)
+        
+        # 2. 替换特殊引号和标点为标准形式
+        text = text.replace('"', '"').replace('"', '"')
+        text = text.replace(''', "'").replace(''', "'")
+        text = text.replace('…', '...')
+        text = text.replace('—', '，')  # 破折号改逗号，朗读更自然
+        text = text.replace('–', '，')
+        text = text.replace('·', '，')  # 间隔号改逗号
+        
+        # 3. 移除特殊 Unicode 符号（箭头、数学符号等）
+        text = re.sub(r'[→←↑↓↔↕⇒⇐⇑⇓⇔]', '', text)
+        text = re.sub(r'[≈≠≤≥±×÷∞∑∏√∫∂∇]', '', text)
+        
+        # 4. 移除网址和邮箱
+        text = re.sub(r'https?://\S+', '', text)
+        text = re.sub(r'\S+@\S+\.\S+', '', text)
+        
+        # 5. 清理多余空白
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = re.sub(r'[ \t]{2,}', ' ', text)
+        text = re.sub(r'^\s+$', '', text, flags=re.MULTILINE)
+        
+        # 6. 确保文本不会以标点开头
+        text = re.sub(r'^[，。！？、；：]+', '', text.strip())
+        
+        return text.strip()
+    
     async def _generate_segmented_tts(self, full_text: str, output_path: str):
         """
         分段生成 TTS，在模块之间加入停顿
@@ -610,6 +654,10 @@ class PodcastGeneratorService:
                 print(f"[TTS] 超长段落已切割为 {len(final_segments)} 个子段")
         segments = final_segments
         
+        # 【关键】对每个段落做 TTS 安全清洗
+        segments = [self._sanitize_for_tts(s) for s in segments]
+        segments = [s for s in segments if s.strip()]
+        
         print(f"[TTS] 最终 {len(segments)} 个音频段落，最长 {max(len(s) for s in segments)} 字")
         
         # 创建临时目录存放分段音频
@@ -652,8 +700,31 @@ class PodcastGeneratorService:
                         await asyncio.sleep(3)
                 
                 if not success:
-                    failed_count += 1
-                    print(f"[TTS] ⚠️ 第 {i+1} 段最终失败，跳过")
+                    # 【降级】整段失败时，拆成更小的子段逐句重试
+                    print(f"[TTS] ⚠️ 第 {i+1} 段整体失败，尝试逐句生成...")
+                    sub_sentences = re.split(r'(?<=[。！？\n])', segment)
+                    sub_sentences = [s.strip() for s in sub_sentences if s.strip() and len(s.strip()) > 2]
+                    sub_success = 0
+                    for j, sub in enumerate(sub_sentences):
+                        sub_path = temp_dir / f"segment_{i:02d}_sub_{j:02d}.mp3"
+                        try:
+                            comm = edge_tts.Communicate(
+                                text=sub,
+                                voice=self.voice,
+                                rate=self.rate,
+                                volume=self.volume
+                            )
+                            await comm.save(str(sub_path))
+                            if sub_path.exists() and sub_path.stat().st_size > 512:
+                                segment_files.append(sub_path)
+                                sub_success += 1
+                        except Exception:
+                            pass  # 单句失败直接跳过
+                    if sub_success > 0:
+                        print(f"[TTS] ✅ 逐句恢复了 {sub_success}/{len(sub_sentences)} 句")
+                    else:
+                        failed_count += 1
+                        print(f"[TTS] ⚠️ 第 {i+1} 段最终失败，跳过")
             
             if not segment_files:
                 raise Exception("所有 TTS 段落都失败了，无法生成播客音频")
