@@ -361,6 +361,8 @@ class AIAnalyzerService:
 
 ⚠️ 重要：以下模块仅是内容框架，你写出来的文章必须是**一个整体**，模块之间要有自然的逻辑过渡，不能有割裂感。
 
+⚠️ **禁止在正文开头输出日期行**（如"2026年04月13日 周一"），系统会自动添加日期，你直接从模块1的内容开始写。
+
 ### 模块1：🎯 今日三条操作建议
 
 **这是全文最重要的部分，开门见山。**
@@ -595,6 +597,8 @@ class AIAnalyzerService:
 
 ⚠️ 重要：以下模块仅是内容框架，你写出来的文章必须是**一个完整的叙事**。想象你在{settings.user_nickname}对面坐下来，从今天发生了什么 → 为什么会这样 → 所以我们学到了什么 → 明天该怎么做，自然地聊下来。
 
+⚠️ **禁止在正文开头输出日期行**（如"2026年04月13日 周一 收盘后"），系统会自动添加日期，你直接从模块1的内容开始写。
+
 ### 模块1：📊 今日市场一句话
 
 **30秒快速概括**，先告诉{settings.user_nickname}今天大盘怎么样：
@@ -807,6 +811,8 @@ class AIAnalyzerService:
 ## 📝 深度早报结构（7大模块，时长更长）——必须一气呵成
 
 ⚠️ 重要：想象你周末约{settings.user_nickname}喝咖啡，从头到尾聊一个小时投资。从本周发生了什么 → 为什么 → 这些热点概念到底是什么 → 哪些行业值得深入研究 → 下周怎么操作。这是一次**完整的深度对话**，不是7个独立的段落。
+
+⚠️ **禁止在正文开头输出日期行**（如"2026年04月13日 周日"），系统会自动添加日期，你直接从模块1的内容开始写。
 
 ### 模块1：📊 本周市场复盘
 
@@ -2265,6 +2271,22 @@ class AIAnalyzerService:
         content = response
         if "```json" in response:
             content = response.split("```json")[0].strip()
+        
+        # 强制修正报告正文中的日期行（防止 AI 写错星期几）
+        import re as _re
+        weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        correct_weekday = weekday_names[report_date.weekday()]
+        date_str_prefix = report_date.strftime('%Y年%m月%d日')
+        # 匹配类似 "2026年04月13日 周日 收盘后" 或 "2026年04月13日 周日" 的日期行
+        wrong_weekday_pattern = _re.compile(
+            date_str_prefix + r'\s+周[一二三四五六日]'
+        )
+        if wrong_weekday_pattern.search(content):
+            content = _re.sub(
+                date_str_prefix + r'\s+周[一二三四五六日]',
+                f'{date_str_prefix} {correct_weekday}',
+                content
+            )
         
         # 根据报告类型确定默认标题
         type_name = "早报" if report_type == ReportType.MORNING else "晚报"
