@@ -1,13 +1,11 @@
 """
 播客生成服务
-使用 Edge TTS 将报告文本转换为音频
+使用硅基流动 TTS API（主）或 Edge TTS（降级）将报告文本转换为音频
 
-重构版 v2：AI 自动生成播客脚本
-- 不再依赖固定模板，每期开场白都独一无二
-- AI 根据报告内容、天气、日期等上下文生成自然口语化的播客脚本
-- 早报：简洁直接，快节奏，聚焦当日操作
-- 晚报：深入复盘，稍慢节奏，回顾+展望
-- 非交易日：深度科普，慢节奏，知识性强
+重构版 v3：
+- TTS 引擎优先使用硅基流动 CosyVoice2（正规 API，不受 VPS IP 限制）
+- Edge TTS 作为降级备选（微软对数据中心 IP 有风控限制）
+- AI 自动生成播客脚本（v2 延续）
 """
 import asyncio
 import os
@@ -594,9 +592,9 @@ class PodcastGeneratorService:
         """
         分段生成 TTS，在模块之间加入停顿
         
-        通过 [SECTION_BREAK] 标记分段，每段之间加入 1.5 秒停顿
+        v3: 优先使用硅基流动 TTS API（不受 VPS IP 限制），失败则降级到 Edge TTS
+        通过 [SECTION_BREAK] 标记分段，每段之间加入停顿
         """
-        # 使用 audio_mixer 模块中已配置好 ffmpeg 路径的 AudioSegment
         from .audio_mixer import AudioSegment
         import tempfile
         
@@ -607,13 +605,9 @@ class PodcastGeneratorService:
         # 二次清理：确保每段中不残留舞台指示
         cleaned_segments = []
         for s in segments:
-            # 移除可能残留的 SECTION_BREAK 变体
             s = re.sub(r'(?i)\[?\s*section[\s_]*break\s*\]?', '', s).strip()
-            # 移除任何残留的舞台指示（中文括号）
             s = re.sub(r'（[^）]*(?:音乐|音效|渐弱|渐强|淡入|淡出|过渡|停顿)[^）]*）', '', s, flags=re.IGNORECASE)
-            # 移除任何残留的舞台指示（英文括号）
             s = re.sub(r'\([^)]*(?:music|fade|pause|transition|sound)[^)]*\)', '', s, flags=re.IGNORECASE)
-            # 移除任何残留的舞台指示（方括号，排除SECTION_BREAK）
             s = re.sub(r'\[[^\]]*(?:音乐|音效|渐弱|渐强|淡入|淡出|过渡|停顿|music|fade|pause|transition|break|intro|outro)[^\]]*\]', '', s, flags=re.IGNORECASE)
             s = s.strip()
             if s:
@@ -622,25 +616,196 @@ class PodcastGeneratorService:
         
         print(f"[TTS] 检测到 {len(segments)} 个内容模块")
         
-        if len(segments) <= 1:
-            # 没有分段标记，直接生成
-            communicate = edge_tts.Communicate(
-                text=full_text.replace('[SECTION_BREAK]', ''),
-                voice=self.voice,
-                rate=self.rate,
-                volume=self.volume
-            )
-            await communicate.save(output_path)
+        # 对每段做 TTS 安全清洗
+        segments = [self._sanitize_for_tts(s) for s in segments]
+        segments = [s for s in segments if s.strip()]
+        
+        if not segments:
+            segments = [self._sanitize_for_tts(full_text.replace('[SECTION_BREAK]', ''))]
+        
+        print(f"[TTS] 清洗后 {len(segments)} 个段落，最长 {max(len(s) for s in segments)} 字")
+        
+        # ============ 尝试硅基流动 TTS（主引擎）============
+        siliconflow_success = False
+        if settings.backup_ai_api_key and settings.backup_ai_base_url and "siliconflow" in settings.backup_ai_base_url.lower():
+            print("[TTS] 🔵 尝试硅基流动 CosyVoice2 TTS...")
+            try:
+                siliconflow_success = await self._generate_tts_siliconflow(segments, output_path)
+            except Exception as e:
+                print(f"[TTS] ❌ 硅基流动 TTS 整体异常: {e}")
+        else:
+            print("[TTS] ℹ️ 未配置硅基流动，跳过")
+        
+        if siliconflow_success:
             return
         
-        # 超长段落自动切割（Edge TTS 对当前服务器有文本长度限制，控制在60字以内）
+        # ============ 降级到 Edge TTS ============
+        print("[TTS] 🟡 降级到 Edge TTS...")
+        await self._generate_tts_edge(segments, output_path)
+    
+    async def _generate_tts_siliconflow(self, segments: List[str], output_path: str) -> bool:
+        """
+        使用硅基流动 CosyVoice2 TTS API 生成音频
+        
+        优点：正规 API，不受 VPS IP 限制，支持长文本
+        
+        Returns:
+            True=成功，False=失败需降级
+        """
+        from .audio_mixer import AudioSegment
+        import tempfile
+        
+        api_key = settings.backup_ai_api_key
+        api_url = "https://api.siliconflow.cn/v1/audio/speech"
+        
+        # 硅基流动支持长文本，按 SECTION_BREAK 段落即可，不需要极限切割
+        # 但单次请求建议不超过 2000 字，超长的做二次切割
+        MAX_CHARS = 2000
+        final_segments = []
+        for seg in segments:
+            if len(seg) <= MAX_CHARS:
+                final_segments.append(seg)
+            else:
+                # 按句号切割
+                sub_parts = re.split(r'(?<=[。！？\n])', seg)
+                current_chunk = ""
+                for part in sub_parts:
+                    if len(current_chunk) + len(part) > MAX_CHARS and current_chunk:
+                        final_segments.append(current_chunk.strip())
+                        current_chunk = part
+                    else:
+                        current_chunk += part
+                if current_chunk.strip():
+                    final_segments.append(current_chunk.strip())
+        
+        segments = [s for s in final_segments if s.strip()]
+        print(f"[TTS-SiliconFlow] {len(segments)} 个段落待生成")
+        
+        temp_dir = Path(tempfile.gettempdir()) / f"podcast_sf_{uuid.uuid4().hex[:8]}"
+        temp_dir.mkdir(exist_ok=True)
+        
+        try:
+            segment_files = []
+            failed_count = 0
+            
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                for i, segment in enumerate(segments):
+                    if not segment:
+                        continue
+                    
+                    segment_path = temp_dir / f"seg_{i:03d}.mp3"
+                    print(f"[TTS-SiliconFlow] 生成第 {i+1}/{len(segments)} 段（{len(segment)}字）...")
+                    
+                    success = False
+                    for retry in range(3):
+                        try:
+                            payload = {
+                                "model": "FunAudioLLM/CosyVoice2-0.5B",
+                                "input": segment,
+                                "voice": "FunAudioLLM/CosyVoice2-0.5B:alex",
+                                "response_format": "mp3",
+                                "sample_rate": 32000,
+                                "stream": False,
+                                "speed": 1.0,
+                                "gain": 0
+                            }
+                            
+                            response = await client.post(
+                                api_url,
+                                headers={
+                                    "Authorization": f"Bearer {api_key}",
+                                    "Content-Type": "application/json"
+                                },
+                                json=payload
+                            )
+                            
+                            if response.status_code == 200:
+                                content_type = response.headers.get("content-type", "")
+                                if "audio" in content_type or len(response.content) > 1024:
+                                    with open(str(segment_path), "wb") as f:
+                                        f.write(response.content)
+                                    
+                                    if segment_path.exists() and segment_path.stat().st_size > 1024:
+                                        segment_files.append(segment_path)
+                                        success = True
+                                        break
+                                    else:
+                                        print(f"[TTS-SiliconFlow] 第 {i+1} 段文件过小，重试 ({retry+1}/3)")
+                                else:
+                                    print(f"[TTS-SiliconFlow] 第 {i+1} 段返回非音频内容: {content_type}, 重试 ({retry+1}/3)")
+                            else:
+                                error_text = response.text[:200] if response.text else "无错误详情"
+                                print(f"[TTS-SiliconFlow] 第 {i+1} 段 HTTP {response.status_code}: {error_text}, 重试 ({retry+1}/3)")
+                            
+                            await asyncio.sleep(1)
+                            
+                        except httpx.TimeoutException:
+                            print(f"[TTS-SiliconFlow] 第 {i+1} 段超时，重试 ({retry+1}/3)")
+                            await asyncio.sleep(2)
+                        except Exception as e:
+                            print(f"[TTS-SiliconFlow] 第 {i+1} 段异常: {e}，重试 ({retry+1}/3)")
+                            await asyncio.sleep(2)
+                    
+                    if not success:
+                        failed_count += 1
+                        print(f"[TTS-SiliconFlow] ⚠️ 第 {i+1} 段最终失败，跳过")
+                    
+                    # 请求间隔，避免触发限流
+                    if i < len(segments) - 1:
+                        await asyncio.sleep(0.3)
+            
+            # 判断是否足够多段落成功
+            if not segment_files:
+                print("[TTS-SiliconFlow] ❌ 所有段落都失败了")
+                return False
+            
+            success_rate = len(segment_files) / len(segments)
+            if success_rate < 0.5:
+                print(f"[TTS-SiliconFlow] ❌ 成功率过低 ({success_rate:.0%})，降级到 Edge TTS")
+                return False
+            
+            if failed_count > 0:
+                print(f"[TTS-SiliconFlow] ⚠️ {failed_count} 段失败，使用 {len(segment_files)} 段继续合成")
+            
+            # 合并音频
+            print(f"[TTS-SiliconFlow] 合并 {len(segment_files)} 个音频段落...")
+            pause = AudioSegment.silent(duration=500)  # 段间 0.5 秒停顿
+            
+            final_audio = AudioSegment.empty()
+            for i, segment_path in enumerate(segment_files):
+                seg_audio = AudioSegment.from_mp3(str(segment_path))
+                final_audio += seg_audio
+                if i < len(segment_files) - 1:
+                    final_audio += pause
+            
+            final_audio.export(output_path, format="mp3", bitrate="192k")
+            print(f"[TTS-SiliconFlow] ✅ 合成完成，{len(final_audio) // 1000} 秒")
+            return True
+            
+        finally:
+            import shutil
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
+    
+    async def _generate_tts_edge(self, segments: List[str], output_path: str):
+        """
+        使用 Edge TTS 生成音频（降级方案）
+        
+        注意：Edge TTS 在 VPS 上可能因微软 IP 风控导致 NoAudioReceived，
+        需要极限分段（每段 < 60 字）来提高成功率。
+        """
+        from .audio_mixer import AudioSegment
+        import tempfile
+        
+        # Edge TTS 需要极限切割（VPS 上对文本长度限制严格）
         MAX_SEGMENT_CHARS = 60
         final_segments = []
         for seg in segments:
             if len(seg) <= MAX_SEGMENT_CHARS:
                 final_segments.append(seg)
             else:
-                # 先按句号/问号/感叹号切割
                 sub_parts = re.split(r'(?<=[。！？\n])', seg)
                 for part in sub_parts:
                     part = part.strip()
@@ -649,7 +814,6 @@ class PodcastGeneratorService:
                     if len(part) <= MAX_SEGMENT_CHARS:
                         final_segments.append(part)
                     else:
-                        # 单句还是太长，按逗号/分号继续切
                         sub_sub = re.split(r'(?<=[，；、])', part)
                         current_chunk = ""
                         for ss in sub_sub:
@@ -660,20 +824,14 @@ class PodcastGeneratorService:
                                 current_chunk += ss
                         if current_chunk.strip():
                             final_segments.append(current_chunk.strip())
-        segments = final_segments
         
-        # 【关键】对每个段落做 TTS 安全清洗
-        segments = [self._sanitize_for_tts(s) for s in segments]
-        segments = [s for s in segments if s.strip()]
+        segments = [s for s in final_segments if s.strip()]
+        print(f"[TTS-Edge] 最终 {len(segments)} 个音频段落，最长 {max(len(s) for s in segments) if segments else 0} 字")
         
-        print(f"[TTS] 最终 {len(segments)} 个音频段落，最长 {max(len(s) for s in segments)} 字")
-        
-        # 创建临时目录存放分段音频
-        temp_dir = Path(tempfile.gettempdir()) / f"podcast_segments_{uuid.uuid4().hex[:8]}"
+        temp_dir = Path(tempfile.gettempdir()) / f"podcast_edge_{uuid.uuid4().hex[:8]}"
         temp_dir.mkdir(exist_ok=True)
         
         try:
-            # 生成每个段落的音频（带重试和容错）
             segment_files = []
             failed_count = 0
             for i, segment in enumerate(segments):
@@ -681,9 +839,8 @@ class PodcastGeneratorService:
                     continue
                     
                 segment_path = temp_dir / f"segment_{i:02d}.mp3"
-                print(f"[TTS] 正在生成第 {i+1}/{len(segments)} 段（{len(segment)}字）...")
+                print(f"[TTS-Edge] 正在生成第 {i+1}/{len(segments)} 段（{len(segment)}字）...")
                 
-                # 重试机制：Edge TTS 偶尔会返回空音频
                 success = False
                 for retry in range(3):
                     try:
@@ -695,21 +852,19 @@ class PodcastGeneratorService:
                         )
                         await communicate.save(str(segment_path))
                         
-                        # 验证文件是否有效（大于 1KB）
                         if segment_path.exists() and segment_path.stat().st_size > 1024:
                             segment_files.append(segment_path)
                             success = True
                             break
                         else:
-                            print(f"[TTS] 第 {i+1} 段生成了空文件，重试 ({retry+1}/3)...")
+                            print(f"[TTS-Edge] 第 {i+1} 段生成了空文件，重试 ({retry+1}/3)...")
                             await asyncio.sleep(2)
                     except Exception as e:
-                        print(f"[TTS] 第 {i+1} 段失败: {e}，重试 ({retry+1}/3)...")
+                        print(f"[TTS-Edge] 第 {i+1} 段失败: {e}，重试 ({retry+1}/3)...")
                         await asyncio.sleep(3)
                 
                 if not success:
-                    # 【降级】整段失败时，拆成更小的子段逐句重试
-                    print(f"[TTS] ⚠️ 第 {i+1} 段整体失败，尝试逐句生成...")
+                    print(f"[TTS-Edge] ⚠️ 第 {i+1} 段整体失败，尝试逐句生成...")
                     sub_sentences = re.split(r'(?<=[。！？\n])', segment)
                     sub_sentences = [s.strip() for s in sub_sentences if s.strip() and len(s.strip()) > 2]
                     sub_success = 0
@@ -727,42 +882,34 @@ class PodcastGeneratorService:
                                 segment_files.append(sub_path)
                                 sub_success += 1
                         except Exception:
-                            pass  # 单句失败直接跳过
+                            pass
                     if sub_success > 0:
-                        print(f"[TTS] ✅ 逐句恢复了 {sub_success}/{len(sub_sentences)} 句")
+                        print(f"[TTS-Edge] ✅ 逐句恢复了 {sub_success}/{len(sub_sentences)} 句")
                     else:
                         failed_count += 1
-                        print(f"[TTS] ⚠️ 第 {i+1} 段最终失败，跳过")
+                        print(f"[TTS-Edge] ⚠️ 第 {i+1} 段最终失败，跳过")
             
             if not segment_files:
-                raise Exception("所有 TTS 段落都失败了，无法生成播客音频")
+                raise Exception("所有 TTS 段落都失败了（Edge TTS + 硅基流动均失败），无法生成播客音频")
             
             if failed_count > 0:
-                print(f"[TTS] ⚠️ {failed_count} 个段落失败，使用 {len(segment_files)} 个成功段落继续合成")
+                print(f"[TTS-Edge] ⚠️ {failed_count} 个段落失败，使用 {len(segment_files)} 个成功段落继续合成")
             
-            # 合并所有段落，中间加入停顿
-            print(f"[TTS] 正在合并音频段落...")
-            
-            # 段间停顿：短停顿（因为段数多了，每段间不需要长停顿）
-            pause_duration = 300  # 毫秒（0.3秒，自然呼吸间隔）
+            print(f"[TTS-Edge] 正在合并音频段落...")
+            pause_duration = 300
             pause = AudioSegment.silent(duration=pause_duration)
             
-            # 合并
             final_audio = AudioSegment.empty()
             for i, segment_path in enumerate(segment_files):
                 segment_audio = AudioSegment.from_mp3(str(segment_path))
                 final_audio += segment_audio
-                
-                # 在段落之间加入停顿（最后一段不加）
                 if i < len(segment_files) - 1:
                     final_audio += pause
             
-            # 导出最终音频
             final_audio.export(output_path, format="mp3", bitrate="192k")
-            print(f"[TTS] 分段合成完成，共 {len(segment_files)} 段")
+            print(f"[TTS-Edge] 分段合成完成，共 {len(segment_files)} 段")
             
         finally:
-            # 清理临时文件
             import shutil
             try:
                 shutil.rmtree(temp_dir)
