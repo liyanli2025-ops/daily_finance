@@ -664,8 +664,8 @@ class PodcastGeneratorService:
         from .audio_mixer import AudioSegment
         import tempfile
         
-        # Edge TTS 需要极限切割（VPS 上对文本长度限制严格）
-        MAX_SEGMENT_CHARS = 40  # 从60降到40，减少失败率
+        # Edge TTS 分段（有超时保护兜底，不怕单段失败）
+        MAX_SEGMENT_CHARS = 60
         final_segments = []
         for seg in segments:
             if len(seg) <= MAX_SEGMENT_CHARS:
@@ -967,8 +967,8 @@ class PodcastGeneratorService:
         from .audio_mixer import AudioSegment
         import tempfile
         
-        # Edge TTS 需要极限切割（VPS 上对文本长度限制严格）
-        MAX_SEGMENT_CHARS = 40  # 从60降到40，减少失败率
+        # Edge TTS 分段（有超时保护兜底，不怕单段失败）
+        MAX_SEGMENT_CHARS = 60
         final_segments = []
         for seg in segments:
             if len(seg) <= MAX_SEGMENT_CHARS:
