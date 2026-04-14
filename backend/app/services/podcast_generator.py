@@ -1,10 +1,10 @@
 """
 播客生成服务
-使用硅基流动 TTS API（主）或 Edge TTS（降级）将报告文本转换为音频
+使用 Edge TTS（主）或硅基流动 TTS API（降级）将报告文本转换为音频
 
-重构版 v3：
-- TTS 引擎优先使用硅基流动 CosyVoice2（正规 API，不受 VPS IP 限制）
-- Edge TTS 作为降级备选（微软对数据中心 IP 有风控限制）
+重构版 v4：
+- TTS 引擎优先使用 Edge TTS（微软语音，音质好）
+- 硅基流动 CosyVoice2 作为降级备选（Edge TTS 失败时自动切换）
 - AI 自动生成播客脚本（v2 延续）
 """
 import asyncio
@@ -592,7 +592,7 @@ class PodcastGeneratorService:
         """
         分段生成 TTS，在模块之间加入停顿
         
-        v3: 优先使用硅基流动 TTS API（不受 VPS IP 限制），失败则降级到 Edge TTS
+        v4: 优先使用 Edge TTS（微软语音，音质好），失败则降级到硅基流动 CosyVoice2
         通过 [SECTION_BREAK] 标记分段，每段之间加入停顿
         """
         from .audio_mixer import AudioSegment
@@ -625,23 +625,186 @@ class PodcastGeneratorService:
         
         print(f"[TTS] 清洗后 {len(segments)} 个段落，最长 {max(len(s) for s in segments)} 字")
         
-        # ============ 尝试硅基流动 TTS（主引擎）============
-        siliconflow_success = False
+        # ============ 尝试 Edge TTS（主引擎）============
+        edge_success = False
+        print("[TTS] 🔵 尝试 Edge TTS（微软语音）...")
+        try:
+            edge_success = await self._generate_tts_edge_with_fallback(segments, output_path)
+        except Exception as e:
+            print(f"[TTS] ❌ Edge TTS 整体异常: {e}")
+        
+        if edge_success:
+            return
+        
+        # ============ 降级到硅基流动 TTS ============
         if settings.backup_ai_api_key and settings.backup_ai_base_url and "siliconflow" in settings.backup_ai_base_url.lower():
-            print("[TTS] 🔵 尝试硅基流动 CosyVoice2 TTS...")
+            print("[TTS] 🟡 降级到硅基流动 CosyVoice2 TTS...")
             try:
                 siliconflow_success = await self._generate_tts_siliconflow(segments, output_path)
+                if siliconflow_success:
+                    return
             except Exception as e:
                 print(f"[TTS] ❌ 硅基流动 TTS 整体异常: {e}")
         else:
-            print("[TTS] ℹ️ 未配置硅基流动，跳过")
+            print("[TTS] ℹ️ 未配置硅基流动降级方案")
         
-        if siliconflow_success:
-            return
+        # ============ 全部失败，抛出异常 ============
+        raise Exception("所有 TTS 引擎（Edge TTS + 硅基流动）均失败，无法生成播客音频")
+    
+    async def _generate_tts_edge_with_fallback(self, segments: List[str], output_path: str) -> bool:
+        """
+        使用 Edge TTS 生成音频（主引擎，带成功率检测）
         
-        # ============ 降级到 Edge TTS ============
-        print("[TTS] 🟡 降级到 Edge TTS...")
-        await self._generate_tts_edge(segments, output_path)
+        如果成功率 >= 50%，视为成功，合并已有段落输出。
+        如果成功率 < 50%，返回 False，主流程会降级到硅基流动。
+        
+        Returns:
+            True=成功，False=失败需降级
+        """
+        from .audio_mixer import AudioSegment
+        import tempfile
+        
+        # Edge TTS 需要极限切割（VPS 上对文本长度限制严格）
+        MAX_SEGMENT_CHARS = 60
+        final_segments = []
+        for seg in segments:
+            if len(seg) <= MAX_SEGMENT_CHARS:
+                final_segments.append(seg)
+            else:
+                sub_parts = re.split(r'(?<=[。！？\n])', seg)
+                for part in sub_parts:
+                    part = part.strip()
+                    if not part:
+                        continue
+                    if len(part) <= MAX_SEGMENT_CHARS:
+                        final_segments.append(part)
+                    else:
+                        sub_sub = re.split(r'(?<=[，；、])', part)
+                        current_chunk = ""
+                        for ss in sub_sub:
+                            if len(current_chunk) + len(ss) > MAX_SEGMENT_CHARS and current_chunk:
+                                final_segments.append(current_chunk.strip())
+                                current_chunk = ss
+                            else:
+                                current_chunk += ss
+                        if current_chunk.strip():
+                            final_segments.append(current_chunk.strip())
+        
+        segments = [s for s in final_segments if s.strip()]
+        print(f"[TTS-Edge] 最终 {len(segments)} 个音频段落，最长 {max(len(s) for s in segments) if segments else 0} 字")
+        
+        if not segments:
+            return False
+        
+        temp_dir = Path(tempfile.gettempdir()) / f"podcast_edge_{uuid.uuid4().hex[:8]}"
+        temp_dir.mkdir(exist_ok=True)
+        
+        # 先用前 3 段做快速探测，如果全部失败就直接降级，不浪费时间
+        probe_count = min(3, len(segments))
+        probe_failures = 0
+        
+        try:
+            segment_files = []
+            failed_count = 0
+            
+            for i, segment in enumerate(segments):
+                if not segment:
+                    continue
+                    
+                segment_path = temp_dir / f"segment_{i:02d}.mp3"
+                print(f"[TTS-Edge] 正在生成第 {i+1}/{len(segments)} 段（{len(segment)}字）...")
+                
+                success = False
+                for retry in range(3):
+                    try:
+                        communicate = edge_tts.Communicate(
+                            text=segment,
+                            voice=self.voice,
+                            rate=self.rate,
+                            volume=self.volume
+                        )
+                        await communicate.save(str(segment_path))
+                        
+                        if segment_path.exists() and segment_path.stat().st_size > 1024:
+                            segment_files.append(segment_path)
+                            success = True
+                            break
+                        else:
+                            print(f"[TTS-Edge] 第 {i+1} 段生成了空文件，重试 ({retry+1}/3)...")
+                            await asyncio.sleep(2)
+                    except Exception as e:
+                        print(f"[TTS-Edge] 第 {i+1} 段失败: {e}，重试 ({retry+1}/3)...")
+                        await asyncio.sleep(3)
+                
+                if not success:
+                    failed_count += 1
+                    # 探测阶段检测
+                    if i < probe_count:
+                        probe_failures += 1
+                        if probe_failures >= probe_count:
+                            print(f"[TTS-Edge] ❌ 前 {probe_count} 段全部失败，Edge TTS 不可用，快速降级")
+                            return False
+                    
+                    # 尝试逐句生成
+                    print(f"[TTS-Edge] ⚠️ 第 {i+1} 段整体失败，尝试逐句生成...")
+                    sub_sentences = re.split(r'(?<=[。！？\n])', segment)
+                    sub_sentences = [s.strip() for s in sub_sentences if s.strip() and len(s.strip()) > 2]
+                    sub_success = 0
+                    for j, sub in enumerate(sub_sentences):
+                        sub_path = temp_dir / f"segment_{i:02d}_sub_{j:02d}.mp3"
+                        try:
+                            comm = edge_tts.Communicate(
+                                text=sub,
+                                voice=self.voice,
+                                rate=self.rate,
+                                volume=self.volume
+                            )
+                            await comm.save(str(sub_path))
+                            if sub_path.exists() and sub_path.stat().st_size > 512:
+                                segment_files.append(sub_path)
+                                sub_success += 1
+                        except Exception:
+                            pass
+                    if sub_success > 0:
+                        print(f"[TTS-Edge] ✅ 逐句恢复了 {sub_success}/{len(sub_sentences)} 句")
+                    else:
+                        print(f"[TTS-Edge] ⚠️ 第 {i+1} 段最终失败，跳过")
+            
+            # 判断成功率
+            if not segment_files:
+                print("[TTS-Edge] ❌ 所有段落都失败了")
+                return False
+            
+            success_rate = len(segment_files) / len(segments)
+            if success_rate < 0.5:
+                print(f"[TTS-Edge] ❌ 成功率过低 ({success_rate:.0%})，降级到硅基流动")
+                return False
+            
+            if failed_count > 0:
+                print(f"[TTS-Edge] ⚠️ {failed_count} 段失败，使用 {len(segment_files)} 段继续合成")
+            
+            # 合并音频
+            print(f"[TTS-Edge] 合并 {len(segment_files)} 个音频段落...")
+            pause_duration = 300
+            pause = AudioSegment.silent(duration=pause_duration)
+            
+            final_audio = AudioSegment.empty()
+            for i, segment_path in enumerate(segment_files):
+                segment_audio = AudioSegment.from_mp3(str(segment_path))
+                final_audio += segment_audio
+                if i < len(segment_files) - 1:
+                    final_audio += pause
+            
+            final_audio.export(output_path, format="mp3", bitrate="192k")
+            print(f"[TTS-Edge] ✅ 合成完成，共 {len(segment_files)} 段，{len(final_audio) // 1000} 秒")
+            return True
+            
+        finally:
+            import shutil
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
     
     async def _generate_tts_siliconflow(self, segments: List[str], output_path: str) -> bool:
         """
