@@ -2081,7 +2081,10 @@ class AIAnalyzerService:
     
     def _select_model(self, base_url: str, ai_model: str) -> str:
         """根据 base_url 智能选择模型"""
-        if ai_model and "claude" not in ai_model.lower():
+        # 如果配置了具体模型名（含 claude 或 anthropic/），直接使用
+        if ai_model and ("claude" in ai_model.lower() or "anthropic/" in ai_model.lower()):
+            return ai_model
+        if ai_model and ai_model not in ("claude-3-opus-20240229",):
             return ai_model
         if base_url:
             if "deepseek" in base_url.lower():
@@ -2089,18 +2092,24 @@ class AIAnalyzerService:
             elif "siliconflow" in base_url.lower():
                 return "deepseek-ai/DeepSeek-V3"
             else:
-                return "gpt-4-turbo"
-        return ai_model if "gpt" in ai_model.lower() else "gpt-4-turbo"
+                return ai_model or "gpt-4-turbo"
+        return ai_model or "gpt-4-turbo"
     
     def _adapt_max_tokens(self, model: str, base_url: str, max_tokens: int) -> int:
         """根据模型自动适配 max_tokens
         
-        DeepSeek 官方 API (api.deepseek.com) 的 deepseek-chat 最大输出 8192 tokens。
-        硅基流动等第三方托管的 DeepSeek-V3 可能支持更高上限。
+        Claude (Ofox等中转): 支持 64K 输出，不限制
+        DeepSeek 官方 API: max_tokens 上限 8192
+        硅基流动 DeepSeek-V3: 上限 16384
         """
+        model_lower = (model or "").lower()
         base_url_lower = (base_url or "").lower()
+        
+        # Claude 系列：支持超大输出，不限制
+        if "claude" in model_lower or "anthropic" in model_lower:
+            return max_tokens
+        
         if "deepseek.com" in base_url_lower:
-            # DeepSeek 官方 API: max_tokens 上限 8192
             return min(max_tokens, 8192)
         elif "siliconflow" in base_url_lower:
             # 硅基流动托管的 DeepSeek-V3: 上限更高

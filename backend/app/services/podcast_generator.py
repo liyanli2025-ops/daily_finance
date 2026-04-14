@@ -168,14 +168,17 @@ class PodcastGeneratorService:
     
     def _select_podcast_model(self, base_url: str, ai_model: str) -> str:
         """为播客选择模型"""
-        if ai_model and "claude" not in ai_model.lower():
+        # Claude 中转平台：直接使用配置的模型名
+        if ai_model and ("claude" in ai_model.lower() or "anthropic/" in ai_model.lower()):
+            return ai_model
+        if ai_model and ai_model not in ("claude-3-opus-20240229",):
             return ai_model
         if base_url:
             if "deepseek" in base_url.lower():
                 return "deepseek-chat"
             elif "siliconflow" in base_url.lower():
                 return "deepseek-ai/DeepSeek-V3"
-        return "gpt-4-turbo"
+        return ai_model or "gpt-4-turbo"
     
     async def _call_ai_for_podcast(self, system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> Optional[str]:
         """
