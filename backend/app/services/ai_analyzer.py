@@ -1878,7 +1878,7 @@ class AIAnalyzerService:
                             lambda: self.openai_client.chat.completions.create(
                                 model="openai",
                                 max_tokens=min(max_tokens, 4000),
-                                temperature=0.3,
+                                temperature=0.1,
                                 messages=[{"role": "user", "content": prompt}],
                                 timeout=120
                             )
@@ -2445,19 +2445,146 @@ class AIAnalyzerService:
         )
     
     def _extract_json(self, text: str) -> Dict:
-        """从文本中提取 JSON"""
+        """从文本中提取 JSON（增强版：处理截断、格式错误等）"""
+        import re
+        
+        if not text:
+            return {}
+        
+        json_str = ""
+        
         try:
-            # 尝试找到 JSON 块
+            # 方式1：提取 ```json ... ``` 块
             if "```json" in text:
                 start = text.index("```json") + 7
-                end = text.index("```", start)
-                json_str = text[start:end].strip()
-                return json.loads(json_str)
+                # 尝试找到闭合的 ```
+                try:
+                    end = text.index("```", start)
+                    json_str = text[start:end].strip()
+                except ValueError:
+                    # 没有闭合的 ```（被截断了），取到文本末尾
+                    json_str = text[start:].strip()
+                    print(f"[AI] ⚠️ JSON 块未闭合（可能被截断），尝试修复...", flush=True)
             
-            # 尝试直接解析
+            if json_str:
+                # 尝试直接解析
+                try:
+                    return json.loads(json_str)
+                except json.JSONDecodeError:
+                    pass
+                
+                # 修复常见截断问题：补全缺失的括号
+                fixed = self._fix_truncated_json(json_str)
+                if fixed:
+                    try:
+                        result = json.loads(fixed)
+                        print(f"[AI] ✅ 截断 JSON 修复成功", flush=True)
+                        return result
+                    except json.JSONDecodeError:
+                        pass
+                
+                # 最后尝试：用正则提取关键字段
+                return self._extract_json_fields_by_regex(json_str)
+            
+            # 方式2：尝试直接解析整个文本
             return json.loads(text)
-        except:
+            
+        except (json.JSONDecodeError, ValueError) as e:
+            # 尝试从文本中找 { ... } 块
+            try:
+                brace_match = re.search(r'\{[\s\S]*\}', text)
+                if brace_match:
+                    return json.loads(brace_match.group())
+            except (json.JSONDecodeError, ValueError):
+                pass
+            
+            print(f"[AI] ⚠️ JSON 解析失败: {str(e)[:80]}", flush=True)
             return {}
+        except Exception as e:
+            print(f"[AI] ⚠️ JSON 提取异常: {type(e).__name__}: {str(e)[:80]}", flush=True)
+            return {}
+    
+    def _fix_truncated_json(self, json_str: str) -> Optional[str]:
+        """尝试修复被截断的 JSON（补全缺失的括号和引号）"""
+        if not json_str:
+            return None
+        
+        # 去掉尾部可能的乱码
+        json_str = json_str.rstrip()
+        
+        # 如果尾部是逗号，去掉
+        json_str = json_str.rstrip(',').rstrip()
+        
+        # 统计未闭合的括号
+        open_braces = json_str.count('{') - json_str.count('}')
+        open_brackets = json_str.count('[') - json_str.count(']')
+        
+        # 检查是否在字符串中间被截断（未闭合的引号）
+        in_string = False
+        escaped = False
+        for ch in json_str:
+            if escaped:
+                escaped = False
+                continue
+            if ch == '\\':
+                escaped = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+        
+        # 如果在字符串中间截断，补全引号
+        if in_string:
+            json_str += '"'
+        
+        # 去掉尾部不完整的键值对（如 "key": 或 "key": "val）
+        # 先尝试去掉最后一个不完整的 key-value
+        json_str = json_str.rstrip()
+        if json_str.endswith(':'):
+            json_str += ' ""'
+        
+        # 补全括号
+        json_str += ']' * max(0, open_brackets)
+        json_str += '}' * max(0, open_braces)
+        
+        return json_str
+    
+    def _extract_json_fields_by_regex(self, text: str) -> Dict:
+        """用正则从残缺 JSON 中提取关键字段"""
+        import re
+        result = {}
+        
+        # 提取 title
+        title_match = re.search(r'"title"\s*:\s*"([^"]*)"', text)
+        if title_match:
+            result["title"] = title_match.group(1)
+        
+        # 提取 summary
+        summary_match = re.search(r'"summary"\s*:\s*"([^"]*)"', text)
+        if summary_match:
+            result["summary"] = summary_match.group(1)
+        
+        # 提取 core_opinions（数组）
+        opinions_match = re.search(r'"core_opinions"\s*:\s*\[(.*?)\]', text, re.DOTALL)
+        if opinions_match:
+            opinions_str = opinions_match.group(1)
+            opinions = re.findall(r'"([^"]+)"', opinions_str)
+            if opinions:
+                result["core_opinions"] = opinions
+        
+        # 提取 market_score
+        score_match = re.search(r'"market_score"\s*:\s*(\d+)', text)
+        if score_match:
+            result["market_score"] = int(score_match.group(1))
+        
+        # 提取 position_advice
+        pos_match = re.search(r'"position_advice"\s*:\s*"([^"]*)"', text)
+        if pos_match:
+            result["position_advice"] = pos_match.group(1)
+        
+        if result:
+            print(f"[AI] ✅ 正则提取到 {len(result)} 个 JSON 字段: {list(result.keys())}", flush=True)
+        
+        return result
     
     def _generate_mock_report(self) -> str:
         """生成模拟报告（用于测试或 API 不可用时）- 7模块结构"""
