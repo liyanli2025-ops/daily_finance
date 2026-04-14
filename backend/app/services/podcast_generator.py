@@ -665,7 +665,7 @@ class PodcastGeneratorService:
         import tempfile
         
         # Edge TTS 需要极限切割（VPS 上对文本长度限制严格）
-        MAX_SEGMENT_CHARS = 60
+        MAX_SEGMENT_CHARS = 40  # 从60降到40，减少失败率
         final_segments = []
         for seg in segments:
             if len(seg) <= MAX_SEGMENT_CHARS:
@@ -699,6 +699,8 @@ class PodcastGeneratorService:
         temp_dir = Path(tempfile.gettempdir()) / f"podcast_edge_{uuid.uuid4().hex[:8]}"
         temp_dir.mkdir(exist_ok=True)
         
+        EDGE_TTS_TIMEOUT = 15  # 每段最多 15 秒，避免永久卡住
+        
         # 先用前 3 段做快速探测，如果全部失败就直接降级，不浪费时间
         probe_count = min(3, len(segments))
         probe_failures = 0
@@ -723,7 +725,7 @@ class PodcastGeneratorService:
                             rate=self.rate,
                             volume=self.volume
                         )
-                        await communicate.save(str(segment_path))
+                        await asyncio.wait_for(communicate.save(str(segment_path)), timeout=EDGE_TTS_TIMEOUT)
                         
                         if segment_path.exists() and segment_path.stat().st_size > 1024:
                             segment_files.append(segment_path)
@@ -731,10 +733,13 @@ class PodcastGeneratorService:
                             break
                         else:
                             print(f"[TTS-Edge] 第 {i+1} 段生成了空文件，重试 ({retry+1}/3)...")
-                            await asyncio.sleep(2)
+                            await asyncio.sleep(1)
+                    except asyncio.TimeoutError:
+                        print(f"[TTS-Edge] 第 {i+1} 段超时({EDGE_TTS_TIMEOUT}s)，重试 ({retry+1}/3)...")
+                        await asyncio.sleep(1)
                     except Exception as e:
                         print(f"[TTS-Edge] 第 {i+1} 段失败: {e}，重试 ({retry+1}/3)...")
-                        await asyncio.sleep(3)
+                        await asyncio.sleep(2)
                 
                 if not success:
                     failed_count += 1
@@ -745,7 +750,7 @@ class PodcastGeneratorService:
                             print(f"[TTS-Edge] ❌ 前 {probe_count} 段全部失败，Edge TTS 不可用，快速降级")
                             return False
                     
-                    # 尝试逐句生成
+                    # 尝试逐句生成（更短的文本更容易成功）
                     print(f"[TTS-Edge] ⚠️ 第 {i+1} 段整体失败，尝试逐句生成...")
                     sub_sentences = re.split(r'(?<=[。！？\n])', segment)
                     sub_sentences = [s.strip() for s in sub_sentences if s.strip() and len(s.strip()) > 2]
@@ -759,7 +764,7 @@ class PodcastGeneratorService:
                                 rate=self.rate,
                                 volume=self.volume
                             )
-                            await comm.save(str(sub_path))
+                            await asyncio.wait_for(comm.save(str(sub_path)), timeout=EDGE_TTS_TIMEOUT)
                             if sub_path.exists() and sub_path.stat().st_size > 512:
                                 segment_files.append(sub_path)
                                 sub_success += 1
@@ -957,13 +962,13 @@ class PodcastGeneratorService:
         使用 Edge TTS 生成音频（降级方案）
         
         注意：Edge TTS 在 VPS 上可能因微软 IP 风控导致 NoAudioReceived，
-        需要极限分段（每段 < 60 字）来提高成功率。
+        需要极限分段（每段 < 40 字）来提高成功率。
         """
         from .audio_mixer import AudioSegment
         import tempfile
         
         # Edge TTS 需要极限切割（VPS 上对文本长度限制严格）
-        MAX_SEGMENT_CHARS = 60
+        MAX_SEGMENT_CHARS = 40  # 从60降到40，减少失败率
         final_segments = []
         for seg in segments:
             if len(seg) <= MAX_SEGMENT_CHARS:
@@ -994,6 +999,8 @@ class PodcastGeneratorService:
         temp_dir = Path(tempfile.gettempdir()) / f"podcast_edge_{uuid.uuid4().hex[:8]}"
         temp_dir.mkdir(exist_ok=True)
         
+        EDGE_TTS_TIMEOUT = 15  # 每段最多 15 秒
+        
         try:
             segment_files = []
             failed_count = 0
@@ -1013,7 +1020,7 @@ class PodcastGeneratorService:
                             rate=self.rate,
                             volume=self.volume
                         )
-                        await communicate.save(str(segment_path))
+                        await asyncio.wait_for(communicate.save(str(segment_path)), timeout=EDGE_TTS_TIMEOUT)
                         
                         if segment_path.exists() and segment_path.stat().st_size > 1024:
                             segment_files.append(segment_path)
@@ -1021,10 +1028,13 @@ class PodcastGeneratorService:
                             break
                         else:
                             print(f"[TTS-Edge] 第 {i+1} 段生成了空文件，重试 ({retry+1}/3)...")
-                            await asyncio.sleep(2)
+                            await asyncio.sleep(1)
+                    except asyncio.TimeoutError:
+                        print(f"[TTS-Edge] 第 {i+1} 段超时({EDGE_TTS_TIMEOUT}s)，重试 ({retry+1}/3)...")
+                        await asyncio.sleep(1)
                     except Exception as e:
                         print(f"[TTS-Edge] 第 {i+1} 段失败: {e}，重试 ({retry+1}/3)...")
-                        await asyncio.sleep(3)
+                        await asyncio.sleep(2)
                 
                 if not success:
                     print(f"[TTS-Edge] ⚠️ 第 {i+1} 段整体失败，尝试逐句生成...")
@@ -1040,7 +1050,7 @@ class PodcastGeneratorService:
                                 rate=self.rate,
                                 volume=self.volume
                             )
-                            await comm.save(str(sub_path))
+                            await asyncio.wait_for(comm.save(str(sub_path)), timeout=EDGE_TTS_TIMEOUT)
                             if sub_path.exists() and sub_path.stat().st_size > 512:
                                 segment_files.append(sub_path)
                                 sub_success += 1
