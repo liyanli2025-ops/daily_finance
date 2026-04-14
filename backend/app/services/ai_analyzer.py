@@ -1976,7 +1976,7 @@ class AIAnalyzerService:
                             lambda: self.openai_client.chat.completions.create(
                                 model=model,
                                 max_tokens=actual_max_tokens,
-                                temperature=0.3,
+                                temperature=0.5,
                                 messages=[{"role": "user", "content": prompt}],
                                 timeout=AI_CALL_TIMEOUT
                             )
@@ -2014,7 +2014,7 @@ class AIAnalyzerService:
                             lambda: self.backup_client.chat.completions.create(
                                 model=backup_model,
                                 max_tokens=backup_max_tokens,
-                                temperature=0.3,
+                                temperature=0.5,
                                 messages=[{"role": "user", "content": prompt}],
                                 timeout=AI_CALL_TIMEOUT
                             )

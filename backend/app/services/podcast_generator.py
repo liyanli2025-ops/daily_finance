@@ -1338,8 +1338,8 @@ class PodcastGeneratorService:
             # 清理可能的 Markdown 残留
             script = self._clean_for_tts(script)
             
-            # 【保护】检查脚本长度，太短则视为失败（早报至少800字，晚报/周末至少1200字）
-            min_length = 800 if not is_weekend and report_type != ReportType.EVENING else 1200
+            # 【保护】检查脚本长度，太短则视为失败（早报至少500字，晚报/周末至少800字）
+            min_length = 500 if not is_weekend and report_type != ReportType.EVENING else 800
             if len(script) < min_length:
                 print(f"[播客] ⚠️ AI 脚本过短（{len(script)}字 < {min_length}字），视为失败，回退到模板")
                 return None
