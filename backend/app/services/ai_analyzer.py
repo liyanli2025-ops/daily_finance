@@ -987,7 +987,7 @@ class AIAnalyzerService:
         """
         准备自选股分析文本
         
-        统一从配置文件和数据库加载自选股
+        统一从配置文件和数据库加载自选股，并获取实时行情数据
         """
         watchlist_service = get_watchlist_service()
         
@@ -1014,13 +1014,162 @@ class AIAnalyzerService:
         except Exception as e:
             print(f"[AI] 数据库自选股加载失败: {e}")
         
-        return watchlist_service.format_for_prompt()
+        # 获取自选股实时行情数据
+        all_stocks = watchlist_service.get_all_stocks()
+        stock_quotes = self._fetch_watchlist_quotes(all_stocks)
+        
+        # 生成带行情数据的 prompt
+        return self._format_watchlist_with_quotes(watchlist_service, stock_quotes)
+    
+    def _fetch_watchlist_quotes(self, stocks) -> dict:
+        """
+        获取自选股实时行情（通过东方财富 HTTP 接口）
+        
+        Returns:
+            {code: {price, change_pct, change_amount, volume, amount, high, low, open}} 
+        """
+        import requests
+        
+        if not stocks:
+            return {}
+        
+        quotes = {}
+        
+        # 构建东方财富批量查询的 secids
+        secids = []
+        for stock in stocks:
+            code = stock.code
+            if stock.market == "HK":
+                secids.append(f"116.{code}")
+            elif code.startswith("6"):
+                secids.append(f"1.{code}")
+            elif code.startswith(("0", "3")):
+                secids.append(f"0.{code}")
+            elif code.startswith("68"):
+                secids.append(f"1.{code}")
+            elif code.startswith("4") or code.startswith("8"):
+                secids.append(f"0.{code}")
+            else:
+                secids.append(f"1.{code}")
+        
+        try:
+            # 东方财富批量行情接口（HTTP，避免 HTTPS 被封）
+            url = "http://push2.eastmoney.com/api/qt/ulist.np/get"
+            params = {
+                "fltt": "2",
+                "fields": "f2,f3,f4,f5,f6,f7,f12,f14,f15,f16,f17",
+                "secids": ",".join(secids),
+            }
+            resp = requests.get(url, params=params, timeout=10)
+            data = resp.json()
+            
+            if data.get("data") and data["data"].get("diff"):
+                for item in data["data"]["diff"]:
+                    code = str(item.get("f12", ""))
+                    name = item.get("f14", "")
+                    price = item.get("f2", 0)  # 最新价
+                    change_pct = item.get("f3", 0)  # 涨跌幅
+                    change_amount = item.get("f4", 0)  # 涨跌额
+                    volume = item.get("f5", 0)  # 成交量（手）
+                    amount = item.get("f6", 0)  # 成交额（元）
+                    amplitude = item.get("f7", 0)  # 振幅
+                    high = item.get("f15", 0)  # 最高
+                    low = item.get("f16", 0)  # 最低
+                    open_price = item.get("f17", 0)  # 开盘
+                    
+                    if price and price != "-":
+                        quotes[code] = {
+                            "name": name,
+                            "price": float(price) if price else 0,
+                            "change_pct": float(change_pct) if change_pct else 0,
+                            "change_amount": float(change_amount) if change_amount else 0,
+                            "volume": int(volume) if volume else 0,
+                            "amount": float(amount) if amount else 0,
+                            "amplitude": float(amplitude) if amplitude else 0,
+                            "high": float(high) if high else 0,
+                            "low": float(low) if low else 0,
+                            "open": float(open_price) if open_price else 0,
+                        }
+                
+                print(f"[AI] 自选股行情获取成功：{len(quotes)}/{len(stocks)} 只")
+            else:
+                print(f"[AI] 自选股行情接口返回空数据")
+        except Exception as e:
+            print(f"[AI] 自选股行情获取失败（不影响报告生成）: {e}")
+        
+        return quotes
+    
+    def _format_watchlist_with_quotes(self, watchlist_service, stock_quotes: dict) -> str:
+        """格式化自选股信息（含实时行情数据）"""
+        all_stocks = watchlist_service.get_all_stocks()
+        
+        if not all_stocks:
+            return ""
+        
+        lines = [
+            "### 📌 用户自选股（请特别关注）",
+            "",
+            "用户正在追踪以下股票，请在分析中重点关注：",
+            "",
+        ]
+        
+        if stock_quotes:
+            lines.append("⚠️ **【自选股实时行情数据】以下是系统采集的自选股真实行情，你在报告中引用自选股的价格、涨跌幅时必须与此完全一致，严禁编造！**")
+            lines.append("")
+            lines.append("| 股票 | 代码 | 最新价 | 涨跌幅 | 涨跌额 | 开盘 | 最高 | 最低 | 振幅 | 成交额(万) |")
+            lines.append("|------|------|--------|--------|--------|------|------|------|------|-----------|")
+            
+            for stock in all_stocks:
+                q = stock_quotes.get(stock.code)
+                if q:
+                    trend = "📈" if q["change_pct"] > 0 else ("📉" if q["change_pct"] < 0 else "➡️")
+                    amount_wan = q["amount"] / 10000 if q["amount"] else 0
+                    lines.append(
+                        f"| {trend} {stock.name} | {stock.code} | "
+                        f"{q['price']:.2f} | {q['change_pct']:+.2f}% | "
+                        f"{q['change_amount']:+.2f} | {q['open']:.2f} | "
+                        f"{q['high']:.2f} | {q['low']:.2f} | "
+                        f"{q['amplitude']:.2f}% | {amount_wan:.0f} |"
+                    )
+                else:
+                    market_name = "A股" if stock.market == "A" else "港股"
+                    lines.append(f"| {stock.name} | {stock.code} | 数据暂缺 | - | - | - | - | - | - | - |")
+            
+            lines.append("")
+        else:
+            # 没获取到行情，用原格式
+            from typing import Dict as _Dict
+            by_sector: _Dict[str, list] = {}
+            no_sector = []
+            for stock in all_stocks:
+                if stock.sector:
+                    if stock.sector not in by_sector:
+                        by_sector[stock.sector] = []
+                    by_sector[stock.sector].append(stock)
+                else:
+                    no_sector.append(stock)
+            for sector, stocks in by_sector.items():
+                lines.append(f"**{sector}板块**：")
+                for s in stocks:
+                    market_name = "A股" if s.market == "A" else "港股"
+                    lines.append(f"- {s.name}（{s.code}，{market_name}）")
+                lines.append("")
+            if no_sector:
+                lines.append("**其他**：")
+                for s in no_sector:
+                    market_name = "A股" if s.market == "A" else "港股"
+                    lines.append(f"- {s.name}（{s.code}，{market_name}）")
+                lines.append("")
+        
+        lines.append("请在自选股分析模块中对这些股票进行详细分析，**引用上方的真实行情数据**。")
+        
+        return "\n".join(lines)
     
     def _get_watchlist_analysis_prompt(self) -> str:
         """
         生成自选股分析提示
         
-        使用统一的自选股服务
+        使用统一的自选股服务，并强调引用真实行情数据
         """
         watchlist_service = get_watchlist_service()
         
@@ -1032,7 +1181,26 @@ class AIAnalyzerService:
             watchlist_service.load_from_config(settings.watchlist_stocks)
             all_stocks = watchlist_service.get_all_stocks()
         
-        return watchlist_service.format_analysis_prompt()
+        if not all_stocks:
+            return "（用户暂未设置自选股，可跳过此模块）"
+        
+        lines = [
+            "⚠️ **重要：分析每只自选股时，必须引用上方「用户自选股」部分提供的真实行情数据（最新价、涨跌幅、成交额等）。严禁编造任何行情数字！如果某只股票的行情数据显示'数据暂缺'，则直接说明数据缺失。**",
+            "",
+        ]
+        
+        for stock in all_stocks:
+            lines.append(f"""
+#### {stock.name}（{stock.code}）
+
+请基于上方提供的真实行情数据分析：
+1. **今日/本周表现**：引用真实的涨跌幅和成交额数据
+2. **技术面信号**：是否有买入/卖出信号
+3. **消息面**：是否有相关新闻影响
+4. **操作建议**：买入/持有/减仓/观望，给出具体理由
+5. **关键价位**：支撑位和阻力位""")
+        
+        return "\n".join(lines)
     
     def _get_investment_style_description(self) -> str:
         """获取投资风格描述"""
