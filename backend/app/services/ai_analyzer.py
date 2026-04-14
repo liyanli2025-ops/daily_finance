@@ -166,6 +166,10 @@ class AIAnalyzerService:
                   f"{len(market_data.lhb_seats)} 条龙虎榜席位，"
                   f"{len(market_data.block_trades)} 笔大宗交易，"
                   f"融资融券{'有' if market_data.margin_data else '无'}数据")
+        except RuntimeError as e:
+            # 熔断异常：核心数据全部失败，中止报告生成
+            print(f"[ABORT] 🚫 市场数据采集触发熔断，中止报告生成: {e}")
+            raise  # 向上传播，让 scheduler 捕获并跳过本次报告
         except Exception as e:
             print(f"[WARN] 市场数据获取失败，将使用空数据继续生成报告: {e}")
             market_data = MarketOverview(date=today.strftime("%Y-%m-%d"))

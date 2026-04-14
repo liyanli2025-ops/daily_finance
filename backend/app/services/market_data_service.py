@@ -648,8 +648,7 @@ class MarketDataService:
         overview = MarketOverview(date=date_str)
         
         if not self.akshare_available:
-            print("⚠️ AKShare 不可用，返回空数据")
-            return overview
+            print("⚠️ AKShare 不可用，将仅使用 HTTP 直连方案获取数据")
         
         # 串行获取各类数据，每次间隔 1 秒，避免触发数据源限流/反爬
         task_configs = [
@@ -780,16 +779,41 @@ class MarketDataService:
         print(f"\n  [市场数据汇总] {success_count}/{len(results)} 项成功"
               f"{f'，失败项: {', '.join(fail_names)}' if fail_names else ''}")
         
+        # ── 熔断机制：核心数据全部失败则中止报告生成 ──
+        # 核心数据 = 指数 + 板块排行 + 市场统计，这三项全失败说明所有数据源都不可用
+        core_data_ok = (
+            bool(overview.indices) or
+            bool(overview.top_sectors) or
+            (overview.up_count > 0 or overview.down_count > 0)
+        )
+        if not core_data_ok:
+            error_msg = (
+                f"[熔断] ⚠️ 核心市场数据全部采集失败！"
+                f"（指数: {'失败' if not overview.indices else 'OK'}, "
+                f"板块: {'失败' if not overview.top_sectors else 'OK'}, "
+                f"涨跌统计: {'失败' if overview.up_count == 0 and overview.down_count == 0 else 'OK'}）\n"
+                f"失败项: {', '.join(fail_names)}\n"
+                f"所有数据源（AKShare/东方财富/腾讯/新浪）均不可用，中止报告生成以避免输出无数据的空报告。"
+            )
+            print(error_msg, flush=True)
+            raise RuntimeError(error_msg)
+        
         return overview
     
     async def _get_indices(self) -> List[IndexData]:
-        """获取主要指数数据（双方案兜底）"""
-        import akshare as ak
+        """
+        获取主要指数数据（4层备用链路）
         
+        方案1: AKShare → 东方财富 (stock_zh_index_spot_em)
+        方案2: 东方财富 HTTP 直连 (push2.eastmoney.com，绕过AKShare)
+        方案3: 腾讯财经 HTTP 直连 (qt.gtimg.cn，最稳定)
+        方案4: 新浪实时行情 HTTP 直连 (hq.sinajs.cn)
+        """
         indices = []
         
-        # 方案1：东方财富指数行情
+        # ── 方案1：AKShare → 东方财富 ──
         try:
+            import akshare as ak
             df = await self._call_akshare_with_retry(ak.stock_zh_index_spot_em)
             
             main_indices = {
@@ -817,42 +841,279 @@ class MarketDataService:
                         open=float(r.get('今开', 0)),
                     ))
             if indices:
+                print(f"  [指数] 方案1（AKShare东方财富）获取成功: {len(indices)} 个指数")
                 return indices
         except Exception as e:
-            print(f"获取指数数据异常（方案1东方财富）: {e}")
+            print(f"  [指数] 方案1（AKShare东方财富）失败: {e}")
         
-        # 方案2：新浪指数（备用）
+        # ── 方案2：东方财富 HTTP 直连（绕过AKShare） ──
         try:
-            sina_indices = {
-                "sh000001": ("000001", "上证指数"),
-                "sz399001": ("399001", "深证成指"),
-                "sz399006": ("399006", "创业板指"),
-                "sh000300": ("000300", "沪深300"),
-            }
-            for sina_code, (code, name) in sina_indices.items():
-                try:
-                    df = await self._call_akshare_with_retry(
-                        ak.stock_zh_index_daily, symbol=sina_code,
-                        max_retries=1, cache_key=f"index_sina_{sina_code}"
-                    )
-                    if df is not None and not df.empty:
-                        row = df.iloc[-1]
-                        close_val = float(row.get('close', 0))
-                        open_val = float(row.get('open', 0))
-                        change_pct = ((close_val - open_val) / open_val * 100) if open_val > 0 else 0
-                        if close_val > 0:
-                            indices.append(IndexData(
-                                code=code, name=name, current=close_val,
-                                change=close_val - open_val, change_pct=round(change_pct, 2),
-                                high=float(row.get('high', 0)), low=float(row.get('low', 0)),
-                                open=open_val, volume=float(row.get('volume', 0)),
-                            ))
-                except Exception:
-                    continue
+            indices = await self._fetch_indices_eastmoney_http()
             if indices:
-                print(f"  [指数] 方案2（新浪）获取成功: {len(indices)} 个指数")
+                print(f"  [指数] 方案2（东方财富HTTP直连）获取成功: {len(indices)} 个指数")
+                return indices
         except Exception as e:
-            print(f"获取指数数据异常（方案2新浪）: {e}")
+            print(f"  [指数] 方案2（东方财富HTTP直连）失败: {e}")
+        
+        # ── 方案3：腾讯财经 HTTP 直连（最稳定） ──
+        try:
+            indices = await self._fetch_indices_tencent_http()
+            if indices:
+                print(f"  [指数] 方案3（腾讯财经HTTP直连）获取成功: {len(indices)} 个指数")
+                return indices
+        except Exception as e:
+            print(f"  [指数] 方案3（腾讯财经HTTP直连）失败: {e}")
+        
+        # ── 方案4：新浪实时行情 HTTP 直连 ──
+        try:
+            indices = await self._fetch_indices_sina_http()
+            if indices:
+                print(f"  [指数] 方案4（新浪HTTP直连）获取成功: {len(indices)} 个指数")
+                return indices
+        except Exception as e:
+            print(f"  [指数] 方案4（新浪HTTP直连）失败: {e}")
+        
+        print("  [指数] ⚠️ 所有4个方案均失败！")
+        return indices
+    
+    async def _fetch_indices_eastmoney_http(self) -> List[IndexData]:
+        """
+        方案2：东方财富 push2.eastmoney.com 直连
+        不依赖 AKShare，直接 HTTP 请求
+        """
+        import urllib.request
+        import ssl
+        import json
+        
+        # 东方财富 secid 格式: 1.000001=上证, 0.399001=深证
+        em_indices = {
+            "1.000001": ("000001", "上证指数"),
+            "0.399001": ("399001", "深证成指"),
+            "0.399006": ("399006", "创业板指"),
+            "1.000688": ("000688", "科创50"),
+            "1.000300": ("000300", "沪深300"),
+        }
+        
+        secids = ",".join(em_indices.keys())
+        url = (
+            f"https://push2.eastmoney.com/api/qt/ulist.np/get?"
+            f"fltt=2&secids={secids}"
+            f"&fields=f2,f3,f4,f6,f12,f13,f14,f15,f16,f17,f18"
+        )
+        
+        def _do_request():
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
+            req = urllib.request.Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+            req.add_header('Referer', 'https://quote.eastmoney.com/')
+            
+            with urllib.request.urlopen(req, timeout=15, context=ctx) as response:
+                return json.loads(response.read().decode('utf-8'))
+        
+        loop = asyncio.get_event_loop()
+        data = await asyncio.wait_for(
+            loop.run_in_executor(None, _do_request),
+            timeout=20
+        )
+        
+        indices = []
+        diff_list = data.get("data", {}).get("diff", []) if data.get("data") else []
+        
+        for item in diff_list:
+            secid = f"{item.get('f13', '')}.{item.get('f12', '')}"
+            if secid in em_indices:
+                code, name = em_indices[secid]
+                current = item.get('f2', 0)
+                if current and current != '-':
+                    indices.append(IndexData(
+                        code=code,
+                        name=name,
+                        current=float(current),
+                        change=float(item.get('f4', 0) or 0),
+                        change_pct=float(item.get('f3', 0) or 0),
+                        amount=float(item.get('f6', 0) or 0),
+                        high=float(item.get('f15', 0) or 0),
+                        low=float(item.get('f16', 0) or 0),
+                        open=float(item.get('f17', 0) or 0),
+                    ))
+        
+        return indices
+    
+    async def _fetch_indices_tencent_http(self) -> List[IndexData]:
+        """
+        方案3：腾讯财经 qt.gtimg.cn 直连
+        不依赖 AKShare，国内最稳定的行情接口
+        """
+        import urllib.request
+        import ssl
+        
+        qq_indices = {
+            "sh000001": ("000001", "上证指数"),
+            "sz399001": ("399001", "深证成指"),
+            "sz399006": ("399006", "创业板指"),
+            "sh000688": ("000688", "科创50"),
+            "sh000300": ("000300", "沪深300"),
+        }
+        
+        symbols = ",".join(qq_indices.keys())
+        url = f"http://qt.gtimg.cn/q={symbols}"
+        
+        def _do_request():
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
+            req = urllib.request.Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0')
+            
+            with urllib.request.urlopen(req, timeout=10, context=ctx) as response:
+                return response.read().decode('gbk')
+        
+        loop = asyncio.get_event_loop()
+        content = await asyncio.wait_for(
+            loop.run_in_executor(None, _do_request),
+            timeout=15
+        )
+        
+        indices = []
+        for line in content.strip().split(';'):
+            if '=' not in line or '~' not in line:
+                continue
+            
+            var_name = line.split('=')[0].replace('v_', '').strip()
+            data_str = line.split('"')[1] if '"' in line else ""
+            
+            if var_name in qq_indices and data_str:
+                code, name = qq_indices[var_name]
+                parts = data_str.split('~')
+                
+                if len(parts) >= 6:
+                    try:
+                        current_price = float(parts[3]) if parts[3] else 0
+                        change = float(parts[4]) if parts[4] else 0
+                        
+                        # 涨跌幅：优先 parts[32]，其次 parts[5]
+                        change_pct = 0
+                        if len(parts) > 32 and parts[32]:
+                            try:
+                                change_pct = float(parts[32])
+                            except ValueError:
+                                pass
+                        if change_pct == 0 and parts[5]:
+                            try:
+                                pct_val = float(parts[5])
+                                if abs(pct_val) <= 100:
+                                    change_pct = pct_val
+                                elif current_price > 0 and change != 0:
+                                    prev_close = current_price - change
+                                    if prev_close > 0:
+                                        change_pct = (change / prev_close) * 100
+                            except ValueError:
+                                pass
+                        
+                        if current_price > 0:
+                            indices.append(IndexData(
+                                code=code,
+                                name=name,
+                                current=current_price,
+                                change=change,
+                                change_pct=round(change_pct, 2),
+                                volume=float(parts[6]) * 100 if len(parts) > 6 and parts[6] else 0,
+                                amount=float(parts[7]) * 10000 if len(parts) > 7 and parts[7] else 0,
+                                high=float(parts[33]) if len(parts) > 33 and parts[33] else 0,
+                                low=float(parts[34]) if len(parts) > 34 and parts[34] else 0,
+                                open=0,
+                            ))
+                    except (ValueError, IndexError) as e:
+                        print(f"  [腾讯] 解析 {var_name} 失败: {e}")
+        
+        return indices
+    
+    async def _fetch_indices_sina_http(self) -> List[IndexData]:
+        """
+        方案4：新浪实时行情 hq.sinajs.cn 直连
+        注意：需要 Referer 头，返回 GBK 编码
+        """
+        import urllib.request
+        import ssl
+        
+        sina_indices = {
+            "sh000001": ("000001", "上证指数"),
+            "sz399001": ("399001", "深证成指"),
+            "sz399006": ("399006", "创业板指"),
+            "sh000300": ("000300", "沪深300"),
+            "sh000688": ("000688", "科创50"),
+        }
+        
+        symbols = ",".join(sina_indices.keys())
+        url = f"https://hq.sinajs.cn/list={symbols}"
+        
+        def _do_request():
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
+            req = urllib.request.Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+            req.add_header('Referer', 'https://finance.sina.com.cn')
+            
+            with urllib.request.urlopen(req, timeout=10, context=ctx) as response:
+                return response.read().decode('gbk')
+        
+        loop = asyncio.get_event_loop()
+        content = await asyncio.wait_for(
+            loop.run_in_executor(None, _do_request),
+            timeout=15
+        )
+        
+        indices = []
+        for line in content.strip().split('\n'):
+            if '=' not in line or '"' not in line:
+                continue
+            
+            # 格式: var hq_str_sh000001="上证指数,3299.7057,...";
+            var_part = line.split('=')[0].strip()
+            symbol = var_part.split('_')[-1] if '_' in var_part else ""
+            
+            data_str = line.split('"')[1] if '"' in line else ""
+            if not data_str or symbol not in sina_indices:
+                continue
+            
+            code, name = sina_indices[symbol]
+            parts = data_str.split(',')
+            
+            # 新浪指数格式: 名称,今开,昨收,当前价,最高,最低,成交量,成交额,...
+            if len(parts) >= 7:
+                try:
+                    current = float(parts[3]) if parts[3] else 0
+                    open_price = float(parts[1]) if parts[1] else 0
+                    prev_close = float(parts[2]) if parts[2] else 0
+                    high = float(parts[4]) if parts[4] else 0
+                    low = float(parts[5]) if parts[5] else 0
+                    volume = float(parts[6]) if parts[6] else 0
+                    amount = float(parts[7]) if len(parts) > 7 and parts[7] else 0
+                    
+                    if current > 0 and prev_close > 0:
+                        change = current - prev_close
+                        change_pct = (change / prev_close) * 100
+                        
+                        indices.append(IndexData(
+                            code=code,
+                            name=name,
+                            current=current,
+                            change=round(change, 2),
+                            change_pct=round(change_pct, 2),
+                            volume=volume,
+                            amount=amount,
+                            high=high,
+                            low=low,
+                            open=open_price,
+                        ))
+                except (ValueError, IndexError) as e:
+                    print(f"  [新浪] 解析 {symbol} 失败: {e}")
         
         return indices
     
