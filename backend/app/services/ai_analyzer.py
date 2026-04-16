@@ -38,6 +38,8 @@ class AIAnalyzerService:
     
     def _init_clients(self):
         """初始化 AI 客户端（含备用服务）"""
+        print(f"[AI] 初始化开始 - 配置: model={settings.ai_model}, base_url={settings.openai_base_url}, has_anthropic_key={bool(settings.anthropic_api_key)}, has_openai_key={bool(settings.openai_api_key)}, has_backup_key={bool(settings.backup_ai_api_key)}")
+        
         # 1. 尝试初始化 Anthropic（最高优先级）
         if settings.anthropic_api_key:
             try:
@@ -89,9 +91,10 @@ class AIAnalyzerService:
         if self.anthropic_client:
             providers.append("Anthropic")
         if self.openai_client and not self.using_free_service:
-            providers.append(f"OpenAI/DeepSeek({settings.openai_base_url or 'default'})")
+            model_name = settings.ai_model or "unknown"
+            providers.append(f"OpenAI/DeepSeek({settings.openai_base_url or 'default'}, model={model_name})")
         if self.backup_client:
-            providers.append(f"备用({settings.backup_ai_base_url or 'default'})")
+            providers.append(f"备用({settings.backup_ai_base_url or 'default'}, model={settings.backup_ai_model})")
         if self.using_free_service:
             providers.append("Pollinations(免费)")
         print(f"[AI] 降级链路: {' → '.join(providers) if providers else '⚠️ 无可用AI服务!'}")
@@ -2022,6 +2025,7 @@ class AIAnalyzerService:
                         timeout=AI_CALL_TIMEOUT + 10
                     )
                     print(f"[AI] ✅ 备用服务 {backup_model} 调用成功（降级成功！）", flush=True)
+                    print(f"[AI] ⚠️⚠️ 注意：本次使用降级模型 {backup_model}，非首选模型 {settings.ai_model}！报告质量可能下降", flush=True)
                     return response.choices[0].message.content
                 except asyncio.TimeoutError:
                     msg = f"备用服务 {backup_model} 超时 (尝试 {attempt + 1})"

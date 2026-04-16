@@ -772,12 +772,27 @@ class MarketDataService:
         # 计算市场情绪
         overview.market_sentiment = self._calculate_sentiment(overview)
         
-        # 汇总日志：哪些数据成功，哪些失败
-        success_count = sum(1 for r in results if not isinstance(r, Exception))
+        # 汇总日志：哪些数据成功，哪些失败（空数据也算失败）
+        def _is_empty_result(r):
+            """检查结果是否为空数据"""
+            if isinstance(r, Exception):
+                return True
+            if r is None or r == [] or r == ([], []):
+                return True
+            if isinstance(r, dict) and all(v == 0 for v in r.values()):
+                return True
+            return False
+        
+        real_success_count = sum(1 for r in results if not _is_empty_result(r))
+        empty_count = sum(1 for r in results if not isinstance(r, Exception) and _is_empty_result(r))
         fail_count = sum(1 for r in results if isinstance(r, Exception))
         fail_names = [task_configs[i][0] for i, r in enumerate(results) if isinstance(r, Exception)]
-        print(f"\n  [市场数据汇总] {success_count}/{len(results)} 项成功"
-              f"{f'，失败项: {', '.join(fail_names)}' if fail_names else ''}")
+        empty_names = [task_configs[i][0] for i, r in enumerate(results) if not isinstance(r, Exception) and _is_empty_result(r)]
+        
+        problem_names = fail_names + empty_names
+        print(f"\n  [市场数据汇总] {real_success_count}/{len(results)} 项有效数据"
+              f"（{fail_count} 项异常, {empty_count} 项空数据）"
+              f"{f'，问题项: {chr(44).join(problem_names)}' if problem_names else ''}")
         
         # ── 熔断机制：核心数据全部失败则中止报告生成 ──
         # 核心数据 = 指数 + 板块排行 + 市场统计，这三项全失败说明所有数据源都不可用
