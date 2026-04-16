@@ -1924,7 +1924,7 @@ class AIAnalyzerService:
         import asyncio
         import sys
         
-        AI_CALL_TIMEOUT = 180  # 3 分钟
+        AI_CALL_TIMEOUT = 300  # 5 分钟（Claude 生成长报告需要更久）
         
         print(f"[AI DEBUG] 准备调用 AI，客户端状态:", flush=True)
         print(f"   - Anthropic: {'已初始化' if self.anthropic_client else '未初始化'}", flush=True)
