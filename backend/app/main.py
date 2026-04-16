@@ -7,7 +7,7 @@ import sys
 import io
 from contextlib import asynccontextmanager
 from datetime import datetime
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -132,27 +132,39 @@ async def health_check():
 
 
 @app.post("/api/trigger-report")
-async def trigger_report_generation():
+async def trigger_report_generation(request: Request):
     """
     手动触发报告生成（用于测试）
+    支持 body: {"type": "morning"} 或 {"type": "evening"}，默认 morning
     """
     print(f"\n[API] /api/trigger-report 被调用！时间: {datetime.now()}")
+    
+    # 解析 type 参数
+    report_type = "morning"
+    try:
+        body = await request.json()
+        report_type = body.get("type", "morning")
+    except Exception:
+        pass
+    
     if scheduler_service:
-        print("[API] 创建报告生成任务...")
+        print(f"[API] 创建{report_type}报告生成任务...")
         
-        # 使用包装函数来捕获异常
         async def generate_with_error_handling():
             try:
-                await scheduler_service.generate_daily_report()
-                print("[API] 报告生成任务完成！")
+                if report_type == "evening":
+                    await scheduler_service.generate_evening_report()
+                else:
+                    await scheduler_service.generate_daily_report()
+                print(f"[API] {report_type}报告生成任务完成！")
             except Exception as e:
                 print(f"[API] ❌ 报告生成任务失败: {e}")
                 import traceback
                 traceback.print_exc()
         
         asyncio.create_task(generate_with_error_handling())
-        print("[API] 任务已创建，立即返回")
-        return {"status": "started", "message": "报告生成任务已启动"}
+        print(f"[API] {report_type}任务已创建，立即返回")
+        return {"status": "started", "message": f"{report_type}报告生成任务已启动"}
     print("[API] 调度器未运行！")
     return {"status": "error", "message": "调度器未运行"}
 
