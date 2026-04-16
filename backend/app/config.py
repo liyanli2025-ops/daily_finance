@@ -108,7 +108,8 @@ class Settings(BaseSettings):
     )
     
     class Config:
-        env_file = ".env"
+        # 使用绝对路径定位 .env，避免 CWD 不同（如 systemd、nohup 等）导致找不到文件
+        env_file = Path(__file__).resolve().parent.parent / ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
     
@@ -141,6 +142,11 @@ class Settings(BaseSettings):
 
 # 全局配置实例
 settings = Settings()
+
+# 启动时打印关键配置，便于排查问题
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+print(f"[CONFIG] .env 路径: {_env_path} (存在: {_env_path.is_file()})")
+print(f"[CONFIG] daily_report_hour={settings.daily_report_hour}, ai_model={settings.ai_model}, port={settings.port}")
 
 
 # 确保目录存在
