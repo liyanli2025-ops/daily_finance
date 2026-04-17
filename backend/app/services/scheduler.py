@@ -536,7 +536,7 @@ class SchedulerService:
                 china_news, cross_border_news = self._generate_mock_news()
             
             # Step 3: AI 分析生成晚报（带超时保护）
-            AI_REPORT_TIMEOUT = 600  # 10 分钟超时
+            AI_REPORT_TIMEOUT = 900  # 15 分钟超时（含AI生成+审查修复，Claude长报告需要更久）
             print(f"\n[Step 3] AI 分析生成晚报（超时 {AI_REPORT_TIMEOUT}s）...", flush=True)
             analyzer = get_ai_analyzer(force_reinit=True)
             
