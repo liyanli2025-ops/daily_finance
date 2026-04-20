@@ -371,7 +371,7 @@ class SchedulerService:
                 print(f"   跨界事件: {len(report.cross_border_events)} 条")
                 
                 # Step 3: 生成播客（带超时保护）
-                PODCAST_TIMEOUT = 600  # 10 分钟
+                PODCAST_TIMEOUT = 900  # 15 分钟
                 print(f"\n[Step 3] 生成播客音频（超时 {PODCAST_TIMEOUT}s）...", flush=True)
                 podcast_gen = get_podcast_generator()
                 
@@ -570,7 +570,7 @@ class SchedulerService:
             print(f"   字数: {report.word_count}, 预计阅读时间: {report.reading_time} 分钟")
             
             # Step 4: 生成播客（晚报版，带超时保护）
-            PODCAST_TIMEOUT = 600  # 10 分钟
+            PODCAST_TIMEOUT = 900  # 15 分钟
             print(f"\n[Step 4] 生成播客音频（超时 {PODCAST_TIMEOUT}s）...", flush=True)
             podcast_gen = get_podcast_generator()
             

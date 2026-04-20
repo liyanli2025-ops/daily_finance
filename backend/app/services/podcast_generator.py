@@ -746,11 +746,17 @@ class PodcastGeneratorService:
                 
                 if not success:
                     failed_count += 1
-                    # 探测阶段检测
+                    # 探测阶段检测：前3段全败直接降级
                     if i < probe_count:
                         probe_failures += 1
                         if probe_failures >= probe_count:
                             print(f"[TTS-Edge] ❌ 前 {probe_count} 段全部失败，Edge TTS 不可用，快速降级")
+                            return False
+                    # 动态失败率检测：已处理超过20段且失败率>40%，提前降级
+                    if i >= 20:
+                        current_fail_rate = failed_count / (i + 1)
+                        if current_fail_rate > 0.4:
+                            print(f"[TTS-Edge] ❌ 已处理 {i+1} 段，失败率 {current_fail_rate:.0%} 过高，提前降级到硅基流动")
                             return False
                     
                     # 尝试逐句生成（更短的文本更容易成功）
