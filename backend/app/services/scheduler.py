@@ -153,13 +153,14 @@ class SchedulerService:
         evening_hour = settings.evening_report_hour
         evening_minute = settings.evening_report_minute
         evening_collection_hour = settings.evening_collection_hour
+        evening_collection_minute = settings.evening_collection_minute
         
         # 添加晚报生成任务（仅交易日执行，在任务内部判断）
         self.scheduler.add_job(
             self.generate_evening_report,
             CronTrigger(
                 hour=evening_collection_hour,
-                minute=0,
+                minute=evening_collection_minute,
                 day_of_week="mon-fri"  # 周一到周五触发，内部再判断是否真正的交易日
             ),
             id="evening_report",
@@ -233,7 +234,7 @@ class SchedulerService:
         print(f"   - 盘中预采集时间: {midday_hour:02d}:{midday_minute:02d} (仅交易日)")
         print(f"   - 盘后回测时间: 15:30 (仅交易日)")
         print(f"   - 信号追踪时间: 15:35 (仅交易日)")
-        print(f"   - 晚报采集时间: {evening_collection_hour:02d}:00 (仅交易日)")
+        print(f"   - 晚报采集时间: {evening_collection_hour:02d}:{evening_collection_minute:02d} (仅交易日)")
         print(f"   - 晚报推送时间: {evening_hour:02d}:{evening_minute:02d} (仅交易日)")
     
     async def stop(self):

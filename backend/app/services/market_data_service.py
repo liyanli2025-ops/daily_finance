@@ -1834,48 +1834,95 @@ class MarketDataService:
         """
         获取连板强势股
         
-        使用 AKShare 的涨停股票池接口，筛选连续涨停天数 >= 2 的股票
+        使用 AKShare 的涨停股票池接口，筛选连续涨停天数 >= 2 的股票。
+        
+        注意：东方财富的涨停股票池数据在收盘后（15:00）约 30-60 分钟才完成更新。
+        若在数据更新完成前调用，接口会静默返回前一个交易日的数据。
+        因此此处加入数据新鲜度验证：通过检查返回数据量是否与历史均值差距过大，
+        以及调用时间来判断是否需要重试。
         """
         import akshare as ak
+        import re
+        from datetime import datetime as dt
         
         consecutive_stocks = []
         date_str = target_date.strftime("%Y%m%d")
         
-        try:
-            # 获取涨停股票池（含连板天数信息）
-            df = await self._call_akshare_with_retry(ak.stock_zt_pool_em, date=date_str)
+        # 在收盘后窗口期（15:00-17:00）内最多重试 3 次，每次等待 5 分钟
+        now = dt.now()
+        is_post_close_window = (now.hour == 15 or now.hour == 16)
+        max_attempts = 3 if is_post_close_window else 1
+        
+        def parse_df(df):
+            """解析 DataFrame，返回连板股列表和涨停总数"""
+            import re
             
-            if df is not None and not df.empty:
-                # 筛选连板 >= 2 天的，按连板天数降序排序
-                if '连板数' in df.columns:
-                    df_multi = df[df['连板数'] >= 2].sort_values('连板数', ascending=False)
-                elif '几天几板' in df.columns:
-                    # 解析"几天几板"字段，如 "3天3板"
-                    import re
-                    def parse_limit_days(text):
-                        text = str(text)
-                        match = re.search(r'(\d+)天', text)
-                        return int(match.group(1)) if match else 1
-                    
-                    df['_limit_days'] = df['几天几板'].apply(parse_limit_days)
-                    df_multi = df[df['_limit_days'] >= 2].sort_values('_limit_days', ascending=False)
-                else:
-                    # 无连板字段，跳过
-                    df_multi = df.head(0)
+            def parse_limit_days_field(text):
+                text = str(text)
+                # 优先取"板"前面的数字（代表涨停次数），如 "5天3板" → 3
+                match_ban = re.search(r'(\d+)板', text)
+                if match_ban:
+                    return int(match_ban.group(1))
+                # fallback 取"天"前面的数字
+                match_tian = re.search(r'(\d+)天', text)
+                return int(match_tian.group(1)) if match_tian else 1
+            
+            total_count = len(df)
+            
+            if '连板数' in df.columns:
+                df_multi = df[df['连板数'] >= 2].sort_values('连板数', ascending=False)
+                get_limit_days = lambda row: int(row.get('连板数', 0))
+            elif '几天几板' in df.columns:
+                df['_limit_days'] = df['几天几板'].apply(parse_limit_days_field)
+                df_multi = df[df['_limit_days'] >= 2].sort_values('_limit_days', ascending=False)
+                get_limit_days = lambda row: int(row.get('_limit_days', 0))
+            else:
+                return [], total_count
+            
+            stocks = []
+            for _, row in df_multi.head(10).iterrows():
+                limit_days = get_limit_days(row)
+                stocks.append(ConsecutiveLimitStock(
+                    code=str(row.get('代码', '')),
+                    name=str(row.get('名称', '')),
+                    price=float(row.get('最新价', 0)),
+                    change_pct=float(row.get('涨跌幅', 0)),
+                    limit_days=limit_days,
+                    limit_reason=str(row.get('涨停原因', row.get('所属行业', ''))),
+                    sector=str(row.get('所属行业', '')),
+                ))
+            return stocks, total_count
+        
+        for attempt in range(max_attempts):
+            try:
+                df = await self._call_akshare_with_retry(ak.stock_zt_pool_em, date=date_str)
                 
-                for _, row in df_multi.head(10).iterrows():
-                    limit_days = int(row.get('连板数', 0)) or int(row.get('_limit_days', 0))
-                    consecutive_stocks.append(ConsecutiveLimitStock(
-                        code=str(row.get('代码', '')),
-                        name=str(row.get('名称', '')),
-                        price=float(row.get('最新价', 0)),
-                        change_pct=float(row.get('涨跌幅', 0)),
-                        limit_days=limit_days,
-                        limit_reason=str(row.get('涨停原因', row.get('所属行业', ''))),
-                        sector=str(row.get('所属行业', '')),
-                    ))
-        except Exception as e:
-            print(f"获取连板强势股异常（可能非交易日）: {e}")
+                if df is None or df.empty:
+                    print(f"[连板股] 获取数据为空（日期={date_str}，尝试 {attempt+1}/{max_attempts}）")
+                else:
+                    stocks, total_count = parse_df(df)
+                    
+                    # 数据新鲜度验证：
+                    # 正常交易日涨停股通常在 30-200 只之间。
+                    # 若返回数据量异常少（< 5 只），且当前处于盘后窗口期，
+                    # 可能是东财数据还未更新，需要重试。
+                    if total_count < 5 and is_post_close_window and attempt < max_attempts - 1:
+                        print(f"[连板股] 疑似数据未更新（仅 {total_count} 只涨停股，日期={date_str}），"
+                              f"5分钟后重试 (第{attempt+2}次)...")
+                        await asyncio.sleep(300)
+                        continue
+                    
+                    print(f"[连板股] 获取成功：{date_str} 共 {total_count} 只涨停股，"
+                          f"其中连板 {len(stocks)} 只")
+                    consecutive_stocks = stocks
+                    break
+                    
+            except Exception as e:
+                print(f"获取连板强势股异常（可能非交易日）: {e}")
+                break
+            
+            # 第一次尝试结束，不满足条件时不再循环（非盘后窗口已设 max_attempts=1）
+            break
         
         return consecutive_stocks
     

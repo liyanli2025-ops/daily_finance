@@ -28,8 +28,9 @@ class Settings(BaseSettings):
     # 新闻采集提前时间（提前多少分钟开始采集）
     collection_lead_time: int = Field(default=60, description="采集提前时间（分钟）")
     
-    # 【新增】晚报采集开始时间（下午4点开始收集内容）
+    # 【新增】晚报采集开始时间（下午4点30分开始收集内容，避免东财涨停池数据延迟问题）
     evening_collection_hour: int = Field(default=16, ge=0, le=23, description="晚报采集开始小时")
+    evening_collection_minute: int = Field(default=30, ge=0, le=59, description="晚报采集开始分钟（默认30分，等待东财涨停池数据更新完成）")
     
     # 【新增】盘中预采集时间（交易日午间，缓存上午新闻避免被下午新闻冲掉）
     midday_collection_hour: int = Field(default=11, ge=0, le=23, description="盘中预采集小时")
