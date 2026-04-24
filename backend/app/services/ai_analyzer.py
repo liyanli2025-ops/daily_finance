@@ -150,6 +150,15 @@ class AIAnalyzerService:
             last_trading -= timedelta(days=1)
         last_trading_str = f"{last_trading.month}月{last_trading.day}日{weekday_names[last_trading.weekday()]}"
         
+        # 计算明天及下一个交易日信息
+        tomorrow = today + timedelta(days=1)
+        tomorrow_weekday_name = weekday_names[tomorrow.weekday()]
+        tomorrow_is_trading_day = tomorrow.weekday() < 5
+        next_trading_day = tomorrow
+        while next_trading_day.weekday() >= 5:
+            next_trading_day += timedelta(days=1)
+        next_trading_str = f"{next_trading_day.month}月{next_trading_day.day}日{weekday_names[next_trading_day.weekday()]}"
+        
         # 【新增】获取自选股配置
         watchlist_text = self._prepare_watchlist_analysis()
         investment_style_desc = self._get_investment_style_description()
@@ -577,6 +586,12 @@ class AIAnalyzerService:
 
 今天是{today.strftime('%Y年%m月%d日')} {weekday_name}。
 本报告在收盘后生成，反映今日实际交易情况。
+
+⚠️ **【日历信息——严格遵守，禁止自行推算】**
+- 今天：{today.strftime('%Y年%m月%d日')} {weekday_name}
+- 明天：{tomorrow.strftime('%m月%d日')} {tomorrow_weekday_name}{'（非交易日，休市）' if not tomorrow_is_trading_day else '（交易日）'}
+- 下一个交易日：{next_trading_str}
+- {'⚠️ 明天不是交易日，"明日作战地图"应以"下一个交易日（' + next_trading_str + '）"为标题，而非"明天"。' if not tomorrow_is_trading_day else '明日策略即针对明天（' + next_trading_str + '）。'}
 
 ### 用户画像
 - 昵称：{settings.user_nickname}
@@ -2285,7 +2300,7 @@ class AIAnalyzerService:
             summary_parts.append(f"""
 ### {i}. {sentiment_emoji} {news.title}
 - 来源：{news.source}
-- 时间：{news.published_at.strftime('%H:%M')}
+- 时间：{news.published_at.strftime('%m月%d日 %H:%M')}
 - **情感判断**：{sentiment_text} | {confidence_text} | {strength_text}
 - **情感触发词**：{keywords_text if keywords_text else "无明显情感词"}
 - 摘要：{content_preview}
@@ -2462,7 +2477,7 @@ class AIAnalyzerService:
                 summary_parts.append(f"""
 {i}. **{news.title}**
 - 来源：{news.source}
-- 时间：{news.published_at.strftime('%H:%M')}
+- 时间：{news.published_at.strftime('%m月%d日 %H:%M')}
 - 内容：{news.content[:150]}...{impact_info}
 """)
         
