@@ -224,6 +224,17 @@ class AIAnalyzerService:
                 print("[AI] 回测准确度数据已加载")
         except Exception as e:
             print(f"[AI] 获取回测数据失败（不影响报告生成）: {e}")
+
+        # 【新增】获取经验记忆（历史准确率+薄弱环节+误判模式）
+        lessons_memory_text = ""
+        try:
+            from .lessons_memory_service import get_lessons_memory_service
+            lessons_memory_service = get_lessons_memory_service()
+            lessons_memory_text = await lessons_memory_service.get_lessons_memory_text()
+            if lessons_memory_text:
+                print("[AI] 历史经验记忆已加载")
+        except Exception as e:
+            print(f"[AI] 获取经验记忆失败（不影响报告生成）: {e}")
         
         # 准备新闻摘要
         finance_summary = self._prepare_news_summary_with_sentiment(news_list)
@@ -240,6 +251,7 @@ class AIAnalyzerService:
                 morning_report,
                 backtest_summary_text=backtest_summary_text,
                 signal_win_rates_text=signal_win_rates_text,
+                lessons_memory_text=lessons_memory_text,
             )
         elif not is_trading_day:
             # 非交易日深度版早报 prompt
@@ -249,6 +261,7 @@ class AIAnalyzerService:
                 market_data_text, sentiment_index_text,
                 finance_summary, cross_border_summary,
                 signal_win_rates_text=signal_win_rates_text,
+                lessons_memory_text=lessons_memory_text,
             )
         else:
             # 交易日早报 prompt
@@ -258,6 +271,7 @@ class AIAnalyzerService:
                 market_data_text, sentiment_index_text,
                 finance_summary, cross_border_summary,
                 signal_win_rates_text=signal_win_rates_text,
+                lessons_memory_text=lessons_memory_text,
             )
         
         # 根据报告类型动态调整输出容量
@@ -315,6 +329,7 @@ class AIAnalyzerService:
         market_data_text, sentiment_index_text,
         finance_summary, cross_border_summary,
         signal_win_rates_text: str = "",
+        lessons_memory_text: str = "",
     ) -> str:
         """
         构建交易日早报 prompt
@@ -386,6 +401,8 @@ class AIAnalyzerService:
 {cross_border_summary if cross_border_summary else "暂无重大跨界热点"}
 
 {signal_win_rates_text}
+
+{lessons_memory_text}
 
 {topic_dedup}
 
@@ -528,6 +545,7 @@ class AIAnalyzerService:
         morning_report: Optional[Report] = None,
         backtest_summary_text: str = "",
         signal_win_rates_text: str = "",
+        lessons_memory_text: str = "",
     ) -> str:
         """
         构建交易日晚报 prompt
@@ -632,6 +650,8 @@ class AIAnalyzerService:
 {backtest_summary_text}
 
 {signal_win_rates_text}
+
+{lessons_memory_text}
 
 {topic_dedup}
 
@@ -781,6 +801,7 @@ class AIAnalyzerService:
         market_data_text, sentiment_index_text,
         finance_summary, cross_border_summary,
         signal_win_rates_text: str = "",
+        lessons_memory_text: str = "",
     ) -> str:
         """
         构建非交易日深度早报 prompt
@@ -853,6 +874,8 @@ class AIAnalyzerService:
 {cross_border_summary if cross_border_summary else "暂无重大跨界热点"}
 
 {signal_win_rates_text}
+
+{lessons_memory_text}
 
 {topic_dedup}
 
