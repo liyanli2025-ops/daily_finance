@@ -140,6 +140,7 @@ class WatchlistService:
         self._config_stocks = []
         
         if not watchlist_config or not watchlist_config.strip():
+            self._update_merged()
             return self._config_stocks
         
         for item in watchlist_config.split(","):
@@ -195,16 +196,16 @@ class WatchlistService:
         
         # 配置文件的优先（用户主动设置的）
         for stock in self._config_stocks:
-            if stock.code not in seen_codes:
-                seen_codes.add(stock.code)
+            if (stock.market, stock.code) not in seen_codes:
+                seen_codes.add((stock.market, stock.code))
                 self._merged_stocks.append(stock)
                 if stock.sector:
                     self._sectors.add(stock.sector)
         
         # 数据库的补充
         for stock in self._db_stocks:
-            if stock.code not in seen_codes:
-                seen_codes.add(stock.code)
+            if (stock.market, stock.code) not in seen_codes:
+                seen_codes.add((stock.market, stock.code))
                 self._merged_stocks.append(stock)
                 if stock.sector:
                     self._sectors.add(stock.sector)
@@ -220,6 +221,16 @@ class WatchlistService:
     def get_unique_sectors(self) -> List[str]:
         """获取自选股覆盖的所有行业（去重）"""
         return list(self._sectors)
+
+    def apply_research_profiles(self, profiles):
+        """Verified current-company profiles override the small legacy lookup table."""
+        for stock in self._merged_stocks:
+            market = getattr(stock.market, 'value', stock.market)
+            key = str(market)+':'+(stock.code.zfill(5) if market=='HK' else stock.code)
+            profile = profiles.get(key)
+            if profile and profile.get('industry'):
+                stock.sector = profile['industry']
+        self._sectors = {stock.sector for stock in self._merged_stocks if stock.sector}
     
     def get_sector_keywords(self, sector: str) -> List[str]:
         """获取行业搜索关键词"""

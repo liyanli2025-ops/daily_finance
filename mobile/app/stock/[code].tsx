@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Platform,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -44,7 +45,7 @@ interface StockDetail {
   update_time?: string;
   prediction?: {
     signal: 'bullish' | 'neutral' | 'bearish';
-    confidence: number;
+    confidence?: number;
     reasoning: string;
     target_price?: number;
     stop_loss?: number;
@@ -147,7 +148,7 @@ export default function StockDetailScreen() {
         if (predData && predData.prediction) {
           prediction = {
             signal: predData.prediction as 'bullish' | 'neutral' | 'bearish',
-            confidence: predData.confidence || 0.5,
+            confidence: typeof predData.confidence === 'number' ? predData.confidence : undefined,
             reasoning: predData.reasoning || '暂无分析数据',
             target_price: predData.target_price,
             stop_loss: predData.stop_loss,
@@ -211,6 +212,9 @@ export default function StockDetailScreen() {
       await fetchStockDetail();
     } catch (error) {
       console.error('分析失败:', error);
+      const message = error instanceof Error ? error.message : '分析暂时不可用，请稍后重试';
+      if (Platform.OS === 'web') window.alert(message);
+      else Alert.alert('暂无法分析', message);
     }
     setIsAnalyzing(false);
   };
@@ -460,9 +464,11 @@ export default function StockDetailScreen() {
                     {getPredictionLabel(stock.prediction.signal)}
                   </Text>
                 </View>
-                <Text style={[styles.confidenceText, { color: colors.onSurfaceVariant }]}>
-                  置信度: {Math.round(stock.prediction.confidence * 100)}%
-                </Text>
+                {typeof stock.prediction.confidence === 'number' ? (
+                  <Text style={[styles.confidenceText, { color: colors.onSurfaceVariant }]}>
+                    模型自评（未经校准）: {Math.round(stock.prediction.confidence * 100)}%
+                  </Text>
+                ) : null}
               </View>
 
               <Text style={[styles.reasoning, { color: colors.onSurface }]}>

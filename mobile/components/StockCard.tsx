@@ -11,7 +11,7 @@ interface Stock {
   current_price?: number;
   change_percent?: number;
   latest_prediction?: 'bullish' | 'neutral' | 'bearish';
-  latest_confidence?: number;
+  latest_confidence?: number | null;
 }
 
 interface StockCardProps {
@@ -40,8 +40,10 @@ export default function StockCard({ stock, onPress, onRemove }: StockCardProps) 
         return '看多';
       case 'bearish':
         return '看空';
-      default:
+      case 'neutral':
         return '中性';
+      default:
+        return '资料不足';
     }
   };
 
@@ -108,9 +110,9 @@ export default function StockCard({ stock, onPress, onRemove }: StockCardProps) 
             >
               AI预测: {getPredictionText(stock.latest_prediction)}
             </Text>
-            {stock.latest_confidence !== undefined && (
+            {typeof stock.latest_confidence === 'number' && (
               <Text variant="bodySmall" style={{ color: theme.colors.outline, marginLeft: 8 }}>
-                置信度 {Math.round(stock.latest_confidence * 100)}%
+                模型自评（未经校准） {Math.round(stock.latest_confidence * 100)}%
               </Text>
             )}
           </View>

@@ -9,8 +9,9 @@
 import asyncio
 import hashlib
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
+from .time_context import china_now, china_today
 from dataclasses import dataclass
 import uuid
 
@@ -21,6 +22,9 @@ from bs4 import BeautifulSoup
 from ..config import settings
 from ..models.news import News, NewsCreate, SentimentType, NewsType, SentimentStrength
 from .watchlist_service import get_watchlist_service, WatchlistStock
+from .watchlist_repository import read_app_watchlist
+from .news_selection import matches_watchlist, within_window
+from .evidence import article_url
 
 
 @dataclass
@@ -36,7 +40,7 @@ class RawNewsItem:
 class NewsCollectorService:
     """新闻采集服务"""
     
-    def __init__(self):
+    def __init__(self,sentiment=True):
         self.client = httpx.AsyncClient(
             timeout=30.0,
             follow_redirects=True,
@@ -44,11 +48,14 @@ class NewsCollectorService:
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
         )
+        self._archive_enabled=True
+        self._rss_coverage={}
+        from pathlib import Path
+        self._rss_state_root=Path(__file__).resolve().parents[2]/'data/radar/rss-state'
         
-        # RSSHub 备用节点（主节点挂掉时自动切换）
+        # 仅保留本次生产验收可用的节点，移除域名解析失败的备用节点。
         self._rsshub_nodes = [
             "https://rsshub.rssforever.com",
-            "https://rsshub.pseudoyu.com",
         ]
         self._current_rsshub_node = self._rsshub_nodes[0]
         
@@ -58,12 +65,6 @@ class NewsCollectorService:
             # ==========================================
             # 财经类新闻（国内 — 核心信源）
             # ==========================================
-            {
-                "url": "{RSSHUB}/cls/telegraph",
-                "name": "财联社电报",
-                "category": "快讯",
-                "news_type": "finance"
-            },
             {
                 "url": "{RSSHUB}/jin10/flash",
                 "name": "金十数据",
@@ -98,12 +99,6 @@ class NewsCollectorService:
                 "category": "全球快讯",
                 "news_type": "finance"
             },
-            {
-                "url": "{RSSHUB}/cls/depth/1000",
-                "name": "财联社深度",
-                "category": "深度分析",
-                "news_type": "finance"
-            },
             
             # ==========================================
             # 国际财经新闻
@@ -132,7 +127,7 @@ class NewsCollectorService:
             # ==========================================
             {
                 "url": "{RSSHUB}/hkej/index",
-                "name": "香港经济日报",
+                "name": "信报财经新闻",
                 "category": "港股",
                 "news_type": "finance"
             },
@@ -140,12 +135,6 @@ class NewsCollectorService:
                 "url": "{RSSHUB}/gelonghui/subject/3",
                 "name": "格隆汇港股",
                 "category": "港股",
-                "news_type": "finance"
-            },
-            {
-                "url": "{RSSHUB}/nikkei/index",
-                "name": "日经新闻",
-                "category": "日股",
                 "news_type": "finance"
             },
             
@@ -191,6 +180,17 @@ class NewsCollectorService:
                 "news_type": "social"
             }
         ]
+        # Acceptance found these feeds supplied headlines/empty bodies almost
+        # exclusively. No body completion path exists for them in this project.
+        disabled={name:'headline_only_without_body_reader' for name in
+            ('Finviz美股新闻','百度财经焦点','百度股票焦点','百度国际新闻','百度科技焦点','百度社会新闻')}
+        disabled['华尔街见闻-股市']='duplicate_of_global_rss_in_acceptance'
+        from .source_health import PAUSED_FEEDS
+        disabled.update(PAUSED_FEEDS)
+        self._disabled_rss_feeds=[dict(feed,disabled_reason=disabled[feed['name']]) for feed in self.rss_feeds if feed['name'] in disabled]
+        self.rss_feeds=[feed for feed in self.rss_feeds if feed['name'] not in disabled]
+        self._rss_coverage={feed['name']:dict(status='disabled',reason=feed['disabled_reason'])
+            for feed in self._disabled_rss_feeds}
         
         # 新闻去重缓存（基于标题哈希）
         self._seen_hashes: set = set()
@@ -234,19 +234,20 @@ class NewsCollectorService:
         
         # 初始化情感分析器
         self.sentiment_analyzer = None
-        self.sentiment_analysis_enabled = True
-        try:
-            from .sentiment_analyzer import get_sentiment_analyzer
-            self.sentiment_analyzer = get_sentiment_analyzer()
-            print("[OK] NewsCollector: 情感分析服务已启用")
-        except Exception as e:
-            print(f"[WARN] NewsCollector: 情感分析服务初始化失败: {e}")
+        self.sentiment_analysis_enabled = bool(sentiment)
+        if sentiment:
+            try:
+                from .sentiment_analyzer import get_sentiment_analyzer
+                self.sentiment_analyzer = get_sentiment_analyzer()
+                print("[OK] NewsCollector: 情感分析服务已启用")
+            except Exception as e:
+                print(f"[WARN] NewsCollector: 情感分析服务初始化失败: {e}")
     
     async def collect_all(self, hours: int = 24) -> List[News]:
         """
         采集所有来源的新闻
         
-        增强版：RSS + AKShare + 雪球API 三数据源
+        增强版：RSS + AKShare + 同花顺快讯
         
         Args:
             hours: 采集最近多少小时的新闻
@@ -256,6 +257,8 @@ class NewsCollectorService:
         """
         # 每次采集前清空去重缓存，避免跨次调用（如早报->晚报）时误过滤
         self._seen_hashes.clear()
+        self._rss_coverage={feed['name']:dict(status='disabled',reason=feed['disabled_reason'])
+            for feed in getattr(self,'_disabled_rss_feeds',[])}
         
         all_news = []
         
@@ -287,14 +290,6 @@ class NewsCollectorService:
             except Exception as e:
                 print(f"[AKShare] 新闻采集失败: {e}")
         
-        # 3. 【新增】直接爬取雪球热帖（投资者观点/小道消息）
-        try:
-            xueqiu_news = await self._collect_xueqiu_hot()
-            all_news.extend(xueqiu_news)
-            print(f"[雪球] 热帖补充 {len(xueqiu_news)} 条")
-        except Exception as e:
-            print(f"[雪球] 热帖采集失败: {e}")
-        
         # 4. 【新增】采集同花顺快讯
         try:
             ths_news = await self._collect_10jqka_news()
@@ -305,21 +300,73 @@ class NewsCollectorService:
         
         # 5. 【新增】采集自选股相关新闻（个股 + 行业）
         try:
-            watchlist_news = await self._collect_watchlist_news()
+            watchlist_news = await self._collect_watchlist_news(hours=hours)
             all_news.extend(watchlist_news)
             print(f"[自选股] 相关新闻补充 {len(watchlist_news)} 条")
         except Exception as e:
             print(f"[自选股] 新闻采集失败: {e}")
-        
-        # 去重
-        unique_news = self._deduplicate(all_news)
-        
-        # 过滤时间范围
-        cutoff_time = datetime.now() - timedelta(hours=hours)
-        filtered_news = [
-            n for n in unique_news 
-            if n.published_at >= cutoff_time
-        ]
+
+        # Global coverage must run even when the App watchlist is empty.
+        all_news.extend(await self._collect_radar_news(hours))
+
+        retrieved=list(all_news)
+        history=[];history_status=dict(status='not_enabled',complete_window=False)
+        if getattr(self,'_archive_enabled',False):
+            from .material_lifecycle import prune_material_caches
+            await asyncio.to_thread(prune_material_caches)
+            from .news_archive import NewsArchive,identity
+            archive=NewsArchive(getattr(self,'_archive_root',None))
+            try:
+                await asyncio.to_thread(archive.save,retrieved,dict(rss=self._rss_coverage,
+                    media=getattr(self,'_radar_coverage',{})),'full_collection')
+                retained,history_status=await asyncio.to_thread(archive.load,hours)
+                current={identity(item) for item in retrieved}
+                history=[item for item in retained if identity(item) not in current]
+                all_news.extend(history)
+            except Exception as error:
+                history_status=dict(status='failed',error=type(error).__name__,complete_window=False)
+                print('[新闻历史库] 失败：'+type(error).__name__+'；本次继续使用现采材料',flush=True)
+        from .source_inventory import inventory
+        self._source_inventory=inventory(retrieved,history,china_now(),hours,
+            {**self._rss_coverage,**getattr(self,"_supplement_coverage",{})},history_status)
+        print(f'[采集覆盖] 本次抓取={len(retrieved)}，历史补回={len(history)}；非完整历史，逐源质量已记录',flush=True)
+
+        from .research_hub import ResearchHub, tag_industry_news
+        current_stocks = get_watchlist_service().get_all_stocks()
+        profiles = [item.get('profile') for item in ResearchHub().load(current_stocks)]
+        tag_industry_news(all_news, profiles)
+
+        # Filter before deduplication: an old high-score copy must not displace
+        # a current report. Future-dated items cannot become current evidence.
+        now = china_now()
+        cutoff_time = now - timedelta(hours=hours)
+        in_window = [n for n in all_news if within_window(n, now, hours)]
+        for item in in_window:
+            if item.published_at.tzinfo is not None:
+                item.published_at = item.published_at.astimezone(
+                    timezone(timedelta(hours=8))).replace(tzinfo=None)
+        # The private acceptance snapshot retains the pre-dedup text too, so
+        # counts and removed copies can be inspected without another collection.
+        self._raw_news_snapshot=list(in_window)
+        self._collection_funnel=dict(retrieved=len(retrieved),history_restored=len(history),in_window=len(in_window))
+        unique_news = self._deduplicate(in_window)
+        self._collection_funnel['after_dedup']=len(unique_news)
+        filtered_news = unique_news
+        try:
+            from .event_observations import EventObservations
+            EventObservations().observe(in_window,dict(
+                scope='本次RSS及公开媒体采集，非全网',rss_with_items=rss_success_count,
+                rss_requested=len(self.rss_feeds),empty_rss_status='unknown',
+                media=getattr(self,'_radar_coverage',{})))
+        except Exception as error:
+            print(f'[事件历史] 写入失败：{type(error).__name__}，传播范围未知',flush=True)
+        stocks = get_watchlist_service().get_all_stocks()
+        for stock in stocks:
+            raw_count = sum(matches_watchlist(n, [stock]) for n in all_news)
+            window_count = sum(matches_watchlist(n, [stock]) for n in in_window)
+            kept_count = sum(matches_watchlist(n, [stock]) for n in filtered_news)
+            print(f"[自选股新闻漏斗] {stock.market}:{stock.code} 原始={raw_count} "
+                  f"窗口内={window_count} 去重后={kept_count}")
         
         # 按重要性和时间排序
         filtered_news.sort(key=lambda x: (x.importance_score, x.published_at), reverse=True)
@@ -352,7 +399,7 @@ class NewsCollectorService:
         """
         from datetime import date as date_type
         
-        today_str = date_type.today().strftime("%Y-%m-%d")
+        today_str = china_today().strftime("%Y-%m-%d")
         
         print(f"\n[盘中预采集] 开始采集盘中新闻，时间窗口 {hours}h...")
         
@@ -378,7 +425,7 @@ class NewsCollectorService:
         """
         from datetime import date as date_type
         
-        today_str = date_type.today().strftime("%Y-%m-%d")
+        today_str = china_today().strftime("%Y-%m-%d")
         
         if self._midday_cache_date != today_str:
             # 缓存不是今天的，清空
@@ -450,154 +497,8 @@ class NewsCollectorService:
         
         return combined
 
-    async def _collect_xueqiu_hot(self) -> List[News]:
-        """
-        采集雪球热帖（投资者观点/小道消息）
-        
-        策略：优先使用 RSSHub 雪球源（稳定），失败再回退直接 API
-        """
-        # 方案 A：通过 RSSHub 获取雪球热帖（推荐，不被 WAF 拦截）
-        rsshub_urls = [
-            "https://rsshub.rssforever.com/xueqiu/hots",
-            "https://rsshub.pseudoyu.com/xueqiu/hots",
-        ]
-        
-        for rsshub_url in rsshub_urls:
-            try:
-                news_list = await self._collect_xueqiu_via_rsshub(rsshub_url)
-                if news_list:
-                    print(f"  [雪球] RSSHub 获取热帖 {len(news_list)} 条（{rsshub_url}）")
-                    return news_list
-            except Exception as e:
-                print(f"  [雪球] RSSHub 源失败 ({rsshub_url}): {e}")
-        
-        # 方案 B：直接 API（加强反爬）
-        try:
-            news_list = await self._collect_xueqiu_hot_direct()
-            if news_list:
-                print(f"  [雪球] 直接 API 获取热帖 {len(news_list)} 条")
-                return news_list
-        except Exception as e:
-            print(f"  [雪球] 直接 API 失败: {e}")
-        
-        print("  [雪球] 所有方式均失败，跳过")
-        return []
     
-    async def _collect_xueqiu_via_rsshub(self, rsshub_url: str) -> List[News]:
-        """通过 RSSHub 获取雪球热帖"""
-        news_list = []
-        
-        feed_response = await self.client.get(rsshub_url, timeout=15.0)
-        if feed_response.status_code != 200:
-            return news_list
-        
-        feed = feedparser.parse(feed_response.text)
-        
-        for entry in feed.entries[:20]:
-            title = entry.get("title", "")
-            content = entry.get("summary", entry.get("description", ""))
-            
-            # 清理 HTML
-            content = self._clean_html(content) if content else ""
-            
-            if not title:
-                continue
-            
-            # 解析时间
-            try:
-                published = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') and entry.published_parsed else datetime.now()
-            except:
-                published = datetime.now()
-            
-            news_list.append(News(
-                id=str(uuid.uuid4()),
-                title=title,
-                content=content[:1000],
-                summary=content[:200] if content else title,
-                source="雪球热帖",
-                source_url=entry.get("link", "https://xueqiu.com"),
-                published_at=published,
-                news_type=NewsType.FINANCE,
-                sentiment=SentimentType.NEUTRAL,
-                importance_score=0.7,
-                is_china_related=True,
-                category="投资者观点"
-            ))
-        
-        return news_list
     
-    async def _collect_xueqiu_hot_direct(self) -> List[News]:
-        """
-        直接爬取雪球热帖（备用方案，加强反爬）
-        """
-        news_list = []
-        
-        try:
-            # 雪球热门话题 API（加强 headers 模拟真实浏览器）
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-                "Accept-Encoding": "gzip, deflate, br",
-                "Referer": "https://xueqiu.com/",
-                "Origin": "https://xueqiu.com",
-                "X-Requested-With": "XMLHttpRequest",
-            }
-            
-            # 先访问首页获取 cookie（关键！）
-            try:
-                home_resp = await self.client.get("https://xueqiu.com/", headers={
-                    "User-Agent": headers["User-Agent"],
-                    "Accept": "text/html,application/xhtml+xml",
-                })
-                # 小延迟模拟真人行为
-                await asyncio.sleep(0.5)
-            except:
-                pass
-            
-            # 热门帖子 API
-            hot_url = "https://xueqiu.com/statuses/hot/listV2.json?since_id=-1&max_id=-1&size=30"
-            response = await self.client.get(hot_url, headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                items = data.get("data", {}).get("items", [])
-                
-                for item in items[:20]:
-                    original = item.get("original_status", item)
-                    title = original.get("title", "")
-                    text = original.get("text", "")
-                    
-                    # 清理 HTML
-                    text = self._clean_html(text)
-                    
-                    if not title:
-                        title = text[:50] + "..." if len(text) > 50 else text
-                    
-                    # 用户信息
-                    user = original.get("user", {})
-                    author = user.get("screen_name", "雪球用户")
-                    
-                    news_list.append(News(
-                        id=str(uuid.uuid4()),
-                        title=f"[{author}] {title}",
-                        content=text[:1000],
-                        summary=text[:200],
-                        source="雪球热帖",
-                        source_url=f"https://xueqiu.com/{user.get('id', '')}/post/{original.get('id', '')}",
-                        published_at=datetime.fromtimestamp(original.get("created_at", 0) / 1000) if original.get("created_at") else datetime.now(),
-                        news_type=NewsType.FINANCE,
-                        sentiment=SentimentType.NEUTRAL,
-                        importance_score=0.7,  # 社区观点权重适中
-                        is_china_related=True,
-                        category="投资者观点"
-                    ))
-                
-                print(f"  [雪球] 获取热帖 {len(news_list)} 条")
-        except Exception as e:
-            print(f"  [雪球] 热帖采集失败: {e}")
-        
-        return news_list
     
     async def _collect_10jqka_news(self) -> List[News]:
         """
@@ -628,7 +529,7 @@ class NewsCollectorService:
                     try:
                         published = datetime.strptime(ctime, "%Y-%m-%d %H:%M:%S")
                     except:
-                        published = datetime.now()
+                        published = china_now()
                     
                     news_list.append(News(
                         id=str(uuid.uuid4()),
@@ -649,7 +550,7 @@ class NewsCollectorService:
         
         return news_list
     
-    async def _collect_watchlist_news(self) -> List[News]:
+    async def _collect_watchlist_news(self, hours: int = 24) -> List[News]:
         """
         采集自选股相关新闻
         
@@ -661,47 +562,154 @@ class NewsCollectorService:
         # 获取自选股服务
         watchlist_service = get_watchlist_service()
         
-        # 从配置加载自选股
-        watchlist_service.load_from_config(settings.watchlist_stocks)
-        
-        # 尝试从数据库加载自选股
-        try:
-            db_stocks = await self._load_db_watchlist()
-            if db_stocks:
-                watchlist_service.load_from_database(db_stocks)
-                print(f"  [自选股] 从数据库加载了 {len(db_stocks)} 只股票")
-        except Exception as e:
-            print(f"  [自选股] 数据库加载失败: {e}")
-        
+        db_stocks = await self._load_db_watchlist()
+        watchlist_service.load_from_config("")
+        watchlist_service.load_from_database(db_stocks)
+
         all_stocks = watchlist_service.get_all_stocks()
         unique_sectors = watchlist_service.get_unique_sectors()
         
         if not all_stocks:
             print("  [自选股] 未设置自选股，跳过采集")
             return news_list
-        
+
         print(f"  [自选股] 共 {len(all_stocks)} 只股票，涉及 {len(unique_sectors)} 个行业")
         
+        # Issuer disclosures are independent of the general article search index.
+        from .watchlist_sources import fetch_company_announcements, fetch_sina_stock_news
+        semaphore = asyncio.Semaphore(3)
+        async def collect_disclosures(stock):
+            async with semaphore:
+                try:
+                    items, status = await asyncio.to_thread(fetch_company_announcements, stock, hours=hours)
+                    print(f'[自选股公告] {stock.market}:{stock.code} {status}', flush=True)
+                    return items
+                except Exception as error:
+                    print(f'[自选股公告] {stock.market}:{stock.code} 请求失败：{type(error).__name__}', flush=True)
+                    return []
+        for items in await asyncio.gather(*(collect_disclosures(stock) for stock in all_stocks)):
+            news_list.extend(items)
+
+        async def collect_sina(stock):
+            async with semaphore:
+                try:
+                    items, status = await asyncio.to_thread(fetch_sina_stock_news, stock, hours=hours)
+                    print(f'[自选股新闻-新浪] {stock.market}:{stock.code} {status}', flush=True)
+                    return items
+                except Exception as error:
+                    print(f'[自选股新闻-新浪] {stock.market}:{stock.code} 请求失败：{type(error).__name__}', flush=True)
+                    return []
+        for items in await asyncio.gather(*(collect_sina(stock) for stock in all_stocks)):
+            news_list.extend(items)
+
         # 1. 采集个股新闻（使用 AKShare）
         if self.akshare_available:
-            stock_news = await self._collect_individual_stock_news(all_stocks)
+            covered = {code for item in news_list if within_window(item, china_now(), hours)
+                       for code in item.related_stocks}
+            uncovered = [stock for stock in all_stocks if stock.code not in covered]
+            stock_news = await self._collect_individual_stock_news(uncovered) if uncovered else []
+            print(f'[自选股搜索] 已有近期原文覆盖{len(all_stocks)-len(uncovered)}只，'
+                  f'旧搜索接口仅补缺{len(uncovered)}只', flush=True)
             news_list.extend(stock_news)
             print(f"  [自选股] 个股新闻: {len(stock_news)} 条")
         
+        # Current issuer news is fetched before slower background document work.
+        # Refresh dynamic business profiles before expanding industry news queries.
+        from .research_hub import ResearchHub
+        try:
+            research = await ResearchHub().collect(all_stocks, budget=110)
+            profiles = {item['key']:item['profile'] for item in research['stocks'] if item.get('profile')}
+            watchlist_service.apply_research_profiles(profiles)
+            unique_sectors = watchlist_service.get_unique_sectors()
+            for item in research['stocks']:
+                print(f'[研究覆盖] {item["key"]} {item["coverage"]}', flush=True)
+        except Exception as error:
+            print(f'[研究覆盖] 采集失败：{type(error).__name__}；不能解释为没有资料', flush=True)
+
         # 2. 采集行业新闻（行业去重）
         if self.akshare_available and unique_sectors:
             sector_news = await self._collect_sector_news(unique_sectors)
             news_list.extend(sector_news)
             print(f"  [自选股] 行业新闻: {len(sector_news)} 条")
         
-        # 3. 采集雪球个股讨论
-        xueqiu_news = await self._collect_xueqiu_stock_discussion(all_stocks)
-        news_list.extend(xueqiu_news)
-        if xueqiu_news:
-            print(f"  [自选股] 雪球讨论: {len(xueqiu_news)} 条")
-        
         return news_list
     
+    async def _collect_radar_news(self,hours=24):
+        from .media_sources import MediaCollector
+        from .policy_sources import PolicyCollector
+        from .technical_radar import TechnicalRadar
+        from .research_hub import ResearchHub
+        from .wechat_sources import WeChatCollector
+        from .public_news_sources import PublicNewsCollector
+        from .overseas_sources import OverseasCollector
+        service=get_watchlist_service()
+        try:
+            rows=await self._load_db_watchlist()
+            service.load_from_config('')
+            service.load_from_database(rows)
+            stocks=service.get_all_stocks()
+        except Exception as error:
+            stocks=[]
+            print(f'[全市场雷达] App自选股读取失败：{type(error).__name__}；仅收集全市场',flush=True)
+        profiles={item['key']:item['profile'] for item in ResearchHub().load(stocks) if item.get('profile')}
+        media,technical,policy,wechat,direct,overseas=await asyncio.gather(
+            asyncio.to_thread(MediaCollector().collect,stocks,profiles,hours),
+            asyncio.to_thread(TechnicalRadar().collect,stocks),
+            asyncio.to_thread(PolicyCollector().collect,hours),
+            asyncio.to_thread(WeChatCollector().collect,stocks,profiles,hours),
+            asyncio.to_thread(PublicNewsCollector().collect,stocks,profiles,hours),
+            asyncio.to_thread(OverseasCollector().collect,hours),return_exceptions=True)
+        if isinstance(technical,Exception):
+            self._technical_snapshot=dict(status='failed',error=type(technical).__name__)
+            print(f'[日线雷达] 失败：{type(technical).__name__}；禁止补写技术数据',flush=True)
+        else:
+            self._technical_snapshot=technical
+            print(f'[日线雷达] {technical["coverage"]}；行业ETF代理不是全市场宽度',flush=True)
+        if isinstance(media,Exception):
+            self._radar_coverage=dict(status='failed',error=type(media).__name__)
+            print(f'[媒体原文] {self._radar_coverage}',flush=True)
+            items=[]
+        else:
+            items,self._radar_coverage=media
+        if isinstance(policy,Exception):
+            self._radar_coverage.setdefault('sources',{})['policy']=dict(status='failed',read=0,errors=[dict(error=type(policy).__name__)])
+        else:
+            originals,policy_coverage=policy
+            items.extend(originals)
+            self._radar_coverage.setdefault('sources',{}).update(policy_coverage['sources'])
+            self._radar_coverage['policy_articles']=len(originals)
+        if isinstance(wechat,Exception):
+            self._radar_coverage.setdefault('sources',{})['wechat']=dict(status='failed',read=0,
+                errors=[dict(error=type(wechat).__name__)])
+        else:
+            originals,wechat_status=wechat
+            items.extend(originals)
+            self._radar_coverage.setdefault('sources',{})['wechat']=wechat_status
+        if isinstance(direct,Exception):
+            self._radar_coverage.setdefault('sources',{})['direct_publishers']=dict(status='failed',read=0,
+                errors=[dict(error=type(direct).__name__)])
+        else:
+            originals,direct_status=direct
+            items.extend(originals)
+            self._radar_coverage.setdefault('sources',{}).update(direct_status['sources'])
+            self._radar_coverage['direct_publishers']=direct_status
+        if isinstance(overseas,Exception):
+            self._radar_coverage.setdefault('sources',{})['overseas']=dict(status='failed',read=0,
+                errors=[dict(error=type(overseas).__name__)])
+        else:
+            originals,overseas_status=overseas
+            items.extend(originals)
+            self._radar_coverage.setdefault('sources',{}).update({'overseas_'+key:value for key,value in overseas_status['sources'].items()})
+            self._radar_coverage['overseas']=overseas_status
+        self._radar_coverage['total_originals']=len(items)
+        source_rows=list(self._radar_coverage.get('sources',{}).values())
+        incomplete=any(row.get('status') in {'failed','partial'} for row in source_rows) or isinstance(media,Exception)
+        self._radar_coverage['status']='partial' if incomplete and items else 'failed' if incomplete else 'ok' if items else 'no_material'
+        summary={name:dict(status=row.get('status'),read=row.get('read'),errors=len(row.get('errors',[])))
+            for name,row in self._radar_coverage.get('sources',{}).items()}
+        print(f'[媒体原文] 合计={len(items)}；逐源摘要={summary}；完整候选与错误保存在验收快照',flush=True)
+        return sorted(items,key=lambda item:(item.importance_score,item.published_at),reverse=True)
+
     async def _load_db_watchlist(self) -> List[Dict]:
         """
         从数据库加载自选股列表
@@ -709,31 +717,8 @@ class NewsCollectorService:
         Returns:
             [{"code": "xxx", "name": "xxx", "market": "A"}, ...]
         """
-        db_stocks = []
-        
-        try:
-            # 尝试直接读取 SQLite 数据库
-            import aiosqlite
-            from pathlib import Path
-            
-            db_path = Path(settings.database_url.replace("sqlite:///", ""))
-            if not db_path.exists():
-                return db_stocks
-            
-            async with aiosqlite.connect(str(db_path)) as db:
-                async with db.execute("SELECT code, name, market FROM stocks") as cursor:
-                    rows = await cursor.fetchall()
-                    for row in rows:
-                        db_stocks.append({
-                            "code": row[0],
-                            "name": row[1],
-                            "market": row[2]
-                        })
-        except Exception as e:
-            print(f"  [自选股] 读取数据库失败: {e}")
-        
-        return db_stocks
-    
+        return await read_app_watchlist()
+
     async def _collect_individual_stock_news(self, stocks: List[WatchlistStock]) -> List[News]:
         """
         采集个股新闻（走全局限流器）
@@ -759,7 +744,11 @@ class NewsCollectorService:
                         timeout=30
                     )
                     if df is not None and not df.empty:
-                        for _, row in df.head(5).iterrows():  # 每只股票最多5条
+                        print(f'[个股新闻索引] {stock.code} 返回{len(df)}条；'
+                              f'最新发布时间={df["发布时间"].astype(str).max()}；当前窗口另行校验', flush=True)
+                        # The provider's row order is not a freshness guarantee.
+                        df = df.sort_values("发布时间", ascending=False)
+                        for _, row in df.head(5).iterrows():
                             title = str(row.get('新闻标题', ''))
                             content = str(row.get('新闻内容', title))
                             
@@ -772,9 +761,9 @@ class NewsCollectorService:
                                 if time_str:
                                     published = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
                                 else:
-                                    published = datetime.now()
-                            except:
-                                published = datetime.now()
+                                    continue
+                            except (ValueError, TypeError):
+                                continue
                             
                             news_list.append(News(
                                 id=str(uuid.uuid4()),
@@ -803,157 +792,11 @@ class NewsCollectorService:
         return news_list
     
     async def _collect_sector_news(self, sectors: List[str]) -> List[News]:
-        """
-        采集行业板块新闻（走全局限流器）
-        """
-        import akshare as ak
-        from .market_data_service import _akshare_rate_limiter
-        
-        news_list = []
-        
-        # 行业板块名称映射
-        sector_name_map = {
-            "白酒": "白酒",
-            "新能源": "新能源汽车",
-            "光伏": "光伏设备",
-            "半导体": "半导体",
-            "消费电子": "消费电子",
-            "医药": "医药生物",
-            "银行": "银行",
-            "保险": "保险",
-            "证券": "证券",
-            "地产": "房地产",
-            "互联网": "互联网服务",
-            "汽车": "汽车整车",
-            "家电": "家用电器",
-            "食品饮料": "食品饮料",
-            "军工": "国防军工",
-            "煤炭": "煤炭开采",
-            "钢铁": "钢铁行业",
-            "石油化工": "石油行业",
-            "电力": "电力行业",
-            "AI软件": "软件开发",
-        }
-        
-        # 一次性获取概念板块数据（走限流器），而不是每个行业调一次
-        df = None
-        try:
-            await _akshare_rate_limiter.acquire()
-            loop = asyncio.get_event_loop()
-            df = await asyncio.wait_for(
-                loop.run_in_executor(None, ak.stock_board_concept_name_em),
-                timeout=30
-            )
-        except Exception as e:
-            print(f"    [板块新闻] 获取概念板块失败: {e}")
-            return news_list
-        
-        if df is None or df.empty:
-            return news_list
-        
-        for sector in sectors:
-            try:
-                sector_name = sector_name_map.get(sector, sector)
-                
-                for _, row in df.iterrows():
-                    board_name = str(row.get('板块名称', ''))
-                    if sector in board_name or sector_name in board_name:
-                        change = row.get('涨跌幅', 0)
-                        leader_stock = str(row.get('领涨股票', ''))
-                        
-                        news_list.append(News(
-                            id=str(uuid.uuid4()),
-                            title=f"[{sector}板块] 今日涨跌幅 {change}%，领涨股 {leader_stock}",
-                            content=f"{sector}板块今日涨跌幅为{change}%，领涨股票为{leader_stock}。板块整体表现{'强势' if float(change) > 1 else '弱势' if float(change) < -1 else '平稳'}。",
-                            summary=f"{sector}板块涨跌幅{change}%",
-                            source=f"东方财富-{sector}板块",
-                            source_url="https://data.eastmoney.com/bkzj/BK0493.html",
-                            published_at=datetime.now(),
-                            news_type=NewsType.FINANCE,
-                            sentiment=SentimentType.POSITIVE if float(change) > 0 else SentimentType.NEGATIVE if float(change) < 0 else SentimentType.NEUTRAL,
-                            importance_score=0.7,
-                            is_china_related=True,
-                            category=f"行业板块-{sector}",
-                            beneficiary_sectors=[sector] if float(change) > 0 else [],
-                            affected_sectors=[sector] if float(change) < 0 else []
-                        ))
-                        break
-                        
-            except Exception as e:
-                print(f"    [板块新闻] {sector} 异常: {e}")
-        
-        return news_list
-    
-    async def _collect_xueqiu_stock_discussion(self, stocks: List[WatchlistStock]) -> List[News]:
-        """
-        采集雪球个股讨论
-        
-        雪球是投资者社区，可以获取市场观点和小道消息。
-        先尝试 RSSHub 源，失败回退直接 API。
-        """
-        news_list = []
-        
-        # 方案 A：通过 RSSHub 获取个股讨论
-        for stock in stocks[:5]:
-            xq_symbol = self._get_xueqiu_symbol(stock)
-            rsshub_urls = [
-                f"https://rsshub.rssforever.com/xueqiu/stock_comments/{xq_symbol}",
-                f"https://rsshub.pseudoyu.com/xueqiu/stock_comments/{xq_symbol}",
-            ]
-            
-            fetched = False
-            for rsshub_url in rsshub_urls:
-                try:
-                    resp = await self.client.get(rsshub_url, timeout=10.0)
-                    if resp.status_code == 200:
-                        feed = feedparser.parse(resp.text)
-                        for entry in feed.entries[:3]:
-                            title = entry.get("title", "")
-                            content = entry.get("summary", entry.get("description", ""))
-                            content = self._clean_html(content) if content else ""
-                            
-                            if not title or len(title) < 10:
-                                continue
-                            
-                            try:
-                                published = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') and entry.published_parsed else datetime.now()
-                            except:
-                                published = datetime.now()
-                            
-                            news_list.append(News(
-                                id=str(uuid.uuid4()),
-                                title=f"[{stock.name}] {title}",
-                                content=content[:1000],
-                                summary=content[:200] if content else title,
-                                source=f"雪球-{stock.name}",
-                                source_url=entry.get("link", f"https://xueqiu.com/S/{xq_symbol}"),
-                                published_at=published,
-                                news_type=NewsType.FINANCE,
-                                sentiment=SentimentType.NEUTRAL,
-                                importance_score=0.65,
-                                is_china_related=True,
-                                category=f"雪球讨论-{stock.name}",
-                                related_stocks=[stock.code]
-                            ))
-                        fetched = True
-                        break
-                except Exception as e:
-                    pass
-            
-            if not fetched:
-                # 方案 B：直接 API 获取
-                try:
-                    direct_news = await self._collect_xueqiu_stock_direct(stock)
-                    news_list.extend(direct_news)
-                except:
-                    pass
-            
-            await asyncio.sleep(0.3)
-        
-        if news_list:
-            print(f"  [雪球] 个股讨论共 {len(news_list)} 条")
-        return news_list
-    
+        # Sector quotes are market data, not news. Industry evidence now comes
+        # from dated articles and industry research in ResearchHub.
+        print('[行业新闻] 已停用板块涨跌幅拼接新闻；采用真实文章及行业研报', flush=True)
+        return []
+
     @staticmethod
     def _get_xueqiu_symbol(stock) -> str:
         """构造雪球股票代码"""
@@ -961,150 +804,20 @@ class NewsCollectorService:
             return f"SH{stock.code}" if stock.code.startswith("6") else f"SZ{stock.code}"
         return stock.code
     
-    async def _collect_xueqiu_stock_direct(self, stock) -> List[News]:
-        """直接 API 获取单只股票的雪球讨论（备用）"""
-        news_list = []
-        
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            "Referer": "https://xueqiu.com/",
-            "Origin": "https://xueqiu.com",
-        }
-        
-        try:
-            # 先获取 cookie
-            await self.client.get("https://xueqiu.com/", headers={
-                "User-Agent": headers["User-Agent"],
-                "Accept": "text/html",
-            })
-            await asyncio.sleep(0.3)
-            
-            xq_symbol = self._get_xueqiu_symbol(stock)
-            
-            # 获取个股讨论
-            url = f"https://xueqiu.com/query/v1/symbol/search/status.json?symbol={xq_symbol}&count=10&page=1"
-            
-            response = await self.client.get(url, headers=headers)
-            if response.status_code == 200:
-                # 防止返回 HTML 而非 JSON
-                content_type = response.headers.get("content-type", "")
-                if "json" not in content_type and "text/html" in content_type:
-                    return news_list
-                
-                data = response.json()
-                items = data.get("list", [])
-                
-                for item in items[:3]:
-                    text = item.get("text", "")
-                    text = self._clean_html(text)
-                    
-                    if len(text) < 20:
-                        continue
-                    
-                    user = item.get("user", {})
-                    author = user.get("screen_name", "雪球用户")
-                    followers = user.get("followers_count", 0)
-                    
-                    importance = 0.65 if followers > 10000 else 0.55
-                    title = text[:50] + "..." if len(text) > 50 else text
-                    
-                    news_list.append(News(
-                        id=str(uuid.uuid4()),
-                        title=f"[{stock.name}] {author}: {title}",
-                        content=text[:1000],
-                        summary=text[:200],
-                        source=f"雪球-{stock.name}",
-                        source_url=f"https://xueqiu.com/{user.get('id', '')}/post/{item.get('id', '')}",
-                        published_at=datetime.fromtimestamp(item.get("created_at", 0) / 1000) if item.get("created_at") else datetime.now(),
-                        news_type=NewsType.FINANCE,
-                        sentiment=SentimentType.NEUTRAL,
-                        importance_score=importance,
-                        is_china_related=True,
-                        category=f"雪球讨论-{stock.name}",
-                        related_stocks=[stock.code]
-                    ))
-        except Exception as e:
-            print(f"    [雪球] {stock.name} 直接API讨论采集失败: {e}")
-        
-        return news_list
     
     async def _collect_akshare_news(self) -> List[News]:
+        """Retired supplement adapters: no article URL or verified source time.
+
+        The observed EM response contained 30 empty bodies. The old CCTV
+        adapter also supplied a homepage URL and collection time as publication.
+        Keep issuer filings and research adapters; these are separate paths.
         """
-        使用 AKShare 采集财经新闻
-        
-        AKShare 提供的新闻接口比 RSS 更稳定，可作为主要数据源的补充。
-        所有调用走全局限流器，避免被东方财富封IP。
-        """
-        import akshare as ak
-        from .market_data_service import _akshare_rate_limiter
-        
-        news_list = []
-        
-        try:
-            # 1. 采集东方财富快讯（股票相关新闻）
-            try:
-                await _akshare_rate_limiter.acquire()
-                loop = asyncio.get_event_loop()
-                df = await asyncio.wait_for(
-                    loop.run_in_executor(None, ak.stock_info_global_em),
-                    timeout=30
-                )
-                if df is not None and not df.empty:
-                    for _, row in df.head(30).iterrows():
-                        news_list.append(News(
-                            id=str(uuid.uuid4()),
-                            title=str(row.get('标题', row.get('内容', '')[:50])),
-                            content=str(row.get('内容', '')),
-                            source="东方财富",
-                            source_url="https://www.eastmoney.com",
-                            published_at=datetime.now(),
-                            news_type=NewsType.FINANCE,
-                            sentiment=SentimentType.NEUTRAL,
-                            importance_score=0.6,
-                            is_china_related=True
-                        ))
-                    print(f"  [AKShare] 全球财经快讯: {len(news_list)} 条")
-            except Exception as e:
-                print(f"  [AKShare] 全球财经快讯采集失败: {e}")
-            
-            await asyncio.sleep(2)  # 接口间隔
-            
-            # 2. 采集 CCTV 新闻（央视财经相关）
-            try:
-                await _akshare_rate_limiter.acquire()
-                loop = asyncio.get_event_loop()
-                df_cctv = await asyncio.wait_for(
-                    loop.run_in_executor(None, lambda: ak.news_cctv(date=datetime.now().strftime("%Y%m%d"))),
-                    timeout=30
-                )
-                if df_cctv is not None and not df_cctv.empty:
-                    finance_keywords = ["经济", "金融", "股市", "央行", "货币", "贸易", "GDP", "通胀", "利率"]
-                    for _, row in df_cctv.iterrows():
-                        title = str(row.get('title', ''))
-                        if any(kw in title for kw in finance_keywords):
-                            news_list.append(News(
-                                id=str(uuid.uuid4()),
-                                title=title,
-                                content=str(row.get('content', title)),
-                                source="央视新闻",
-                                source_url="https://www.cctv.com",
-                                published_at=datetime.now(),
-                                news_type=NewsType.FINANCE,
-                                sentiment=SentimentType.NEUTRAL,
-                                importance_score=0.8,
-                                is_china_related=True
-                            ))
-                    print(f"  [AKShare] 央视财经新闻: 筛选到 {sum(1 for n in news_list if n.source == '央视新闻')} 条")
-            except Exception as e:
-                print(f"  [AKShare] 央视新闻采集失败: {e}")
-                
-        except Exception as e:
-            print(f"[AKShare] 新闻采集总体失败: {e}")
-        
-        return news_list
-    
+        self._supplement_coverage={
+            '东方财富':dict(status='disabled',reason='empty_body_homepage_url_and_unverified_publication'),
+            '央视新闻':dict(status='disabled',reason='homepage_url_and_unverified_publication')}
+        print('[补充入口] 停用旧东方财富/央视适配器：缺少合格正文链接或来源时间；不发送请求',flush=True)
+        return []
+
     def _resolve_rss_url(self, url: str, node: str = None) -> str:
         """将 {RSSHUB} 占位符替换为实际的 RSSHub 节点地址"""
         if "{RSSHUB}" in url:
@@ -1120,6 +833,30 @@ class NewsCollectorService:
         news_list = []
         url_template = feed_config["url"]
         last_error = None
+        if not hasattr(self,'_rss_coverage'):self._rss_coverage={}
+        status=dict(status='pending',feed_entries=0,parsed=0,invalid_entries=0,
+            history_pagination=False,reading_scope='feed_excerpt',transport_host=None)
+        self._rss_coverage[feed_config['name']]=status
+        from .source_health import PAUSED_FEEDS
+        if feed_config['name'] in PAUSED_FEEDS:
+            status.update(status='disabled',reason=PAUSED_FEEDS[feed_config['name']],automatic_retest=False)
+            return []
+        state_root=getattr(self,'_rss_state_root',None)
+        if state_root:
+            from .source_health import ensure_active,RetiredSourceError
+            try:ensure_active(state_root,url_template)
+            except RetiredSourceError:
+                status.update(status='disabled',reason='source_paused_no_automatic_retest',automatic_retest=False)
+                return []
+        state_path=state_root/(hashlib.sha256(url_template.encode()).hexdigest()+'.json') if state_root else None
+        if state_path:
+            import json
+            try:
+                saved=json.loads(state_path.read_text(encoding='utf-8'))
+                if china_now()<datetime.fromisoformat(saved['until']):
+                    status.update(status='cooldown',retry_after=saved['until'])
+                    return []
+            except (OSError,ValueError,KeyError,TypeError):pass
         
         # 确定要尝试的 URL 列表
         if "{RSSHUB}" in url_template:
@@ -1134,11 +871,15 @@ class NewsCollectorService:
             try:
                 response = await self.client.get(url, timeout=15.0)
                 response.raise_for_status()
+                from urllib.parse import urlsplit
+                status['transport_host']=urlsplit(url).hostname
                 
                 # 解析 RSS
                 feed = feedparser.parse(response.text)
+                status['feed_entries']=len(feed.entries)
                 
                 if not feed.entries:
+                    status['status']='empty' if feed.get('version') else 'invalid_feed'
                     continue
                 
                 for entry in feed.entries:
@@ -1146,7 +887,9 @@ class NewsCollectorService:
                         news = self._parse_rss_entry(entry, feed_config)
                         if news:
                             news_list.append(news)
+                        else:status['invalid_entries']+=1
                     except Exception as e:
+                        status['invalid_entries']+=1
                         print(f"解析条目失败: {e}")
                         continue
                 
@@ -1161,14 +904,29 @@ class NewsCollectorService:
                                 break
                 
                 print(f"[OK] {feed_config['name']}: 获取 {len(news_list)} 条")
+                status['parsed']=len(news_list)
+                status['status']='partial' if status['invalid_entries'] else 'ok'
                 return news_list  # 成功就返回
                 
             except Exception as e:
                 last_error = e
+                status['status']='failed';status['error']=type(e).__name__
+                if state_root:
+                    from .source_health import record_failure
+                    if record_failure(state_root,url_template,e):
+                        status.update(status='disabled',reason='source_paused_no_automatic_retest',automatic_retest=False)
+                        break
                 continue
         
         # 所有节点都失败了
         print(f"[FAIL] {feed_config['name']} 采集失败: {last_error or '未知错误'}")
+        if state_path and status['status'] in {'failed','invalid_feed'}:
+            from .research_hub import save_json
+            until=(china_now()+timedelta(hours=6)).isoformat()
+            try:
+                save_json(state_path,dict(until=until,error=status.get('error',status['status'])))
+                status['retry_after']=until
+            except OSError:pass
         
         return news_list
     
@@ -1181,33 +939,25 @@ class NewsCollectorService:
         
         # 提取内容
         content = ""
-        if hasattr(entry, "content"):
-            content = entry.content[0].value if entry.content else ""
-        elif hasattr(entry, "summary"):
-            content = entry.summary or ""
-        elif hasattr(entry, "description"):
-            content = entry.description or ""
-        
-        # 清理 HTML 标签
-        content = self._clean_html(content)
-        
-        # 如果内容太短，用标题作为内容
-        if len(content) < 50:
-            content = title
-        
-        # 解析发布时间
-        published_at = datetime.now()
-        if hasattr(entry, "published_parsed") and entry.published_parsed:
-            try:
-                published_at = datetime(*entry.published_parsed[:6])
-            except:
-                pass
-        elif hasattr(entry, "updated_parsed") and entry.updated_parsed:
-            try:
-                published_at = datetime(*entry.updated_parsed[:6])
-            except:
-                pass
-        
+        candidates=[getattr(block,'value','') for block in (getattr(entry,'content',None) or [])]
+        candidates.extend([getattr(entry,'summary','') or '',getattr(entry,'description','') or ''])
+        for candidate in candidates:
+            content=self._clean_html(candidate)
+            if content:break
+
+        # Keep short actual text (a complete notice can be short). Do not replace
+        # it with a headline and later count that headline as supporting content.
+
+        # feedparser parsed timestamps are UTC. Missing dates cannot be treated as today.
+        parsed_time = entry.get("published_parsed") or entry.get("updated_parsed")
+        if not parsed_time:
+            return None
+        try:
+            published_at = datetime(*parsed_time[:6], tzinfo=timezone.utc).astimezone(
+                timezone(timedelta(hours=8))).replace(tzinfo=None)
+        except (TypeError, ValueError):
+            return None
+
         # 提取链接
         source_url = entry.get("link", "")
         
@@ -1248,7 +998,7 @@ class NewsCollectorService:
             category=feed_config.get("category"),
             beneficiary_sectors=beneficiary_sectors,
             affected_sectors=affected_sectors,
-            created_at=datetime.now()
+            created_at=china_now()
         )
     
     def _clean_html(self, text: str) -> str:
@@ -1454,17 +1204,29 @@ class NewsCollectorService:
         第二层：标准化后的 Jaccard bigram 相似度 > 0.7 视为重复
                 保留重要性评分更高的那条
         """
+        from .evidence_audit import copy_reason,retain_distinct_full_bodies
         unique = []
         # 用于相似度比较的标准化标题列表
         normalized_titles = []
         
         dup_exact = 0
         dup_similar = 0
-        
-        for news in news_list:
+        seen_hashes = set()
+        stocks = get_watchlist_service().get_all_stocks()
+        def priority(item):
+            from .news_quality import priority as evidence_priority
+            return (article_url(item.source_url),evidence_priority(item)[0],matches_watchlist(item, stocks),
+                    item.importance_score, item.published_at)
+
+        for news in sorted(news_list, key=priority, reverse=True):
+            if any(copy_reason(news,existing) for existing in unique):
+                dup_exact += 1
+                continue
             # 第一层：MD5 精确去重
             title_hash = hashlib.md5(news.title.encode()).hexdigest()
-            if title_hash in self._seen_hashes:
+            if title_hash in seen_hashes and not any(
+                    existing.title==news.title and retain_distinct_full_bodies(news,existing)
+                    for existing in unique):
                 dup_exact += 1
                 continue
             
@@ -1475,12 +1237,20 @@ class NewsCollectorService:
             for i, existing_norm in enumerate(normalized_titles):
                 sim = self._title_similarity(norm_title, existing_norm)
                 if sim > 0.7:
+                    if retain_distinct_full_bodies(news,unique[i]):
+                        continue
+                    # Similar headlines about different watched companies are
+                    # separate evidence and must not be collapsed into one.
+                    new_stocks = {s.code for s in stocks if matches_watchlist(news, [s])}
+                    old_stocks = {s.code for s in stocks if matches_watchlist(unique[i], [s])}
+                    if new_stocks and old_stocks and new_stocks.isdisjoint(old_stocks):
+                        continue
                     # 相似度超过阈值，保留重要性更高的
-                    if news.importance_score > unique[i].importance_score:
+                    if priority(news) > priority(unique[i]):
                         # 新的更重要，替换旧的
                         old_hash = hashlib.md5(unique[i].title.encode()).hexdigest()
-                        self._seen_hashes.discard(old_hash)
-                        self._seen_hashes.add(title_hash)
+                        seen_hashes.discard(old_hash)
+                        seen_hashes.add(title_hash)
                         unique[i] = news
                         normalized_titles[i] = norm_title
                     is_duplicate = True
@@ -1488,7 +1258,7 @@ class NewsCollectorService:
                     break
             
             if not is_duplicate:
-                self._seen_hashes.add(title_hash)
+                seen_hashes.add(title_hash)
                 unique.append(news)
                 normalized_titles.append(norm_title)
         
@@ -1512,7 +1282,7 @@ class NewsCollectorService:
             "财联社电报", "财联社深度", "金十数据", "东方财富研报",
             "百度财经焦点", "百度股票焦点", "格隆汇7x24快讯",
             "东方财富", "同花顺快讯", "央视新闻",
-            "华尔街见闻-股市", "格隆汇港股", "香港经济日报",
+            "华尔街见闻-股市", "格隆汇港股", "香港经济日报", "信报财经新闻",
         }
         # 自选股/雪球/行业板块来源也直接放行
         domestic_source_keywords = ["自选股", "雪球", "行业板块", "东方财富-"]
@@ -1537,6 +1307,11 @@ class NewsCollectorService:
         
         for news in news_list:
             source = news.source or ""
+            if ('全市场事件入口' in (news.market_impact or '') and article_url(news.source_url)
+                    and news.importance_score>=min_score):
+                filtered_news.append(news)
+                bypass_count+=1
+                continue
             
             # 规则1：国内财经源白名单直接放行
             is_domestic = source in domestic_sources
@@ -1574,11 +1349,16 @@ class NewsCollectorService:
             筛选后的跨界新闻列表
         """
         cross_border_news = []
+        stocks=get_watchlist_service().get_all_stocks()
+        macro_events=('美联储','央行','关税','出口管制','制裁','原油','天然气','航运','海峡','战争','停产','供应链中断')
         
         for news in news_list:
             # 只选取非财经类新闻
             if news.news_type != NewsType.FINANCE and news.importance_score >= min_score:
-                cross_border_news.append(news)
+                text=news.title+' '+(news.content or '')
+                if (matches_watchlist(news,stocks) or '行业关联 ' in (news.market_impact or '')
+                        or any(term in text for term in macro_events)):
+                    cross_border_news.append(news)
         
         # 按类型分组，每类最多取5条
         result = []
@@ -1590,7 +1370,7 @@ class NewsCollectorService:
                 result.append(news)
                 type_counts[type_key] = type_counts.get(type_key, 0) + 1
         
-        return result
+        return result[:6]
     
     def get_news_by_type(self, news_list: List[News]) -> Dict[str, List[News]]:
         """

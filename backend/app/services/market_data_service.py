@@ -6,6 +6,7 @@ import asyncio
 import time
 from datetime import datetime, date
 from typing import Dict, List, Optional, Any
+from .time_context import china_now, china_today
 from dataclasses import dataclass, field, asdict
 import traceback
 
@@ -51,45 +52,51 @@ class _AKShareRateLimiter:
 _akshare_rate_limiter = _AKShareRateLimiter(rate=0.67, burst=2)
 
 
-# ── 当日数据缓存：同一交易日同一接口只调一次 ──
+# ── 共享数据缓存：120秒有效，避免盘中沿用整天旧快照 ──
 class _MarketDataCache:
     """
     市场数据缓存（内存 + 可选磁盘持久化）
     
-    同一交易日内，相同的 AKShare 接口只调用一次，
-    后续复用缓存结果，大幅减少对东方财富的请求次数。
+    相同请求共享120秒缓存；跨日或过期后重新获取。
     """
     def __init__(self):
         self._cache: Dict[str, Any] = {}
         self._cache_date: Optional[str] = None
+        self._stored_at: Dict[str, float] = {}
     
     def get(self, key: str) -> Optional[Any]:
         """获取缓存数据，如果日期不匹配则清空"""
-        today = date.today().isoformat()
+        today = china_today().isoformat()
         if self._cache_date != today:
             self._cache.clear()
+            self._stored_at.clear()
             self._cache_date = today
+            return None
+        if time.monotonic() - self._stored_at.get(key, float('-inf')) > 120:
             return None
         return self._cache.get(key)
     
     def set(self, key: str, value: Any):
         """设置缓存数据"""
-        today = date.today().isoformat()
+        today = china_today().isoformat()
         if self._cache_date != today:
             self._cache.clear()
+            self._stored_at.clear()
             self._cache_date = today
         self._cache[key] = value
+        self._stored_at[key] = time.monotonic()
     
     def has(self, key: str) -> bool:
         """检查是否有缓存"""
-        today = date.today().isoformat()
+        today = china_today().isoformat()
         if self._cache_date != today:
             return False
-        return key in self._cache
+        return self.get(key) is not None
 
 
 # 全局缓存实例
 _market_data_cache = _MarketDataCache()
+_akshare_failures = {}
 
 # ── 给 requests 全局加超时，防止 AKShare 底层 HTTP 请求永久挂起 ──
 try:
@@ -139,6 +146,9 @@ class IndexData:
     high: float = 0
     low: float = 0
     open: float = 0
+    as_of: str = ''
+    source: str = ''
+    time_basis: str = ''
 
 
 @dataclass
@@ -276,6 +286,9 @@ class GlobalIndexData:
     current: float      # 当前点位
     change_pct: float   # 涨跌幅(%)
     region: str = ""    # 区域（美股/港股/欧洲/亚太）
+    as_of: str = ''
+    source: str = ''
+    time_basis: str = ''
 
 
 @dataclass
@@ -304,6 +317,7 @@ class MarketOverview:
     lhb_seats: List[LHBSeatData] = field(default_factory=list)             # 龙虎榜席位明细
     block_trades: List[BlockTradeData] = field(default_factory=list)       # 大宗交易
     margin_data: Optional[MarginTradingData] = None                        # 融资融券
+    source_status: Dict = field(default_factory=dict)
     
     def to_dict(self) -> Dict:
         """转换为字典"""
@@ -312,7 +326,11 @@ class MarketOverview:
     def to_prompt_text(self) -> str:
         """转换为 AI Prompt 使用的文本格式"""
         lines = []
-        lines.append(f"## 📊 市场数据（{self.date}）\n")
+        lines.append(f"## 📊 市场数据（查询目标日期：{self.date}，不等于各项来源行情时间）\n")
+        lines.append("未标注来源行情时间的数值未完成时点核验，不能当作同一时点或当日实时行情引用。"
+                     "不同新闻中的行情按各自发布时点单独描述，无法确定时点或指数身份时省略数字，不拼接涨幅区间。\n")
+        if self.source_status:
+            lines.append('市场数据覆盖：'+str(self.source_status)+'\n未核验数据不是零值；周末不能生成当日涨停、连板或交易榜单。\n')
         
         # 数据缺失警告（让 AI 知道哪些数据不可用，避免编造）
         missing = []
@@ -332,7 +350,7 @@ class MarketOverview:
             missing.append("融资融券")
         
         if missing:
-            lines.append(f"⚠️ **以下数据因接口异常暂不可用：{', '.join(missing)}**")
+            lines.append(f"⚠️ **以下数据缺失或未通过核验：{', '.join(missing)}**")
             lines.append(f"**对于缺失的数据项，请直接说\"数据暂缺\"，严禁编造任何数字或趋势。**\n")
         
         # 1. 大盘指数
@@ -340,7 +358,9 @@ class MarketOverview:
             lines.append("### 主要指数")
             for idx in self.indices:
                 trend = "📈" if idx.change_pct > 0 else ("📉" if idx.change_pct < 0 else "➡️")
-                lines.append(f"- {idx.name}：{idx.current:.2f} {trend} {idx.change_pct:+.2f}%（成交额 {idx.amount/100000000:.0f}亿）")
+                if not idx.as_of or not idx.source:
+                    continue
+                lines.append(f"- {idx.name}：{idx.current:.2f} {trend} {idx.change_pct:+.2f}%；来源：{idx.source}；来源时间：{idx.as_of}；{idx.time_basis}。成交额未核实。")
             lines.append("")
         
         # 1.5 外盘指数（全球市场）
@@ -356,8 +376,10 @@ class MarketOverview:
             for region, indices in regions.items():
                 lines.append(f"**{region}：**")
                 for gi in indices:
+                    if not gi.as_of or not gi.source:
+                        continue
                     trend = "📈" if gi.change_pct > 0 else ("📉" if gi.change_pct < 0 else "➡️")
-                    lines.append(f"- {gi.name}：{gi.current:.2f} {trend} {gi.change_pct:+.2f}%")
+                    lines.append(f"- {gi.name}：{gi.current:.2f} {trend} {gi.change_pct:+.2f}%；来源：{gi.source}；来源时间：{gi.as_of}；{gi.time_basis}")
             lines.append("")
         
         # 1.8 大宗商品
@@ -568,7 +590,7 @@ class MarketDataService:
         except ImportError:
             print("⚠️ MarketDataService: AKShare 不可用")
     
-    async def _call_akshare_with_retry(self, func, *args, max_retries: int = 2, use_cache: bool = True, cache_key: str = None, **kwargs):
+    async def _call_akshare_with_retry(self, func, *args, max_retries: int = 1, use_cache: bool = True, cache_key: str = None, **kwargs):
         """
         带重试 + 全局限流 + 缓存的 AKShare 调用包装
         
@@ -578,11 +600,13 @@ class MarketDataService:
         3. asyncio.wait_for 45 秒超时（本函数）
         4. scheduler 层 10 分钟总超时（外层兜底）
         
-        缓存机制：
-        - 同一交易日内，相同接口调用直接返回缓存结果
-        - 大幅减少对东方财富的重复请求
+        缓存机制：成功结果共享120秒；同参数失败冷却600秒。
         """
         global _akshare_rate_limiter, _market_data_cache
+        # Share failures across callers even when they use different cache labels.
+        failure_key = (func.__name__, repr(args), repr(sorted(kwargs.items())))
+        if _akshare_failures.get(failure_key, 0) > time.monotonic():
+            raise RuntimeError(f'{func.__name__} 正在故障冷却期（10分钟），跳过重复请求')
         
         # 生成缓存 key
         if cache_key is None:
@@ -629,191 +653,13 @@ class MarketDataService:
                     print(f"  [AKShare] {func.__name__} 第{attempt+1}次失败: {type(e).__name__}, {wait}秒后重试...", flush=True)
                     await asyncio.sleep(wait)
         
+        _akshare_failures[failure_key] = time.monotonic() + 600
         raise last_error
     
     async def get_market_overview(self, target_date: Optional[date] = None) -> MarketOverview:
-        """
-        获取市场全面数据
-        
-        Args:
-            target_date: 目标日期，默认为今天
-            
-        Returns:
-            MarketOverview 包含所有市场数据
-        """
-        if target_date is None:
-            target_date = date.today()
-        
-        date_str = target_date.strftime("%Y-%m-%d")
-        overview = MarketOverview(date=date_str)
-        
-        if not self.akshare_available:
-            print("⚠️ AKShare 不可用，将仅使用 HTTP 直连方案获取数据")
-        
-        # 串行获取各类数据，每次间隔 1 秒，避免触发数据源限流/反爬
-        task_configs = [
-            ("指数", self._get_indices),
-            ("板块排行", self._get_sector_ranking),
-            ("资金流向", self._get_fund_flow),
-            ("涨跌停", lambda: self._get_limit_stocks(target_date)),
-            ("市场统计", self._get_market_stats),
-            ("热门股票", lambda: self._get_hot_stocks(target_date)),
-            ("概念板块", self._get_concept_sectors),
-            ("连板强势股", lambda: self._get_consecutive_limit_stocks(target_date)),
-            ("技术信号机会股", lambda: self._get_tech_signal_stocks(target_date)),
-            ("大宗商品", self._get_commodities),
-            ("外盘指数", self._get_global_indices),
-            ("龙虎榜席位", lambda: self._get_lhb_seats(target_date)),
-            ("大宗交易", lambda: self._get_block_trades(target_date)),
-            ("融资融券", lambda: self._get_margin_trading(target_date)),
-        ]
-        
-        results = []
-        for name, task_func in task_configs:
-            try:
-                result = await task_func()
-                results.append(result)
-                # 检查返回值是否为空数据（空列表/空元组/None/空字典）
-                is_empty = (
-                    result is None or 
-                    result == [] or 
-                    result == ([], []) or 
-                    (isinstance(result, dict) and all(v == 0 for v in result.values()))
-                )
-                if is_empty:
-                    print(f"  [WARN] {name} 返回空数据（接口可能异常）")
-                else:
-                    print(f"  [OK] {name} 获取成功")
-            except Exception as e:
-                results.append(e)
-                print(f"  [FAIL] {name} 获取失败: {e}")
-            await asyncio.sleep(2)  # 间隔 2 秒，配合全局令牌桶避免限流
-        
-        # 处理结果（原有6个）
-        if not isinstance(results[0], Exception):
-            overview.indices = results[0]
-        else:
-            print(f"获取指数失败: {results[0]}")
-            
-        if not isinstance(results[1], Exception):
-            top, bottom = results[1]
-            overview.top_sectors = top
-            overview.bottom_sectors = bottom
-        else:
-            print(f"获取板块排行失败: {results[1]}")
-            
-        if not isinstance(results[2], Exception):
-            overview.fund_flow = results[2]
-        else:
-            print(f"获取资金流向失败: {results[2]}")
-            
-        if not isinstance(results[3], Exception):
-            overview.limit_data = results[3]
-        else:
-            print(f"获取涨跌停失败: {results[3]}")
-            
-        if not isinstance(results[4], Exception):
-            stats = results[4]
-            overview.up_count = stats.get("up", 0)
-            overview.down_count = stats.get("down", 0)
-            overview.flat_count = stats.get("flat", 0)
-            overview.total_volume = stats.get("total_volume", 0)
-        else:
-            print(f"获取市场统计失败: {results[4]}")
-            
-        if not isinstance(results[5], Exception):
-            overview.hot_stocks = results[5]
-        else:
-            print(f"获取热门股票失败: {results[5]}")
-        
-        # 处理结果（新增3个）
-        if not isinstance(results[6], Exception):
-            overview.concept_sectors = results[6]
-        else:
-            print(f"获取概念板块失败: {results[6]}")
-        
-        if not isinstance(results[7], Exception):
-            overview.consecutive_limit_stocks = results[7]
-        else:
-            print(f"获取连板强势股失败: {results[7]}")
-        
-        if not isinstance(results[8], Exception):
-            overview.tech_signal_stocks = results[8]
-        else:
-            print(f"获取技术信号机会股失败: {results[8]}")
-        
-        # 处理结果（大宗商品+外盘）
-        if not isinstance(results[9], Exception):
-            overview.commodities = results[9]
-        else:
-            print(f"获取大宗商品失败: {results[9]}")
-        
-        if not isinstance(results[10], Exception):
-            overview.global_indices = results[10]
-        else:
-            print(f"获取外盘指数失败: {results[10]}")
-        
-        # 处理结果（聪明钱数据）
-        if len(results) > 11 and not isinstance(results[11], Exception):
-            overview.lhb_seats = results[11]
-        elif len(results) > 11:
-            print(f"获取龙虎榜席位失败: {results[11]}")
-        
-        if len(results) > 12 and not isinstance(results[12], Exception):
-            overview.block_trades = results[12]
-        elif len(results) > 12:
-            print(f"获取大宗交易失败: {results[12]}")
-        
-        if len(results) > 13 and not isinstance(results[13], Exception):
-            overview.margin_data = results[13]
-        elif len(results) > 13:
-            print(f"获取融资融券失败: {results[13]}")
-        
-        # 计算市场情绪
-        overview.market_sentiment = self._calculate_sentiment(overview)
-        
-        # 汇总日志：哪些数据成功，哪些失败（空数据也算失败）
-        def _is_empty_result(r):
-            """检查结果是否为空数据"""
-            if isinstance(r, Exception):
-                return True
-            if r is None or r == [] or r == ([], []):
-                return True
-            if isinstance(r, dict) and all(v == 0 for v in r.values()):
-                return True
-            return False
-        
-        real_success_count = sum(1 for r in results if not _is_empty_result(r))
-        empty_count = sum(1 for r in results if not isinstance(r, Exception) and _is_empty_result(r))
-        fail_count = sum(1 for r in results if isinstance(r, Exception))
-        fail_names = [task_configs[i][0] for i, r in enumerate(results) if isinstance(r, Exception)]
-        empty_names = [task_configs[i][0] for i, r in enumerate(results) if not isinstance(r, Exception) and _is_empty_result(r)]
-        
-        problem_names = fail_names + empty_names
-        print(f"\n  [市场数据汇总] {real_success_count}/{len(results)} 项有效数据"
-              f"（{fail_count} 项异常, {empty_count} 项空数据）"
-              f"{f'，问题项: {chr(44).join(problem_names)}' if problem_names else ''}")
-        
-        # ── 熔断机制：核心数据全部失败则中止报告生成 ──
-        # 核心数据 = 指数 + 板块排行 + 市场统计，这三项全失败说明所有数据源都不可用
-        core_data_ok = (
-            bool(overview.indices) or
-            bool(overview.top_sectors) or
-            (overview.up_count > 0 or overview.down_count > 0)
-        )
-        if not core_data_ok:
-            error_msg = (
-                f"[熔断] ⚠️ 核心市场数据全部采集失败！"
-                f"（指数: {'失败' if not overview.indices else 'OK'}, "
-                f"板块: {'失败' if not overview.top_sectors else 'OK'}, "
-                f"涨跌统计: {'失败' if overview.up_count == 0 and overview.down_count == 0 else 'OK'}）\n"
-                f"失败项: {', '.join(fail_names)}\n"
-                f"所有数据源（AKShare/东方财富/腾讯/新浪）均不可用，中止报告生成以避免输出无数据的空报告。"
-            )
-            print(error_msg, flush=True)
-            raise RuntimeError(error_msg)
-        
-        return overview
+        """Use only sources whose identity and actual observation time are verified."""
+        from .timed_market import collect_overview
+        return await collect_overview(target_date)
     
     async def _get_indices(self) -> List[IndexData]:
         """
@@ -1244,7 +1090,7 @@ class MarketDataService:
             "reportName=RPT_BOARD_INDUSTRY_ALLDATA&"
             "columns=ALL&"
             "filter=(TRADE_DATE%3E%27{date}%27)"
-        ).format(date=datetime.now().strftime("%Y-%m-%d"))
+        ).format(date=china_now().strftime("%Y-%m-%d"))
         
         # 备用：用 push2his（历史数据域名，不同于实时 push2）
         url_alt = (
@@ -2429,7 +2275,8 @@ class MarketDataService:
                     for _, row in df_hk.iterrows():
                         name_col = str(row.get('名称', ''))
                         for target_name, region in hk_targets.items():
-                            if target_name in name_col:
+                            if name_col.strip() == target_name and not any(
+                                    item.name == target_name for item in global_indices):
                                 try:
                                     current = float(row.get('最新价', 0))
                                     change_pct = float(row.get('涨跌幅', 0))

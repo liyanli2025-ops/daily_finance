@@ -10,6 +10,7 @@ import sys
 import asyncio
 from datetime import datetime, timedelta, date
 from typing import Optional
+from .time_context import china_now, china_today
 import uuid
 
 # 强制行缓冲，让 print 立即写入日志文件（nohup 重定向时默认是全缓冲）
@@ -30,13 +31,14 @@ from .signal_tracker import get_signal_tracker
 from .backtest_service import get_backtest_service
 from ..models.database import ReportModel, get_session_maker
 from ..models.report import ReportType, Report
+from .model_usage import budgeted_generation
 
 
 class SchedulerService:
     """定时调度服务"""
     
     def __init__(self):
-        self.scheduler = AsyncIOScheduler()
+        self.scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
         self.is_running = False
         self._db_engine = None
         self._session_maker = None
@@ -91,7 +93,7 @@ class SchedulerService:
         2. 不是法定节假日
         """
         if check_date is None:
-            check_date = date.today()
+            check_date = china_today()
         
         # 周末不是交易日
         if check_date.weekday() >= 5:  # 5=周六, 6=周日
@@ -108,7 +110,7 @@ class SchedulerService:
     def get_last_trading_day(self, from_date: date = None) -> date:
         """获取上一个交易日"""
         if from_date is None:
-            from_date = date.today()
+            from_date = china_today()
         
         last_day = from_date - timedelta(days=1)
         while not self.is_trading_day(last_day):
@@ -127,7 +129,7 @@ class SchedulerService:
         lead_time = settings.collection_lead_time
         
         # 计算早报采集开始时间
-        collection_time = datetime.now().replace(
+        collection_time = china_now().replace(
             hour=report_hour, 
             minute=report_minute,
             second=0,
@@ -141,6 +143,7 @@ class SchedulerService:
         self.scheduler.add_job(
             self.generate_morning_report,
             CronTrigger(
+                timezone="Asia/Shanghai",
                 hour=collection_hour,
                 minute=collection_minute
             ),
@@ -159,6 +162,7 @@ class SchedulerService:
         self.scheduler.add_job(
             self.generate_evening_report,
             CronTrigger(
+                timezone="Asia/Shanghai",
                 hour=evening_collection_hour,
                 minute=evening_collection_minute,
                 day_of_week="mon-fri"  # 周一到周五触发，内部再判断是否真正的交易日
@@ -176,6 +180,7 @@ class SchedulerService:
         self.scheduler.add_job(
             self.midday_news_precollect,
             CronTrigger(
+                timezone="Asia/Shanghai",
                 hour=midday_hour,
                 minute=midday_minute,
                 day_of_week="mon-fri"  # 周一到周五触发，内部再判断是否真正的交易日
@@ -189,6 +194,7 @@ class SchedulerService:
         self.scheduler.add_job(
             self.update_watchlist_data,
             CronTrigger(
+                timezone="Asia/Shanghai",
                 hour="9-15",
                 minute="30"
             ),
@@ -202,6 +208,7 @@ class SchedulerService:
         self.scheduler.add_job(
             self.run_backtest,
             CronTrigger(
+                timezone="Asia/Shanghai",
                 hour=15,
                 minute=30,
                 day_of_week="mon-fri"
@@ -216,6 +223,7 @@ class SchedulerService:
         self.scheduler.add_job(
             self.run_signal_tracking,
             CronTrigger(
+                timezone="Asia/Shanghai",
                 hour=15,
                 minute=35,
                 day_of_week="mon-fri"
@@ -225,6 +233,10 @@ class SchedulerService:
             replace_existing=True
         )
         
+        from .radar_sampler import sample
+        self.scheduler.add_job(sample,CronTrigger(timezone='Asia/Shanghai',minute=10),
+            id='public_radar_sample',name='全市场公开原文观察（无模型）',
+            replace_existing=True,max_instances=1,coalesce=True,misfire_grace_time=120)
         self.scheduler.start()
         self.is_running = True
         
@@ -244,7 +256,8 @@ class SchedulerService:
             self.is_running = False
             print("[SCHEDULER] 调度器已停止")
     
-    async def generate_morning_report(self):
+    @budgeted_generation
+    async def generate_morning_report(self, force=False):
         """
         生成早报的完整流程
         
@@ -261,12 +274,15 @@ class SchedulerService:
         - 下周操作预测
         """
         import sys
-        today = date.today()
+        today = china_today()
         is_trading = self.is_trading_day(today)
         report_type_str = "交易日早报" if is_trading else "非交易日深度早报"
+        if not force and await self._has_saved_edition(today,'morning'):
+            print('[SKIP] 数据库已有本日早报，不重复采集或扣费；确需重做请明确指定force=true',flush=True)
+            return
         
         # ===== 防重复生成：同一天只生成一次早报 =====
-        if self._last_morning_date == today:
+        if not force and self._last_morning_date == today:
             print(f"\n[SKIP] 今日早报已在本进程中生成过（{today}），跳过重复执行", flush=True)
             return
         
@@ -277,12 +293,12 @@ class SchedulerService:
         
         async with self._generating_lock:
             # 二次检查（拿到锁后再确认一次）
-            if self._last_morning_date == today:
+            if not force and self._last_morning_date == today:
                 print(f"\n[SKIP] 今日早报已生成（并发检查），跳过", flush=True)
                 return
         
             print("\n" + "="*50, flush=True)
-            print(f"[START] 开始生成{report_type_str} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+            print(f"[START] 开始生成{report_type_str} - {china_now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
             print("="*50, flush=True)
             sys.stdout.flush()
         
@@ -301,7 +317,7 @@ class SchedulerService:
                         timeout=NEWS_COLLECT_TIMEOUT
                     )
                 except asyncio.TimeoutError:
-                    print(f"[WARN] ⚠️ 新闻采集超时 ({NEWS_COLLECT_TIMEOUT}s)！将使用已采集到的数据或模拟数据", flush=True)
+                    print(f"[WARN] ⚠️ 新闻采集超时 ({NEWS_COLLECT_TIMEOUT}s)！本期停止生成", flush=True)
                     all_news = []
                 
                 # 分离财经新闻和跨界新闻
@@ -333,23 +349,15 @@ class SchedulerService:
                         print(f"      - [{news.news_type.value}] {news.title[:40]}...")
                 
                 if not all_news:
-                    print("[WARN] 未能从 RSS 源采集到新闻，将使用模拟数据生成报告")
-                    china_news, cross_border_news = self._generate_mock_news()
+                    print("[WARN] 未能从 RSS 源采集到新闻，停止生成报告")
+                    raise RuntimeError("新闻采集为空，本期停止生成；禁止用模拟新闻替代真实资料")
                 
                 # Step 2: AI 分析生成早报（带超时保护）
                 AI_REPORT_TIMEOUT = 900  # 15 分钟超时（含AI生成+审查修复，Claude长报告需要更久）
                 print(f"\n[Step 2] AI 分析生成{report_type_str}（超时 {AI_REPORT_TIMEOUT}s）...", flush=True)
                 analyzer = get_ai_analyzer(force_reinit=True)
                 
-                # 对重要新闻进行情绪分析（单条超时30秒，失败跳过）
-                for news in china_news[:10]:
-                    try:
-                        news.sentiment = await asyncio.wait_for(
-                            analyzer.analyze_news_sentiment(news),
-                            timeout=30
-                        )
-                    except (asyncio.TimeoutError, Exception) as e:
-                        print(f"   [WARN] 情绪分析跳过: {str(e)[:50]}", flush=True)
+                # News already has local rule sentiment; analysis must assess the evidence itself.
                 
                 # 生成早报（传入报告类型和是否交易日）
                 try:
@@ -364,7 +372,7 @@ class SchedulerService:
                     )
                 except asyncio.TimeoutError:
                     print(f"\n[ERROR] ⚠️ AI 报告生成超时 ({AI_REPORT_TIMEOUT}s)！跳过本次生成", flush=True)
-                    return
+                    raise RuntimeError('早报分析超时，任务失败，未生成完整报告') from None
                 
                 print(f"   报告生成完成: {report.title}")
                 print(f"   字数: {report.word_count}, 预计阅读时间: {report.reading_time} 分钟")
@@ -416,6 +424,7 @@ class SchedulerService:
                 print(f"\n[ERROR] 早报生成失败: {e}")
                 import traceback
                 traceback.print_exc()
+                raise
     
     async def midday_news_precollect(self):
         """
@@ -430,7 +439,7 @@ class SchedulerService:
         - 避免下午4点采集时，上午的热点新闻被下午新闻冲掉
         """
         import sys
-        today = date.today()
+        today = china_today()
         
         # 非交易日不执行
         if not self.is_trading_day(today):
@@ -438,7 +447,7 @@ class SchedulerService:
             return
         
         print("\n" + "-"*40, flush=True)
-        print(f"[盘中预采集] 开始 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+        print(f"[盘中预采集] 开始 - {china_now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
         print("-"*40, flush=True)
         sys.stdout.flush()
         
@@ -456,7 +465,8 @@ class SchedulerService:
             import traceback
             traceback.print_exc()
     
-    async def generate_evening_report(self):
+    @budgeted_generation
+    async def generate_evening_report(self, force=False):
         """
         生成晚报的完整流程（仅交易日）
         
@@ -468,7 +478,10 @@ class SchedulerService:
         - 新颖/深刻的概念解释
         """
         import sys
-        today = date.today()
+        today = china_today()
+        if not force and await self._has_saved_edition(today,'evening'):
+            print('[SKIP] 数据库已有本日晚报，不重复采集或扣费；确需重做请明确指定force=true',flush=True)
+            return
         
         # 非交易日不生成晚报
         if not self.is_trading_day(today):
@@ -476,7 +489,7 @@ class SchedulerService:
             return
         
         print("\n" + "="*50, flush=True)
-        print(f"[START] 开始生成交易日晚报 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+        print(f"[START] 开始生成交易日晚报 - {china_now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
         print("="*50, flush=True)
         sys.stdout.flush()
         
@@ -533,23 +546,15 @@ class SchedulerService:
                 china_news = finance_news
             
             if not all_news:
-                print("[WARN] 未能采集到新闻，将使用模拟数据")
-                china_news, cross_border_news = self._generate_mock_news()
+                print("[WARN] 未能采集到新闻，停止生成报告")
+                raise RuntimeError("新闻采集为空，本期停止生成；禁止用模拟新闻替代真实资料")
             
             # Step 3: AI 分析生成晚报（带超时保护）
             AI_REPORT_TIMEOUT = 900  # 15 分钟超时（含AI生成+审查修复，Claude长报告需要更久）
             print(f"\n[Step 3] AI 分析生成晚报（超时 {AI_REPORT_TIMEOUT}s）...", flush=True)
             analyzer = get_ai_analyzer(force_reinit=True)
             
-            # 对重要新闻进行情绪分析（单条超时30秒，失败跳过）
-            for news in china_news[:10]:
-                try:
-                    news.sentiment = await asyncio.wait_for(
-                        analyzer.analyze_news_sentiment(news),
-                        timeout=30
-                    )
-                except (asyncio.TimeoutError, Exception) as e:
-                    print(f"   [WARN] 情绪分析跳过: {str(e)[:50]}", flush=True)
+            # News already has local rule sentiment; analysis must assess the evidence itself.
             
             # 生成晚报（传入今日早报用于回顾对比）
             try:
@@ -565,7 +570,7 @@ class SchedulerService:
                 )
             except asyncio.TimeoutError:
                 print(f"\n[ERROR] ⚠️ 晚报 AI 报告生成超时 ({AI_REPORT_TIMEOUT}s)！跳过本次生成", flush=True)
-                return
+                raise RuntimeError('晚报分析超时，任务失败，未生成完整报告') from None
             
             print(f"   报告生成完成: {report.title}")
             print(f"   字数: {report.word_count}, 预计阅读时间: {report.reading_time} 分钟")
@@ -611,13 +616,26 @@ class SchedulerService:
             print(f"\n[ERROR] 晚报生成失败: {e}")
             import traceback
             traceback.print_exc()
+            raise
     
-    async def generate_daily_report(self):
+    async def generate_daily_report(self, force=False):
         """
         兼容旧接口：生成每日报告（默认生成早报）
         """
-        await self.generate_morning_report()
+        await self.generate_morning_report(force=force)
+
+    async def _has_saved_edition(self, report_date, report_type):
+        """Persistent duplicate guard survives process restarts; database errors stop before paid calls."""
+        from sqlalchemy import select
+        maker=getattr(self,'_session_maker',None)
+        if maker is None:
+            return False
+        async with maker() as session:
+            result=await session.execute(select(ReportModel.id).where(
+                ReportModel.report_date==report_date,ReportModel.report_type==report_type).limit(1))
+            return result.scalar_one_or_none() is not None
     
+    @budgeted_generation
     async def generate_podcast_for_report(self, report_id: str):
         """
         为指定报告重新生成播客
@@ -668,13 +686,13 @@ class SchedulerService:
                 summary="A股震荡整理，科技板块领涨",
                 source="财经快讯",
                 source_url="",
-                published_at=datetime.now(),
+                published_at=china_now(),
                 sentiment=SentimentType.POSITIVE,
                 importance_score=0.8,
                 keywords=["A股", "科技", "新能源"],
                 related_stocks=["000001"],
                 news_type=NewsType.FINANCE,
-                created_at=datetime.now()
+                created_at=china_now()
             ),
             News(
                 id=str(uuid.uuid4()),
@@ -683,13 +701,13 @@ class SchedulerService:
                 summary="央行维持流动性，货币政策稳健",
                 source="金融要闻",
                 source_url="",
-                published_at=datetime.now(),
+                published_at=china_now(),
                 sentiment=SentimentType.NEUTRAL,
                 importance_score=0.9,
                 keywords=["央行", "货币政策", "流动性"],
                 related_stocks=[],
                 news_type=NewsType.FINANCE,
-                created_at=datetime.now()
+                created_at=china_now()
             ),
             News(
                 id=str(uuid.uuid4()),
@@ -698,7 +716,7 @@ class SchedulerService:
                 summary="地缘政治风险上升",
                 source="国际新闻",
                 source_url="",
-                published_at=datetime.now(),
+                published_at=china_now(),
                 sentiment=SentimentType.NEGATIVE,
                 importance_score=0.85,
                 keywords=["地缘", "风险", "国际"],
@@ -706,7 +724,7 @@ class SchedulerService:
                 news_type=NewsType.GEOPOLITICAL,
                 beneficiary_sectors=["黄金", "军工"],
                 affected_sectors=["航空", "旅游"],
-                created_at=datetime.now()
+                created_at=china_now()
             )
         ]
         
@@ -722,7 +740,7 @@ class SchedulerService:
         if not self._session_maker:
             return None
         
-        today = date.today()
+        today = china_today()
         
         async with self._session_maker() as session:
             query = select(ReportModel).where(
@@ -765,13 +783,13 @@ class SchedulerService:
         计算预测准确率，保存结果。
         """
         import sys
-        today = date.today()
+        today = china_today()
         
         if not self.is_trading_day(today):
             print(f"[SKIP] 今天 {today} 不是交易日，跳过回测")
             return
         
-        print(f"\n[BACKTEST] 开始盘后回测 - {datetime.now().strftime('%H:%M:%S')}", flush=True)
+        print(f"\n[BACKTEST] 开始盘后回测 - {china_now().strftime('%H:%M:%S')}", flush=True)
         sys.stdout.flush()
         
         try:
@@ -793,7 +811,7 @@ class SchedulerService:
                 print(f"   大盘方向: {'✅ 命中' if direction.get('hit') else '❌ 失误'}")
                 print(f"   经验教训: {evaluation.get('lessons', 'N/A')}")
             else:
-                print("[BACKTEST] 回测未能完成（数据不足）")
+                print("[BACKTEST] 未产生有效评测；旧评分已停用，不报告准确率")
                 
         except Exception as e:
             print(f"[BACKTEST ERROR] 回测失败: {e}")
@@ -809,13 +827,13 @@ class SchedulerService:
         2. 评估7天前的信号是否命中
         """
         import sys
-        today = date.today()
+        today = china_today()
         
         if not self.is_trading_day(today):
             print(f"[SKIP] 今天 {today} 不是交易日，跳过信号追踪")
             return
         
-        print(f"\n[SIGNAL] 开始信号追踪 - {datetime.now().strftime('%H:%M:%S')}", flush=True)
+        print(f"\n[SIGNAL] 开始信号追踪 - {china_now().strftime('%H:%M:%S')}", flush=True)
         sys.stdout.flush()
         
         signal_tracker = get_signal_tracker()
@@ -864,7 +882,7 @@ class SchedulerService:
         - 使用限流方式批量获取实时行情
         - 更新数据库中的价格和涨跌幅
         """
-        print(f"[STOCK] 开始更新自选股数据 - {datetime.now().strftime('%H:%M:%S')}")
+        print(f"[STOCK] 开始更新自选股数据 - {china_now().strftime('%H:%M:%S')}")
         
         if not self._session_maker:
             print("[WARN] 数据库未初始化，跳过自选股更新")
@@ -887,56 +905,20 @@ class SchedulerService:
                 
                 print(f"[STOCK] 开始更新 {len(stocks)} 只自选股")
                 
-                # 2. 通过 MarketDataService 的带限流方法获取行情
-                market_service = get_market_data_service()
-                import akshare as ak
-                
-                # 获取 A股实时行情（使用带限流+缓存的方式）
-                a_share_df = None
-                try:
-                    a_share_df = await market_service._call_akshare_with_retry(
-                        ak.stock_zh_a_spot_em,
-                        use_cache=True, cache_key="watchlist_a_share_spot"
-                    )
-                except Exception as e:
-                    print(f"[STOCK] 获取A股行情失败: {e}")
-                
-                # 获取港股实时行情
-                hk_df = None
-                hk_stocks = [s for s in stocks if s.market == 'HK']
-                if hk_stocks:
-                    try:
-                        hk_df = await market_service._call_akshare_with_retry(
-                            ak.stock_hk_spot_em,
-                            use_cache=True, cache_key="watchlist_hk_spot"
-                        )
-                    except Exception as e:
-                        print(f"[STOCK] 获取港股行情失败: {e}")
-                
-                # 3. 更新每只股票
+                # Fetch only the App watchlist, never all A/H shares for three quotes.
+                from .watchlist_sources import fetch_watchlist_quotes
+                quotes = await asyncio.to_thread(fetch_watchlist_quotes, stocks)
                 updated_count = 0
                 for stock in stocks:
-                    try:
-                        if stock.market == 'A' and a_share_df is not None:
-                            row = a_share_df[a_share_df['代码'] == stock.code]
-                            if not row.empty:
-                                r = row.iloc[0]
-                                stock.current_price = float(r['最新价']) if r['最新价'] else None
-                                stock.change_percent = float(r['涨跌幅']) if r['涨跌幅'] else None
-                                stock.last_updated = datetime.now()
-                                updated_count += 1
-                        elif stock.market == 'HK' and hk_df is not None:
-                            code_padded = stock.code.zfill(5)
-                            row = hk_df[hk_df['代码'] == code_padded]
-                            if not row.empty:
-                                r = row.iloc[0]
-                                stock.current_price = float(r['最新价']) if r['最新价'] else None
-                                stock.change_percent = float(r['涨跌幅']) if r['涨跌幅'] else None
-                                stock.last_updated = datetime.now()
-                                updated_count += 1
-                    except Exception as e:
-                        print(f"[STOCK] 更新 {stock.code} 失败: {e}")
-                
+                    quote = quotes.get(stock.code)
+                    if not quote:
+                        continue
+                    stock.current_price = quote['price']
+                    stock.change_percent = quote['change_pct']
+                    # Preserve the provider timestamp instead of marking old data as new.
+                    stock.last_updated = datetime.fromisoformat(quote['as_of'])
+                    updated_count += 1
+
                 await session.commit()
                 print(f"[STOCK] 自选股数据更新完成，更新了 {updated_count}/{len(stocks)} 只")
                 
@@ -993,7 +975,7 @@ class SchedulerService:
                 existing_report.reading_time = report.reading_time
                 existing_report.news_count = report.news_count
                 existing_report.cross_border_count = report.cross_border_count if hasattr(report, 'cross_border_count') else 0
-                existing_report.updated_at = datetime.now()
+                existing_report.updated_at = china_now()
                 # 更新 report 对象的 id 以匹配数据库记录（保持一致性）
                 report.id = existing_report.id
             else:
@@ -1075,97 +1057,12 @@ class SchedulerService:
                 report.podcast_url = url
                 report.podcast_duration = duration
                 report.podcast_status = status
-                report.updated_at = datetime.now()
+                report.updated_at = china_now()
                 await session.commit()
     
     async def _update_watchlist_predictions(self):
-        """
-        自动为所有自选股更新 AI 预测
-        
-        在早报/晚报生成后调用，确保用户看到的预测是最新的
-        """
-        if not self._session_maker:
-            print("   [WARN] 数据库未初始化，跳过自选股预测更新")
-            return
-        
-        try:
-            from sqlalchemy import select
-            from ..models.database import StockModel, StockPredictionModel
-            from .ai_analyzer import AIAnalyzerService
-            import uuid as uuid_mod
-            
-            async with self._session_maker() as session:
-                # 获取所有自选股
-                query = select(StockModel)
-                result = await session.execute(query)
-                stocks = result.scalars().all()
-                
-                if not stocks:
-                    print("   没有自选股，跳过 AI 预测")
-                    return
-                
-                print(f"   开始为 {len(stocks)} 只自选股生成 AI 预测...")
-                
-                ai_analyzer = AIAnalyzerService()
-                predicted_count = 0
-                
-                for stock in stocks:
-                    try:
-                        prediction = await asyncio.wait_for(
-                            ai_analyzer.analyze_stock_simple(
-                                code=stock.code,
-                                name=stock.name,
-                                market=stock.market,
-                                current_price=stock.current_price or 0,
-                                change_percent=stock.change_percent or 0
-                            ),
-                            timeout=60  # 单只股票分析超时60秒
-                        )
-                        
-                        # 更新 stocks 表的预测字段
-                        stock.latest_prediction = prediction.prediction.value
-                        stock.latest_confidence = prediction.confidence
-                        stock.last_updated = datetime.now()
-                        
-                        # 写入 stock_predictions 表（保存详细预测记录）
-                        pred_record = StockPredictionModel(
-                            id=str(uuid_mod.uuid4()),
-                            stock_code=stock.code,
-                            stock_name=stock.name,
-                            market=stock.market,
-                            current_price=stock.current_price or 0,
-                            prediction=prediction.prediction.value,
-                            confidence=prediction.confidence,
-                            target_price=prediction.target_price,
-                            stop_loss=prediction.stop_loss,
-                            reasoning=prediction.reasoning,
-                            fundamental_score=prediction.fundamental_score,
-                            technical_score=prediction.technical_score,
-                            sentiment_score=prediction.sentiment_score,
-                            overall_score=prediction.overall_score,
-                            fundamentals=None,
-                            technicals=None,
-                            sentiment=None,
-                            generated_at=datetime.now()
-                        )
-                        session.add(pred_record)
-                        
-                        predicted_count += 1
-                        print(f"   ✅ {stock.name}({stock.code}): {prediction.prediction.value} "
-                              f"(置信度 {prediction.confidence*100:.0f}%)")
-                        
-                    except asyncio.TimeoutError:
-                        print(f"   ⏰ {stock.name}({stock.code}): AI 分析超时，跳过")
-                    except Exception as e:
-                        print(f"   ❌ {stock.name}({stock.code}): 预测失败 - {str(e)[:50]}")
-                
-                await session.commit()
-                print(f"   自选股 AI 预测完成：{predicted_count}/{len(stocks)} 只成功")
-                
-        except Exception as e:
-            print(f"   [ERROR] 自选股预测更新出错: {e}")
-            import traceback
-            traceback.print_exc()
+        """Do not create price-only predictions or new uncalibrated confidence records."""
+        print("[自选股] 跳过仅凭报价的投资评级；不写入默认中性或置信度")
 
 
 # 单例实例

@@ -4,7 +4,7 @@
 """
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 from pathlib import Path
 
 
@@ -36,29 +36,34 @@ class Settings(BaseSettings):
     midday_collection_hour: int = Field(default=11, ge=0, le=23, description="盘中预采集小时")
     midday_collection_minute: int = Field(default=35, ge=0, le=59, description="盘中预采集分钟")
     
-    # AI 服务配置
-    # 优先级：Anthropic > OpenAI/DeepSeek > 备用AI > Pollinations免费服务
-    # 
-    # 推荐配置方式：
-    # 1. 使用 Claude（最佳效果）: 设置 ANTHROPIC_API_KEY
-    # 2. 使用 GPT-4: 设置 OPENAI_API_KEY
-    # 3. 使用 DeepSeek（高性价比）: 设置 OPENAI_API_KEY 和 OPENAI_BASE_URL=https://api.deepseek.com
-    # 4. 配置备用 AI（强烈推荐！主服务挂了自动切换）: 设置 BACKUP_AI_*
-    # 5. 不配置任何 key：自动使用免费的 Pollinations.AI（不稳定，仅用于测试）
-    anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API Key（推荐使用 Claude）")
-    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API Key 或兼容服务的 Key")
-    openai_base_url: Optional[str] = Field(default=None, description="OpenAI 兼容服务 Base URL（如 DeepSeek）")
-    ai_model: str = Field(
-        default="claude-3-opus-20240229", 
-        description="AI 模型名称。Claude: claude-3-opus-20240229 / claude-3-5-sonnet-20241022; OpenAI: gpt-4-turbo / gpt-4o; DeepSeek: deepseek-chat"
-    )
-    
+    # Explicit task routes; existing credentials remain supported.
+    ai_provider: Literal["auto", "compatible", "anthropic", "backup"] = "auto"
+    anthropic_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    openai_base_url: Optional[str] = None
+    ai_model: Optional[str] = Field(default=None, description="兼容旧配置的明确模型名；不再默认过期模型")
+    ai_timeout_seconds: int = Field(default=300, ge=10, le=900)
+    model_max_calls_per_report: int = Field(default=8, ge=1, le=12, description='整期模型HTTP请求上限，含网络重试与审查修复；不是金额上限')
+
     # 备用 AI 服务（主服务挂了自动切换，强烈推荐配置！）
     # 例如：主用 DeepSeek，备用硅基流动
     backup_ai_api_key: Optional[str] = Field(default=None, description="备用 AI API Key")
     backup_ai_base_url: Optional[str] = Field(default=None, description="备用 AI Base URL")
     backup_ai_model: Optional[str] = Field(default=None, description="备用 AI 模型名称")
     
+    analysis_provider: Optional[Literal["compatible", "anthropic", "backup"]] = None
+    analysis_model: Optional[str] = None
+    analysis_reasoning_effort: Literal["none", "low", "high", "max"] = "none"
+    review_provider: Optional[Literal["compatible", "anthropic", "backup"]] = None
+    review_model: Optional[str] = None
+    review_reasoning_effort: Literal["none", "low", "high", "max"] = "none"
+    extraction_provider: Optional[Literal["compatible", "anthropic", "backup"]] = None
+    extraction_model: Optional[str] = None
+    extraction_reasoning_effort: Literal["none", "low", "high", "max"] = "none"
+    podcast_provider: Optional[Literal["compatible", "anthropic", "backup"]] = None
+    podcast_model: Optional[str] = None
+    podcast_reasoning_effort: Literal["none", "low", "high", "max"] = "none"
+
     # 语音合成配置
     tts_voice: str = Field(default="zh-CN-YunxiNeural", description="TTS语音角色")
     tts_rate: str = Field(default="+0%", description="TTS语速")

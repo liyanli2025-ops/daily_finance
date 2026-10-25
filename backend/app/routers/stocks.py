@@ -44,78 +44,9 @@ async def get_watchlist(db: AsyncSession = Depends(get_db)):
     if not stocks:
         return []
     
-    def _fetch_realtime_quotes(stock_list):
-        """从腾讯财经批量获取股票实时行情"""
-        symbols = []
-        for s in stock_list:
-            if s.market == 'A':
-                if s.code.startswith('6') or s.code.startswith('9'):
-                    symbols.append(f"sh{s.code}")
-                else:
-                    symbols.append(f"sz{s.code}")
-            elif s.market == 'HK':
-                symbols.append(f"hk{s.code.zfill(5)}")
-        
-        if not symbols:
-            return {}
-        
-        url = f"http://qt.gtimg.cn/q={','.join(symbols)}"
-        
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        
-        req = urllib.request.Request(url)
-        req.add_header('User-Agent', 'Mozilla/5.0')
-        
-        with urllib.request.urlopen(req, timeout=10, context=ctx) as response:
-            content = response.read().decode('gbk')
-        
-        quotes = {}
-        for line in content.strip().split(';'):
-            if '=' not in line or '~' not in line:
-                continue
-            
-            var_name = line.split('=')[0].replace('v_', '').strip()
-            data_str = line.split('"')[1] if '"' in line else ""
-            
-            if not data_str:
-                continue
-            
-            parts = data_str.split('~')
-            
-            if var_name.startswith('sh') or var_name.startswith('sz'):
-                code = var_name[2:]
-                if len(parts) >= 33:
-                    try:
-                        current_price = float(parts[3]) if parts[3] else None
-                        change_pct = float(parts[32]) if parts[32] else None
-                        quotes[code] = {"price": current_price, "change_pct": change_pct}
-                    except ValueError:
-                        pass
-            elif var_name.startswith('hk'):
-                code = var_name[2:].lstrip('0')
-                if len(parts) >= 33:
-                    try:
-                        current_price = float(parts[3]) if parts[3] else None
-                        change_pct = float(parts[32]) if parts[32] else None
-                        quotes[code] = {"price": current_price, "change_pct": change_pct}
-                    except ValueError:
-                        pass
-        
-        return quotes
-    
-    # 尝试获取实时行情，失败则使用数据库缓存
-    quotes = {}
-    try:
-        loop = asyncio.get_event_loop()
-        quotes = await asyncio.wait_for(
-            loop.run_in_executor(None, _fetch_realtime_quotes, stocks),
-            timeout=10
-        )
-    except Exception as e:
-        print(f"[WATCHLIST] 实时行情获取失败，使用数据库缓存: {e}")
-    
+    from ..services.watchlist_sources import fetch_watchlist_quotes
+    quotes = await asyncio.to_thread(fetch_watchlist_quotes, stocks)
+
     result_list = []
     for s in stocks:
         quote = quotes.get(s.code)
@@ -129,10 +60,10 @@ async def get_watchlist(db: AsyncSession = Depends(get_db)):
             market=MarketType(s.market),
             current_price=current_price,
             change_percent=change_percent,
-            latest_prediction=PredictionType(s.latest_prediction) if s.latest_prediction else None,
-            latest_confidence=s.latest_confidence,
+            latest_prediction=None,  # Legacy ratings have no evidence verification.
+            latest_confidence=None,
             added_at=s.added_at,
-            last_updated=s.last_updated
+            last_updated=datetime.fromisoformat(quote['as_of']) if quote else s.last_updated
         ))
     
     return result_list
@@ -174,8 +105,8 @@ async def add_to_watchlist(
         market=MarketType(stock.market),
         current_price=stock.current_price,
         change_percent=stock.change_percent,
-        latest_prediction=PredictionType(stock.latest_prediction) if stock.latest_prediction else None,
-        latest_confidence=stock.latest_confidence,
+        latest_prediction=None,  # Legacy ratings have no evidence verification.
+        latest_confidence=None,
         added_at=stock.added_at,
         last_updated=stock.last_updated
     )
@@ -817,86 +748,8 @@ async def get_stock_prediction(
     request: Request = None,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    获取股票投资预判
-    
-    返回字段新增：
-    - is_expired: 预测是否已过期（超过24小时）
-    - hours_since_generated: 距离预测生成已过去多少小时
-    """
-    # 先查询是否有缓存的预测
-    query = (
-        select(StockPredictionModel)
-        .where(StockPredictionModel.stock_code == stock_code)
-        .order_by(desc(StockPredictionModel.generated_at))
-        .limit(1)
-    )
-    result = await db.execute(query)
-    prediction_record = result.scalar_one_or_none()
-    
-    if prediction_record:
-        # 计算过期状态
-        generated_at = prediction_record.generated_at or datetime.now()
-        hours_since = (datetime.now() - generated_at).total_seconds() / 3600
-        is_expired = hours_since > 24  # 超过24小时视为过期
-        
-        # 返回已有预测
-        from ..models.stock import FundamentalData, TechnicalData, SentimentData
-        
-        prediction_data = StockPrediction(
-            code=prediction_record.stock_code,
-            name=prediction_record.stock_name,
-            market=MarketType(prediction_record.market),
-            current_price=prediction_record.current_price,
-            fundamentals=FundamentalData(**(prediction_record.fundamentals or {})),
-            technicals=TechnicalData(**(prediction_record.technicals or {})),
-            sentiment=SentimentData(**(prediction_record.sentiment or {})),
-            prediction=PredictionType(prediction_record.prediction),
-            confidence=prediction_record.confidence,
-            target_price=prediction_record.target_price,
-            stop_loss=prediction_record.stop_loss,
-            reasoning=prediction_record.reasoning,
-            fundamental_score=prediction_record.fundamental_score or 0.5,
-            technical_score=prediction_record.technical_score or 0.5,
-            sentiment_score=prediction_record.sentiment_score or 0.5,
-            overall_score=prediction_record.overall_score or 0.5,
-            generated_at=prediction_record.generated_at
-        )
-        
-        # 转换为 dict 并附加过期信息
-        resp = prediction_data.model_dump()
-        resp["is_expired"] = is_expired
-        resp["hours_since_generated"] = round(hours_since, 1)
-        if is_expired:
-            resp["expire_hint"] = "预测已过期，建议点击「重新分析」获取最新结果"
-        return resp
-    
-    # 如果没有预测记录，返回模拟数据（实际应该触发生成）
-    from ..models.stock import FundamentalData, TechnicalData, SentimentData
-    
-    prediction_data = StockPrediction(
-        code=stock_code,
-        name="待获取",
-        market=MarketType(market),
-        current_price=0.0,
-        fundamentals=FundamentalData(),
-        technicals=TechnicalData(),
-        sentiment=SentimentData(),
-        prediction=PredictionType.NEUTRAL,
-        confidence=0.5,
-        reasoning="暂无预测数据，请先触发分析",
-        fundamental_score=0.5,
-        technical_score=0.5,
-        sentiment_score=0.5,
-        overall_score=0.5,
-        generated_at=datetime.now()
-    )
-    
-    resp = prediction_data.model_dump()
-    resp["is_expired"] = True
-    resp["hours_since_generated"] = 0
-    resp["expire_hint"] = "暂无预测数据，请点击「重新分析」生成"
-    return resp
+    """Legacy records lack evidence verification; preserve storage but do not publish as current analysis."""
+    raise HTTPException(status_code=404, detail="暂无通过证据核验的个股分析；历史默认评级和置信度不作为当前结果展示")
 
 
 @router.post("/{stock_code}/analyze")
@@ -907,91 +760,8 @@ async def trigger_stock_analysis(
     request: Request = None,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    触发单只股票的 AI 分析
-    
-    在后台执行 AI 分析，分析完成后将结果写入 stock_predictions 表
-    同时更新 stocks 表的 latest_prediction 字段
-    """
-    from ..services.ai_analyzer import AIAnalyzerService
-    
-    # 获取股票信息
-    stock_query = select(StockModel).where(
-        StockModel.code == stock_code,
-        StockModel.market == market
-    )
-    result = await db.execute(stock_query)
-    stock = result.scalar_one_or_none()
-    
-    stock_name = stock.name if stock else stock_code
-    current_price = stock.current_price if stock else 0
-    change_percent = stock.change_percent if stock else 0
-    
-    async def _run_analysis():
-        """后台执行 AI 分析"""
-        try:
-            ai_analyzer = AIAnalyzerService()
-            prediction = await ai_analyzer.analyze_stock_simple(
-                code=stock_code,
-                name=stock_name,
-                market=market,
-                current_price=current_price or 0,
-                change_percent=change_percent or 0
-            )
-            
-            # 写入数据库
-            session_maker = request.app.state.session_maker
-            async with session_maker() as session:
-                # 写入 stock_predictions 表
-                pred_record = StockPredictionModel(
-                    id=str(uuid.uuid4()),
-                    stock_code=stock_code,
-                    stock_name=stock_name,
-                    market=market,
-                    current_price=current_price or 0,
-                    prediction=prediction.prediction.value,
-                    confidence=prediction.confidence,
-                    target_price=prediction.target_price,
-                    stop_loss=prediction.stop_loss,
-                    reasoning=prediction.reasoning,
-                    fundamental_score=prediction.fundamental_score,
-                    technical_score=prediction.technical_score,
-                    sentiment_score=prediction.sentiment_score,
-                    overall_score=prediction.overall_score,
-                    fundamentals=None,
-                    technicals=None,
-                    sentiment=None,
-                    generated_at=datetime.now()
-                )
-                session.add(pred_record)
-                
-                # 更新 stocks 表的预测字段（如果股票在自选列表中）
-                stock_update_query = select(StockModel).where(
-                    StockModel.code == stock_code,
-                    StockModel.market == market
-                )
-                stock_result = await session.execute(stock_update_query)
-                stock_record = stock_result.scalar_one_or_none()
-                if stock_record:
-                    stock_record.latest_prediction = prediction.prediction.value
-                    stock_record.latest_confidence = prediction.confidence
-                    stock_record.last_updated = datetime.now()
-                
-                await session.commit()
-                print(f"[AI] ✅ 单股分析完成: {stock_name}({stock_code}) → {prediction.prediction.value}")
-                
-        except Exception as e:
-            print(f"[AI] ❌ 单股分析失败: {stock_code} - {e}")
-    
-    # 在后台执行分析（不阻塞响应）
-    background_tasks.add_task(_run_analysis)
-    
-    return {
-        "status": "started",
-        "message": f"已开始分析 {stock_name}({stock_code})，预计 30-60 秒完成",
-        "stock_code": stock_code,
-        "market": market
-    }
+    """Do not acknowledge a background task that cannot produce evidence-based analysis."""
+    raise HTTPException(status_code=422, detail="资料不足：仅凭报价不能生成投资评级；请查看报告中的来源、反证与触发条件")
 
 
 @router.post("/watchlist/refresh")
@@ -1130,90 +900,8 @@ async def generate_watchlist_predictions(
     db: AsyncSession = Depends(get_db),
     background_tasks: BackgroundTasks = None
 ):
-    """
-    为所有自选股生成 AI 预测
-    
-    这是一个耗时操作，会调用 AI 对每只股票进行分析
-    建议在报告生成后调用，或者用户手动触发
-    """
-    from ..services.ai_analyzer import AIAnalyzerService
-    
-    query = select(StockModel)
-    result = await db.execute(query)
-    stocks = result.scalars().all()
-    
-    if not stocks:
-        return {"status": "success", "message": "没有自选股", "predicted": 0}
-    
-    ai_analyzer = AIAnalyzerService()
-    predicted_count = 0
-    results = []
-    
-    for stock in stocks:
-        try:
-            # 简化的 AI 预测 - 不需要完整的基本面和技术面数据
-            prediction = await ai_analyzer.analyze_stock_simple(
-                code=stock.code,
-                name=stock.name,
-                market=stock.market,
-                current_price=stock.current_price or 0,
-                change_percent=stock.change_percent or 0
-            )
-            
-            # 更新 stocks 表
-            stock.latest_prediction = prediction.prediction.value
-            stock.latest_confidence = prediction.confidence
-            stock.last_updated = datetime.now()
-            
-            # 写入 stock_predictions 表（保存详细预测记录）
-            pred_record = StockPredictionModel(
-                id=str(uuid.uuid4()),
-                stock_code=stock.code,
-                stock_name=stock.name,
-                market=stock.market,
-                current_price=stock.current_price or 0,
-                prediction=prediction.prediction.value,
-                confidence=prediction.confidence,
-                target_price=prediction.target_price,
-                stop_loss=prediction.stop_loss,
-                reasoning=prediction.reasoning,
-                fundamental_score=prediction.fundamental_score,
-                technical_score=prediction.technical_score,
-                sentiment_score=prediction.sentiment_score,
-                overall_score=prediction.overall_score,
-                fundamentals=None,
-                technicals=None,
-                sentiment=None,
-                generated_at=datetime.now()
-            )
-            db.add(pred_record)
-            
-            predicted_count += 1
-            results.append({
-                "code": stock.code,
-                "name": stock.name,
-                "prediction": prediction.prediction.value,
-                "confidence": round(prediction.confidence * 100),
-                "reasoning": prediction.reasoning[:100] + "..." if len(prediction.reasoning) > 100 else prediction.reasoning
-            })
-            
-        except Exception as e:
-            print(f"[AI] 预测 {stock.code} 失败: {e}")
-            results.append({
-                "code": stock.code,
-                "name": stock.name,
-                "error": str(e)
-            })
-    
-    await db.commit()
-    
-    return {
-        "status": "success",
-        "message": f"已完成 {predicted_count}/{len(stocks)} 只股票的 AI 预测",
-        "predicted": predicted_count,
-        "total": len(stocks),
-        "results": results
-    }
+    """Do not acknowledge a background task that cannot produce evidence-based analysis."""
+    raise HTTPException(status_code=422, detail="资料不足：仅凭报价不能生成投资评级；请查看报告中的来源、反证与触发条件")
 
 
 @router.get("/watchlist/merged")

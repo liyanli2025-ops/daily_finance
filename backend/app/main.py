@@ -141,9 +141,11 @@ async def trigger_report_generation(request: Request):
     
     # 解析 type 参数
     report_type = "morning"
+    force = False
     try:
         body = await request.json()
         report_type = body.get("type", "morning")
+        force = body.get('force') is True
     except Exception:
         pass
     
@@ -153,9 +155,9 @@ async def trigger_report_generation(request: Request):
         async def generate_with_error_handling():
             try:
                 if report_type == "evening":
-                    await scheduler_service.generate_evening_report()
+                    await scheduler_service.generate_evening_report(force=force)
                 else:
-                    await scheduler_service.generate_daily_report()
+                    await scheduler_service.generate_daily_report(force=force)
                 print(f"[API] {report_type}报告生成任务完成！")
             except Exception as e:
                 print(f"[API] ❌ 报告生成任务失败: {e}")

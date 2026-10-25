@@ -45,6 +45,7 @@ export default function StocksScreen() {
     searchResults,
     isLoading,
     isSearching,
+    error: watchlistError,
     fetchWatchlist,
     searchStocks,
     addToWatchlist,
@@ -135,7 +136,8 @@ export default function StocksScreen() {
   };
 
   const handleAddStock = async (stock: { code: string; name: string; market: string }) => {
-    await addToWatchlist(stock);
+    const saved = await addToWatchlist(stock);
+    if (!saved) return;
     setSearchVisible(false);
     setSearchQuery('');
   };
@@ -152,7 +154,8 @@ export default function StocksScreen() {
     switch (prediction) {
       case 'bullish': return '看多';
       case 'bearish': return '看空';
-      default: return '中性';
+      case 'neutral': return '中性';
+      default: return '资料不足';
     }
   };
 
@@ -195,6 +198,11 @@ export default function StocksScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
+        {watchlistError ? (
+          <Text accessibilityRole="alert" style={{ color: colors.onSurfaceVariant, padding: 16 }}>
+            {watchlistError}；当前列表仅保留上次成功读取的结果。
+          </Text>
+        ) : null}
         {/* 市场概览 */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>市场概览</Text>
@@ -345,9 +353,9 @@ export default function StocksScreen() {
                       <Text style={[styles.predictionText, { color: getPredictionColor(stock.latest_prediction) }]}>
                         AI预测: {getPredictionText(stock.latest_prediction)}
                       </Text>
-                      {stock.latest_confidence !== undefined && (
+                      {typeof stock.latest_confidence === 'number' && (
                         <Text style={[styles.confidenceText, { color: colors.onSurfaceVariant }]}>
-                          置信度 {Math.round(stock.latest_confidence * 100)}%
+                          模型自评（未经校准） {Math.round(stock.latest_confidence * 100)}%
                         </Text>
                       )}
                     </View>

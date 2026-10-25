@@ -28,34 +28,9 @@ class LessonsMemoryService:
         self._session_maker = session_maker
 
     async def get_lessons_memory_text(self, days: int = 30) -> str:
-        """
-        生成经验记忆文本，可直接注入到 prompt 中。
+        """Legacy scores are invalid; never teach the model from them."""
+        return ""
 
-        内容包括：
-        - 各维度历史准确率（大盘/板块/个股）
-        - 近期趋势（是否在进步还是退步）
-        - 薄弱环节预警（准确率低的维度）
-        - 常见误判模式（从 lessons_learned 字段中提取）
-
-        Returns:
-            格式化的经验文本，数据不足时返回空字符串
-        """
-        if not self._session_maker:
-            return ""
-
-        try:
-            stats = await self._get_accuracy_stats(days)
-            if not stats or stats.get("total", 0) < 5:
-                return ""
-
-            patterns = await self._get_error_patterns(days)
-            recent_trend = await self._get_recent_trend()
-
-            return self._format_lessons_text(stats, patterns, recent_trend)
-
-        except Exception as e:
-            print(f"[LessonsMemory] 生成经验文本失败（不影响报告生成）: {e}")
-            return ""
 
     async def _get_accuracy_stats(self, days: int) -> Dict:
         """从 prediction_accuracy 表获取各维度准确率汇总"""

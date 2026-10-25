@@ -1,0 +1,210 @@
+{
+  "checked_on": "2026-10-25",
+  "collection_policy": "每轮读取App当前自选股，以市场和代码隔离缓存；未知行业不猜测。新股自动采集，删除的股票不进入下一轮底稿。",
+  "implemented": [
+    {
+      "kind": "primary_notice",
+      "markets": [
+        "A:沪深"
+      ],
+      "source": "巨潮资讯发行人原始披露",
+      "identity_url": "https://www.cninfo.com.cn/new/data/szse_stock.json",
+      "list_url": "https://www.cninfo.com.cn/new/hisAnnouncement/query",
+      "original_host": "https://static.cninfo.com.cn",
+      "validation": "代码和orgId同时核对，PDF编号和发行人文本校验；普通公告7天，最新经营简报35天仅作经营基线；无正文不入模；不把日期当精确公开时刻。",
+      "cache_seconds": 1800,
+      "limit": "首50条、最多2份原文；港股、北交所尚未适配"
+    },
+    {
+      "kind": "industry_observation",
+      "markets": [
+        "按主营适配，与上市市场无关"
+      ],
+      "source": "农业农村部、国家能源局、国家统计局公开原文",
+      "urls": [
+        "https://xmsyj.moa.gov.cn/jcyj/",
+        "https://www.nea.gov.cn/",
+        "https://www.stats.gov.cn/sj/zxfb/"
+      ],
+      "validation": "从栏目动态发现近14天文章，核对正文元数据日期、标题和业务相关段落；保留页面标注来源；不解析表格数字；统计期和发布时间分开。",
+      "cache_seconds": 1800,
+      "failure_cooldown_seconds": 600,
+      "limit": "已适配养殖、电力及部分制造业/消费行业；不是全国行业全覆盖，不能从行业数据确认公司受益。"
+    },
+    {
+      "kind": "company_profile",
+      "markets": [
+        "A",
+        "HK"
+      ],
+      "source": "东方财富F10公司资料",
+      "url": "https://emweb.securities.eastmoney.com/PC_HSF10/CompanySurvey/CompanySurveyAjax",
+      "hk_report": "RPT_HKF10_INFO_ORGPROFILE",
+      "validation": "股票代码核对，行业与主营文本来自供应商，归类日期未知",
+      "cache_seconds": 86400
+    },
+    {
+      "kind": "financial_baseline",
+      "markets": [
+        "A",
+        "HK"
+      ],
+      "source": "东方财富结构化财务指标",
+      "url": "https://datacenter.eastmoney.com/securities/api/data/v1/get",
+      "reports": [
+        "RPT_F10_FINANCE_MAINFINADATA",
+        "RPT_HKF10_FN_MAININDICATOR"
+      ],
+      "validation": "核对公司、报告期间、币种及可用披露日期；最新期间和可取得的上年同期分开；未知字段不赋予猜测的含义",
+      "cache_seconds": 21600
+    },
+    {
+      "kind": "financial_report",
+      "markets": [
+        "A"
+      ],
+      "source": "公司定期报告披露镜像",
+      "url": "https://np-anotice-stock.eastmoney.com/api/security/ann",
+      "validation": "核对公司及公告编号；PDF可用时隔离进程解析并保留页码；不可用时只保留明确标记的镜像文本节选，不称全文"
+    },
+    {
+      "kind": "research",
+      "markets": [
+        "A"
+      ],
+      "source": "东方财富个股和行业研报",
+      "url": "https://reportapi.eastmoney.com/report/list",
+      "validation": "个股核对代码，行业代码来自对应个股研报；下载失败回退到含相同报告编号的发布页节选；券商预测及评级均为第三方当时观点",
+      "cache_seconds": 21600
+    },
+    {
+      "kind": "investor_relations",
+      "markets": [
+        "A"
+      ],
+      "source": "投资者调研记录镜像",
+      "url": "https://datacenter.eastmoney.com/securities/api/data/v1/get",
+      "report": "RPT_ORG_SURVEY",
+      "validation": "核对公司、发布日期和正文；去除重复记录；仅最近14天作为本轮交流材料；经营计划不当作已经兑现"
+    },
+    {
+      "kind": "event_calendar",
+      "markets": [
+        "A"
+      ],
+      "source": "巨潮资讯预约披露",
+      "url": "https://www.cninfo.com.cn/new/information/getPrbookInfo",
+      "validation": "核对公司和报告期；分别保留首次预约、各次变更及实际披露；预约不是已披露；来源未给出发布日期时保持未知",
+      "cache_seconds": 3600
+    },
+    {
+      "kind": "industry_news",
+      "source": "现有带原文链接与日期的新闻池及行业研报",
+      "validation": "按动态档案的行业和业务词筛选；行业关联不自动写成公司受益；停用板块涨跌幅拼接新闻"
+    }
+  ],
+  "explicit_gaps": [
+    "港股个股研报、港交所原始披露、交流记录和日历尚未有通过验证的适配器，状态为unsupported。",
+    "PDF地址可能返回脚本而非PDF；下载、解析、OCR或表格列关系存在缺口时不能称全文核验成功。",
+    "目前只构建有来源的行业归类；具体产品、客户、供应商与成本传导关系仍需逐项证据，不根据关键词自动确认为事实。",
+    "研报与定期报告是历史背景，采集完整不代表模型事实准确或投资有效。",
+    "已接入部分政府周/月经营统计；实时流域来水、半导体订单和价格、同行与客户的已验证业务关系、实时行业行情仍有缺口。工信部网页访问受限，本轮不作为成功接入。",
+    "已接入部分政府周/月经营统计；实时流域来水、半导体订单和价格、同行与客户的已验证业务关系、实时行业行情仍有缺口。工信部网页访问受限，本轮不作为成功接入。"
+  ],
+  "chain_knowledge_graph_assessment": {
+    "repository": "https://github.com/liuhuanyong/ChainKnowledgeGraph",
+    "data_last_commit": "2021-10-26",
+    "decision": "参考公司-产品-行业-上下游的关系设计；本轮不导入数据、不运行其代码、不部署Neo4j。",
+    "reasons": [
+      "当前自选股样本中未找到华海诚科",
+      "公司产品样本含主体与产品混杂",
+      "抽查关系未携带逐条原文与生效日期"
+    ]
+  },
+  "optional_ima": {
+    "url": "https://ima.qq.com/wikis?knowledgeBaseId=7419228206421351",
+    "status": "awaiting_authorized_verification",
+    "official_api_entry": "https://ima.qq.com/agent-interface",
+    "official_documentation_package": "https://app-dl.ima.qq.com/skills/ima-skills-1.1.7.zip",
+    "capabilities": [
+      "get_knowledge_base",
+      "get_knowledge_list",
+      "search_knowledge",
+      "get_media_info"
+    ],
+    "authentication": "官方Client ID与API Key，并受账号知识库与原文访问权限限制；不使用网页Cookie",
+    "verified_scope": "已核对官方接口文档；未读取此库的目录、实际研报或更新记录，不声称覆盖充分。",
+    "decision": "本轮不接入、不复制整库，等待可授权读取与原文来源日期验收。"
+  },
+  "daily_market_policy": {
+    "source": "https://qt.gtimg.cn",
+    "active": "A股5个指数、港股3个指数、美股3个指数；代码及数值一致性校验，保留来源时钟与时区不明限制。",
+    "disabled": "旧板块排行、资金流、涨跌停、涨跌家数、热门股、概念、连板、技术扫描、大宗商品、龙虎榜、大宗交易、融资融券不再进入每日报告；等待实际观测时间验证。",
+    "limitation": "不能把缺失当成0，不能用查询日期标注旧行情；不支持用实时端点回放历史。"
+  },
+  "periodic_report_policy": {
+    "source": "巨潮资讯发行人定期报告原始PDF，失败才回退镜像并标明缺口",
+    "selection": "最近180天内最新定期报告；公司代码+orgId+PDF编号+正文发行人校验；不是每日观点窗口。",
+    "acceptance_20261025": {
+      "002714": "196/196页文本解析",
+      "600900": "214/214页文本解析",
+      "688535": "216/216页文本解析"
+    },
+    "limitation": "全文文本解析不等于图表数字逐项核验；只将带页码节选提供给模型，未提供页面不可补写。"
+  },
+  "cost_controls": {
+    "model_calls_per_report_default": 8,
+    "notes": "上限包含HTTP重试；不是金额上限；密钥及所选模型保持不变。",
+    "dedup": "同日同类型数据库存在报告时默认跳过，跨早晚报共用并发锁；明确force=true才覆盖。",
+    "reuse": "相同报告事实、昵称和模型路由才复用已核验口播稿，减少音频重试的模型费用。",
+    "ledger": "backend/data/diagnostics/model-usage-YYYY-MM-DD.jsonl；阶段、HTTP状态、用量、时延，不记录密钥、请求正文或响应正文。",
+    "news": "财经候选上限28，跨界最多6条且要求公司/行业/宏观关联；停用空内容日经RSS。"
+  },
+  "media_originals": {
+    "verified_on": "2026-10-25",
+    "wscn": {
+      "search": "https://api-one.wallstcn.com/apiv1/search/article",
+      "article": "https://api-one.wallstcn.com/apiv1/content/articles/{id}",
+      "latest": "https://api-one.wallstcn.com/apiv1/content/information-flow?channel=global-channel&accept=article&limit=30"
+    },
+    "stcn": {
+      "indexes": [
+        "https://www.stcn.com/",
+        "https://www.stcn.com/article/list/xw.html",
+        "https://www.stcn.com/article/list/cj.html"
+      ],
+      "article": "https://www.stcn.com/article/detail/{id}.html"
+    },
+    "routing": "当前App公司名及业务关键词；行业关联不代表公司受益或供货；宏观材料须说明A/H传导。",
+    "limits": "每轮最多12个检索词、12篇正文，约50秒采集预算；15分钟检索缓存、1小时正文缓存；不调用模型。",
+    "acceptance": "2026-10-25本地72小时窗口实读9篇公开原文（华尔街见闻7、证券时报2），有1篇读取错误保留partial；三家公司直接提及均为0，行业线索2条。服务器仍须验证。",
+    "excluded_probes": "上证搜索404，财联社搜索404，证券时报搜索仅返回空列表；未接入，不在生产轮询。",
+    "limitation": "媒体报道保留归属，不等同独立核实；栏目与搜索覆盖有限。公开页面接口不等同稳定开放API。"
+  },
+  "market_radar": {
+    "scope": "全市场公开文章流、证券时报制度关键词栏目候选；与App自选股独立；采集和报告各预留3条，未证明覆盖充分或有交易优势。",
+    "technical": "腾讯公开日线：6指数、8行业ETF代理、动态自选股；要求股票/ETF明确qfqday复权序列；已完成日线，日期/代码/OHLC/有限值校验；均线、回撤、RSI、ATR、量能比和对齐基准收益差。",
+    "live_acceptance": "18请求15可用；2只ETF及腾讯控股缺少明确复权序列，列数据缺口。无完整市场宽度及盘中技术。",
+    "observation": "每小时第10分钟有限公开正文采样，不调用模型/音频/财报；私有data/radar/observations.db记录首次观察、同标题域名及正文版本；独立佐证、传播程度及是否已定价均未知。",
+    "retention": "采样批次保留30天；文章、正文hash版本及原始请求缓存供追溯；不存密钥。技术请求缓存15分钟，快照超过2小时不入模。",
+    "acceptance_command": "python -m app.radar_check --hours 72"
+  },
+  "policy_originals": {
+    "sources": {
+      "csrc": "https://www.csrc.gov.cn/",
+      "pbc_news": "https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/index.html",
+      "pbc_operations": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125475/index.html"
+    },
+    "selection": "独立于自选股；最多6篇正文，15分钟索引缓存、6小时原文缓存、失败冷却；排除会见、纪念币、行政许可企业清单。只用具体文章原始PubDate，拒绝以列表月日猜年份。",
+    "boundaries": "征求意见不等于生效；操作量不等于净投放；只有日期的当日文章保守排除，不推断零点已知。",
+    "rejected": "旧证监会common_list.shtml列表停在2021；另一common_xq_list.shtml会重定向至HTTP首页，未接入；采用直接HTTPS可读的首页及原文。"
+  },
+  "selection_quality": {
+    "topics": "美国货币政策、海外AI交易/融资等重复主题最多2篇非直接公司报道；保留各文章证据ID，不冒充语义事件合并。",
+    "associations": "company_mention是名称/代码提及；business_overlap是产品/经营变量文本交集；keyword_only是关键词或跨环节线索。均不证明受益、供货、利润影响或独立核实。弱线索不占自选股/行业保底配额。",
+    "full_acceptance": "python -m app.radar_check --hours 72 --full-news；完整生产新闻池与实际财经选题，不调用付费模型；原始采集文本、选择结果及实际新闻输入保存data/radar/news-acceptance.json。",
+    "evidence_completeness": "去重及最终输入优先明确读取的原文，而非高分RSS版本；会员路径与自动融资快讯不进入财经或跨界撰稿；RSS摘要最多6条、研报摘要最多2条且排在其他正文之后。阅读范围不代表独立核实或内容为真。",
+    "company_focus": "公司名/代码只在正文中顺带出现，不享受公司专属名额；原文提及与公司新增事件分开。",
+    "server_acceptance": "news-quality部署完整采集346条（原始442）、财经筛后191、链接合格158、入选28；其中3自动融资、2会员路径、10研报条目等问题尚未通过内容验收。"
+  }
+}

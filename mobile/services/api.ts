@@ -44,7 +44,8 @@ class ApiService {
       clearTimeout(timeoutId);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const detail = await response.json().catch(() => null);
+        throw new Error(typeof detail?.detail === 'string' ? detail.detail : `请求失败 (${response.status})`);
       }
       
       return await response.json();
