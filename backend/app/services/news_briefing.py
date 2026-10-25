@@ -8,6 +8,20 @@ from .news_selection import matches_watchlist
 from .news_quality import reading_scope,company_focus,priority
 
 
+def editorial_exclusion(item, stocks):
+    """Keep soft-feature material searchable, without filling initial story slots.
+
+    This narrow screen is not a general financial relevance classifier.
+    Concrete company and policy/operating events override a feature heading.
+    """
+    title=item.title
+    feature=re.search(r'人才培养|管理人才|会计学院|老有所依|走进卧室',title)
+    event=re.search(r'业绩|财报|订单|中标|合同|收购|融资|上市|回购|销售额|收入|净利润|政策|补贴|征求意见|监管',title)
+    if feature and not event and not any(company_focus(item,stock) for stock in stocks):
+        return 'soft_feature_without_concrete_market_event'
+    return None
+
+
 def diverse_rank(news):
     """Interleave publishers within reading-completeness tiers, without a quota.
 
@@ -78,7 +92,8 @@ def associations(item,stocks,profiles):
             elif '屠宰' in text:
                 reason='屠宰项目属不同经营环节；缺少采购、猪价及供给变化证据'
         elif any(word in business for word in ('水电','水力发电')):
-            if any(word in text for word in ('来水','水电发电量','水电电价','水电站')):
+            from .news_selection import industry_terms
+            if industry_terms(text,('来水','水电发电量','水电电价','水电站')):
                 level='business_overlap';reason='涉及水电经营变量；流域、交易电价及公司敞口仍需核验'
         result.append(dict(stock=key,level=level,reason=reason))
     return result

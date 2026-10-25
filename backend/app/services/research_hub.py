@@ -587,12 +587,13 @@ class ResearchHub:
 
 def tag_industry_news(news, profiles):
     """Industry links remain industry links; do not invent company beneficiaries."""
+    from .news_selection import industry_terms
     for item in news:
         text=item.title+' '+item.content
         for profile in profiles:
             if not profile:
                 continue
-            matches=[word for word in profile['topics'] if len(word)>=2 and word in text]
+            matches=industry_terms(text,profile['topics'])
             if matches:
                 label='行业关联 '+profile['key']+'（匹配：'+','.join(matches[:4])+'；不证明该公司受益）'
                 item.market_impact=(item.market_impact+'；' if item.market_impact else '')+label

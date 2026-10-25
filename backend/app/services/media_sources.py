@@ -68,10 +68,11 @@ def query_plan(stocks,profiles,limit=12):
 
 
 def relation(title,body,stocks,terms):
+    from .news_selection import industry_terms
     text=title+' '+body
     # Search hit != company mention, and industry hit != company beneficiary.
     direct=[stock.code for stock in stocks if stock.name and stock.name in text]
-    industry={stock.code:[term for term in terms.get(stock.code,[]) if term in text]
+    industry={stock.code:industry_terms(text,terms.get(stock.code,[]))
               for stock in stocks}
     industry={key:value for key,value in industry.items() if value and key not in direct}
     macro=[term for term in MACRO if term in title]

@@ -1092,8 +1092,11 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         research_background = []
         stocks = get_watchlist_service().get_all_stocks()
         from .research_hub import ResearchHub
-        from .news_briefing import associations,topic,briefing,consultation_key,diverse_rank,prompt as briefing_prompt
+        from .news_briefing import associations,topic,briefing,consultation_key,diverse_rank,editorial_exclusion,prompt as briefing_prompt
         profiles={row['key']:row['profile'] for row in ResearchHub().load(stocks) if row.get('profile')}
+        editorial_counts=Counter(editorial_exclusion(item,stocks) for item in news_list if editorial_exclusion(item,stocks))
+        self._news_quality_exclusions.update(editorial_counts)
+        news_list=[item for item in news_list if not editorial_exclusion(item,stocks)]
         
         # 大宗商品/外盘/宏观关键词
         global_keywords = [
@@ -1177,7 +1180,9 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                 if theme and topic_counts.get(theme,0)>=2 and not matches_watchlist(n,stocks):
                     continue
                 norm = _normalize_for_dedup(n.title)
-                is_dup = any(copy_reason(n,existing) or (
+                from .event_observations import canonical
+                is_dup = any(n.id==existing.id or (
+                    norm==_normalize_for_dedup(existing.title) and canonical(n.source_url)==canonical(existing.source_url)) or copy_reason(n,existing) or (
                     _jaccard_sim(norm,_normalize_for_dedup(existing.title))>0.7
                     and not retain_distinct_full_bodies(n,existing)) for existing in selected)
                 if not is_dup:

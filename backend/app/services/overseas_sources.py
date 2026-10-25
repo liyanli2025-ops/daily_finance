@@ -146,6 +146,21 @@ def discover(provider,content):
 class OverseasCollector:
     def __init__(self,root=None):self.hub=ResearchHub(root)
 
+    def failure_detail(self,key,error):
+        # Read existing negative evidence only; never re-request a failed URL
+        # to retrieve an HTTP status. Provider response bodies are not logged.
+        from .source_health import state_path
+        path=state_path(self.hub.root,key)
+        if path.exists():
+            try:
+                reason=json.loads(path.read_text(encoding='utf-8')).get('reason','')
+                if re.fullmatch(r'http_\d{3}|tls_verification_failed|legacy_negative_result_requires_review|overseas_\w+',reason):
+                    return reason
+            except (ValueError,OSError):pass
+        reason=str(error)
+        if re.fullmatch(r'(?:cached_primary_failure:\w+:)?overseas_\w+|source_paused_no_automatic_retest',reason):return reason
+        return 'cause_not_retained_no_retest'
+
     def get(self,provider,url,deadline,index=False):
         if not permitted(provider,url,index):raise ValueError('overseas_article_url_rejected')
         remaining=deadline-time.monotonic()
@@ -185,7 +200,8 @@ class OverseasCollector:
                             end=(day+timedelta(days=1)).astimezone(CST).replace(tzinfo=None)
                             if end<cutoff or start>now:states[key]['outside_window']+=1;continue
                         queues[key].append(row)
-                except Exception as error:states[key]['errors'].append(dict(stage='index',error=type(error).__name__))
+                except Exception as error:states[key]['errors'].append(dict(stage='index',error=type(error).__name__,
+                    reason=self.failure_detail('overseas:index:v1:'+key,error)))
         articles=[]
         with ThreadPoolExecutor(max_workers=4) as pool:
             pending={};busy=set();turn=0
@@ -215,9 +231,8 @@ class OverseasCollector:
                             +'正文为原语言公开主体，未调用模型翻译；报道及官方声明均不等于独立证实。'))
                     states[key]['read']+=1
                 except Exception as error:
-                    reason=str(error)
                     states[key]['errors'].append(dict(url=candidate['url'],error=type(error).__name__,
-                        reason=reason if re.fullmatch(r'(?:cached_primary_failure:\w+:)?overseas_\w+|source_paused_no_automatic_retest',reason) else 'overseas_read_failed'))
+                        reason=self.failure_detail('overseas:article:v1:'+candidate['url'],error)))
                 finally:fill()
         for key,state in states.items():
             state['not_attempted']=len(queues[key])
