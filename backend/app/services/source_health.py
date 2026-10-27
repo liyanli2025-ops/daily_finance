@@ -12,6 +12,16 @@ from .time_context import china_now
 PAUSED_FEEDS={name:'paused_after_observed_failure_no_automatic_retest' for name in
     ('东方财富研报','格隆汇港股','金十数据')}
 PAUSED_DAILY={'sh512660','sh515700'}
+PAUSED_PUBLIC_ARTICLES={
+    'https://www.eeo.com.cn/2026/1027/1076099.shtml':'publisher_source_date_missing',
+    'https://news.smm.cn/news/104181722':'publisher_full_body_unavailable',
+    'https://news.smm.cn/news/104181778':'publisher_full_body_unavailable',
+}
+# Reviewed public probe failures travel with the release. Runtime failures still
+# live in the private, persistent exact-key ledger; neither expires into a retry.
+_public_failures=Path(__file__).resolve().parents[2]/'public_source_failures.json'
+if _public_failures.exists():
+    PAUSED_PUBLIC_ARTICLES.update(json.loads(_public_failures.read_text(encoding='utf-8')))
 
 
 class RetiredSourceError(ValueError):pass

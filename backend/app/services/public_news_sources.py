@@ -4,7 +4,7 @@ No account, signed/private API, paid article, model or snippet-as-body fallback.
 Latest-page coverage is explicitly partial, even when every candidate was read.
 """
 from concurrent.futures import ThreadPoolExecutor,as_completed
-from datetime import datetime,timedelta
+from datetime import datetime,timedelta,timezone
 import hashlib
 import json
 import re
@@ -28,10 +28,16 @@ SOURCES={
  'cs':dict(index='https://www.cs.com.cn/',name='中证网公开原文',host='www.cs.com.cn',path=r'/(?:ssgs|xwzx|gppd|tzjj|qs|gj|sy|hy|cj)/[\w/]+\.html'),
  'nbd':dict(index='https://www.nbd.com.cn/',name='每日经济新闻公开原文',host='www.nbd.com.cn',path=r'/articles/\d{4}-\d{2}-\d{2}/\d+\.html'),
  'ndrc':dict(index='https://www.ndrc.gov.cn/xwdt/',name='发改委公开原文',host='www.ndrc.gov.cn',path=r'/xwdt/(?:xwfb|tzgg)/\d{6}/t\d+_\d+\.html'),
- 'sse':dict(index='https://www.sse.com.cn/aboutus/mediacenter/hotandd/',name='上交所公开原文',host='www.sse.com.cn',path=r'/aboutus/mediacenter/hotandd/c/c_\d+_\d+\.shtml')}
+ 'sse':dict(index='https://www.sse.com.cn/aboutus/mediacenter/hotandd/',name='上交所公开原文',host='www.sse.com.cn',path=r'/aboutus/mediacenter/hotandd/c/c_\d+_\d+\.shtml'),
+ 'eeo':dict(index='https://www.eeo.com.cn/',name='经济观察网公开原文',host='www.eeo.com.cn',path=r'/\d{4}/\d{4}/\d+\.shtml',role='财经记者报道或分析，具体作者与事实归属以正文为准'),
+ 'jiemian':dict(index='https://www.jiemian.com/',name='界面新闻公开原文',host='www.jiemian.com',path=r'/article/\d+\.html',role='商业报道或评论，记者分析不是独立核实的事实'),
+ 'smm':dict(index='https://news.smm.cn/',name='上海有色网公开原文',host='news.smm.cn',path=r'/news/\d+',role='产业机构公开报道/市场观察；非交易所行情，观点、样本及数据口径需另核验'),
+ 'trendforce':dict(index='https://www.trendforce.com/presscenter',name='TrendForce公开研究发布',host='www.trendforce.com',path=r'/presscenter/news/\d{8}-\d+\.html',role='机构公开研究发布文章；不是订阅报告全文，预测必须归属TrendForce')}
 FINANCE=('A股','港股','股市','上市','公司','收购','三季报','半年报','财报','银行','金融','证券','基金','政策','电力','能源',
  '电价','芯片','半导体','存储','科技','AI','资本','人民币','出口','外贸','国务院','经济','猪价','生猪','养殖','水电','煤炭',
- '原油','铜','黄金','债券','ETF','美联储','关税','需求','供给','发改委','价格','投资','产能','消费','工业','就业','地产')
+ '原油','铜','黄金','债券','ETF','美联储','关税','需求','供给','发改委','价格','投资','产能','消费','工业','就业','地产',
+ '旺季','增长','盈利','亏损','利润','订单','库存','交期','排产','钢铁','汽车','啤酒','零售','医药','航运','机器人','光伏','算力',
+ 'Anthropic','Server','Optical','CapEx','Memory','DRAM','NAND','Panel','Shipments')
 RESTRICTED=('登录后阅读全文','购买后阅读','订阅后阅读','付费阅读全文','开通会员阅读全文','付费内容','剩余内容仅限会员')
 
 
@@ -59,6 +65,10 @@ def discover(provider,html,stocks,terms):
     soup=BeautifulSoup(html,'html.parser');result={}
     for anchor in soup.select('a[href]'):
         url=urljoin(SOURCES[provider]['index'],anchor['href'])
+        # The publisher's own homepage advertises HTTP article links; HTTPS
+        # was separately verified on the same host, never follow arbitrary hosts.
+        if provider=='eeo' and url.startswith('http://www.eeo.com.cn/'):
+            url='https://'+url[len('http://'):]
         if not permitted(provider,url):continue
         heading=anchor.select_one('h2,h3,h4')
         title=(heading or anchor).get_text(' ',strip=True)
@@ -122,12 +132,45 @@ def parse_article(provider,html,url):
     elif provider=='sse':
         title=text(soup.select_one('.article-infor h2'));raw_date=text(soup.select_one('.article_opt i'))
         body=text(soup.select_one('.article-infor .allZoom'))
+    elif provider=='eeo':
+        title=text(soup.select_one('h1'));raw_date=text(soup.select_one('#showFocus'))
+        body=text(soup.select_one('.xx_boxsing'))
+    elif provider=='jiemian':
+        title=text(soup.select_one('h1'));raw_date=text(soup.select_one('.info-s'))
+        body=text(soup.select_one('.article-content'))
+    elif provider=='smm':
+        script=soup.select_one('#__NEXT_DATA__')
+        if not script:raise ValueError('publisher_public_page_state_missing')
+        row=json.loads(script.get_text())['props']['pageProps']['newsDetail']
+        if str(row.get('newsId'))!=url.rsplit('/',1)[-1]:raise ValueError('publisher_identity_rejected')
+        if (row.get('isVip') is not False or row.get('isLoginVisible') is not False
+                or row.get('hasPerm') is not True or row.get('remainWords') or row.get('disable')):
+            raise ValueError('publisher_paid_access_rejected')
+        title=row.get('title','');raw_date=text(soup.select_one('time'));upstream=row.get('source','')
+        # Public page state only. Image-only research is not text extraction.
+        body=text(BeautifulSoup(row.get('content',''),'html.parser'))
+        if len(body)<300:raise ValueError('publisher_full_body_unavailable')
+    elif provider=='trendforce':
+        node=soup.select_one('article.presscenter')
+        title=text(node.select_one('h1')) if node else ''
+        raw_date=text(node.select_one('.tag-row span')) if node else ''
+        body='\n'.join(text(p) for p in node.find_all('p',recursive=False)) if node else ''
+        day=datetime.strptime(raw_date.strip(),'%d %B %Y')
+        raw_date=day.strftime('%Y-%m-%d')
     if not title.strip() or len(body)<100:raise ValueError('publisher_full_body_unavailable')
     if any(marker in body for marker in RESTRICTED):raise ValueError('publisher_restricted_content')
     published,precision=date_value(raw_date)
-    return dict(title=title.strip(),body=body,published=published.isoformat(),date_precision=precision,
+    result=dict(title=title.strip(),body=body,published=published.isoformat(),date_precision=precision,
         url=url,source=config['name'],upstream=upstream,
         reading='公开文章页正文；页面状态正文不等于独立核验，文内事件日期可能早于页面发布时间')
+    if provider=='trendforce':
+        # No clock/timezone is supplied. Use conservative bounds for admission,
+        # but display only the actual source day (never a fabricated clock).
+        cst=timezone(timedelta(hours=8))
+        result['publication_start']=published.replace(tzinfo=timezone(timedelta(hours=14))).astimezone(cst).replace(tzinfo=None).isoformat()
+        result['publication_end']=(published+timedelta(days=1)).replace(tzinfo=timezone(timedelta(hours=-12))).astimezone(cst).replace(tzinfo=None).isoformat()
+        result['reading']+='；原始来源时点：'+raw_date+'（时分及来源时区未提供）；精度：day；公开研究发布，不等于完整订阅报告'
+    return result
 
 
 class PublicNewsCollector:
@@ -149,6 +192,9 @@ class PublicNewsCollector:
             lambda:self.get(provider,SOURCES[provider]['index'],deadline,True))
 
     def detail(self,provider,url,deadline):
+        from .source_health import PAUSED_PUBLIC_ARTICLES,RetiredSourceError
+        if url in PAUSED_PUBLIC_ARTICLES:
+            raise RetiredSourceError('source_paused_no_automatic_retest')
         return cached(self.hub,'publisher:article:v1:'+url,3600,
             lambda:parse_article(provider,self.get(provider,url,deadline),url))
 
@@ -185,10 +231,13 @@ class PublicNewsCollector:
                 future=next(as_completed(pending));key,candidate=pending.pop(future);busy.remove(key)
                 try:
                     row=future.result();published=datetime.fromisoformat(row['published'])
-                    if not cutoff<=published<=now:
+                    start=datetime.fromisoformat(row.get('publication_start',row['published']))
+                    end=datetime.fromisoformat(row.get('publication_end',row['published']))
+                    if not cutoff<=start<=end<=now:
                         statuses[key]['excluded_old_or_future']+=1;continue
                     direct,industry,macro=relation(row['title'],row['body'],stocks,terms)
                     labels=['独立直连采集入口；不表示原创或独立佐证；页面时间精度：'+row['date_precision'],row['reading']]
+                    if SOURCES[key].get('role'):labels.append(SOURCES[key]['role'])
                     if row.get('upstream'):labels.append('页面标明转载来源：'+row['upstream'])
                     for stock in stocks:
                         if stock.code in industry:
@@ -204,11 +253,11 @@ class PublicNewsCollector:
                 except Exception as error:
                     reason=str(error)
                     statuses[key]['errors'].append(dict(url=candidate['url'],error=type(error).__name__,
-                        reason=reason if re.fullmatch(r'(?:cached_primary_failure:\w+:)?publisher_\w+',reason) else 'public_article_read_failed'))
+                        reason=reason if re.fullmatch(r'(?:cached_primary_failure:\w+:)?publisher_\w+|source_paused_no_automatic_retest',reason) else 'public_article_read_failed'))
                 finally:fill()
         for key,state in statuses.items():
             state['not_attempted']=len(queues[key])
             state['status']='partial' if state['errors'] or queues[key] else 'ok' if state['read'] else 'no_recent_material'
             if not state['read'] and state['errors']:state['status']='failed'
         return articles,dict(sources=statuses,window_hours=hours,seconds=budget,read=len(articles),
-            limit=None,complete_window=False,limitation='直连8家列明公开入口；仅扫描首页/当前列表，非72小时全量或全网。正文各有原日期与转载归属；多家报道不等于独立事件。无模型/付费搜索/会员请求。')
+            limit=None,complete_window=False,limitation='直连列明公开入口；仅扫描首页/当前列表，非72小时全量或全网。正文各有原日期与转载归属；多家报道不等于独立事件。无模型/付费搜索/会员请求。')

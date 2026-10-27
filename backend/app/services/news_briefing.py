@@ -15,6 +15,8 @@ def editorial_exclusion(item, stocks):
     Concrete company and policy/operating events override a feature heading.
     """
     title=item.title
+    if re.search(r'论坛成功举办|采标企业名单.*揭晓|【直播】',title) and not any(company_focus(item,stock) for stock in stocks):
+        return 'conference_promotion_not_primary_story'
     feature=re.search(r'人才培养|管理人才|会计学院|老有所依|走进卧室',title)
     event=re.search(r'业绩|财报|订单|中标|合同|收购|融资|上市|回购|销售额|收入|净利润|政策|补贴|征求意见|监管',title)
     if feature and not event and not any(company_focus(item,stock) for stock in stocks):
