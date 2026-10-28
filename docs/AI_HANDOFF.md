@@ -4,6 +4,8 @@
 
 ## 本轮增量：先读这里
 
+**线上暂停已获用户输出确认：** health为status=healthy、database=connected、scheduler=stopped、automation_paused=true。暂停备份`/var/backups/finance-daily/automation-pause-20261028T081218836588Z`。此前重启期间两次curl连接失败，随后健康检查成功；不要误报服务故障或要求重跑。财经后台自动任务已停，模型出口受持久标记阻止；App读取保留。当前无需额外付费验证，禁止删除暂停标记、恢复调度或为了验证重启整期，直到用户明确同意。
+
 **最新明确指令：用户要求修改完成前暂停线上每日自动采集/生成，而不只是调试不调用Claude。** 已实现持久标记backend/data/.automation-paused：App启动不注册自动任务，所有本项目模型调用/重试在HTTP前阻止，health显示automation_paused；App与数据库保留。354项离线回归及实际源码暂停补丁演练通过，无模型/TTS调用。暂停命令已准备，尚待用户执行及health确认；不要声称线上已暂停，也不要擅自恢复。详见[automation_pause.md](automation_pause.md)。
 
 **本轮继续口播完整性：** 发现并修复旧清洗器删除背景括号、来源归属、整条注释、数字括号和表格的路径；新格式器保留事实条件、单位与符号，只移除明确舞台指示及已知来源目录。口播请求去掉参考目录与重复摘要，生成稿在付费核验前保存原稿/清洗稿/本地阅读负荷，支持免费恢复检查并按24小时清理。349项离线回归通过，未调用真实模型、TTS或采集接口，尚未部署。免费工具app.spoken_check；详见[spoken_integrity_progress.md](spoken_integrity_progress.md)。实际分析专业性、材料使用语义及音频听感仍未通过真实验收。

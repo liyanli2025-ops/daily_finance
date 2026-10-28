@@ -26,3 +26,7 @@ tools/pause_finance_automation.py只接受当前已知或已应用的main.py、m
 ## 恢复
 
 当前不要执行恢复。只有用户明确同意后，删除该项目的暂停标记并重启finance-daily；检查health和下一次运行时间，不为恢复验证主动生成整期。不要更改或删除模型密钥来实现暂停。
+
+## 服务器确认
+
+用户已执行暂停命令，私有备份`/var/backups/finance-daily/automation-pause-20261028T081218836588Z`。重启初期curl短暂连接失败后，最终返回`{"status":"healthy","database":"connected","scheduler":"stopped","automation_paused":true}`，暂停生效。无需再试模型来验证；恢复仍必须等待用户明确同意。
