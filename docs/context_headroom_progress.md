@@ -24,3 +24,9 @@
 ```bash
 cd /var/www/finance-daily/backend && sudo ./venv/bin/python -m app.prompt_cost_check --case /var/www/finance-daily/backend/data/diagnostics/review-a8fe1ab537dc4379823f32dedf02978e.json
 ```
+
+## 最新服务器回放确认
+
+用户随后贴回：new_finance_characters=44776，new_market_characters=33833（原40910）；analysis90813，review91865，余量9187/8135；would_stop_before_http均false。该补充已在服务器生效，本次无模型请求。
+
+初始长度通过不是整轮取材/修复一定通过，也不是质量认证。后续请求如追加工具结果仍可能触发保护。下一步刷新当期新闻、技术与研究快照，再用项目tools/run_text_acceptance_v2.py做一次限额文字验收；旧失败标记保留，不删除后重复扣费。工具沿原完整池检索和正式审查路径，不生成音频、不写App报告。
