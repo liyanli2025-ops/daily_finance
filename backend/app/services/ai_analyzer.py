@@ -588,7 +588,7 @@ App当前自选股与行情快照：
         
         第一步：AI 审查员角色，专注找问题，输出结构化问题清单
         第二步：根据问题数量和严重程度，决定修复方式
-          - 问题少且轻微 → 正则/字符串替换（零 token 成本）
+          - 问题少且轻微 → 保留候选稿，待人工编辑，不做无上下文替换
           - 问题多或有逻辑问题 → AI 完整修复
         """
         import re
@@ -834,7 +834,7 @@ App当前自选股与行情快照：
 
 1. **先区分事实与分析**：无来源的数字、日期、币种和声称已确认的因果删除，不猜测替换。有现成证据支持的机制假设则保留为分析，说明竞争解释、期限和失效条件；不能要求预测先成为事实，也不把整段分析改成“原因未证实”。
 2. **证据锚定**：新闻发布时间不等于公告日期；市场快照缺少来源时间时不得补作实时依据。同一标的仅采用时点明确的最新报价，确需比较则分别标注时点。金额保持原文币种和单位。
-3. **保持风格**：修复后的文本风格要与原文保持一致
+3. **保留有效判断，重整表达**：不改与问题无关的有效事实与条件；原稿若是清单堆砌、先铺背景或重复指标，按本期写作规范重组，不机械保持原文风格。
 4. **不引入新问题**：修复一个问题时不要引入新的错误
 5. **信息不足时坦诚**：如果无法确认某条信息的准确性，删除该主张或明确数据缺失，不得用“据市场消息”掩盖无来源
 6. **审查意见不是新增证据**：先核对原文再决定如何修复。审查员要求补写“跌得多所以超跌”、强行增加个股方向或补不存在的指标时，不执行；等价表述不制造冲突。将有依据的判断收窄，而不是服从无依据补写。
@@ -866,12 +866,13 @@ App当前自选股与行情快照：
 title（字符串）、summary（不超过300字）、core_opinions（字符串数组，最多3项）、
 market_analysis（overall_sentiment为positive/negative/neutral；trend为bullish/bearish/neutral；
 key_factors、opportunities、risks均为字符串数组）。摘要和核心观点必须重新核对，不能保留原稿中已删除的判断。
-引用ID只能取自上方新闻全文。删除无法证实的主张，不保留占位ID，不用附注掩盖错误。
+引用ID只能取自上方已提供的新闻阅读片段。删除无法证实的主张，不保留占位ID，不用附注掩盖错误。
 允许大幅缩短；内容长度不代表准确性。不解释修复过程。
 
 开始输出修复后的报告："""
         
         fix_prompt += "\n" + self._get_writing_philosophy()
+        fix_prompt += '\n'+REPORT_POLICY
         fix_prompt += '\n'+DECISION_NOTES_INSTRUCTION+'\n元数据同步更新decision_notes，不能沿用已删除的判断、证据或失效条件。'
 
         # 根据报告类型动态调整输出容量
@@ -908,31 +909,38 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                 or not isinstance(fixed_json.get('market_analysis'), dict)):
             raise RuntimeError("修复元数据不完整，停止发布")
         analysis = fixed_json['market_analysis']
-        report.analysis = MarketAnalysis(
+        new_analysis = MarketAnalysis(
             overall_sentiment=ReportSentiment(analysis.get('overall_sentiment')),
             trend=MarketTrend(analysis.get('trend')),
             key_factors=analysis.get('key_factors', []), opportunities=analysis.get('opportunities', []),
             risks=analysis.get('risks', []))
-        report.title = fixed_json['title']
-        if getattr(self, '_edition_label', None) == '即时更新' and '即时更新' not in report.title:
-            report.title = ('即时更新｜' + report.title).replace('早报', '即时更新')
-        report.summary = fixed_json['summary']
-        report.core_opinions = fixed_json['core_opinions']
+        new_title = fixed_json['title']
+        if getattr(self, '_edition_label', None) == '即时更新' and '即时更新' not in new_title:
+            new_title = ('即时更新｜' + new_title).replace('早报', '即时更新')
         from .review_feedback import decision_notes
-        known={item.id for item in getattr(self,'_selected_evidence_news',[])+getattr(self,'_research_evidence',[])}
-        self._decision_notes=decision_notes(fixed_json.get('decision_notes'),known)
+        known={item.id for item in (getattr(self,'_selected_evidence_news',[])
+            +getattr(self,'_cross_border_evidence_news',[])+getattr(self,'_research_evidence',[]))}
+        new_notes=decision_notes(fixed_json.get('decision_notes'),known)
+        new_content=fixed_response.split('```json')[0].strip()
+        if not new_content:raise RuntimeError('修复缺少正文，保留原稿，停止后续请求')
+        # Parse everything before touching the reviewed original. A failed parse
+        # must not leave a new title/summary attached to the old body.
+        from copy import copy
+        report=copy(report)
+        report.analysis=new_analysis
+        report.title=new_title
+        report.summary=fixed_json['summary']
+        report.core_opinions=fixed_json['core_opinions']
         report.highlights = []
         report.cross_border_events = []
         
         # 更新正文
-        if "```json" in fixed_response:
-            report.content = fixed_response.split("```json")[0].strip()
-        else:
-            report.content = fixed_response.strip()
+        report.content = new_content
         
         # 更新字数统计
         report.word_count = len(report.content)
         report.reading_time = max(1, report.word_count // 400)
+        self._decision_notes=new_notes
         
         print(f"[AI] 🔧 AI 深度修复完成：{old_content_len} → {report.word_count} 字", flush=True)
         return report
