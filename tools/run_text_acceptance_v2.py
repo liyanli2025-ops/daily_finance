@@ -115,14 +115,33 @@ async def main(root=None,run=False):
         result=dict(metadata,status='passed_model_review',http_requests=analyzer.calls,run_id=analyzer.run_id,
             limitation='模型审查通过不代表事实已独立核实、预测准确或用户听感验收通过')
     except Exception as error:
+        from app.services.review_feedback import ReviewNeedsHuman
         reasons={'报告修复后复核仍未通过，停止发布':'repair_review_failed',
                  '本期模型调用次数已达上限，停止额外扣费；保留诊断后人工检查':'request_budget_exhausted'}
         reason=reasons.get(str(error),'see_saved_diagnostics')
         if str(error).startswith('模型输入字符数'):reason='input_character_guard'
+        human=isinstance(error,ReviewNeedsHuman)
+        if human:reason=error.reason
         result=dict(metadata,status='failed',http_requests=analyzer.calls,run_id=analyzer.run_id,
             last_phase=analyzer.phase,error_type=type(error).__name__,failure_reason=reason,
             note='保留开始标记和生成/审查检查点；不要删除标记重新扣费。错误详情查看本次日志。')
+        if human:
+            result['status']='needs_human_review'
+            result['review_case']=str(getattr(analyzer,'_last_review_path','') or '')
+            candidate=getattr(analyzer,'_last_reviewed_report',None)
+            if candidate is not None:
+                target=base.with_suffix('.candidate.md')
+                try:
+                    fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+                    with os.fdopen(fd,'w',encoding='utf-8') as stream:
+                        stream.write('未通过发布审核，仅供人工核对；不是已通过的App报告。\n\n'+candidate.content)
+                    result['candidate_output']=str(target)
+                except OSError as export_error:
+                    result['candidate_export_error']=type(export_error).__name__
         save_json(state,result);save_json(latest,result)
+        if human:
+            print(json.dumps(result,ensure_ascii=False,indent=2),flush=True)
+            return
         raise
     save_json(state,result);save_json(latest,result)
     print(json.dumps(result,ensure_ascii=False,indent=2),flush=True)

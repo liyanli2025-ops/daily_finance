@@ -37,7 +37,8 @@ class EditorialGatesTests(unittest.IsolatedAsyncioTestCase):
         analyzer = AIAnalyzerService.__new__(AIAnalyzerService)
         report = SimpleNamespace(content='材料属实，但“经营改善所以明天必涨”的推断无依据')
         rejected = json.dumps({'overall_quality': 8, 'issues': [
-            {'severity': 'high', 'type': '逻辑错误', 'detail': '经营改善不能直接推出明天上涨'}]})
+            {'severity': 'high', 'type': '逻辑错误', 'detail': '经营改善不能直接推出明天上涨',
+             'check_kind':'reasoning','report_quote':'经营改善'}]})
         analyzer._call_ai = AsyncMock(return_value=rejected)
         analyzer._ai_fix_report = AsyncMock(return_value=report)
         with patch('app.services.ai_analyzer.save_review_case'):

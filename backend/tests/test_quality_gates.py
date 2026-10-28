@@ -41,7 +41,8 @@ class ReviewTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_repaired_report_must_be_reviewed_again(self):
         issue = json.dumps({"issues": [{"severity": "high", "type": "数据编造",
-                                        "detail": "数字无依据"}], "overall_quality": 5})
+                                        "detail": "数字无依据", "check_kind":"unsupported_fact",
+                                        "report_quote":"完整事实", "source_quote":"market"}], "overall_quality": 5})
         self.service._ai_fix_report = AsyncMock(return_value=self.report)
         with self.assertRaisesRegex(RuntimeError, "复核"):
             await self.review([issue, issue])
@@ -50,7 +51,8 @@ class ReviewTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_repair_then_clean_review_passes(self):
         self.service._ai_fix_report = AsyncMock(return_value=self.report)
-        await self.review(['{"issues":[],"overall_quality":5}',
+        await self.review([json.dumps(dict(issues=[dict(severity='high',type='逻辑矛盾',detail='事实解释矛盾',
+            check_kind='reasoning',report_quote='完整事实')],overall_quality=5)),
                            '{"issues":[],"overall_quality":8}'])
         self.assertEqual(self.service._call_ai.await_count, 2)
 
@@ -58,6 +60,7 @@ class ReviewTests(unittest.IsolatedAsyncioTestCase):
         self.report.title = "test"
         self.report.summary = "summary"
         self.report.core_opinions = []
+        self.service._decision_notes=[dict(claim='已删除的旧判断')]
         metadata = {"title":"修复标题", "summary":"修复摘要", "core_opinions":[],
                     "market_analysis":{"overall_sentiment":"neutral", "trend":"neutral"}}
         self.service._call_ai = AsyncMock(return_value="修复后的完整内容及证据，保留限制条件。\n```json\n" +
@@ -71,6 +74,7 @@ class ReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("完整海外证据末尾", self.service._call_ai.call_args.args[0])
         self.assertEqual(result.summary, "修复摘要")
         self.assertEqual(result.core_opinions, [])
+        self.assertEqual(self.service._decision_notes, [])
 
     async def test_repair_without_metadata_cannot_leave_old_summary(self):
         self.service._call_ai = AsyncMock(return_value='修复正文但缺少完整元数据')

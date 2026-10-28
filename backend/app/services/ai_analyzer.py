@@ -33,6 +33,7 @@ from .news_selection import matches_watchlist
 from .report_diagnostics import save_review_case
 from .editorial_policy import REPORT_POLICY, REVIEW_POLICY
 from .episode_workspace import episode_generation,current_workspace
+from .review_feedback import DECISION_NOTES_INSTRUCTION
 
 
 class AIAnalyzerService:
@@ -289,11 +290,13 @@ App当前自选股与行情快照：
 ```json
 {{"title":"日期和主题", "summary":"不超过300字，忠实于正文",
 "core_opinions":["有证据的核心观察及条件，最多3条"],
+"decision_notes":[],
 "highlights":[], "cross_border_events":[],
 "market_analysis":{{"overall_sentiment":"neutral", "trend":"neutral",
 "key_factors":[],"opportunities":[],"risks":[]}}}}
 ```
 元数据必须与正文一致；无法判断的市场方向保持neutral，不为填字段做预测。
+{DECISION_NOTES_INSTRUCTION}
 """
 
     def _prepare_watchlist_analysis(self) -> str:
@@ -591,8 +594,10 @@ App当前自选股与行情快照：
         metadata = {key: getattr(report, key, None) for key in ('title', 'summary', 'core_opinions')}
         analysis = getattr(report, 'analysis', None)
         metadata['market_analysis'] = analysis.model_dump(mode='json') if analysis is not None else None
+        metadata['decision_notes'] = getattr(self,'_decision_notes',[])
+        review_subject=report.content + "\n\n待核验的标题、摘要和核心观点：\n" + json.dumps(metadata, ensure_ascii=False)
         review_prompt = self._build_review_prompt(
-            report.content + "\n\n待核验的标题、摘要和核心观点：\n" + json.dumps(metadata, ensure_ascii=False), market_data_text, finance_summary,
+            review_subject, market_data_text, finance_summary,
             cross_border_summary, report_type
         )
         
@@ -633,9 +638,18 @@ App当前自选股与行情快照：
             raise RuntimeError("审查结构不完整，禁止按通过处理")
         
         print(f"[AI] 🔍 审查完成：质量评分 {overall_quality}/10，发现 {len(issues)} 个问题", flush=True)
-        save_review_case(report, metadata, review_data, finance_summary,
+        from .review_feedback import assess,ReviewNeedsHuman
+        feedback=(dict(all_anchors_valid=True,origin='program_citation_check') if citation_error else
+            assess(issues,review_subject,'\n'.join((market_data_text,finance_summary,cross_border_summary))))
+        review_data['feedback_checks']=feedback
+        self._last_reviewed_report=report
+        self._last_review_path=save_review_case(report, metadata, review_data, finance_summary,
                          cross_border_summary, market_data_text,
                          getattr(self, '_generation_context', ''), _repair_attempted)
+        if not feedback['all_anchors_valid']:
+            raise ReviewNeedsHuman('审查意见缺少可核对原句或存在数字比较矛盾，停止自动修稿，待人工复核')
+        if not issues and overall_quality<7:
+            raise ReviewNeedsHuman('审查低分但未提供可处理问题，停止自动修稿，待人工复核')
         
         if not issues and overall_quality >= 7:
             print("[AI] ✅ 审查通过，无需修复", flush=True)
@@ -648,7 +662,7 @@ App当前自选股与行情快照：
             detail = issue.get("detail", "")
             print(f"   {i}. [{severity}] {issue_type}: {detail}", flush=True)
         if _repair_attempted:
-            raise RuntimeError("报告修复后复核仍未通过，停止发布")
+            raise ReviewNeedsHuman("报告修复后复核仍未通过，停止发布",reason='repair_review_failed')
         
         # === 第二步：智能决策修复方式 ===
         severe_issues = [i for i in issues if i.get("severity") in ("high", "critical")]
@@ -669,9 +683,9 @@ App当前自选股与行情快照：
                 report_type, finance_summary=finance_summary, cross_border_summary=cross_border_summary
             )
         else:
-            # 轻量级正则修复
-            print(f"[AI] 🔧 第二步：问题较少，使用轻量级修复...", flush=True)
-            report = self._lightweight_fix_report(report, issues, market_data_text)
+            # Do not replace the first matching number or append reviewer notes
+            # to a listener's report, then pay to review an unchanged claim.
+            raise ReviewNeedsHuman('当前意见需编辑核对，保留候选稿，停止无上下文正则修复',reason='editorial_review_pending')
         
         return await self._review_and_fix_report(
             report, raw_response, market_data_text, finance_summary,
@@ -768,6 +782,9 @@ App当前自选股与行情快照：
       "severity": "critical|high|medium|low",
       "location": "问题出现在报告的哪个位置（模块名或段落描述）",
       "detail": "具体描述问题是什么",
+      "check_kind": "numeric_mismatch|time_or_basis|unsupported_fact|missing_evidence|reasoning|clarity，选择一种",
+      "report_quote": "从待审正文或元数据逐字复制有问题的短句，不使用省略号拼句",
+      "source_quote": "事实或时点矛盾须从所给材料逐字复制对应短句；纯逻辑或表达问题可为空",
       "evidence": "原始数据中的正确信息（如适用）",
       "suggested_fix": "建议如何修复（简短描述）"
     }}
@@ -782,6 +799,9 @@ App当前自选股与行情快照：
 - 如果没有问题，issues 返回空数组 []
 - 同类问题合并，优先列出影响事实、交易日期和投资判断的问题；不要复述整份报告或原始素材
 - 每项 detail、evidence、suggested_fix 各不超过100个汉字；summary不超过60个汉字
+- report_quote不超过120字、source_quote不超过160字，均须能在输入中逐字找到；最多列5项实质问题。
+- numeric_mismatch另给comparison对象：reported和source为JSON数字，same_basis为true，先核对单位、时点、复权一致；两数一致不得报数字不一致。时点或口径矛盾改用time_or_basis。
+- 缺引用或缺材料用missing_evidence并归为内容缺失，不能仅因材料未给就声称已证明编造。逻辑问题用reasoning，指出原句的推理缺口。
 - 若问题过多无法完整列出，overall_quality不得高于6，并在summary注明审查不完整，不能判为通过"""
     
     async def _ai_fix_report(
@@ -843,6 +863,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
 开始输出修复后的报告："""
         
         fix_prompt += "\n" + self._get_writing_philosophy()
+        fix_prompt += '\n'+DECISION_NOTES_INSTRUCTION+'\n元数据同步更新decision_notes，不能沿用已删除的判断、证据或失效条件。'
 
         # 根据报告类型动态调整输出容量
         if report_type == ReportType.EVENING:
@@ -888,6 +909,9 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
             report.title = ('即时更新｜' + report.title).replace('早报', '即时更新')
         report.summary = fixed_json['summary']
         report.core_opinions = fixed_json['core_opinions']
+        from .review_feedback import decision_notes
+        known={item.id for item in getattr(self,'_selected_evidence_news',[])+getattr(self,'_research_evidence',[])}
+        self._decision_notes=decision_notes(fixed_json.get('decision_notes'),known)
         report.highlights = []
         report.cross_border_events = []
         
@@ -902,61 +926,6 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         report.reading_time = max(1, report.word_count // 400)
         
         print(f"[AI] 🔧 AI 深度修复完成：{old_content_len} → {report.word_count} 字", flush=True)
-        return report
-    
-    def _lightweight_fix_report(
-        self, report: Report, issues: list, market_data_text: str
-    ) -> Report:
-        """
-        轻量级修复：用正则/字符串替换处理简单问题
-        零 token 成本，适用于问题少且轻微的情况
-        """
-        import re
-        
-        content = report.content
-        fix_count = 0
-        
-        for issue in issues:
-            issue_type = issue.get("type", "")
-            evidence = issue.get("evidence", "")
-            detail = issue.get("detail", "")
-            suggested_fix = issue.get("suggested_fix", "")
-            
-            if issue_type == "数据不一致" and evidence:
-                # 尝试从 evidence 中提取正确数据并替换
-                # 例如：evidence="上证指数涨跌幅: +0.52%"，detail 中有错误值
-                # 提取 detail 中的错误值
-                error_numbers = re.findall(r'报告引用\s*["\']?([+-]?\d+\.?\d*%?)["\']?', detail)
-                correct_numbers = re.findall(r'([+-]?\d+\.?\d*%)', evidence)
-                
-                if error_numbers and correct_numbers:
-                    old_val = error_numbers[0]
-                    new_val = correct_numbers[0]
-                    if old_val in content:
-                        content = content.replace(old_val, new_val, 1)
-                        fix_count += 1
-                        print(f"   ✅ 修复数据：{old_val} → {new_val}", flush=True)
-            
-            elif issue_type == "交易日错误" and suggested_fix:
-                # 尝试从 suggested_fix 中提取替换信息
-                # 这类问题通常很具体，如"明天"→"下周一"
-                fix_pairs = re.findall(r'[""](.+?)[""].*?(?:改为|替换为|应为).*?[""](.+?)[""]', suggested_fix)
-                for old_text, new_text in fix_pairs:
-                    if old_text in content:
-                        content = content.replace(old_text, new_text, 1)
-                        fix_count += 1
-                        print(f"   ✅ 修复交易日：{old_text} → {new_text}", flush=True)
-        
-        if fix_count > 0:
-            report.content = content
-            report.word_count = len(content)
-            print(f"[AI] 🔧 轻量级修复完成：修复了 {fix_count} 处", flush=True)
-        else:
-            print(f"[AI] ℹ️ 轻量级修复未能自动处理（问题可能需要人工核实）", flush=True)
-            # 在报告末尾追加审查提示
-            issue_summaries = [f"- {i.get('type','')}: {i.get('detail','')[:50]}" for i in issues]
-            report.content += f"\n\n---\n*🔍 AI审查提示：审查发现以下待确认事项（建议人工核实）：*\n" + "\n".join(issue_summaries)
-        
         return report
     
     async def analyze_stock(self, code: str, name: str, market: str,
@@ -1497,6 +1466,9 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         """解析 AI 响应，构建5模块投资决策导向报告对象"""
         # 尝试提取 JSON 数据
         json_data = self._extract_json(response)
+        from .review_feedback import decision_notes
+        known={item.id for item in news_list+cross_border_news+getattr(self,'_research_evidence',[])}
+        self._decision_notes=decision_notes(json_data.get('decision_notes'),known)
         
         # 提取报告正文（JSON 之前的部分）
         content = response

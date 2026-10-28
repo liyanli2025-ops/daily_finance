@@ -82,3 +82,23 @@ class TextAcceptanceTests(unittest.IsolatedAsyncioTestCase):
                     patch.object(module.settings,'model_max_calls_per_report',4):
                 with self.assertRaisesRegex(RuntimeError,'上限'):await analyzer.once([])
             self.assertEqual(analyzer.calls,4)
+
+    async def test_human_review_candidate_is_saved_without_pass_or_repeat_call(self):
+        from app.services.review_feedback import ReviewNeedsHuman
+        calls=[]
+        async def pending(analyzer,pool):
+            calls.append(pool)
+            analyzer._last_reviewed_report=SimpleNamespace(content='待人工核对的稿件')
+            analyzer._last_review_path='private-review.json'
+            raise ReviewNeedsHuman('审查锚点不足')
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);self.fixture(root)
+            with patch.object(module,'china_now',return_value=NOW),patch.object(module,'read_app_watchlist',AsyncMock(return_value=[])), \
+                    patch.object(module.SnapshotAnalyzer,'once',pending),patch.object(module.settings,'model_max_calls_per_report',4):
+                await module.main(root,True);await module.main(root,True)
+            result=json.loads((root/'data/diagnostics/text-acceptance-latest.json').read_text())
+            self.assertEqual(len(calls),1)
+            self.assertEqual(result['status'],'needs_human_review')
+            self.assertEqual(result['failure_reason'],'review_feedback_unverified')
+            self.assertIn('未通过发布审核',Path(result['candidate_output']).read_text(encoding='utf-8'))
+            self.assertFalse(Path(result['output']).exists())
