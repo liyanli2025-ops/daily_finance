@@ -6,12 +6,30 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock,patch
 
-from app.services.spoken_editing import clean,report_body,audit
+from app.services.spoken_editing import clean,report_body,audit,tts_text,tts_segments
 from app.services.podcast_generator import PodcastGeneratorService
 from app.services.report_diagnostics import save_spoken_case,mark_spoken_case
 
 
 class SpeechFormattingTests(unittest.TestCase):
+    def test_tts_preserves_comparisons_ranges_signs_and_qualifying_parentheses(self):
+        text='未来1—3个交易日，若RSI≤30或收益≥+2%，则检查（市场处于过渡阶段，不代表已经反转）。\n误差±0.5，价格≈10元，不等式a≠b，2026-10-28。'
+        result=tts_text(text)
+        for value in ['1至3个交易日','小于或等于30','大于或等于正百分之2',
+                      '市场处于过渡阶段，不代表已经反转','正负0.5','约等于10元','不等于','2026-10-28']:
+            self.assertIn(value,result)
+        self.assertEqual(tts_text(result),result)
+        self.assertEqual(tts_text('波动1—3%，对照1%—3%。'),'波动1至百分之3，对照百分之1至百分之3。')
+        hidden='（背景\u200b音乐渐弱）若增长≥2%，再验证。'
+        self.assertNotIn('背景',tts_text(hidden))
+        self.assertEqual(tts_text(tts_text(hidden)),tts_text(hidden))
+
+    def test_synthesis_refuses_changed_or_empty_text_instead_of_silent_cleanup(self):
+        for text in ['条件≤30。','（背景音乐渐弱）事实。','[SECTION_BREAK]']:
+            with self.assertRaises(RuntimeError):tts_segments(text)
+        canonical=tts_text('条件≤30。（市场处于过渡区间）[SECTION_BREAK]反证应保留。')
+        self.assertEqual(tts_segments(canonical),canonical.split('[SECTION_BREAK]'))
+
     def test_background_scope_attribution_and_notes_are_preserved(self):
         text='该研报（仅作历史背景，不代表今日催化）提供对照。\n增长预测（来源：某机构，尚未证实）。\n注：若价格续跌，则原判断失效。'
         result=clean(text)
@@ -64,6 +82,49 @@ class SpeechFormattingTests(unittest.TestCase):
 
 
 class SpokenCheckpointTests(unittest.IsolatedAsyncioTestCase):
+    async def test_exact_canonical_text_is_reviewed_checkpointed_and_sent_to_engine(self):
+        from app.models.report import ReportType
+        generator=PodcastGeneratorService.__new__(PodcastGeneratorService);generator.ai_client=True
+        raw='未来1—3日，如果指标≤30，观察反弹（市场处于过渡区间，不代表已经反转）。[SECTION_BREAK]如果回落，原判断失效。'
+        generator._call_ai_for_podcast=AsyncMock(return_value=raw)
+        generator._verify_podcast_script=AsyncMock()
+        generator._generate_tts_edge_with_fallback=AsyncMock(return_value=True)
+        report=SimpleNamespace(content='事实与条件',title='测试',id='id',summary='',core_opinions=[])
+        with tempfile.TemporaryDirectory() as folder:
+            def save(report,raw,script,load):return save_spoken_case(report,raw,script,load,folder)
+            with patch('app.services.report_diagnostics.save_spoken_case',side_effect=save):
+                script=await generator._generate_ai_podcast_script(report,'',date(2026,10,28),ReportType.MORNING,False)
+            # A concise script is valid input for review; there is no 200-character floor.
+            self.assertLess(len(script),200)
+            generator._verify_podcast_script.assert_awaited_once_with(script,report)
+            case=json.loads(next(Path(folder).glob('spoken-*.json')).read_text(encoding='utf-8'))
+            self.assertEqual(case['script'],script);self.assertEqual(case['raw_script'],raw)
+            import hashlib
+            self.assertEqual(case['script_sha256'],hashlib.sha256(script.encode('utf-8')).hexdigest())
+            with patch('edge_tts.Communicate',side_effect=AssertionError('no TTS network')):
+                await generator._generate_segmented_tts(script,str(Path(folder)/'unused.mp3'))
+            self.assertEqual(generator._generate_tts_edge_with_fallback.call_args.args[0],tts_segments(script))
+            self.assertEqual(generator._call_ai_for_podcast.await_count,1)
+
+    async def test_noncanonical_text_stops_before_either_engine(self):
+        generator=PodcastGeneratorService.__new__(PodcastGeneratorService)
+        generator._generate_tts_edge_with_fallback=AsyncMock(return_value=True)
+        generator._generate_tts_siliconflow=AsyncMock(return_value=True)
+        with self.assertRaises(RuntimeError):await generator._generate_segmented_tts('若指标≤30，则观察。','unused.mp3')
+        generator._generate_tts_edge_with_fallback.assert_not_awaited()
+        generator._generate_tts_siliconflow.assert_not_awaited()
+
+    def test_cache_changes_with_format_version_and_rejects_uncanonical_script(self):
+        from app.services import podcast_script_cache as cache
+        report=SimpleNamespace(content='事实与条件')
+        with tempfile.TemporaryDirectory() as folder:
+            script=tts_text('若收益≥2%，判断需要修正。')
+            cache.save(report,'用户',script,folder)
+            self.assertEqual(cache.load(report,'用户',folder),script)
+            with patch.object(cache,'TTS_TEXT_VERSION','new-version'):
+                self.assertIsNone(cache.load(report,'用户',folder))
+            with self.assertRaises(ValueError):cache.save(report,'用户','若收益≥2%，检查。',folder)
+
     async def test_failed_model_review_keeps_paid_script_and_recovery_needs_no_model(self):
         report=SimpleNamespace(content='事实与条件',title='报告',id='report-id',summary='',core_opinions=[])
         generator=PodcastGeneratorService.__new__(PodcastGeneratorService);generator.ai_client=True

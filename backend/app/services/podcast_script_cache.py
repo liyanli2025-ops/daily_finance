@@ -5,6 +5,8 @@ from pathlib import Path
 
 from ..config import settings
 from .research_hub import save_json
+from .spoken_editing import tts_text,TTS_TEXT_VERSION
+from .editorial_policy import SPOKEN_POLICY
 
 ROOT=Path(__file__).resolve().parents[2]/'data/diagnostics/verified-scripts'
 
@@ -14,7 +16,7 @@ def signature(report,nickname):
     routing={name:getattr(settings,name,None) for name in ['ai_provider','ai_model','podcast_provider','podcast_model',
         'podcast_reasoning_effort','review_provider','review_model','review_reasoning_effort',
         'openai_base_url','backup_ai_model','backup_ai_base_url']}
-    value=json.dumps(dict(policy='2026-10-25-editorial-v2',facts=facts,routing=routing,nickname=nickname),
+    value=json.dumps(dict(policy=SPOKEN_POLICY,tts_text_version=TTS_TEXT_VERSION,facts=facts,routing=routing,nickname=nickname),
                      ensure_ascii=False,sort_keys=True,default=str)
     return hashlib.sha256(value.encode()).hexdigest()
 
@@ -26,7 +28,9 @@ def load(report,nickname,directory=None):
         value=json.loads(path.read_text(encoding='utf-8'))
         script=value.get('script')
         if (value.get('verified') is True and value.get('signature')==key and isinstance(script,str)
-                and 200<=len(script)<=4000 and hashlib.sha256(script.encode()).hexdigest()==value.get('script_sha256')):
+                and script.replace('[SECTION_BREAK]','').strip() and len(script)<=4000
+                and tts_text(script)==script
+                and hashlib.sha256(script.encode()).hexdigest()==value.get('script_sha256')):
             return script
     except (OSError,ValueError,TypeError):
         pass
@@ -34,6 +38,8 @@ def load(report,nickname,directory=None):
 
 
 def save(report,nickname,script,directory=None):
+    if tts_text(script)!=script or not script.replace('[SECTION_BREAK]','').strip():
+        raise ValueError('不能缓存未经规范化核验的口播文本')
     key=signature(report,nickname)
     try:
         save_json((Path(directory) if directory is not None else ROOT)/(key+'.json'),

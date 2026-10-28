@@ -409,49 +409,10 @@ class PodcastGeneratorService:
         return str(output_path), duration_seconds
 
     def _sanitize_for_tts(self, text: str) -> str:
-        """
-        TTS 安全清洗：移除会导致 Edge TTS "No audio was received" 的特殊字符
-        
-        Edge TTS 对某些 Unicode 字符非常敏感，包括：
-        - 零宽空格、零宽连接符等不可见字符
-        - 特殊数学符号、箭头符号
-        - 某些CJK扩展字符
-        - 连续多个换行或空白
-        """
-        if not text:
-            return text
-        
-        # 1. 移除零宽字符和不可见控制字符
-        text = re.sub(r'[\u200b\u200c\u200d\u200e\u200f\ufeff\u00ad]', '', text)
-        # 移除其他不可见控制字符（保留换行\n和空格）
-        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', text)
-        
-        # 2. 替换特殊引号和标点为标准形式
-        text = text.replace('"', '"').replace('"', '"')
-        text = text.replace(''', "'").replace(''', "'")
-        text = text.replace('…', '...')
-        text = text.replace('—', '，')  # 破折号改逗号，朗读更自然
-        text = text.replace('–', '，')
-        text = text.replace('·', '，')  # 间隔号改逗号
-        
-        # 3. 移除特殊 Unicode 符号（箭头、数学符号等）
-        text = re.sub(r'[→←↑↓↔↕⇒⇐⇑⇓⇔]', '', text)
-        text = re.sub(r'[≈≠≤≥±×÷∞∑∏√∫∂∇]', '', text)
-        
-        # 4. 移除网址和邮箱
-        text = re.sub(r'https?://\S+', '', text)
-        text = re.sub(r'\S+@\S+\.\S+', '', text)
-        
-        # 5. 清理多余空白
-        text = re.sub(r'\n{3,}', '\n\n', text)
-        text = re.sub(r'[ \t]{2,}', ' ', text)
-        text = re.sub(r'^\s+$', '', text, flags=re.MULTILINE)
-        
-        # 6. 确保文本不会以标点开头
-        text = re.sub(r'^[，。！？、；：]+', '', text.strip())
-        
-        return text.strip()
-    
+        """Compatibility formatter. Actual synthesis accepts reviewed canonical text only."""
+        from .spoken_editing import tts_text
+        return tts_text(text)
+
     async def _generate_segmented_tts(self, full_text: str, output_path: str):
         """
         分段生成 TTS，在模块之间加入停顿
@@ -462,33 +423,10 @@ class PodcastGeneratorService:
         from .audio_mixer import AudioSegment
         import tempfile
         
-        # 分段
-        segments = full_text.split('[SECTION_BREAK]')
-        segments = [s.strip() for s in segments if s.strip()]
-        
-        # 二次清理：确保每段中不残留舞台指示
-        cleaned_segments = []
-        for s in segments:
-            s = re.sub(r'(?i)\[?\s*section[\s_]*break\s*\]?', '', s).strip()
-            s = re.sub(r'（[^）]*(?:音乐|音效|渐弱|渐强|淡入|淡出|过渡|停顿)[^）]*）', '', s, flags=re.IGNORECASE)
-            s = re.sub(r'\([^)]*(?:music|fade|pause|transition|sound)[^)]*\)', '', s, flags=re.IGNORECASE)
-            s = re.sub(r'\[[^\]]*(?:音乐|音效|渐弱|渐强|淡入|淡出|过渡|停顿|music|fade|pause|transition|break|intro|outro)[^\]]*\]', '', s, flags=re.IGNORECASE)
-            s = s.strip()
-            if s:
-                cleaned_segments.append(s)
-        segments = cleaned_segments
-        
-        print(f"[TTS] 检测到 {len(segments)} 个内容模块")
-        
-        # 对每段做 TTS 安全清洗
-        segments = [self._sanitize_for_tts(s) for s in segments]
-        segments = [s for s in segments if s.strip()]
-        
-        if not segments:
-            segments = [self._sanitize_for_tts(full_text.replace('[SECTION_BREAK]', ''))]
-        
-        print(f"[TTS] 清洗后 {len(segments)} 个段落，最长 {max(len(s) for s in segments)} 字")
-        
+        from .spoken_editing import tts_segments
+        segments=tts_segments(full_text)
+        print(f"[TTS] 核验稿原文分为 {len(segments)} 个模块，不再清洗正文")
+
         # ============ 尝试 Edge TTS（主引擎）============
         edge_success = False
         print("[TTS] 🔵 尝试 Edge TTS（微软语音）...")
@@ -1058,12 +996,13 @@ class PodcastGeneratorService:
                         if (i + 1) % 3 == 0 and i < len(paragraphs) - 1:
                             new_paragraphs.append("[SECTION_BREAK]")
                     script = "\n\n".join(new_paragraphs)
-            from .spoken_editing import audit
+            from .spoken_editing import audit,tts_text
+            script=tts_text(script)
             from .report_diagnostics import save_spoken_case,mark_spoken_case
             checkpoint=save_spoken_case(report,raw_script,script,audit(script))
             # Preserve the paid reply before any format/review failure.
-            if len(script)<200:
-                mark_spoken_case(checkpoint,'format_rejected','too_short')
+            if not script.replace('[SECTION_BREAK]','').strip():
+                mark_spoken_case(checkpoint,'format_rejected','empty')
                 return None
             if len(script) > 4000:
                 mark_spoken_case(checkpoint,'format_rejected','too_long')

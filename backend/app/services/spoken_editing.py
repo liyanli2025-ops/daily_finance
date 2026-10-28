@@ -3,6 +3,37 @@ from collections import Counter
 import json
 import re
 
+TTS_TEXT_VERSION='2026-10-28-exact-spoken-v1'
+
+
+def tts_text(text):
+    """Canonical text, prepared BEFORE review, never silently changed afterwards."""
+    text=re.sub(r'[\u200b-\u200f\ufeff\u00ad]','',text)
+    text=re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]','',text)
+    # Do this before percent conversion changes the numeric right-hand side.
+    text=re.sub(r'(?<=[\d%％])[—–](?=[+\-−]?\d)','至',text)
+    text=clean(text)
+    # Preserve the comparison that defines a forecast's trigger or invalidation.
+    replacements={'≈':'约等于','≠':'不等于','≤':'小于或等于','≥':'大于或等于',
+        '±':'正负','×':'乘以','÷':'除以','∞':'无穷',
+        '→':'向右','←':'向左','↑':'向上','↓':'向下',
+        '↔':'双向','↕':'上下','⇒':'向右','⇐':'向左','⇑':'向上','⇓':'向下','⇔':'双向'}
+    for symbol,spoken in replacements.items():text=text.replace(symbol,spoken)
+    # Numeric ranges differ from a rhetorical dash. Leave ISO dates and minus signs alone.
+    text=text.replace('…','...').replace('—','，').replace('–','，').replace('·','，')
+    text=re.sub(r'[ \t]+',' ',text)
+    text=re.sub(r'(?m)^\s+$','',text)
+    return text.strip()
+
+
+def tts_segments(text):
+    """Only split the reviewed canonical script; no second semantic cleanup."""
+    if tts_text(text)!=text:
+        raise RuntimeError('送入语音引擎的文本与核验规范不一致，停止合成；保留原稿供检查')
+    segments=[part.strip() for part in text.split('[SECTION_BREAK]') if part.strip()]
+    if not segments:raise RuntimeError('口播正文为空，停止合成')
+    return segments
+
 
 def report_body(text):
     """Remove only the terminal source catalogue produced by source_notes()."""

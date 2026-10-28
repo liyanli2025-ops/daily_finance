@@ -8,6 +8,8 @@ import uuid
 
 def save_spoken_case(report,raw,script,audit,directory=None):
     from .research_hub import save_json
+    from .spoken_editing import TTS_TEXT_VERSION
+    import hashlib
     from .time_context import china_now
     folder=Path(directory) if directory else Path(__file__).resolve().parents[2]/'data/diagnostics'
     target=folder/('spoken-'+uuid.uuid4().hex+'.json')
@@ -15,6 +17,7 @@ def save_spoken_case(report,raw,script,audit,directory=None):
         save_json(target,dict(owner='finance-spoken-v1',at=china_now().isoformat(),
             status='not_approved',report_id=getattr(report,'id',None),
             report_content=report.content,raw_script=raw,script=script,reading_load=audit,
+            tts_text_version=TTS_TEXT_VERSION,script_sha256=hashlib.sha256(script.encode('utf-8')).hexdigest(),
             limitation='生成/清洗检查点，不代表通过事实核验、音频合成或人工听感验收'))
     except OSError as error:
         raise RuntimeError('口播检查点保存失败，停止后续模型请求：'+type(error).__name__) from None
