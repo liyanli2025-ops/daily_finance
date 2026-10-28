@@ -4,6 +4,8 @@
 
 ## 本轮增量：先读这里
 
+再后续研发：新增分时观测和沪深京覆盖样本宽度，已接入正式采集与技术提示词。本地四个A/H分时响应验证通过；新浪目录5575只与腾讯逐股日期报价配合，5569只可比、覆盖99.89%、时钟跨度93秒。不能称官方全市场全集或完整分钟K线，港股宽度仍缺。本轮源码尚未部署；详见[分时与宽度进度](microstructure_progress.md)，验收工具是`app.microstructure_check`，默认只读当前App股票，`--market-only`可不读数据库。
+
 最新研发增量：已增加可解释选材排序、综述背景配额、保守统计主事实分组及日线聚合的周级参考。284项离线测试通过；同33篇本地正文的初选由28变27，全文仍可检索，不能据此宣称投资价值明显提高。恒指/上证真实数据验证周级边界通过，沪深300一次HTTP失败未重试。新代码尚未安装服务器；详情见[选材与周级进度](editorial_weekly_progress.md)。分钟线、独立日历、市场宽度和最终成稿依然未完成。
 
 用户进一步明确资料不能偏重官方，也不限于自选股。已在实际直连采集链路新增界面新闻、经济观察网、上海有色网和TrendForce公开研究发布，空自选股可运行。本地72小时窗口取得15+5+13+0=33篇正文；TrendForce文章正文可读但本次超窗，不拿旧稿凑数。33篇含转载、官方转述和宣传，不等于33个独立有用事件。明确会务宣传不占初始选题。详情及失败样本见[非官方全市场资料](nonofficial_market_sources.md)。
@@ -63,7 +65,7 @@
 | 海外 | `overseas_sources.py`：BBC、Guardian、美联储、美财政部、EIA五个公开正文适配器；本地成功不等于服务器可用 |
 | 原文质量与选题 | `news_quality.py`、`news_selection.py`、`news_briefing.py`、`editorial_value.py`、`evidence_audit.py`、`source_inventory.py`；区分全文、摘要、快讯，解释阅读排序与统计主事实分组，尚非成熟语义选题 |
 | 当期检索补查 | `episode_workspace.py`、`episode_research.py`、`material_lifecycle.py`；整池可检索、分段读取、有限补查和清理 |
-| 行情与技术 | `timed_market.py`、`technical_radar.py`、`technical_analysis.py`、`weekly_context.py`、`market_data_service.py`；日线校验及按周边界聚合的参考，交易日历未独立核验 |
+| 行情与技术 | `timed_market.py`、`technical_radar.py`、`technical_analysis.py`、`weekly_context.py`；新增`intraday_context.py`、`market_breadth.py`、`microstructure.py`负责有时点的分时观测/覆盖样本，非完整分钟OHLC或交易所全市场全集 |
 | 研究与写作 | `ai_analyzer.py`、`editorial_policy.py`、`evidence.py`；当前 `_prepare_news_summary` 初始最多28条，不是整个工作集只有28条 |
 | 模型与费用 | `model_gateway.py`、`model_usage.py`、`report_diagnostics.py`；正常结束检查、请求预算、用量与阶段诊断。不要修补被截断输出后发布 |
 | 调度与音频 | `scheduler.py`、`podcast_generator.py`、`podcast_script_cache.py`；付费生成与正式发布均需单独验收 |
@@ -109,7 +111,7 @@
 
 ### B. 补齐短线行情能力，不能继续只偏重新闻
 
-1. 独立寻找并验证分钟线、已完成周线、充分样本的A/H市场宽度、行业相对强弱/轮动、重要市场日历。
+1. 先验收已实现的分时观测、周级参考和沪深京覆盖样本宽度，不重做接口探索；继续补完整多日分钟OHLC、独立交易日历、港股宽度、行业相对强弱/轮动及重要市场日历。
 2. 已确认失败的接口不再探测；新数据入口先验证标的、时间、复权、成交量单位、停牌与缺失。ETF只能标行业代理，不能推算全市场涨跌家数。
 3. 价格结构、趋势延续和均值回归需结合市场状态。先验证计算和时点，再让模型解释；未完成K线和需后续确认的转折不回填成历史已知信号。
 4. 缠论、波浪、威科夫等没有全部实现，也不需要凑流派。参考项目清单在 `market_radar_design.md`，不可把项目名当分析能力。
@@ -145,7 +147,7 @@ cd backend
 python -m unittest discover -s tests -v
 ```
 
-最新记录284项通过，包括此前采集/服务器回归，以及 `test_editorial_value.py` 和 `test_weekly_context.py`；测试通过不能替代线上网络和最终内容验证。
+最新记录306项通过，包括此前采集/服务器回归、`test_editorial_value.py`、`test_weekly_context.py`及`test_microstructure.py`；测试通过不能替代线上网络和最终内容验证。
 
 服务器优先读已有精简快照，无重新采集/模型费用：
 

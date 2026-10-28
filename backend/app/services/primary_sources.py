@@ -58,7 +58,7 @@ def cached(hub, key, ttl, fetch, attempt_version=None):
                 record_failure(hub.root,key,error)
                 reason=str(error)
                 # Only our fixed parser diagnostics may enter the cache/logs.
-                safe_reason=reason if (re.fullmatch(r'pdf_parser_exit:-?\d+',reason)
+                safe_reason=reason if (re.fullmatch(r'pdf_parser_exit:-?\d+|(?:minute|breadth)_[a-z_]+',reason)
                     or reason in {'pdf_queue_budget_exhausted','pdf_parse_budget_exhausted',
                                   'pdf_download_budget_exhausted',
                                   'media_article_structure_missing','media_publication_missing',

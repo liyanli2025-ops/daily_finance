@@ -101,5 +101,5 @@ async def collect_overview(target_date=None):
             overview.global_indices.append(GlobalIndexData(**{key:value for key,value in row.items() if key not in {'code','change'}}))
     overview.source_status['指数']=dict(status='ok' if rows else 'no_verified_data',read=len(seen))
     print(f'[行情来源] 腾讯HTTPS：A股指数{len(overview.indices)}，港美指数{len(overview.global_indices)}；'
-          '均保留来源时间。12类未核验行情暂停采集，不轮询旧失败端点。',flush=True)
+          '均保留来源时间。12类旧通道保持暂停，不轮询失败端点；新覆盖样本宽度另见分时/宽度快照。',flush=True)
     return overview

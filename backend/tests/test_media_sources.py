@@ -198,6 +198,7 @@ class CollectionIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 patch('app.services.research_hub.ResearchHub.collect',AsyncMock(return_value={'stocks':[]})), \
                 patch('app.services.research_hub.ResearchHub.load',return_value=[]), \
                 patch('app.services.technical_radar.TechnicalRadar.collect',return_value={'coverage':{}}), \
+                patch('app.services.microstructure.MicrostructureRadar.collect',return_value={}), \
                 patch('app.services.policy_sources.PolicyCollector.collect',return_value=([],{'sources':{}})), \
                 patch('app.services.public_news_sources.PublicNewsCollector.collect',return_value=([],{'sources':{}})), \
                 patch('app.services.overseas_sources.OverseasCollector.collect',return_value=([],{'sources':{}})), \

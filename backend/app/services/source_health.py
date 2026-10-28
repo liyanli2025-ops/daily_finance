@@ -50,7 +50,9 @@ def permanent_reason(error):
         'publisher_full_body_unavailable','publisher_restricted_content','publisher_source_date_missing',
         'publisher_public_page_state_missing','legacy_negative_result_requires_review',
         'overseas_full_body_unavailable','overseas_restricted_content','overseas_source_time_missing',
-        'overseas_source_timezone_missing'}:return str(error)
+        'overseas_source_timezone_missing','minute_identity_missing','minute_quote_identity_missing',
+        'minute_shape_invalid','minute_sequence_invalid','minute_values_invalid','minute_response_invalid',
+        'breadth_catalog_shape_invalid','breadth_catalog_identity_invalid','breadth_response_invalid'}:return str(error)
     return None
 
 

@@ -22,6 +22,8 @@ def summarize_saved(root=None):
     selected=[row for row in selection.get('articles',[]) if row.get('selected')]
     try:technical=json.loads((root/'technical.json').read_text(encoding='utf-8'))
     except FileNotFoundError:technical={}
+    try:microstructure=json.loads((root/'microstructure.json').read_text(encoding='utf-8'))
+    except FileNotFoundError:microstructure={}
     sources=[]
     for row in inventory.get('source_rows',[]):
         state=row.get('feed_status') or {}
@@ -39,6 +41,9 @@ def summarize_saved(root=None):
         selected_count=len(selected),selected_titles=[row['title'] for row in selected],
         selected_reading_scope=selection.get('selected_reading_scope'),
         selected_editorial_counts=selection.get('selected_editorial_counts'),
+        microstructure=dict(collected_at=microstructure.get('collected_at'),
+            intraday_coverage=microstructure.get('intraday',{}).get('coverage'),
+            breadth=microstructure.get('breadth'),time_alignment=microstructure.get('a_index_breadth_time_alignment')),
         technical=dict(collected_at=technical.get('collected_at'),coverage=technical.get('coverage'),
             weekly_coverage=technical.get('weekly_coverage'),
             breadth=technical.get('breadth'),

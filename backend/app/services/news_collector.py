@@ -642,6 +642,7 @@ class NewsCollectorService:
         from .wechat_sources import WeChatCollector
         from .public_news_sources import PublicNewsCollector
         from .overseas_sources import OverseasCollector
+        from .microstructure import MicrostructureRadar
         service=get_watchlist_service()
         try:
             rows=await self._load_db_watchlist()
@@ -652,13 +653,16 @@ class NewsCollectorService:
             stocks=[]
             print(f'[全市场雷达] App自选股读取失败：{type(error).__name__}；仅收集全市场',flush=True)
         profiles={item['key']:item['profile'] for item in ResearchHub().load(stocks) if item.get('profile')}
-        media,technical,policy,wechat,direct,overseas=await asyncio.gather(
+        media,technical,policy,wechat,direct,overseas,microstructure=await asyncio.gather(
             asyncio.to_thread(MediaCollector().collect,stocks,profiles,hours),
             asyncio.to_thread(TechnicalRadar().collect,stocks),
             asyncio.to_thread(PolicyCollector().collect,hours),
             asyncio.to_thread(WeChatCollector().collect,stocks,profiles,hours),
             asyncio.to_thread(PublicNewsCollector().collect,stocks,profiles,hours),
-            asyncio.to_thread(OverseasCollector().collect,hours),return_exceptions=True)
+            asyncio.to_thread(OverseasCollector().collect,hours),
+            asyncio.to_thread(MicrostructureRadar().collect,stocks),return_exceptions=True)
+        self._microstructure_snapshot=(dict(status='failed',error=type(microstructure).__name__)
+            if isinstance(microstructure,Exception) else microstructure)
         if isinstance(technical,Exception):
             self._technical_snapshot=dict(status='failed',error=type(technical).__name__)
             print(f'[日线雷达] 失败：{type(technical).__name__}；禁止补写技术数据',flush=True)

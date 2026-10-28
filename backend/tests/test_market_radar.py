@@ -132,10 +132,12 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
                 patch('app.services.policy_sources.PolicyCollector.collect',return_value=([],{'sources':{}})), \
                 patch('app.services.public_news_sources.PublicNewsCollector.collect',return_value=([],{'sources':{}})), \
                 patch('app.services.overseas_sources.OverseasCollector.collect',return_value=([],{'sources':{}})), \
-                patch('app.services.technical_radar.TechnicalRadar.collect',return_value={'coverage':{}}) as technical:
+                patch('app.services.technical_radar.TechnicalRadar.collect',return_value={'coverage':{}}) as technical, \
+                patch('app.services.microstructure.MicrostructureRadar.collect',return_value={}) as microstructure:
             self.assertEqual(await collector._collect_radar_news(24),[item])
             self.assertEqual(media.call_args.args[0],[])
             technical.assert_called_once_with([])
+            microstructure.assert_called_once_with([])
 
     async def test_market_event_survives_high_score_generic_flood(self):
         event=article('market');event.market_impact='全市场事件入口';event.importance_score=.1

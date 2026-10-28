@@ -198,6 +198,7 @@ class TechnicalRadar:
 
 
 def prompt(stocks,root=None,now=None):
+    from .microstructure import prompt as microstructure_prompt
     now=now or china_now()
     folder=Path(root) if root is not None else ROOT
     try:
@@ -206,7 +207,7 @@ def prompt(stocks,root=None,now=None):
         if not timedelta()<=now-stamp<timedelta(hours=2):
             raise ValueError('expired_technical_snapshot')
     except (OSError,ValueError,KeyError,TypeError):
-        return '## 日线技术雷达\n当前无有效技术快照，禁止补写量价、突破或趋势指标。'
+        return '## 日线技术雷达\n当前无有效技术快照，禁止补写量价、突破或趋势指标。\n'+microstructure_prompt(stocks,folder,now)
     wanted={str(getattr(stock.market,'value',stock.market))+':'+stock.code for stock in stocks}
     wanted_symbols={symbol_for(stock) for stock in stocks}
     lines=['## 已核验日线技术雷达（计算结果，不是新闻或预测）',data['limitation'],str(data['coverage']),str(data['breadth'])]
@@ -256,4 +257,4 @@ def prompt(stocks,root=None,now=None):
                  '量能只用同一股票/ETF序列相对前20日比值，指数成交字段不参与量能判断。')
     lines.append('跨来源/跨市场不得拼时点或比较原始成交量；超额收益仅为同截止日同市场对基准的算术收益差。\n'
                  '技术状态可以与事件交叉核对，但不能证明事件因果、主力意图、尚未定价或信号胜率。')
-    return '\n'.join(lines)
+    return '\n'.join(lines)+'\n'+microstructure_prompt(stocks,folder,now)
