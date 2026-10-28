@@ -12,6 +12,8 @@ from .time_context import china_now
 PAUSED_FEEDS={name:'paused_after_observed_failure_no_automatic_retest' for name in
     ('东方财富研报','格隆汇港股','金十数据')}
 PAUSED_DAILY={'sh512660','sh515700'}
+DAILY_STRUCTURE_FAILURES=frozenset({'kline_identity_missing','completed_daily_or_adjusted_series_missing',
+    'kline_quote_identity_missing','kline_dates_invalid','kline_ohlcv_invalid','kline_response_invalid'})
 PAUSED_PUBLIC_ARTICLES={
     'https://www.eeo.com.cn/2026/1027/1076099.shtml':'publisher_source_date_missing',
     'https://news.smm.cn/news/104181722':'publisher_full_body_unavailable',
@@ -39,6 +41,7 @@ def ensure_active(root,key):
 
 
 def permanent_reason(error):
+    if isinstance(error,ValueError) and str(error) in DAILY_STRUCTURE_FAILURES:return str(error)
     response=getattr(error,'response',None)
     status=getattr(response,'status_code',None)
     if status in {400,401,403,404,405,410}:return 'http_'+str(status)

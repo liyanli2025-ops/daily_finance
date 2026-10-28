@@ -127,9 +127,20 @@ class TechnicalRadar:
 
     def fetch(self,instrument,deadline):
         symbol=instrument['symbol']
-        from .source_health import PAUSED_DAILY
+        from .source_health import PAUSED_DAILY,DAILY_STRUCTURE_FAILURES,record_failure,ensure_active
         if instrument['kind']=='sector_proxy' and symbol in PAUSED_DAILY:
             raise ValueError('daily_adapter_paused_after_verified_missing_series_no_retest')
+        key='daily:v1:'+symbol
+        # A parser failure happened outside the HTTP cache in older releases.
+        # Migrate an already saved exact-instrument failure, without probing it.
+        try:
+            previous=json.loads((self.root/'technical.json').read_text(encoding='utf-8'))
+            failed=next((row for row in previous.get('instruments',[]) if row.get('symbol')==symbol
+                and row.get('market')==instrument.get('market') and row.get('kind')==instrument.get('kind')
+                and row.get('status')=='failed' and row.get('reason') in DAILY_STRUCTURE_FAILURES),None)
+            if failed:record_failure(self.hub.root,key,ValueError(failed['reason']))
+        except (OSError,ValueError,TypeError):pass
+        ensure_active(self.hub.root,key)
         def request():
             remaining=deadline-time.monotonic()
             if remaining<=0:
@@ -141,11 +152,14 @@ class TechnicalRadar:
                 raise ValueError('kline_response_invalid')
             return dict(observed_at=china_now().isoformat(),payload=response.json())
         from .primary_sources import cached
-        saved=cached(self.hub,'daily:v1:'+symbol,900,request)
+        saved=cached(self.hub,key,900,request)
         observed=datetime.fromisoformat(saved['observed_at'])
         if observed>china_now():
             raise ValueError('kline_observation_in_future')
-        bars,name,adjustment=parse_bars(saved['payload'],instrument,observed)
+        try:bars,name,adjustment=parse_bars(saved['payload'],instrument,observed)
+        except ValueError as error:
+            record_failure(self.hub.root,key,error)
+            raise
         metrics=indicators(bars,allow_volume=instrument['kind']!='index')
         return dict(**instrument,status='ok',provider_name=name,source='腾讯公开日线',source_url=API+'?param='+symbol+',day,,,180,qfq',
                     observed_at=observed.isoformat(),adjustment=adjustment,metrics=metrics,
@@ -179,7 +193,7 @@ class TechnicalRadar:
                 row['metrics']['excess_'+str(days)+'d_percentage_points']=round(a-b,4) if aligned and a is not None and b is not None else None
         snapshot=dict(collected_at=china_now().isoformat(),watchlist=[str(getattr(stock.market,'value',stock.market))+':'+stock.code for stock in stocks],
             instruments=rows,coverage=dict(requested=len(rows),verified=sum(row['status']=='ok' for row in rows)),
-            breadth=dict(status='unavailable',reason='尚无覆盖充分的A/H股票样本；指数和ETF代理不能推算全市场涨跌家数或均线上方占比'),
+            breadth=dict(status='unavailable',reason='本日线集合不推算市场宽度；沪深京覆盖样本另见分时快照，港股宽度仍缺失'),
             limitation='仅已完成日线；交易日历未独立核验，超过4个自然日的历史不作当前分析。ETF只是列明的行业代理，非完整行业排名。指标不代表买卖建议或上涨概率。')
         from .technical_analysis import daily_analysis
         for row in rows:
@@ -193,6 +207,8 @@ class TechnicalRadar:
                     row['weekly']=dict(status='unavailable',reason='weekly_input_validation_failed')
         snapshot['weekly_coverage']=dict(available=sum(row.get('weekly',{}).get('status')=='ok' for row in rows),
             calendar_status='not_independently_verified',source='existing_verified_daily_bars_no_extra_requests')
+        from .relative_strength import build as relative_strength
+        snapshot['relative_strength']=relative_strength(rows)
         save_json(self.root/'technical.json',snapshot)
         return snapshot
 
@@ -222,7 +238,8 @@ def prompt(stocks,root=None,now=None):
         'VWMA是日收盘按成交量加权，不是盘中VWAP；方向成交量余额不是实际资金流。'
         '摆动点左右各2根已完成K线严格比较，只能从confirmed_at使用，不能回填point_date。'
         '趋势候选需ADX≥25且价/MA20/MA60同向，ADX<20仅为震荡候选，均为未校准启发式。'
-        '各家族共享输入，不叠加投票；已有日线及按已确认周边界聚合的周级参考，交易日历未独立核验，未实现分钟、多流派和市场宽度。')
+        '各家族共享输入，不叠加投票；已有日线及周级参考，交易日历未独立核验；完整分钟OHLC、多流派与港股宽度仍缺。'
+        '本日线集合的breadth=unavailable只表示不从指数/ETF推算宽度，沪深京覆盖样本状态以本期分时快照为准。')
     missing=wanted-set(data.get('watchlist',[]))
     if missing:
         lines.append('当前新增自选股尚无日线快照：'+','.join(sorted(missing)))
@@ -233,8 +250,7 @@ def prompt(stocks,root=None,now=None):
             lines.append(row['name']+'：数据缺口 '+str(row.get('reason',row.get('error'))))
             continue
         metric_keys=['as_of','close','return_5d_pct','return_20d_pct','ma20','ma60','drawdown_20d_pct',
-                     'volume_vs_prior20','rsi14','atr14','close_above_prior20_high',
-                     'excess_5d_percentage_points','excess_20d_percentage_points']
+                     'volume_vs_prior20','rsi14','atr14','close_above_prior20_high']
         lines.append(json.dumps(dict(symbol=row['symbol'],name=row['provider_name'],kind=row['kind'],
             adjustment=row['adjustment'],observed_at=row['observed_at'],
             metrics={key:row['metrics'].get(key) for key in metric_keys}),ensure_ascii=False,separators=(',',':')))
@@ -257,4 +273,8 @@ def prompt(stocks,root=None,now=None):
                  '量能只用同一股票/ETF序列相对前20日比值，指数成交字段不参与量能判断。')
     lines.append('跨来源/跨市场不得拼时点或比较原始成交量；超额收益仅为同截止日同市场对基准的算术收益差。\n'
                  '技术状态可以与事件交叉核对，但不能证明事件因果、主力意图、尚未定价或信号胜率。')
+    from .relative_strength import build as relative_strength,compact as compact_relative
+    current_rows=[row for row in data['instruments'] if row['kind']!='watchlist' or row['symbol'] in wanted_symbols]
+    lines.append('同市场相对表现与有限ETF代理样本（从已有日线计算，无额外请求）：'+
+        json.dumps(compact_relative(relative_strength(current_rows)),ensure_ascii=False,separators=(',',':')))
     return '\n'.join(lines)+'\n'+microstructure_prompt(stocks,folder,now)
