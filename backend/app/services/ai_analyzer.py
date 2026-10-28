@@ -1072,6 +1072,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         # Untraceable entries must not consume a quota or become writing material.
         from collections import Counter
         from .news_quality import excluded_reason,priority as evidence_priority,reading_scope,scope_label,company_focus
+        from .editorial_value import profile as editorial_profile,rank as editorial_rank,statistical_event_key
         from .evidence_audit import copy_reason,retain_distinct_full_bodies,audit as audit_evidence,prompt as audit_prompt
         audit_candidates=list(news_list)
         self._news_quality_exclusions=dict(Counter(excluded_reason(item) for item in news_list if excluded_reason(item)))
@@ -1141,6 +1142,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         
         # 按保底配额选取
         selected = []
+        background_counts=Counter()
         topic_counts = {}
         scope_counts = {}
         seen_norm_titles = []  # 标准化标题列表，用于相似度去重
@@ -1172,7 +1174,14 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                 consultation=consultation_key(n)
                 if consultation and any(consultation_key(existing)==consultation for existing in selected):
                     continue
+                statistic=statistical_event_key(n)
+                if statistic and any(statistical_event_key(existing)==statistic for existing in selected):
+                    continue
                 scope=reading_scope(n)
+                editorial_kind=editorial_profile(n)['kind']
+                background=editorial_kind in {'recap','routine_quote','general_opinion'}
+                if background and (sum(background_counts.values())>=2 or background_counts[editorial_kind]>=1):
+                    continue
                 if scope=='feed_excerpt' and scope_counts.get(scope,0)>=6:
                     continue
                 if scope=='research_excerpt' and scope_counts.get(scope,0)>=2:
@@ -1188,6 +1197,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                 if not is_dup:
                     seen_norm_titles.append(norm)
                     selected.append(n)
+                    if background:background_counts[editorial_kind]+=1
                     if theme:topic_counts[theme]=topic_counts.get(theme,0)+1
                     scope_counts[scope]=scope_counts.get(scope,0)+1
                     added += 1
@@ -1231,15 +1241,22 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         add_news(related_research,min(2,TOTAL_LIMIT-len(selected)),"研报观点背景")
         
         # 最终按重要性排序
-        sorted_news = sorted(selected, key=evidence_priority, reverse=True)
+        sorted_news = sorted(selected, key=editorial_rank, reverse=True)
         self._selected_evidence_news = sorted_news
         self._news_briefing=briefing(news_list,stocks,profiles,sorted_news)
         self._news_briefing['excluded_by_reason']=self._news_quality_exclusions
         self._news_briefing['selected_reading_scope']=dict(Counter(reading_scope(item) for item in sorted_news))
+        self._news_briefing['statistical_event_supplements']=[dict(primary=item.id,related_ids=[other.id for other in news_list
+            if other.id!=item.id and statistical_event_key(other)==statistical_event_key(item)])
+            for item in sorted_news if statistical_event_key(item) and any(other.id!=item.id
+                and statistical_event_key(other)==statistical_event_key(item) for other in news_list)]
         self._evidence_audit=audit_evidence(audit_candidates,sorted_news,stocks,profiles)
         self._news_briefing['evidence_audit']=self._evidence_audit
         summary_parts.append(audit_prompt(self._evidence_audit))
         summary_parts.append(briefing_prompt(sorted_news,stocks,profiles))
+        if self._news_briefing['statistical_event_supplements']:
+            summary_parts.append('相同标题统计主事实的其他报道仍可当期检索，未读取不得引用或视作独立佐证：'+
+                json.dumps(self._news_briefing['statistical_event_supplements'],ensure_ascii=False,separators=(',',':')))
 
         selected_ids = {n.id for n in sorted_news}
         print(f"[新闻配额] 总计 {len(sorted_news)} 条 | "

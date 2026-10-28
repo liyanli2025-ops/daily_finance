@@ -106,5 +106,5 @@ def daily_analysis(bars,metrics,allow_volume=True):
         families=dict(trend_strength=trend,momentum=momentum,volatility=volatility,volume_price=volume,
             price_structure=confirmed_pivots(bars)),
         limitations=['均线、MACD、RSI等共享价格输入，不累加成独立确认票数',
-            '当前仅日线；分钟线、周线、市场宽度、缠论/威科夫/波浪结构未据此实现',
+            '本技术家族仅日线；另行周级聚合不是独立交易所周K；分钟线、市场宽度、缠论/威科夫/波浪结构未据此实现',
             '先比较趋势延续与均值回归假设，再用事件及相对强弱核对；无自动买卖、目标价或胜率'])

@@ -4,6 +4,8 @@
 
 ## 本轮增量：先读这里
 
+最新研发增量：已增加可解释选材排序、综述背景配额、保守统计主事实分组及日线聚合的周级参考。284项离线测试通过；同33篇本地正文的初选由28变27，全文仍可检索，不能据此宣称投资价值明显提高。恒指/上证真实数据验证周级边界通过，沪深300一次HTTP失败未重试。新代码尚未安装服务器；详情见[选材与周级进度](editorial_weekly_progress.md)。分钟线、独立日历、市场宽度和最终成稿依然未完成。
+
 用户进一步明确资料不能偏重官方，也不限于自选股。已在实际直连采集链路新增界面新闻、经济观察网、上海有色网和TrendForce公开研究发布，空自选股可运行。本地72小时窗口取得15+5+13+0=33篇正文；TrendForce文章正文可读但本次超窗，不拿旧稿凑数。33篇含转载、官方转述和宣传，不等于33个独立有用事件。明确会务宣传不占初始选题。详情及失败样本见[非官方全市场资料](nonofficial_market_sources.md)。
 
 本轮原采集回归264项、加入独立工具后267项通过。用户现已确认安装非官方合并包，服务器2026-10-28 10:39验收取得经济观察网5、界面18、SMM12，共35篇窗口正文；TrendForce7篇候选全超窗，0错误。尚未做付费生成、中文成稿或音频验收。行情宝只完成公开样本阅读，未接生产；不要误报为已接。后续继续补经营观察、采访和量价，不用政府栏目数量代替资料质量。
@@ -59,9 +61,9 @@
 | 国内媒体 | `media_sources.py`：见闻/证券时报等；`public_news_sources.py`：财联社、中国证券网、第一财经、21世纪经济报道、中证网、每日经济新闻及发改委/上交所原文适配 |
 | 官方与研究 | `policy_sources.py`、`primary_sources.py`、`research_hub.py`、`research_documents.py`、`research_schema.py`；动态行业/业务、披露、财报/研报、政府统计。PDF可读不等于每张图表已解释 |
 | 海外 | `overseas_sources.py`：BBC、Guardian、美联储、美财政部、EIA五个公开正文适配器；本地成功不等于服务器可用 |
-| 原文质量与选题 | `news_quality.py`、`news_selection.py`、`news_briefing.py`、`evidence_audit.py`、`source_inventory.py`；区分全文、摘要、快讯，排自动融资快讯、标题替正文等 |
+| 原文质量与选题 | `news_quality.py`、`news_selection.py`、`news_briefing.py`、`editorial_value.py`、`evidence_audit.py`、`source_inventory.py`；区分全文、摘要、快讯，解释阅读排序与统计主事实分组，尚非成熟语义选题 |
 | 当期检索补查 | `episode_workspace.py`、`episode_research.py`、`material_lifecycle.py`；整池可检索、分段读取、有限补查和清理 |
-| 行情与技术 | `timed_market.py`、`technical_radar.py`、`technical_analysis.py`、`market_data_service.py`；日线身份、时间、复权与已完成状态校验后计算 |
+| 行情与技术 | `timed_market.py`、`technical_radar.py`、`technical_analysis.py`、`weekly_context.py`、`market_data_service.py`；日线校验及按周边界聚合的参考，交易日历未独立核验 |
 | 研究与写作 | `ai_analyzer.py`、`editorial_policy.py`、`evidence.py`；当前 `_prepare_news_summary` 初始最多28条，不是整个工作集只有28条 |
 | 模型与费用 | `model_gateway.py`、`model_usage.py`、`report_diagnostics.py`；正常结束检查、请求预算、用量与阶段诊断。不要修补被截断输出后发布 |
 | 调度与音频 | `scheduler.py`、`podcast_generator.py`、`podcast_script_cache.py`；付费生成与正式发布均需单独验收 |
@@ -143,7 +145,7 @@ cd backend
 python -m unittest discover -s tests -v
 ```
 
-最新记录267项通过，包括 `test_server_selection_regressions.py`、`test_nonofficial_sources.py` 和 `test_nonofficial_check.py`；测试通过不能替代线上网络和最终内容验证。
+最新记录284项通过，包括此前采集/服务器回归，以及 `test_editorial_value.py` 和 `test_weekly_context.py`；测试通过不能替代线上网络和最终内容验证。
 
 服务器优先读已有精简快照，无重新采集/模型费用：
 

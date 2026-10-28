@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 
 from .news_selection import matches_watchlist
 from .news_quality import reading_scope,company_focus,priority
+from .editorial_value import profile as editorial_profile,rank as editorial_rank
 
 
 def editorial_exclusion(item, stocks):
@@ -15,8 +16,10 @@ def editorial_exclusion(item, stocks):
     Concrete company and policy/operating events override a feature heading.
     """
     title=item.title
-    if re.search(r'论坛成功举办|采标企业名单.*揭晓|【直播】',title) and not any(company_focus(item,stock) for stock in stocks):
+    if re.search(r'论坛成功举办|采标企业名单.*揭晓|【直播(?:中)?】',title) and not any(company_focus(item,stock) for stock in stocks):
         return 'conference_promotion_not_primary_story'
+    if re.search(r'女首富|男首富|富豪榜|身家.{0,12}亿元',title) and not re.search(r'增持|减持|收购|质押|重组|控制权',title):
+        return 'wealth_profile_without_operating_event'
     feature=re.search(r'人才培养|管理人才|会计学院|老有所依|走进卧室',title)
     event=re.search(r'业绩|财报|订单|中标|合同|收购|融资|上市|回购|销售额|收入|净利润|政策|补贴|征求意见|监管',title)
     if feature and not event and not any(company_focus(item,stock) for stock in stocks):
@@ -31,13 +34,13 @@ def diverse_rank(news):
     from the episode workspace, and company/market buckets still take priority.
     """
     groups=defaultdict(deque)
-    for item in sorted(news,key=priority,reverse=True):
+    for item in sorted(news,key=editorial_rank,reverse=True):
         host=urlsplit(item.source_url or '').hostname or item.source
         if host.startswith(('www.','m.')):host=host.split('.',1)[1]
-        groups[(priority(item)[0],host)].append(item)
+        groups[(priority(item)[0],editorial_profile(item)['priority'],host)].append(item)
     result=[]
-    for tier in sorted({key[0] for key in groups},reverse=True):
-        keys=sorted([key for key in groups if key[0]==tier],key=lambda key:priority(groups[key][0]),reverse=True)
+    for tier in sorted({key[:2] for key in groups},reverse=True):
+        keys=sorted([key for key in groups if key[:2]==tier],key=lambda key:editorial_rank(groups[key][0]),reverse=True)
         while any(groups[key] for key in keys):
             for key in keys:
                 if groups[key]:result.append(groups[key].popleft())
@@ -113,8 +116,11 @@ def briefing(news,stocks,profiles,selected=None):
     rows=[dict(id=item.id,title=item.title,source=item.source,url=item.source_url,
                published=item.published_at.isoformat(),topic=topic(item),
                reading_scope=reading_scope(item),
+               editorial=editorial_profile(item),
                associations=associations(item,stocks,profiles),selected=item.id in selected_ids) for item in news]
     return dict(article_count=len(news),selected_articles=len(selected_ids),topic_counts=dict(counts),
+        editorial_counts=dict(Counter(row['editorial']['kind'] for row in rows)),
+        selected_editorial_counts=dict(Counter(row['editorial']['kind'] for row in rows if row['selected'])),
         direct_company_articles=sum(any(row['level']=='company_mention' for row in item['associations']) for item in rows),
         company_specific_articles=sum(any(row.get('focus')=='company_specific' for row in item['associations']) for item in rows),
         business_overlap_articles=sum(any(row['level']=='business_overlap' for row in item['associations']) for item in rows),
@@ -127,7 +133,9 @@ def prompt(news,stocks,profiles):
     lines=['## 选题与业务关联核对',data['limitation'],
         '相同主题最多选一个主问题，其他报道用作补充或反证，不分成多个重复重点。',
         'keyword_only不能充当公司新增事实或核心短线理由；business_overlap仍需原文证明影响机制。']
+    lines.append('阅读排序标签只来自文本线索，不是事实核验或投资评分；具体变化先核对口径，forecast_or_hypothesis必须保留预测归属和反证。')
     for item in data['articles']:
-        if item['topic'] or item['associations']:
-            lines.append(json.dumps({key:item[key] for key in ('id','topic','associations')},ensure_ascii=False,separators=(',',':')))
+        if item['topic'] or item['associations'] or item['editorial']['kind']!='unclassified':
+            lines.append(json.dumps(dict(id=item['id'],topic=item['topic'],associations=item['associations'],
+                reading_priority=item['editorial']['kind']),ensure_ascii=False,separators=(',',':')))
     return '\n'.join(lines)

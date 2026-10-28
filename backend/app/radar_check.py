@@ -38,7 +38,9 @@ def summarize_saved(root=None):
             for name,row in coverage.get('sources',{}).items()},
         selected_count=len(selected),selected_titles=[row['title'] for row in selected],
         selected_reading_scope=selection.get('selected_reading_scope'),
+        selected_editorial_counts=selection.get('selected_editorial_counts'),
         technical=dict(collected_at=technical.get('collected_at'),coverage=technical.get('coverage'),
+            weekly_coverage=technical.get('weekly_coverage'),
             breadth=technical.get('breadth'),
             gaps=[dict(symbol=row.get('symbol'),reason=row.get('reason',row.get('error')))
                 for row in technical.get('instruments',[]) if row.get('status')!='ok']))

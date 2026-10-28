@@ -140,7 +140,8 @@ class TechnicalRadar:
             if response.status_code!=200 or len(response.content)>2*1024*1024:
                 raise ValueError('kline_response_invalid')
             return dict(observed_at=china_now().isoformat(),payload=response.json())
-        saved=self.hub.cache('daily:v1:'+symbol,900,request)
+        from .primary_sources import cached
+        saved=cached(self.hub,'daily:v1:'+symbol,900,request)
         observed=datetime.fromisoformat(saved['observed_at'])
         if observed>china_now():
             raise ValueError('kline_observation_in_future')
@@ -184,6 +185,14 @@ class TechnicalRadar:
         for row in rows:
             if row['status']=='ok':
                 row['analysis']=daily_analysis(row['bars'],row['metrics'],row['kind']!='index')
+                from .weekly_context import weekly_context
+                try:
+                    observed=datetime.fromisoformat(row.get('observed_at',snapshot['collected_at']))
+                    row['weekly']=weekly_context(row['bars'],observed,row['market'],row['kind']!='index',row['metrics'])
+                except (ValueError,KeyError,TypeError):
+                    row['weekly']=dict(status='unavailable',reason='weekly_input_validation_failed')
+        snapshot['weekly_coverage']=dict(available=sum(row.get('weekly',{}).get('status')=='ok' for row in rows),
+            calendar_status='not_independently_verified',source='existing_verified_daily_bars_no_extra_requests')
         save_json(self.root/'technical.json',snapshot)
         return snapshot
 
@@ -201,6 +210,8 @@ def prompt(stocks,root=None,now=None):
     wanted={str(getattr(stock.market,'value',stock.market))+':'+stock.code for stock in stocks}
     wanted_symbols={symbol_for(stock) for stock in stocks}
     lines=['## 已核验日线技术雷达（计算结果，不是新闻或预测）',data['limitation'],str(data['coverage']),str(data['breadth'])]
+    if not data.get('weekly_coverage'):
+        lines.append('该旧快照尚无周级参考，禁止由日线指标臆造周线结果。')
     lines.append('指标口径：return_5d/20d为截至as_of收盘的5/20期已完成日线收益，包含当期涨跌，不能称为反弹前；'
         'drawdown_20d_pct是距最近20个收盘价最高值的回撤，不是距盘中最高价；prior20_high/low才使用前20期盘中高低，排除当期。'
         'RSI14低于30可按传统口径描述为技术性超卖；不等于估值便宜或反弹已获确认，允许结合其他证据提出反弹或趋势延续假设。'
@@ -210,7 +221,7 @@ def prompt(stocks,root=None,now=None):
         'VWMA是日收盘按成交量加权，不是盘中VWAP；方向成交量余额不是实际资金流。'
         '摆动点左右各2根已完成K线严格比较，只能从confirmed_at使用，不能回填point_date。'
         '趋势候选需ADX≥25且价/MA20/MA60同向，ADX<20仅为震荡候选，均为未校准启发式。'
-        '各家族共享输入，不叠加投票；只实现日线，未实现分钟/周线、多流派和市场宽度。')
+        '各家族共享输入，不叠加投票；已有日线及按已确认周边界聚合的周级参考，交易日历未独立核验，未实现分钟、多流派和市场宽度。')
     missing=wanted-set(data.get('watchlist',[]))
     if missing:
         lines.append('当前新增自选股尚无日线快照：'+','.join(sorted(missing)))
@@ -233,6 +244,14 @@ def prompt(stocks,root=None,now=None):
                 for name,values in analysis['families'].items()}
             lines.append('技术家族（非策略信号）：'+json.dumps(dict(regime=analysis['regime'],families=families),
                 ensure_ascii=False,separators=(',',':')))
+        if row.get('weekly'):
+            weekly=row['weekly']
+            lines.append('周级参考（不是独立交易所周K）：'+json.dumps(
+                {key:weekly[key] for key in ('status','as_of','observations','latest_ohlcv','metrics','warming_up','calendar_status','comparison','reason') if key in weekly},
+                ensure_ascii=False,separators=(',',':')))
+    lines.append('周级口径：仅聚合已完成日线、保留同一复权口径；进行中的周不使用，首周可能截断时丢弃。'
+        '无整周数据时不补零；4/13观察周收益是对应可用周记录间收益，不强称日历月/季度。均线不足返回空，周量仅股票/ETF同序列比较。'
+        '周级与日线共享数据且截止日不同，不算两票独立证据；停牌、节假日与漏数未独立区分。')
     lines.append('日线来源URL模板：'+API+'?param={symbol},day,,,180,qfq；原始缓存与全部指标保存在data/radar。'
                  '量能只用同一股票/ETF序列相对前20日比值，指数成交字段不参与量能判断。')
     lines.append('跨来源/跨市场不得拼时点或比较原始成交量；超额收益仅为同截止日同市场对基准的算术收益差。\n'
