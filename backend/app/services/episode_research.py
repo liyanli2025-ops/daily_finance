@@ -81,6 +81,7 @@ async def complete_with_research(analyzer,prompt,max_tokens,workspace,stocks):
             current+='\n本期取材轮次已用完，请直接输出完整报告；保留未解决缺口，不再请求工具。'
         response=await analyzer._call_ai(current,max_tokens=max_tokens)
         if not response:raise RuntimeError('AI 返回空响应，本次报告不生成')
+        workspace.confirm_analysis_response()
         from .report_diagnostics import save_generation_stage
         save_generation_stage('draft_response',response)
         requests=requests_from_response(response)

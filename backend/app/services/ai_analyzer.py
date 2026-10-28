@@ -167,9 +167,13 @@ class AIAnalyzerService:
         from .event_observations import EventObservations
         finance_summary += '\n\n' + EventObservations().context(self._selected_evidence_news)
         from .research_hub import ResearchHub
-        research_text, self._research_evidence = ResearchHub().prompt(get_watchlist_service().get_all_stocks(),max_characters=8000)
+        research_hub=ResearchHub()
+        research_text, self._research_evidence = research_hub.prompt(get_watchlist_service().get_all_stocks(),max_characters=8000)
         workspace=current_workspace()
         workspace.add(self._research_evidence)
+        for identifier,ranges in getattr(research_hub,'prompt_ranges',{}).items():
+            if identifier in workspace.documents:
+                workspace.prepare_ranges(identifier,ranges,'initial_research')
         workspace.add(ResearchHub().evidence_pool(get_watchlist_service().get_all_stocks()))
         finance_summary += '\n\n' + research_text
         cross_border_summary = self._prepare_cross_border_summary(cross_border_news or [])
@@ -240,6 +244,7 @@ class AIAnalyzerService:
         cited_sources = validate_citations(report.content, news_list + (cross_border_news or []) + self._research_evidence)
         report.content += source_notes(cited_sources)
         report.word_count = len(report.content)
+        workspace.usage(report.content,getattr(self,'_decision_notes',[]))
         return report
     
     def _build_editorial_report_prompt(self, *, today, report_type, is_trading_day,
@@ -596,6 +601,10 @@ App当前自选股与行情快照：
         metadata['market_analysis'] = analysis.model_dump(mode='json') if analysis is not None else None
         metadata['decision_notes'] = getattr(self,'_decision_notes',[])
         review_subject=report.content + "\n\n待核验的标题、摘要和核心观点：\n" + json.dumps(metadata, ensure_ascii=False)
+        workspace=current_workspace()
+        if workspace is not None:
+            # Audit only: do not repeat this large ledger in the review prompt.
+            metadata['evidence_usage']=workspace.usage(report.content,getattr(self,'_decision_notes',[]))
         review_prompt = self._build_review_prompt(
             review_subject, market_data_text, finance_summary,
             cross_border_summary, report_type
@@ -1244,8 +1253,12 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         for i, news in enumerate(sorted_news, 1):
             # The episode workspace retains the full bodies. Only a bounded,
             # explicitly labelled reading window belongs in the initial prompt.
-            from .prompt_reading import excerpt
-            content_preview = excerpt(news.content,news.title,budget=min(1200,max(300,18000//max(1,len(sorted_news)))))
+            from .prompt_reading import excerpt,reading_ranges
+            reading_budget=min(1200,max(300,18000//max(1,len(sorted_news))))
+            content_preview = excerpt(news.content,news.title,budget=reading_budget)
+            workspace=current_workspace()
+            if workspace is not None and news.id in workspace.documents:
+                workspace.prepare_ranges(news.id,reading_ranges(news.content,news.title,reading_budget),'initial_news')
             
             summary_parts.append(f"""
 ### {i}. [N:{news.id}] {news.title}
@@ -1435,6 +1448,9 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
             summary_parts.append(f"\n### {type_name}")
             for i, news in enumerate(news_items[:3], 1):  # 每类最多3条
                 self._cross_border_evidence_news.append(news)
+                workspace=current_workspace()
+                if workspace is not None and news.id in workspace.documents and news.content:
+                    workspace.prepare_ranges(news.id,[(0,len(news.content))],'initial_cross')
                 impact_info = ""
                 if news.beneficiary_sectors or news.affected_sectors:
                     impact_info = f"\n- 潜在影响：受益板块[{', '.join(news.beneficiary_sectors)}]，受损板块[{', '.join(news.affected_sectors)}]"

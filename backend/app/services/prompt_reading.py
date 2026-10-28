@@ -2,9 +2,9 @@
 import re
 
 
-def excerpt(text,query='',budget=1200):
+def reading_ranges(text,query='',budget=1200):
     if len(text)<=budget:
-        return text
+        return [(0,len(text))] if text else []
     # Head, query-relevant context and a counterstatement if present. These are
     # verbatim slices, not generated summaries or a claim of exhaustive reading.
     width=max(80,budget//3)
@@ -23,9 +23,14 @@ def excerpt(text,query='',budget=1200):
     if len(offsets)<3:
         offsets.append(max(0,len(text)-width))
     offsets=sorted(set(offsets))[:3]
+    return [(start,min(len(text),start+width)) for start in offsets]
+
+
+def excerpt(text,query='',budget=1200):
+    if len(text)<=budget:return text
+    ranges=reading_ranges(text,query,budget)
     parts=['【入模节选，未提供全文；字符偏移从0起，缺失部分不得推断。可用read_material按本条ID继续读取。】']
-    for start in offsets:
-        end=min(len(text),start+width)
+    for start,end in ranges:
         parts.append(f'【原文字符{start}:{end} / 总长{len(text)}】\n'+text[start:end])
     return '\n'.join(parts)
 

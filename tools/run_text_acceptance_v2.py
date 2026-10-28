@@ -54,6 +54,16 @@ class SnapshotAnalyzer(AIAnalyzerService):
 
     def _prepare_news_summary_with_sentiment(self,news):
         self._selected_evidence_news=list(self.selected)
+        from app.services.episode_workspace import current_workspace
+        from app.services.prompt_reading import excerpt,reading_ranges
+        workspace=current_workspace()
+        budget=min(1200,max(300,18000//max(1,len(self.selected))))
+        for item in self.selected:
+            # Historical snapshots can have a different reading format. Do not
+            # retroactively claim exposure unless this exact excerpt is present.
+            preview=excerpt(item.content,item.title,budget)
+            if workspace is not None and item.id in workspace.documents and preview and preview in self.replay['news_input']:
+                workspace.prepare_ranges(item.id,reading_ranges(item.content,item.title,budget),'initial_news')
         return self.replay['news_input']
 
     async def _call_ai(self,prompt,max_tokens=4000,task='analysis'):

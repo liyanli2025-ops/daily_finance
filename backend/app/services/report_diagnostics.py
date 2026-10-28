@@ -39,8 +39,11 @@ def save_generation_stage(stage,response,directory=None):
     from .time_context import china_now
     folder=Path(directory) if directory else Path(__file__).resolve().parents[2]/'data/diagnostics'
     path=folder/('generation-'+stage+'-'+uuid.uuid4().hex+'.json')
+    from .episode_workspace import current_workspace
+    workspace=current_workspace()
     try:
         save_json(path,dict(stage=stage,at=china_now().isoformat(),response=response,
+            evidence_usage=workspace.usage() if workspace is not None else None,
             status='unreviewed',limitation='完整模型回复，仅供恢复及核验；不代表已通过审查或可发布'))
     except OSError as error:
         # Do not spend more on review/repair if an already-paid result cannot be preserved.
