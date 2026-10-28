@@ -157,4 +157,6 @@ export const DarkColors = {
   statusBarStyle: 'light' as const,
 };
 
-export type AppColors = typeof LightColors;
+export type AppColors = Omit<typeof LightColors, 'statusBarStyle'> & {
+  statusBarStyle: 'light' | 'dark';
+};

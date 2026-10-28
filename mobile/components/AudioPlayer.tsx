@@ -31,6 +31,7 @@ function SeekableProgressBar({
   const [isDragging, setIsDragging] = useState(false);
   const [dragProgress, setDragProgress] = useState(0);
   const trackRef = useRef<View>(null);
+  const nativeWidthRef = useRef(0);
   const trackRectRef = useRef<{ left: number; width: number } | null>(null);
 
   // 计算进度值
@@ -137,27 +138,27 @@ function SeekableProgressBar({
 
   // Native 平台使用 Responder 系统
   const handleResponderGrant = (e: GestureResponderEvent) => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || nativeWidthRef.current <= 0) return;
     setIsDragging(true);
     const locationX = e.nativeEvent.locationX;
-    const width = e.nativeEvent.layout?.width || 1;
+    const width = nativeWidthRef.current;
     const newProgress = Math.max(0, Math.min(locationX / width, 1));
     setDragProgress(newProgress);
   };
 
   const handleResponderMove = (e: GestureResponderEvent) => {
-    if (Platform.OS === 'web' || !isDragging) return;
+    if (Platform.OS === 'web' || !isDragging || nativeWidthRef.current <= 0) return;
     const locationX = e.nativeEvent.locationX;
-    const width = e.nativeEvent.layout?.width || 1;
+    const width = nativeWidthRef.current;
     const newProgress = Math.max(0, Math.min(locationX / width, 1));
     setDragProgress(newProgress);
   };
 
   const handleResponderRelease = (e: GestureResponderEvent) => {
     if (Platform.OS === 'web') return;
-    if (isDragging && duration > 0) {
+    if (isDragging && duration > 0 && nativeWidthRef.current > 0) {
       const locationX = e.nativeEvent.locationX;
-      const width = e.nativeEvent.layout?.width || 1;
+      const width = nativeWidthRef.current;
       const newProgress = Math.max(0, Math.min(locationX / width, 1));
       onSeek(newProgress * duration);
     }
@@ -170,6 +171,7 @@ function SeekableProgressBar({
     <View style={styles.seekableWrapper}>
       <View
         ref={trackRef}
+        onLayout={(event: LayoutChangeEvent) => { nativeWidthRef.current = event.nativeEvent.layout.width; }}
         style={[styles.seekableTrack, { backgroundColor: trackColor }]}
         onStartShouldSetResponder={() => Platform.OS !== 'web'}
         onMoveShouldSetResponder={() => Platform.OS !== 'web'}

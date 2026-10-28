@@ -33,6 +33,7 @@ export default function TabLayout() {
   return (
     <View style={{ flex: 1 }}>
       <Tabs
+        sceneContainerStyle={showMiniPlayer ? { paddingBottom: miniPlayerHeight } : undefined}
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: colors.tabBarActive,
@@ -53,10 +54,6 @@ export default function TabLayout() {
             letterSpacing: 1.2,
             textTransform: 'uppercase',
           },
-          // 当显示迷你播放器时，为内容区域添加额外的底部边距
-          sceneContainerStyle: showMiniPlayer ? {
-            paddingBottom: miniPlayerHeight,
-          } : undefined,
         }}
       >
         <Tabs.Screen

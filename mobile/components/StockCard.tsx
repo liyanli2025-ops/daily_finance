@@ -68,7 +68,7 @@ export default function StockCard({ stock, onPress, onRemove }: StockCardProps) 
               </Text>
               <Chip
                 compact
-                style={[styles.marketChip, { 
+                style={[styles.marketTag, {
                   backgroundColor: stock.market === 'A' 
                     ? 'rgba(255, 87, 51, 0.15)' 
                     : 'rgba(33, 150, 243, 0.15)' 

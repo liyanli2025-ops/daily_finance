@@ -131,6 +131,7 @@ class RelativeStrengthTests(unittest.TestCase):
             self.assertNotIn('sh600001',text)
             self.assertIn('sz000001',text)
             self.assertIn('prior5',text)
+            self.assertIn('市场模型诊断',text)
 
     def test_collection_adds_context_without_extra_fetch(self):
         specs=[{key:item[key] for key in ('symbol','name','market','kind')} for item in [self.benchmark,self.first,self.second]]
@@ -141,6 +142,7 @@ class RelativeStrengthTests(unittest.TestCase):
                 result=radar.collect([])
             self.assertEqual(fetch.call_count,3)
             self.assertEqual(result['relative_strength']['status'],'ok')
+            self.assertEqual(result['market_model']['model'],'market_model_ols_v1')
 
     def test_saved_watchlist_parser_failure_migrates_without_retesting(self):
         spec=dict(symbol='hk00123',name='动态港股',kind='watchlist',market='HK')

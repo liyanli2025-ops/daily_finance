@@ -209,6 +209,8 @@ class TechnicalRadar:
             calendar_status='not_independently_verified',source='existing_verified_daily_bars_no_extra_requests')
         from .relative_strength import build as relative_strength
         snapshot['relative_strength']=relative_strength(rows)
+        from .market_model import build as market_model
+        snapshot['market_model']=market_model(rows)
         save_json(self.root/'technical.json',snapshot)
         return snapshot
 
@@ -277,4 +279,7 @@ def prompt(stocks,root=None,now=None):
     current_rows=[row for row in data['instruments'] if row['kind']!='watchlist' or row['symbol'] in wanted_symbols]
     lines.append('同市场相对表现与有限ETF代理样本（从已有日线计算，无额外请求）：'+
         json.dumps(compact_relative(relative_strength(current_rows)),ensure_ascii=False,separators=(',',':')))
+    from .market_model import build as market_model,compact as compact_model
+    lines.append('市场模型诊断（固定窗口；未优于留出期基线者不使用最近残差解释走势）：'+
+        json.dumps(compact_model(market_model(current_rows)),ensure_ascii=False,separators=(',',':')))
     return '\n'.join(lines)+'\n'+microstructure_prompt(stocks,folder,now)

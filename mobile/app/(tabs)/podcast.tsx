@@ -261,7 +261,7 @@ export default function PodcastScreen() {
         if (sentence.trim()) {
           segments.push({ 
             text: sentence.trim() + '。', 
-            chapterIndex: displayReport.core_opinions?.length > 0 ? 2 : 1 
+            chapterIndex: (displayReport.core_opinions?.length ?? 0) > 0 ? 2 : 1
           });
         }
       });
@@ -273,7 +273,7 @@ export default function PodcastScreen() {
         if (h.title) {
           segments.push({ 
             text: h.title, 
-            chapterIndex: displayReport.core_opinions?.length > 0 ? 2 : 1 
+            chapterIndex: (displayReport.core_opinions?.length ?? 0) > 0 ? 2 : 1
           });
         }
       });
@@ -1078,7 +1078,6 @@ function createStyles(colors: any, isDark: boolean) {
     progressBarContainer: {
       paddingHorizontal: 0,
       paddingVertical: 12, // 增加可点击区域
-      cursor: 'pointer' as any, // Web 平台显示手型光标
     },
     progressTrack: {
       height: 6, // 增加高度以便更容易点击
