@@ -205,7 +205,9 @@ class AppDatabaseTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn('实际生成时点：2026-10-23T13:00:00', requests[0]['messages'][0]['content'])
                 self.assertIn('即时更新', report.title)
                 self.assertIn("本期引用来源", report.content)
-                self.assertIn(report.content, requests[2]["messages"][1]["content"])
+                from app.services.spoken_editing import report_body
+                self.assertIn(report_body(report.content), requests[2]["messages"][1]["content"])
+                self.assertNotIn('## 本期引用来源',requests[2]["messages"][1]["content"])
                 self.assertIn('节目：即时更新', requests[2]['messages'][1]['content'])
                 self.assertTrue(script)
                 self.assertEqual([r["model"] for r in requests], [

@@ -19,7 +19,7 @@ def prune_material_caches(base=None,now=None):
         if folder.is_dir():candidates.extend(folder.glob('*.json'))
     diagnostics=base/'diagnostics'
     if diagnostics.is_dir() and not diagnostics.is_symlink():
-        for pattern in ('generation-*.json','review-*.json','text-acceptance-*.json'):
+        for pattern in ('generation-*.json','review-*.json','text-acceptance-*.json','spoken-*.json'):
             candidates.extend(diagnostics.glob(pattern))
     for name in ('news-acceptance.json','technical.json','microstructure.json'):
         candidates.append(base/'radar'/name)

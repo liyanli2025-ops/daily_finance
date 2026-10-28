@@ -6,6 +6,31 @@ import tempfile
 import uuid
 
 
+def save_spoken_case(report,raw,script,audit,directory=None):
+    from .research_hub import save_json
+    from .time_context import china_now
+    folder=Path(directory) if directory else Path(__file__).resolve().parents[2]/'data/diagnostics'
+    target=folder/('spoken-'+uuid.uuid4().hex+'.json')
+    try:
+        save_json(target,dict(owner='finance-spoken-v1',at=china_now().isoformat(),
+            status='not_approved',report_id=getattr(report,'id',None),
+            report_content=report.content,raw_script=raw,script=script,reading_load=audit,
+            limitation='生成/清洗检查点，不代表通过事实核验、音频合成或人工听感验收'))
+    except OSError as error:
+        raise RuntimeError('口播检查点保存失败，停止后续模型请求：'+type(error).__name__) from None
+    print('[口播诊断] 已保存：'+str(target),flush=True)
+    return target
+
+
+def mark_spoken_case(path,status,error=None):
+    from .research_hub import save_json
+    if status not in {'format_rejected','review_failed','passed_model_review'}:raise ValueError('invalid_spoken_status')
+    data=json.loads(Path(path).read_text(encoding='utf-8'))
+    if data.get('owner')!='finance-spoken-v1':raise ValueError('unknown_spoken_case')
+    data.update(status=status,error_type=error)
+    save_json(Path(path),data)
+
+
 def save_generation_stage(stage,response,directory=None):
     """Checkpoint completed text before parsing or another paid call; no headers/reasoning."""
     if stage not in {'draft_response','repair_response'} or not isinstance(response,str) or not response.strip():
