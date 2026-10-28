@@ -43,7 +43,7 @@ def reserve_call():
     run['calls']+=1
 
 
-def record_usage(task,route,max_tokens,response=None,error=None,elapsed=None,directory=None):
+def record_usage(task,route,max_tokens,response=None,error=None,elapsed=None,directory=None,request_characters=None):
     def count(value):
         return value if type(value) is int and value>=0 else None
     payload={}
@@ -62,6 +62,7 @@ def record_usage(task,route,max_tokens,response=None,error=None,elapsed=None,dir
              task=task,provider=route.provider,model=route.model,max_output_tokens=max_tokens,
              http_status=response.status_code if response is not None else None,
              transport_error=type(error).__name__ if error else None,
+             request_characters=count(request_characters),
              input_tokens=count(usage.get('input_tokens',usage.get('prompt_tokens'))),
              output_tokens=count(usage.get('output_tokens',usage.get('completion_tokens'))),
              cache_read_tokens=count(usage.get('cache_read_input_tokens')),

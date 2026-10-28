@@ -149,6 +149,8 @@ def completed_text(route, data):
 
 async def complete(task, messages, max_tokens=4000):
     from .model_usage import reserve_call, record_usage
+    from .prompt_reading import validate_input
+    request_characters=validate_input(messages)
     route = resolve_route(task)
     url, headers, body = request_for(route, messages, max_tokens)
     # Report only metadata, never prompts, keys, raw errors, or reasoning content.
@@ -160,12 +162,12 @@ async def complete(task, messages, max_tokens=4000):
             try:
                 response = await client.post(url, headers=headers, json=body)
             except httpx.TransportError as error:
-                record_usage(task,route,body['max_tokens'],error=error,elapsed=time.monotonic()-started)
+                record_usage(task,route,body['max_tokens'],error=error,elapsed=time.monotonic()-started,request_characters=request_characters)
                 if attempt == 0:
                     await asyncio.sleep(1)
                     continue
                 raise RuntimeError(f"{task}模型网络请求失败") from None
-            record_usage(task,route,body['max_tokens'],response=response,elapsed=time.monotonic()-started)
+            record_usage(task,route,body['max_tokens'],response=response,elapsed=time.monotonic()-started,request_characters=request_characters)
             if response.status_code == 429 or response.status_code >= 500:
                 if attempt == 0:
                     await asyncio.sleep(1)

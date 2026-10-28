@@ -164,7 +164,7 @@ class AIAnalyzerService:
         from .event_observations import EventObservations
         finance_summary += '\n\n' + EventObservations().context(self._selected_evidence_news)
         from .research_hub import ResearchHub
-        research_text, self._research_evidence = ResearchHub().prompt(get_watchlist_service().get_all_stocks())
+        research_text, self._research_evidence = ResearchHub().prompt(get_watchlist_service().get_all_stocks(),max_characters=14000)
         workspace=current_workspace()
         workspace.add(self._research_evidence)
         workspace.add(ResearchHub().evidence_pool(get_watchlist_service().get_all_stocks()))
@@ -367,7 +367,7 @@ App当前自选股与行情快照：
                     lines.append(f"- {s.name}（{s.code}，{market_name}）")
                 lines.append("")
         
-        lines.append("请在自选股分析模块中对这些股票进行详细分析，**引用上方的真实行情数据**。")
+        lines.append("仅对确有重要变化的自选股展开，不逐只填模块；使用上方行情时保留各自来源时点。")
         
         return "\n".join(lines)
     
@@ -691,7 +691,7 @@ App当前自选股与行情快照：
         
         return f"""你是财经报告事实与决策价值审查员。你的**唯一任务**是审查以下财经报告，找出所有问题。
 
-⚠️ **你只需要找问题，不需要修改报告。越严格越好。**
+只报告有具体原句与证据支持的问题；允许无问题通过。审查意见本身也可能有误，不为找问题而否定条件分析。
 
 ## 审查对象
 
@@ -801,7 +801,7 @@ App当前自选股与行情快照：
 
 ## 修复原则
 
-1. **删去无证据内容优先**：逐条处理问题；不能从材料直接证实的数字、日期、币种、价位条件和因果判断，删除，不用猜测替换。允许整段删除或大幅缩短。
+1. **先区分事实与分析**：无来源的数字、日期、币种和声称已确认的因果删除，不猜测替换。有现成证据支持的机制假设则保留为分析，说明竞争解释、期限和失效条件；不能要求预测先成为事实，也不把整段分析改成“原因未证实”。
 2. **证据锚定**：新闻发布时间不等于公告日期；市场快照缺少来源时间时不得补作实时依据。同一标的仅采用时点明确的最新报价，确需比较则分别标注时点。金额保持原文币种和单位。
 3. **保持风格**：修复后的文本风格要与原文保持一致
 4. **不引入新问题**：修复一个问题时不要引入新的错误
@@ -819,7 +819,7 @@ App当前自选股与行情快照：
 ## 本期定位与时间边界
 {getattr(self, '_generation_context', '')}
 
-## 与生成和审查完全相同的新闻全文及证据ID
+## 与生成和审查相同的已提供新闻阅读片段及证据ID（不代表全文）
 {finance_summary}
 {cross_border_summary}
 
@@ -1271,8 +1271,10 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
             print(f"[自选股入选] {stock.market}:{stock.code} 候选={matched} 入选={selected_count}")
         
         for i, news in enumerate(sorted_news, 1):
-            # Supply the collected text without truncating it again in the prompt.
-            content_preview = news.content
+            # The episode workspace retains the full bodies. Only a bounded,
+            # explicitly labelled reading window belongs in the initial prompt.
+            from .prompt_reading import excerpt
+            content_preview = excerpt(news.content,news.title,budget=min(1200,max(300,18000//max(1,len(sorted_news)))))
             
             summary_parts.append(f"""
 ### {i}. [N:{news.id}] {news.title}

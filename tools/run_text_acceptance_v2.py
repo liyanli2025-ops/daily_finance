@@ -50,13 +50,14 @@ class SnapshotAnalyzer(AIAnalyzerService):
     def __init__(self,replay,selected,state,metadata):
         super().__init__()
         self.replay=replay;self.selected=selected;self.state=state
-        self.metadata=metadata;self.calls=0
+        self.metadata=metadata;self.calls=0;self.run_id=None;self.phase='preflight'
 
     def _prepare_news_summary_with_sentiment(self,news):
         self._selected_evidence_news=list(self.selected)
         return self.replay['news_input']
 
     async def _call_ai(self,prompt,max_tokens=4000,task='analysis'):
+        self.phase=task
         save_json(self.state,dict(self.metadata,status='running',phase=task,
             http_requests_so_far=_run.get()['calls']))
         print('[文字验收] 当前阶段：'+task,flush=True)
@@ -78,6 +79,7 @@ class SnapshotAnalyzer(AIAnalyzerService):
                 is_trading_day=SchedulerService().is_trading_day(china_today()))
         finally:
             self.calls=_run.get()['calls']
+            self.run_id=_run.get()['id']
 
 
 async def main(root=None,run=False):
@@ -110,10 +112,15 @@ async def main(root=None,run=False):
         if report is None:raise RuntimeError('未返回报告')
         fd=os.open(output,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
         with os.fdopen(fd,'w',encoding='utf-8') as stream:stream.write(report.content)
-        result=dict(metadata,status='passed_model_review',http_requests=analyzer.calls,
+        result=dict(metadata,status='passed_model_review',http_requests=analyzer.calls,run_id=analyzer.run_id,
             limitation='模型审查通过不代表事实已独立核实、预测准确或用户听感验收通过')
     except Exception as error:
-        result=dict(metadata,status='failed',http_requests=analyzer.calls,error_type=type(error).__name__,
+        reasons={'报告修复后复核仍未通过，停止发布':'repair_review_failed',
+                 '本期模型调用次数已达上限，停止额外扣费；保留诊断后人工检查':'request_budget_exhausted'}
+        reason=reasons.get(str(error),'see_saved_diagnostics')
+        if str(error).startswith('模型输入字符数'):reason='input_character_guard'
+        result=dict(metadata,status='failed',http_requests=analyzer.calls,run_id=analyzer.run_id,
+            last_phase=analyzer.phase,error_type=type(error).__name__,failure_reason=reason,
             note='保留开始标记和生成/审查检查点；不要删除标记重新扣费。错误详情查看本次日志。')
         save_json(state,result);save_json(latest,result)
         raise
