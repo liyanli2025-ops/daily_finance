@@ -15,6 +15,9 @@ import tempfile
 import zipfile
 
 BASELINE='b04b35f'
+# The delivered nine-file bundle contained this document before the later
+# deployment-instruction commit. Verified against its immutable payload.zip.
+DEPLOYED_FILE_REFS={'docs/AI_HANDOFF.md':'9ce43f4'}
 PAUSED_HASHES={
     'backend/app/main.py':'deb38b6a26429701113cc3fcf8a995895f5fa1134261afbe02eb000f71f508d9',
     'backend/app/services/model_gateway.py':'b75c82b900fd563c5dcc12c5d22323b25ed475a4127d0170b1f82b2453ab4217'}
@@ -35,14 +38,16 @@ def build(output):
     if any(not (repo/name).is_file() for name in names):raise RuntimeError('Source deletion needs an explicit migration')
     old={}
     for name in names:
-        result=subprocess.run(['git','-C',str(repo),'show',baseline+':'+name],capture_output=True)
+        file_ref=DEPLOYED_FILE_REFS.get(name,baseline)
+        result=subprocess.run(['git','-C',str(repo),'show',file_ref+':'+name],capture_output=True)
         old[name]=result.stdout if result.returncode==0 else None
     new={name:(repo/name).read_bytes() for name in names}
     output=Path(output).resolve()
     if output.exists() or output.with_suffix('.zip').exists():raise RuntimeError('Immutable output already exists')
     output.mkdir(parents=True)
     manifest=dict(settings={},baseline=baseline,source_revision=git('rev-parse','HEAD').decode().strip(),
-        source_worktree_dirty=bool(git('status','--porcelain').strip()),frontend_static_deployed=False,
+        source_worktree_dirty=bool(git('status','--porcelain').strip()),deployed_file_refs=DEPLOYED_FILE_REFS,
+        frontend_static_deployed=False,
         files={name:dict(old_sha256=digest(old[name]),new_sha256=digest(value),
             additional_old_sha256=[PAUSED_HASHES[name]] if name in PAUSED_HASHES else []) for name,value in new.items()})
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
