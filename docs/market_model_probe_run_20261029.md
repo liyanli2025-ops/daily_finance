@@ -23,4 +23,4 @@
 
 此前一次六例`run_editorial_probe_once.py`保持原样，不重跑、不改变它的请求哈希或标记。本次是不同目标和独立槽位。
 
-真实请求必须在持有现有密钥的服务器执行。目前工具已准备，等待用户返回此次结果，不能写成completed或passed。
+真实请求已由用户在服务器执行，回传HTTP 200、completed_for_human_review、输入937/输出893 token。人工裁定为基础纠错通过、口播需局部编辑；详见[实际结果](market_model_probe_result_20261029.md)。不再重跑，不代表整期或预测效果通过。
