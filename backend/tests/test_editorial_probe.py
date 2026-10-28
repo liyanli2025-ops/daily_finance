@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -8,7 +9,6 @@ from unittest.mock import Mock
 
 import httpx
 from app.services.model_gateway import Route,request_for,completed_text,service_error
-from app.services.editorial_policy import REPORT_POLICY,SPOKEN_POLICY
 
 spec=importlib.util.spec_from_file_location('editorial_probe',Path(__file__).resolve().parents[2]/'tools/run_editorial_probe_once.py')
 probe=importlib.util.module_from_spec(spec);spec.loader.exec_module(probe)
@@ -31,8 +31,11 @@ class ProbeTests(unittest.TestCase):
 
     def run_probe(self):return probe.execute(self.root,self.gateway,self.factory,self.record)
 
-    def test_preview_is_small_and_embeds_current_policies(self):
-        self.assertEqual(probe.REPORT_POLICY,REPORT_POLICY);self.assertEqual(probe.SPOKEN_POLICY,SPOKEN_POLICY)
+    def test_preview_is_small_and_preserves_the_already_run_probe(self):
+        # This is an immutable historical request, not a template to silently
+        # regenerate after policy edits (which could defeat duplicate billing protection).
+        digest=hashlib.sha256(json.dumps(probe.messages(),ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
+        self.assertEqual(digest,'80f5f102c986241fbf949ffd7635b17f3a62b4572d37e9bf19530cef54814a2c')
         self.assertLess(probe.preview()['input_characters'],8000)
         self.assertEqual(probe.preview()['max_http_requests'],1)
         self.assertEqual(probe.preview()['max_output_tokens'],1800)
