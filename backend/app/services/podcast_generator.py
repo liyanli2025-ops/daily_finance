@@ -25,7 +25,7 @@ from ..config import settings
 from ..models.report import Report, ReportType
 from .audio_mixer import get_audio_mixer
 from .model_gateway import complete
-from .editorial_policy import SPOKEN_POLICY
+from .editorial_policy import SPOKEN_POLICY, edition_brief
 
 
 class PodcastGeneratorService:
@@ -957,6 +957,8 @@ class PodcastGeneratorService:
         podcast_type = "晚报" if report_type == ReportType.EVENING else "早报"
         if '即时更新' in report.title:
             podcast_type = '即时更新'
+        elif is_weekend:
+            podcast_type = '周末回顾'
         system_prompt = """你是财经播客编辑，服务A股、港股日内和数天交易者。
 严格忠实于完整报告，不添加新闻、数字、因果关系、历史案例或买卖建议。
 保留事实/推断/情景的区别、数据对应日期、来源限定、反证和失效条件。
@@ -970,6 +972,7 @@ class PodcastGeneratorService:
         from .spoken_editing import report_body
         user_prompt = (
             f"日期：{report_date.isoformat()}；节目：{podcast_type}。\n"
+            f"节目定位：{edition_brief(podcast_type)}\n"
             f"完整分析正文（只省略文末来源目录，正文引用仍保留）：\n{report_body(report.content)}\n"
             "只使用上述材料，直接写口播稿。"
         )

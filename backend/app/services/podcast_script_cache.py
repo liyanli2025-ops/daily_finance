@@ -6,17 +6,17 @@ from pathlib import Path
 from ..config import settings
 from .research_hub import save_json
 from .spoken_editing import tts_text,TTS_TEXT_VERSION
-from .editorial_policy import SPOKEN_POLICY
+from .editorial_policy import SPOKEN_POLICY,EDITION_BRIEFS
 
 ROOT=Path(__file__).resolve().parents[2]/'data/diagnostics/verified-scripts'
 
 
 def signature(report,nickname):
-    facts={name:getattr(report,name,None) for name in ['report_date','report_type','content','summary','core_opinions']}
+    facts={name:getattr(report,name,None) for name in ['title','report_date','report_type','content','summary','core_opinions']}
     routing={name:getattr(settings,name,None) for name in ['ai_provider','ai_model','podcast_provider','podcast_model',
         'podcast_reasoning_effort','review_provider','review_model','review_reasoning_effort',
         'openai_base_url','backup_ai_model','backup_ai_base_url']}
-    value=json.dumps(dict(policy=SPOKEN_POLICY,tts_text_version=TTS_TEXT_VERSION,facts=facts,routing=routing,nickname=nickname),
+    value=json.dumps(dict(policy=SPOKEN_POLICY,edition_briefs=EDITION_BRIEFS,tts_text_version=TTS_TEXT_VERSION,facts=facts,routing=routing,nickname=nickname),
                      ensure_ascii=False,sort_keys=True,default=str)
     return hashlib.sha256(value.encode()).hexdigest()
 

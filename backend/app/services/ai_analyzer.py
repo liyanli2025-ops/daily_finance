@@ -31,7 +31,7 @@ from .model_gateway import complete
 from .watchlist_repository import refresh_app_watchlist
 from .news_selection import matches_watchlist
 from .report_diagnostics import save_review_case
-from .editorial_policy import REPORT_POLICY, REVIEW_POLICY
+from .editorial_policy import REPORT_POLICY, REVIEW_POLICY, edition_brief
 from .episode_workspace import episode_generation,current_workspace
 from .review_feedback import DECISION_NOTES_INSTRUCTION
 
@@ -188,6 +188,7 @@ class AIAnalyzerService:
             raise RuntimeError('没有可追溯原文的新闻材料，停止模型生成')
         as_of = china_now()
         self._edition_label = ("即时更新" if report_type == ReportType.MORNING and as_of.hour >= 9
+                               else "周末回顾" if today.weekday() >= 5
                                else "晚报" if report_type == ReportType.EVENING else "早报")
         self._generation_context = (f"实际生成时点：{as_of.isoformat()}（北京时间）。"
             f"本期定位：{self._edition_label}；不得把午后数据写成06:00已知信息。"
@@ -258,10 +259,13 @@ class AIAnalyzerService:
                                       watchlist_text, market_data_text, finance_summary,
                                       cross_border_summary, morning_report=None):
         period = getattr(self, '_edition_label', "晚报" if report_type == ReportType.EVENING else "早报")
+        if period != '即时更新' and today.weekday() >= 5:
+            period = '周末回顾'
         morning_context = morning_report.content if morning_report is not None else "没有当日早报，不得编造早报观点或命中率。"
         return f"""{self._get_writing_philosophy()}
 {REPORT_POLICY}
 任务：生成{today.isoformat()}的A股/港股短线财经{period}。
+节目定位：{edition_brief(period)}
 {getattr(self, '_generation_context', '')}
 调度器给出的A股交易日标志：{is_trading_day}；不据此推断港股也开市或休市。
 早报回答隔夜全市场新增什么、今日已确认事件、行业传导和当前自选股观察条件。
