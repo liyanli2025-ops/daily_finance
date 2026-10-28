@@ -15,6 +15,40 @@ def article(key,title,body='记者采访企业，订单减少20%，库存仍在�
 
 
 class EditorialValueTests(unittest.TestCase):
+    def test_server_promotions_do_not_become_operating_events_from_body(self):
+        titles=[
+            '即将开幕 | 锁定11月苏州电机展：3天集中洽谈，高效撬动批量采购订单！',
+            '四万亿豪赌与算力饥渴之下，电力指数怎么选？五只主流指数拆解后，中证全指电力公用事业指数优势明显',
+            '国内政策与海外投入齐发力！上海加快算力设施建设、甲骨文AI算力部署将达数吉瓦级，创业板算力ETF广发（158049）标的指数半日涨超3%']
+        stocks=[SimpleNamespace(name='电机',code='123456')]
+        for i,title in enumerate(titles):
+            row=article('promo'+str(i),title)
+            self.assertEqual(profile(row)['kind'],'commercial_promotion')
+            self.assertEqual(editorial_exclusion(row,stocks),'commercial_promotion_not_primary_story')
+
+    def test_real_fund_events_and_exhibition_orders_remain_admitted(self):
+        for title in ['创业板ETF广发（158049）净申购增加3亿元，份额创年内新高',
+                      '电机展参展企业披露新订单增长20%',
+                      '电力指数调整样本，权重上限下调',
+                      '算力设施新增订单增长30%']:
+            self.assertIsNone(editorial_exclusion(article('real',title),[]))
+
+    def test_server_market_wraps_share_background_quota_without_losing_events(self):
+        titles=[
+            '创业板指上涨3% 全市场近4500股飘红 机器人产业链爆发',
+            '创业板指半日涨3%，人形机器人概念股集体爆发，全市场近4500只个股上涨',
+            '创业板、科创50齐涨2%，恒科指涨1%，泡泡玛特跌2%',
+            '金属多飘红 原油上涨【SMM午评】']
+        wraps=[article('wrap'+str(i),title,body=(title+'，这是上午市场涨跌和成交分布的综述。')*20) for i,title in enumerate(titles)]
+        for row in wraps:self.assertEqual(profile(row)['kind'],'recap')
+        event=article('pcb','三季报集体报喜 PCB产业链板块爆发 龙头警告供需缺口或延续')
+        self.assertNotEqual(profile(event)['kind'],'recap')
+        analyzer=AIAnalyzerService.__new__(AIAnalyzerService)
+        with patch('app.services.ai_analyzer.get_watchlist_service',return_value=SimpleNamespace(get_all_stocks=lambda:[])),patch('app.services.research_hub.ResearchHub.load',return_value=[]):
+            analyzer._prepare_news_summary(wraps+[event])
+        self.assertEqual(sum(profile(row)['kind']=='recap' for row in analyzer._selected_evidence_news),1)
+        self.assertIn(event,analyzer._selected_evidence_news)
+
     def test_specific_changes_outrank_generic_confidence_without_truth_claim(self):
         change=article('change','产业库存降至九个月新低')
         view=article('view','坚定看好A股中长期投资价值');view.importance_score=.99

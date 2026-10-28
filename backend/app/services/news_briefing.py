@@ -16,6 +16,9 @@ def editorial_exclusion(item, stocks):
     Concrete company and policy/operating events override a feature heading.
     """
     title=item.title
+    from .editorial_value import promotion_reason
+    if promotion_reason(title):
+        return 'commercial_promotion_not_primary_story'
     if re.search(r'论坛成功举办|采标企业名单.*揭晓|【直播(?:中)?】',title) and not any(company_focus(item,stock) for stock in stocks):
         return 'conference_promotion_not_primary_story'
     if re.search(r'女首富|男首富|富豪榜|身家.{0,12}亿元',title) and not re.search(r'增持|减持|收购|质押|重组|控制权',title):
@@ -134,6 +137,7 @@ def prompt(news,stocks,profiles):
         '相同主题最多选一个主问题，其他报道用作补充或反证，不分成多个重复重点。',
         'keyword_only不能充当公司新增事实或核心短线理由；business_overlap仍需原文证明影响机制。']
     lines.append('阅读排序标签只来自文本线索，不是事实核验或投资评分；具体变化先核对口径，forecast_or_hypothesis必须保留预测归属和反证。')
+    lines.append('commercial_promotion是展会招揽或产品推介线索，不作为核心投资理由；recap是带时点综述，不重复包装成多个独立催化。')
     for item in data['articles']:
         if item['topic'] or item['associations'] or item['editorial']['kind']!='unclassified':
             lines.append(json.dumps(dict(id=item['id'],topic=item['topic'],associations=item['associations'],
