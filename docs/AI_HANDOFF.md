@@ -8,6 +8,8 @@
 
 本轮264项离线回归通过。修改尚未获服务器安装确认；原线上已知状态仍为下文2026-10-25的海外合并包。尚未做付费生成、中文成稿或音频验收。行情宝只完成公开样本阅读，未接生产；不要误报为已接。后续继续补经营观察、采访和量价，不用政府栏目数量代替资料质量。
 
+随后新增独立四源工具`app.nonofficial_check`，267项离线测试通过；`--saved-summary`不重新采集。合并包`finance-nonofficial-sources-upgrade.zip`用于覆盖用户已安装的海外合并包，安装前仍需正常基线校验。没有受信任SSH连接，本机连接检查未通过主机密钥校验，未实际远程验收；后续请以用户终端结果更新线上状态。
+
 ## 1. 这是什么项目，用户真正需要什么
 
 这是已有 App、FastAPI 后端、定时采集、AI 分析和语音生成链路的个人财经播客项目，不是从零开发的演示程序。
@@ -139,7 +141,7 @@ cd backend
 python -m unittest discover -s tests -v
 ```
 
-最新记录264项通过，包括 `test_server_selection_regressions.py` 和 `test_nonofficial_sources.py`；测试通过不能替代线上网络和最终内容验证。
+最新记录267项通过，包括 `test_server_selection_regressions.py`、`test_nonofficial_sources.py` 和 `test_nonofficial_check.py`；测试通过不能替代线上网络和最终内容验证。
 
 服务器优先读已有精简快照，无重新采集/模型费用：
 

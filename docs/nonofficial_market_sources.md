@@ -43,3 +43,9 @@
 4. 少量真实模型取材和文字验收、最终音频和连续预测复盘尚未完成，不能以本轮33篇宣布播客已专业、信息充分或准确率提高。
 
 测试：`python -m unittest discover -s tests -v`；新增 `test_nonofficial_sources.py` 覆盖空自选股、头部日期、公开权限、图片拒绝、精确失败不重试、会务降噪及实际采集路径。真实验证的完整原文和缓存留在私有工作区，不发布仓库。
+
+## 仅验收四个新来源
+
+已增加 `python -m app.nonofficial_check --hours 72`，只调用eeo/jiemian/smm/trendforce，传入空自选股；不访问App数据库、不请求模型/TTS、不启动其他来源。只保存一份私有元数据与正文预览到`backend/data/radar/nonofficial-acceptance.json`。`--saved-summary`只读这份结果，文件不存在也不会隐式重新采集。267项离线测试通过。
+
+本机到既有服务器的SSH只读检查因没有受信任的主机密钥而停止，未修改known_hosts、未尝试密码、未在服务器执行验收。需在已登录的腾讯云Ubuntu终端安装合并包后运行上述命令，不能将本地结果当线上成功。
