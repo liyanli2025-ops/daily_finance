@@ -21,6 +21,17 @@ DEPLOYED_FILE_REFS={'docs/AI_HANDOFF.md':'9ce43f4'}
 PAUSED_HASHES={
     'backend/app/main.py':'deb38b6a26429701113cc3fcf8a995895f5fa1134261afbe02eb000f71f508d9',
     'backend/app/services/model_gateway.py':'b75c82b900fd563c5dcc12c5d22323b25ed475a4127d0170b1f82b2453ab4217'}
+# Confirmed by the user's complete server mismatch scan on 2026-10-29.
+# Every hash also matches the immutable spoken-integrity bundle and Git ref.
+SPOKEN_REF='c89844a5e04511b787825665f78f81a821fc3fe3'
+SPOKEN_HASHES={
+    'backend/app/services/material_lifecycle.py':'3facaec5b8b31ffcb4cbdc1cfc06b317a17083a2843287b639b7d45c11b68825',
+    'backend/app/services/podcast_generator.py':'df8b84a5ecaa1b56298a16284c50c954df34c41a985cd6f13c5b5bfe2417cccc',
+    'backend/app/services/report_diagnostics.py':'86051b1bd0393ba9de257a94bfab2d74cbf0546a9183b6a08ed56a34ed6f8ff7',
+    'backend/app/services/spoken_editing.py':'0f0525ba32a3c0f9fbcbbb313d7eb34cae09b72a4d254b9727ec3e7b1db15c26',
+    'docs/AI_HANDOFF.md':'eb5e7dfd6c8021693fbb6d512dd82c852004c4aae5b645e149e807e04740abec',
+    'docs/repair_roadmap.md':'81fc4c28c16d1c5aa78b96f46cdc6220705e8591f532eff65703eaba5cf33189',
+    'docs/spoken_integrity_progress.md':'36c3f261c700d9077efe4f1d7861a1abe8163526514be9cea6cbf70a336c12f6'}
 
 
 def digest(value):
@@ -42,14 +53,18 @@ def build(output):
         result=subprocess.run(['git','-C',str(repo),'show',file_ref+':'+name],capture_output=True)
         old[name]=result.stdout if result.returncode==0 else None
     new={name:(repo/name).read_bytes() for name in names}
+    spoken={name:git('show',SPOKEN_REF+':'+name) for name in SPOKEN_HASHES}
+    if any(digest(value)!=SPOKEN_HASHES[name] for name,value in spoken.items()):
+        raise RuntimeError('Reviewed spoken-integrity source no longer matches its fixed fingerprint')
     output=Path(output).resolve()
     if output.exists() or output.with_suffix('.zip').exists():raise RuntimeError('Immutable output already exists')
     output.mkdir(parents=True)
     manifest=dict(settings={},baseline=baseline,source_revision=git('rev-parse','HEAD').decode().strip(),
         source_worktree_dirty=bool(git('status','--porcelain').strip()),deployed_file_refs=DEPLOYED_FILE_REFS,
-        frontend_static_deployed=False,
+        frontend_static_deployed=False,reviewed_spoken_integrity_ref=SPOKEN_REF,
         files={name:dict(old_sha256=digest(old[name]),new_sha256=digest(value),
-            additional_old_sha256=[PAUSED_HASHES[name]] if name in PAUSED_HASHES else []) for name,value in new.items()})
+            additional_old_sha256=([PAUSED_HASHES[name]] if name in PAUSED_HASHES else [])+
+                ([SPOKEN_HASHES[name]] if name in SPOKEN_HASHES else [])) for name,value in new.items()})
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
     (output/'install_upgrade.py').write_bytes((repo/'tools/install_paused_upgrade.py').read_bytes())
     with zipfile.ZipFile(output/'payload.zip','w',zipfile.ZIP_DEFLATED) as archive:
@@ -91,9 +106,24 @@ def build(output):
         assert all((root/name).read_bytes()==value for name,value in new.items())
         with closing(sqlite3.connect(db)) as connection:
             assert connection.execute('SELECT code FROM stocks').fetchone()[0]=='dynamic'
+        # Reconstruct the earlier baseline with the seven exact deployed spoken
+        # files, then validate and apply together. Do not merely trust new code
+        # idempotence as proof that the alternate old hashes are accepted.
+        for name,value in old.items():
+            target=root/name
+            if value is None:target.unlink()
+            else:target.write_bytes(value)
+        for name,value in spoken.items():
+            target=root/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(value)
+        for options in ([],['--apply']):subprocess.run(command+options,check=True)
+        assert all((root/name).read_bytes()==value for name,value in new.items())
+        assert env.read_bytes()==env_bytes and flag.read_bytes()==b'preserve-pause'
+        assert other.read_bytes()==b'other-project'
+        with closing(sqlite3.connect(db)) as connection:
+            assert connection.execute('SELECT code FROM stocks').fetchone()[0]=='dynamic'
     with zipfile.ZipFile(output.with_suffix('.zip'),'w',zipfile.ZIP_DEFLATED) as archive:
         for path in output.iterdir():archive.write(path,output.name+'/'+path.name)
-    return dict(file=str(output.with_suffix('.zip')),sha256=hashlib.sha256(output.with_suffix('.zip').read_bytes()).hexdigest(),files=len(names),rehearsal='passed_no_service_or_model_calls')
+    return dict(file=str(output.with_suffix('.zip')),sha256=hashlib.sha256(output.with_suffix('.zip').read_bytes()).hexdigest(),files=len(names),rehearsal='baseline_and_confirmed_spoken_variant_passed_no_service_or_model_calls')
 
 
 if __name__=='__main__':
