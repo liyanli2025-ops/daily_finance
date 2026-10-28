@@ -13,7 +13,7 @@ def prune_material_caches(base=None,now=None):
     base=(Path(base) if base is not None else DATA).resolve();now=now or china_now()
     cutoff=now-timedelta(hours=24);removed=[]
     candidates=[]
-    for relative in ('research/cache','research/stocks','radar/cache'):
+    for relative in ('research/cache','research/stocks','radar/cache','radar/watchlist-preparation'):
         folder=base/relative
         if folder.is_symlink() or not folder.resolve().is_relative_to(base):continue
         if folder.is_dir():candidates.extend(folder.glob('*.json'))
@@ -27,7 +27,8 @@ def prune_material_caches(base=None,now=None):
         if path.is_symlink() or not path.resolve().is_relative_to(base) or not path.is_file():continue
         try:
             data=json.loads(path.read_text(encoding='utf-8'))
-            value=data.get('collected_at',data.get('at')) if isinstance(data,dict) else None
+            if path.parent==base/'radar/watchlist-preparation' and (not isinstance(data,dict) or data.get('owner')!='finance-watchlist-preparation-v1'):continue
+            value=data.get('collected_at',data.get('at',data.get('updated_at'))) if isinstance(data,dict) else None
             stamp=datetime.fromisoformat(value) if value else datetime.fromtimestamp(path.stat().st_mtime)
             if stamp.tzinfo is not None:
                 from datetime import timezone

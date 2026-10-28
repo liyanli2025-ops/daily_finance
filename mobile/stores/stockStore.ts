@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api } from '@/services/api';
+import { api, type StockPreparation } from '@/services/api';
 
 interface Stock {
   id: string;
@@ -12,6 +12,7 @@ interface Stock {
   latest_confidence?: number | null;
   added_at: string;
   last_updated?: string;
+  preparation?: StockPreparation | null;
 }
 
 interface SearchResult {
@@ -34,6 +35,8 @@ interface StockStore {
   removeFromWatchlist: (stockId: string) => Promise<boolean>;
   fetchStockDetail: (code: string, market: string) => Promise<void>;
   refreshWatchlist: () => Promise<void>;
+  refreshPreparation: () => Promise<boolean>;
+  prepareStock: (stockId: string) => Promise<void>;
 }
 
 export const useStockStore = create<StockStore>((set, get) => ({
@@ -117,6 +120,28 @@ export const useStockStore = create<StockStore>((set, get) => ({
       await get().fetchWatchlist();
     } catch (error) {
       console.error('刷新自选股失败:', error);
+    }
+  },
+
+  refreshPreparation: async () => {
+    try {
+      const updates = await api.getWatchlistPreparation();
+      set((state) => ({ watchlist: state.watchlist.map((stock) =>
+        updates[stock.id] ? { ...stock, preparation: updates[stock.id] } : stock) }));
+      return true;
+    } catch {
+      // Older backends may not have this route; stop polling on failure.
+      return false;
+    }
+  },
+
+  prepareStock: async (stockId: string) => {
+    try {
+      const preparation = await api.prepareWatchlistStock(stockId);
+      set((state) => ({ watchlist: state.watchlist.map((stock) =>
+        stock.id === stockId ? { ...stock, preparation } : stock) }));
+    } catch {
+      set({ error: '未能启动补采，自选股名单已保留' });
     }
   },
 }));

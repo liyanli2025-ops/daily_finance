@@ -5,6 +5,13 @@
 
 const BASE_URL = 'http://82.156.59.2/api';
 
+export interface StockPreparation {
+  status: string;
+  message: string;
+  updated_at?: string | null;
+  coverage?: Record<string, unknown>;
+}
+
 class ApiService {
   private baseUrl: string;
 
@@ -177,6 +184,14 @@ class ApiService {
    */
   async getWatchlist() {
     return this.request<any[]>('/stocks/watchlist');
+  }
+
+  async getWatchlistPreparation() {
+    return this.request<Record<string, StockPreparation>>('/stocks/watchlist/preparation');
+  }
+
+  async prepareWatchlistStock(stockId: string) {
+    return this.request<StockPreparation>(`/stocks/watchlist/${encodeURIComponent(stockId)}/prepare`, { method: 'POST' });
   }
 
   /**

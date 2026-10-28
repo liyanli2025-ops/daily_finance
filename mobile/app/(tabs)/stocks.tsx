@@ -19,6 +19,7 @@ import { router } from 'expo-router';
 import { useStockStore } from '@/stores/stockStore';
 import { api } from '@/services/api';
 import { useAppTheme } from '@/theme/ThemeContext';
+import { useIsFocused } from '@react-navigation/native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isIOSWeb = Platform.OS === 'web' && typeof navigator !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent);
@@ -50,7 +51,24 @@ export default function StocksScreen() {
     searchStocks,
     addToWatchlist,
     removeFromWatchlist,
+    refreshPreparation,
+    prepareStock,
   } = useStockStore();
+  const focused = useIsFocused();
+  const preparing = watchlist.some((stock) => ['queued', 'collecting'].includes(stock.preparation?.status ?? ''));
+  useEffect(() => {
+    if (!focused || !preparing) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let attempts = 0;
+    const poll = async () => {
+      if (cancelled) return;
+      const ok = await refreshPreparation();
+      if (!cancelled && ok && ++attempts < 30) timer = setTimeout(poll, 10000);
+    };
+    timer = setTimeout(poll, 3000);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [focused, preparing, refreshPreparation]);
 
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -176,12 +194,14 @@ export default function StocksScreen() {
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={styles.headerButton}
+              accessibilityLabel="搜索股票"
               onPress={() => setSearchVisible(true)}
             >
               <MaterialCommunityIcons name="magnify" size={22} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: colors.primary }]}
+              accessibilityLabel="添加自选股"
               onPress={() => setSearchVisible(true)}
             >
               <MaterialCommunityIcons name="plus" size={18} color="#fff" />
@@ -342,6 +362,19 @@ export default function StocksScreen() {
                     </View>
                   </View>
 
+                  {stock.preparation && (
+                    <View style={{ marginTop: 8 }}>
+                      <Text style={{ color: colors.onSurfaceVariant, fontSize: 12 }}>
+                        {stock.preparation.message}
+                      </Text>
+                      {!['complete', 'queued', 'collecting', 'paused'].includes(stock.preparation.status) && (
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel={`补采${stock.name}资料`}
+                          onPress={(event) => { event.stopPropagation(); void prepareStock(stock.id); }}>
+                          <Text style={{ color: colors.primary, fontSize: 12, marginTop: 6 }}>补采资料</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                   {/* AI 预测行 */}
                   <View style={[styles.predictionRow, { borderTopColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
                     <View style={styles.predictionInfo}>

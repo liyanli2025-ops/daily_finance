@@ -70,7 +70,8 @@ class ProductionResponseTests(unittest.IsolatedAsyncioTestCase):
         service._generating_lock = asyncio.Lock()
         service.is_trading_day = lambda _: True
         collector = SimpleNamespace(collect_all=AsyncMock(side_effect=RuntimeError("source failed")))
-        with patch("app.services.scheduler.get_news_collector", return_value=collector):
+        with patch("app.services.scheduler.get_news_collector", return_value=collector), \
+                patch('app.services.watchlist_repository.read_app_watchlist',AsyncMock(return_value=[])):
             with self.assertRaisesRegex(RuntimeError, "source failed"):
                 await service.generate_morning_report()
 

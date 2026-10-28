@@ -310,6 +310,8 @@ class SchedulerService:
                 
                 # 非交易日采集更长时间的新闻（整周）
                 hours = 168 if not is_trading else 24  # 非交易日采集7天，交易日采集24小时
+                from .watchlist_repository import read_app_watchlist,watchlist_signature,assert_watchlist_current
+                collection_revision=watchlist_signature(await read_app_watchlist())
                 
                 try:
                     all_news = await asyncio.wait_for(
@@ -353,6 +355,7 @@ class SchedulerService:
                     raise RuntimeError("新闻采集为空，本期停止生成；禁止用模拟新闻替代真实资料")
                 
                 # Step 2: AI 分析生成早报（带超时保护）
+                await assert_watchlist_current(collection_revision)
                 AI_REPORT_TIMEOUT = 900  # 15 分钟超时（含AI生成+审查修复，Claude长报告需要更久）
                 print(f"\n[Step 2] AI 分析生成{report_type_str}（超时 {AI_REPORT_TIMEOUT}s）...", flush=True)
                 analyzer = get_ai_analyzer(force_reinit=True)
@@ -366,7 +369,8 @@ class SchedulerService:
                             china_news if china_news else finance_news,
                             cross_border_news,
                             report_type=ReportType.MORNING,
-                            is_trading_day=is_trading
+                            is_trading_day=is_trading,
+                            expected_watchlist=collection_revision
                         ),
                         timeout=AI_REPORT_TIMEOUT
                     )
@@ -508,6 +512,8 @@ class SchedulerService:
             collector = get_news_collector()
             
             # 采集今天下午到现在的新闻
+            from .watchlist_repository import read_app_watchlist,watchlist_signature,assert_watchlist_current
+            collection_revision=watchlist_signature(await read_app_watchlist())
             try:
                 all_news = await asyncio.wait_for(
                     collector.collect_all(hours=8),
@@ -558,13 +564,15 @@ class SchedulerService:
             
             # 生成晚报（传入今日早报用于回顾对比）
             try:
+                await assert_watchlist_current(collection_revision)
                 report = await asyncio.wait_for(
                     analyzer.generate_daily_report(
                         china_news if china_news else finance_news,
                         cross_border_news,
                         report_type=ReportType.EVENING,
                         is_trading_day=True,
-                        morning_report=morning_report
+                        morning_report=morning_report,
+                        expected_watchlist=collection_revision
                     ),
                     timeout=AI_REPORT_TIMEOUT
                 )

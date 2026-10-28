@@ -166,6 +166,10 @@ async def complete(task, messages, max_tokens=4000):
     async with httpx.AsyncClient(timeout=settings.ai_timeout_seconds) as client:
         for attempt in range(2):
             ensure_models_enabled()
+            from .episode_workspace import current_workspace
+            from .watchlist_repository import assert_watchlist_current
+            revision=getattr(current_workspace(),'watchlist_signature',None)
+            if revision is not None:await assert_watchlist_current(revision)
             reserve_call()
             started=time.monotonic()
             try:

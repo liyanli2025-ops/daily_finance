@@ -77,7 +77,8 @@ class AIAnalyzerService:
         cross_border_news: List[News] = None,
         report_type: ReportType = ReportType.MORNING,
         is_trading_day: bool = True,
-        morning_report: Optional[Report] = None
+        morning_report: Optional[Report] = None,
+        expected_watchlist=None
     ) -> Report:
         """
         生成每日财经报告（支持早报/晚报/非交易日深度版）
@@ -115,6 +116,12 @@ class AIAnalyzerService:
         
         # 【新增】获取自选股配置
         await refresh_app_watchlist()
+        from .watchlist_repository import watchlist_signature,assert_watchlist_current,WatchlistChangedError
+        current_signature=watchlist_signature(get_watchlist_service().get_all_stocks())
+        if expected_watchlist is not None and current_signature!=expected_watchlist:
+            raise WatchlistChangedError('采集结束后自选股已改变，停止使用旧资料生成')
+        workspace=current_workspace()
+        if workspace is not None:workspace.watchlist_signature=current_signature
         watchlist_text = await asyncio.to_thread(self._prepare_watchlist_analysis)
         investment_style_desc = self._get_investment_style_description()
         
@@ -1037,7 +1044,18 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         raise RuntimeError("资料不足：只有报价和涨跌幅，不能生成投资评级、目标价或置信度；请参考有来源和条件说明的报告")
     
     async def _call_ai(self, prompt: str, max_tokens: int = 4000, task: str = "analysis") -> str:
-        return await complete(task, [{"role": "user", "content": prompt}], max_tokens)
+        from .watchlist_repository import assert_watchlist_current
+        workspace=current_workspace()
+        revision=getattr(workspace,'watchlist_signature',None)
+        if revision is not None:await assert_watchlist_current(revision)
+        response=await complete(task, [{"role": "user", "content": prompt}], max_tokens)
+        if revision is not None:
+            try:await assert_watchlist_current(revision)
+            except Exception:
+                from .report_diagnostics import save_generation_stage
+                save_generation_stage('watchlist_changed_response',response)
+                raise
+        return response
 
     def _prepare_news_summary(self, news_list: List[News]) -> str:
         """准备新闻摘要文本（旧版兼容）"""

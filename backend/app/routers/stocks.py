@@ -10,7 +10,7 @@ import uuid
 
 from ..models.stock import (
     Stock, StockCreate, StockPrediction, StockQuote, 
-    KlineData, MarketType, PredictionType
+    KlineData, MarketType, PredictionType, StockPreparation
 )
 from ..models.database import StockModel, StockPredictionModel
 from ..services.watchlist_service import get_watchlist_service, WatchlistStock
@@ -18,6 +18,10 @@ from ..services.market_data_service import get_market_data_service
 from ..config import settings
 
 router = APIRouter()
+
+
+def preparation_record(stock):
+    return dict(id=stock.id,code=stock.code,name=stock.name,market=stock.market)
 
 
 async def get_db(request: Request) -> AsyncSession:
@@ -48,6 +52,8 @@ async def get_watchlist(db: AsyncSession = Depends(get_db)):
     quotes = await asyncio.to_thread(fetch_watchlist_quotes, stocks)
 
     result_list = []
+    from ..services.watchlist_preparation import get_preparation_service
+    preparation=get_preparation_service()
     for s in stocks:
         quote = quotes.get(s.code)
         current_price = quote["price"] if quote and quote.get("price") is not None else s.current_price
@@ -63,7 +69,8 @@ async def get_watchlist(db: AsyncSession = Depends(get_db)):
             latest_prediction=None,  # Legacy ratings have no evidence verification.
             latest_confidence=None,
             added_at=s.added_at,
-            last_updated=datetime.fromisoformat(quote['as_of']) if quote else s.last_updated
+            last_updated=datetime.fromisoformat(quote['as_of']) if quote else s.last_updated,
+            preparation=preparation.status(preparation_record(s))
         ))
     
     return result_list
@@ -72,6 +79,7 @@ async def get_watchlist(db: AsyncSession = Depends(get_db)):
 @router.post("/watchlist", response_model=Stock)
 async def add_to_watchlist(
     stock_data: StockCreate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -97,6 +105,10 @@ async def add_to_watchlist(
     db.add(stock)
     await db.commit()
     await db.refresh(stock)
+    from ..services.watchlist_preparation import get_preparation_service
+    preparation=get_preparation_service();record=preparation_record(stock)
+    status,attempt=preparation.queue(record)
+    if attempt:background_tasks.add_task(preparation.run,record,attempt)
     
     return Stock(
         id=stock.id,
@@ -108,8 +120,28 @@ async def add_to_watchlist(
         latest_prediction=None,  # Legacy ratings have no evidence verification.
         latest_confidence=None,
         added_at=stock.added_at,
-        last_updated=stock.last_updated
+        last_updated=stock.last_updated,
+        preparation=status
     )
+
+
+@router.get('/watchlist/preparation',response_model=dict[str,StockPreparation])
+async def watchlist_preparation_status(db: AsyncSession=Depends(get_db)):
+    from ..services.watchlist_preparation import get_preparation_service
+    preparation=get_preparation_service()
+    stocks=(await db.execute(select(StockModel))).scalars().all()
+    return {stock.id:preparation.status(preparation_record(stock)) for stock in stocks}
+
+
+@router.post('/watchlist/{stock_id}/prepare',response_model=StockPreparation)
+async def prepare_watchlist_stock(stock_id: str,background_tasks: BackgroundTasks,db: AsyncSession=Depends(get_db)):
+    from ..services.watchlist_preparation import get_preparation_service
+    stock=(await db.execute(select(StockModel).where(StockModel.id==stock_id))).scalar_one_or_none()
+    if stock is None:raise HTTPException(status_code=404,detail='股票已不在自选列表')
+    preparation=get_preparation_service();record=preparation_record(stock)
+    status,attempt=preparation.queue(record)
+    if attempt:background_tasks.add_task(preparation.run,record,attempt)
+    return status
 
 
 @router.delete("/watchlist/{stock_id}")

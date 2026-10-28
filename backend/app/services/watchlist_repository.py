@@ -10,7 +10,7 @@ from ..models.database import StockModel, get_database_url
 from .watchlist_service import get_watchlist_service
 
 
-async def read_app_watchlist(database_url=None):
+async def read_app_watchlist(database_url=None,include_identity=False):
     url = database_url or settings.database_url
     parsed = make_url(url)
     if parsed.drivername.startswith("sqlite") and parsed.database != ":memory:":
@@ -19,9 +19,9 @@ async def read_app_watchlist(database_url=None):
     engine = create_async_engine(get_database_url(url))
     try:
         async with engine.connect() as connection:
-            result = await connection.execute(select(
-                StockModel.code, StockModel.name, StockModel.market
-            ).order_by(StockModel.market, StockModel.code))
+            fields=[StockModel.code,StockModel.name,StockModel.market]
+            if include_identity:fields.append(StockModel.id)
+            result = await connection.execute(select(*fields).order_by(StockModel.market, StockModel.code))
             rows = [dict(row) for row in result.mappings()]
         for row in rows:
             if row["market"] not in {"A", "HK"}:
@@ -43,3 +43,17 @@ async def refresh_app_watchlist():
     contexts = ResearchHub().load(service.get_all_stocks())
     service.apply_research_profiles({item['key']:item['profile'] for item in contexts if item.get('profile')})
     return service
+
+
+class WatchlistChangedError(RuntimeError):pass
+
+
+def watchlist_signature(rows):
+    def field(row,key):return row[key] if isinstance(row,dict) else getattr(row,key)
+    return tuple(sorted((str(getattr(field(row,'market'),'value',field(row,'market'))),
+        field(row,'code'),field(row,'name')) for row in rows))
+
+
+async def assert_watchlist_current(expected):
+    if watchlist_signature(await read_app_watchlist())!=expected:
+        raise WatchlistChangedError('自选股在本次采集或生成期间已改变；保留检查点，重新准备资料后再生成，不沿用旧名单')

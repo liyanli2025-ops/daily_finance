@@ -2,7 +2,7 @@
 股票数据模型
 """
 from datetime import datetime as dt, date as dt_date
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 from enum import Enum
 
@@ -135,6 +135,13 @@ class StockPrediction(BaseModel):
     generated_at: dt = Field(default_factory=dt.now, description="生成时间")
 
 
+class StockPreparation(BaseModel):
+    status: str
+    message: str
+    updated_at: Optional[dt] = None
+    coverage: Dict[str,Any] = Field(default_factory=dict)
+
+
 class Stock(StockBase):
     """完整股票模型（自选股）"""
     id: str = Field(..., description="记录ID")
@@ -150,6 +157,7 @@ class Stock(StockBase):
     # 元数据
     added_at: dt = Field(default_factory=dt.now, description="添加时间")
     last_updated: Optional[dt] = Field(default=None, description="最后更新时间")
+    preparation: Optional[StockPreparation] = None
     
     class Config:
         from_attributes = True

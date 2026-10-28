@@ -203,7 +203,12 @@ def episode_generation(func):
         if isinstance(cross,list):news+=cross
         workspace=EpisodeWorkspace(news);token=_current.set(workspace);success=False
         try:
-            result=await func(*args,**kwargs);success=result is not None
+            result=await func(*args,**kwargs)
+            revision=getattr(workspace,'watchlist_signature',None)
+            if result is not None and revision is not None:
+                from .watchlist_repository import assert_watchlist_current
+                await assert_watchlist_current(revision)
+            success=result is not None
             return result
         finally:
             try:workspace.finish(success)
