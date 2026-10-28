@@ -7,6 +7,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
@@ -15,6 +16,12 @@ from ..config import settings
 
 log = logging.getLogger(__name__)
 TASKS = {"analysis", "review", "extraction", "podcast"}
+MODEL_PAUSE_FILE=Path(__file__).resolve().parents[2]/'data'/'.automation-paused'
+
+
+def ensure_models_enabled():
+    if MODEL_PAUSE_FILE.exists():
+        raise RuntimeError('维护暂停：全部模型请求已阻止，等待用户明确恢复')
 
 
 def service_error(task, response):
@@ -148,6 +155,7 @@ def completed_text(route, data):
 
 
 async def complete(task, messages, max_tokens=4000):
+    ensure_models_enabled()
     from .model_usage import reserve_call, record_usage
     from .prompt_reading import validate_input
     request_characters=validate_input(messages)
@@ -157,6 +165,7 @@ async def complete(task, messages, max_tokens=4000):
     log.info("model_task=%s provider=%s model=%s effort=%s", task, route.provider, route.model, route.effort)
     async with httpx.AsyncClient(timeout=settings.ai_timeout_seconds) as client:
         for attempt in range(2):
+            ensure_models_enabled()
             reserve_call()
             started=time.monotonic()
             try:

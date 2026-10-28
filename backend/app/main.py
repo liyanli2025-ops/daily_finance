@@ -29,6 +29,10 @@ db_engine = None
 scheduler_service = None
 
 
+def automation_paused():
+    return (Path(__file__).resolve().parents[1]/'data'/'.automation-paused').exists()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
@@ -47,9 +51,12 @@ async def lifespan(app: FastAPI):
     scheduler_service = SchedulerService()
     # 关键：传入数据库连接，否则报告无法保存
     scheduler_service.set_db(db_engine, app.state.session_maker)
-    await scheduler_service.start()
+    if automation_paused():
+        print('[维护暂停] 财经自动采集和定时生成未启动')
+    else:
+        await scheduler_service.start()
     app.state.scheduler = scheduler_service
-    print("[OK] 定时调度器启动完成")
+    print('[OK] 定时调度器状态：'+('运行' if scheduler_service.is_running else '已暂停'))
     
     # 确保静态文件目录存在
     settings.podcasts_dir.mkdir(parents=True, exist_ok=True)
@@ -127,7 +134,8 @@ async def health_check():
     return {
         "status": "healthy",
         "database": "connected" if db_engine else "disconnected",
-        "scheduler": "running" if scheduler_service and scheduler_service.is_running else "stopped"
+        "scheduler": "running" if scheduler_service and scheduler_service.is_running else "stopped",
+        "automation_paused": automation_paused()
     }
 
 
