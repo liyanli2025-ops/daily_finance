@@ -47,3 +47,5 @@ cd /var/www/finance-daily/backend && sudo ./venv/bin/python -m app.review_check 
 修复方式：对SHA256为fea5019be7f81a2361381c4b3fd43e2516d05ad34f234a8f64a4fee31a5a93d1的已上传原ZIP生成新的暂存副本，仅从payload和manifest同时排除backend/tests/，留下9个运行/文档文件。运行文件的old_sha256/new_sha256、安装器及settings原样保留；原ZIP和服务器测试均不修改。tools/prepare_editorial_runtime.py可重复生成这个副本，不需要网络或模型。
 
 两项准备工具测试通过；用真实发布ZIP离线演练了校验、应用和重复应用，模拟服务器测试文件为未知旧版本，确认测试、生产配置、App数据库与其他项目保留。服务器实际安装仍需用户执行，未据此宣布上线成功。未来生产包不应为升级运行逻辑而覆盖服务器测试；测试应在匹配源码的开发/CI环境运行。
+
+服务器后续确认：9文件运行副本校验与安装成功，私有备份`/var/backups/finance-daily/20261028T070014691063Z`，服务和数据库健康检查通过。上述运行逻辑已部署，测试文件保留；真实模型的语义质量及音频仍未验收，禁止以安装成功替代这些验收。用户继续要求调试阶段不调用付费模型。
