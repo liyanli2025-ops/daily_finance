@@ -159,12 +159,14 @@ class AIAnalyzerService:
         market_data_text += "\n\n" + watchlist_text
         from .technical_radar import prompt as technical_prompt
         market_data_text += '\n\n' + technical_prompt(get_watchlist_service().get_all_stocks())
+        from .prompt_reading import compact_market
+        market_data_text = compact_market(market_data_text)
         # 准备新闻摘要
         finance_summary = self._prepare_news_summary_with_sentiment(news_list)
         from .event_observations import EventObservations
         finance_summary += '\n\n' + EventObservations().context(self._selected_evidence_news)
         from .research_hub import ResearchHub
-        research_text, self._research_evidence = ResearchHub().prompt(get_watchlist_service().get_all_stocks(),max_characters=14000)
+        research_text, self._research_evidence = ResearchHub().prompt(get_watchlist_service().get_all_stocks(),max_characters=8000)
         workspace=current_workspace()
         workspace.add(self._research_evidence)
         workspace.add(ResearchHub().evidence_pool(get_watchlist_service().get_all_stocks()))

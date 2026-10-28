@@ -9,7 +9,7 @@ from .selection_check import inspect,candidates
 from .services.ai_analyzer import AIAnalyzerService
 from .services.episode_research import INSTRUCTIONS,questions
 from .services.event_observations import EventObservations
-from .services.prompt_reading import input_characters
+from .services.prompt_reading import input_characters,compact_market
 from .services.research_hub import ResearchHub
 from .services.technical_radar import ROOT
 from .services.watchlist_service import get_watchlist_service
@@ -25,9 +25,10 @@ async def check(case_path,root=None):
     ids={row['id'] for row in replay['selection']['articles'] if row.get('selected')}
     news=[row for row in candidates(snapshot) if row.id in ids]
     stocks=get_watchlist_service().get_all_stocks()
-    research,_=ResearchHub().prompt(stocks,max_characters=14000)
+    research,_=ResearchHub().prompt(stocks,max_characters=8000)
     finance=replay['news_input']+'\n\n'+EventObservations().context(news)+'\n\n'+research
-    market=case.get('market_evidence','')
+    old_market=case.get('market_evidence','')
+    market=compact_market(old_market)
     analyzer=AIAnalyzerService.__new__(AIAnalyzerService)
     analyzer._generation_context=case.get('generation_context','')
     analyzer._edition_label='历史即时更新回放（非当前实时）'
@@ -41,8 +42,9 @@ async def check(case_path,root=None):
     return dict(mode='历史快照成本回放，无行情刷新、LLM、TTS或App写入；单独更新selection-replay诊断',
         snapshot_collected_at=snapshot['collected_at'],case_file=Path(case_path).name,
         old_finance_characters=len(case.get('finance_evidence','')),new_finance_characters=len(finance),
-        reused_old_market_characters=len(market),initial_articles=len(news),
+        reused_old_market_characters=len(old_market),new_market_characters=len(market),initial_articles=len(news),
         request_characters=sizes,per_request_character_guard=100000,
+        headroom_characters={task:100000-size for task,size in sizes.items()},
         would_stop_before_http={task:size>100000 for task,size in sizes.items()},
         limitation='这是固定旧市场文本的字符预检，不是token计价或真实模型验收。正式请求还会加入本期时点、取材回复等，网关逐次重新检查；全文仍保留在工作集。')
 
