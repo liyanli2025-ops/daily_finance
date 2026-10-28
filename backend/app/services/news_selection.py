@@ -6,9 +6,15 @@ from datetime import timedelta, timezone
 def industry_terms(text, terms):
     """Lexical leads only; ambiguous utility words need hydropower context."""
     clean = re.sub(r'自来水|水电(?:费|气|煤|工|维修|安装)', '', text)
-    hydro_context = re.search(r'水力发电|水电站|水电发电|水电电价|流域|水库|水情|汛期|蓄水|水电企业|水电公司', clean)
-    return [term for term in terms if len(term) >= 2 and term in clean
-            and (term not in {'水电', '来水'} or hydro_context)]
+    # A mine/factory purchasing electricity from a plant is not a report about
+    # a hydropower producer's operations. Mask only the consumer-side clause
+    # for hydro matching; keep the full article and other industry vocabulary.
+    hydro_text = re.sub(r'(?:除了)?(?:与|同|向|从)[^。！？；;\n]{0,70}?水电站'
+                        r'[^。！？；;\n]{0,70}?(?:购电|购买电力|供电|电力购买)[^。！？；;\n]*', '', clean)
+    hydro_context = re.search(r'水力发电|水电站|水电发电|水电电价|流域|水库|水情|汛期|蓄水|水电企业|水电公司', hydro_text)
+    hydro_terms={'水电','来水','水电站','水电发电量','水电电价','水力发电'}
+    return [term for term in terms if len(term) >= 2 and
+            (term in hydro_text and hydro_context if term in hydro_terms else term in clean)]
 
 
 def matches_watchlist(item, stocks):

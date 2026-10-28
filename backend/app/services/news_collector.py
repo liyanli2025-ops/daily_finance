@@ -707,9 +707,10 @@ class NewsCollectorService:
             self._radar_coverage['overseas']=overseas_status
         self._radar_coverage['total_originals']=len(items)
         source_rows=list(self._radar_coverage.get('sources',{}).values())
-        incomplete=any(row.get('status') in {'failed','partial'} for row in source_rows) or isinstance(media,Exception)
+        incomplete=any(row.get('status') in {'failed','partial','paused'} for row in source_rows) or isinstance(media,Exception)
         self._radar_coverage['status']='partial' if incomplete and items else 'failed' if incomplete else 'ok' if items else 'no_material'
-        summary={name:dict(status=row.get('status'),read=row.get('read'),errors=len(row.get('errors',[])))
+        summary={name:dict(status=row.get('status'),read=row.get('read'),errors=len(row.get('errors',[])),
+                          paused_routes=len(row.get('paused_routes',[])))
             for name,row in self._radar_coverage.get('sources',{}).items()}
         print(f'[媒体原文] 合计={len(items)}；逐源摘要={summary}；完整候选与错误保存在验收快照',flush=True)
         return sorted(items,key=lambda item:(item.importance_score,item.published_at),reverse=True)

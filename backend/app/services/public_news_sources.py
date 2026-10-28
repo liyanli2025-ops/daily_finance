@@ -199,11 +199,12 @@ class PublicNewsCollector:
             lambda:parse_article(provider,self.get(provider,url,deadline),url))
 
     def collect(self,stocks,profiles,hours=72,budget=50,providers=None):
+        from .source_health import RetiredSourceError
         names=list(providers if providers is not None else SOURCES)
         now=china_now();cutoff=now-timedelta(hours=hours);deadline=time.monotonic()+budget
         terms={stock.code:topic_terms(profiles.get(str(getattr(stock.market,'value',stock.market))+':'+stock.code,{})) for stock in stocks}
         statuses={key:dict(index=SOURCES[key]['index'],candidates=0,attempted=0,read=0,
-            excluded_old_or_future=0,errors=[],complete_window=False) for key in names}
+            excluded_old_or_future=0,errors=[],paused_routes=[],complete_window=False) for key in names}
         queues={key:[] for key in names};articles=[]
         with ThreadPoolExecutor(max_workers=4) as pool:
             pending={pool.submit(self.index,key,deadline):key for key in names}
@@ -212,6 +213,8 @@ class PublicNewsCollector:
                 try:
                     queues[key]=discover(key,future.result(),stocks,terms)
                     statuses[key]['candidates']=len(queues[key])
+                except RetiredSourceError:
+                    statuses[key]['paused_routes'].append(dict(stage='index',reason='source_paused_no_automatic_retest'))
                 except Exception as error:statuses[key]['errors'].append(dict(stage='index',error=type(error).__name__))
         # One request in flight per provider, round robin across providers.
         with ThreadPoolExecutor(max_workers=4) as pool:
@@ -250,6 +253,8 @@ class PublicNewsCollector:
                         market_impact='；'.join(labels),category='公司报道' if direct else '行业报道' if industry else '全市场事件',
                         is_china_related=True))
                     statuses[key]['read']+=1
+                except RetiredSourceError:
+                    statuses[key]['paused_routes'].append(dict(stage='article',url=candidate['url'],reason='source_paused_no_automatic_retest'))
                 except Exception as error:
                     reason=str(error)
                     statuses[key]['errors'].append(dict(url=candidate['url'],error=type(error).__name__,
@@ -257,7 +262,8 @@ class PublicNewsCollector:
                 finally:fill()
         for key,state in statuses.items():
             state['not_attempted']=len(queues[key])
-            state['status']='partial' if state['errors'] or queues[key] else 'ok' if state['read'] else 'no_recent_material'
+            state['status']='partial' if state['errors'] or queues[key] or state['paused_routes'] else 'ok' if state['read'] else 'no_recent_material'
             if not state['read'] and state['errors']:state['status']='failed'
+            elif not state['read'] and not queues[key] and state['paused_routes']:state['status']='paused'
         return articles,dict(sources=statuses,window_hours=hours,seconds=budget,read=len(articles),
             limit=None,complete_window=False,limitation='直连列明公开入口；仅扫描首页/当前列表，非72小时全量或全网。正文各有原日期与转载归属；多家报道不等于独立事件。无模型/付费搜索/会员请求。')

@@ -103,6 +103,8 @@ def associations(item,stocks,profiles):
             from .news_selection import industry_terms
             if industry_terms(text,('来水','水电发电量','水电电价','水电站')):
                 level='business_overlap';reason='涉及水电经营变量；流域、交易电价及公司敞口仍需核验'
+            else:
+                reason='旧行业标签仅词匹配；其他项目向水电站购电等背景不构成水电经营变化或公司关联'
         result.append(dict(stock=key,level=level,reason=reason))
     return result
 

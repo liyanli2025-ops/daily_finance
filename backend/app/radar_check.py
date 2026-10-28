@@ -38,6 +38,8 @@ def summarize_saved(root=None):
         media={name:coverage.get(name) for name in ('article_candidates','article_read','detail_budget','per_stock')},
         source_errors={name:dict(status=row.get('status'),read=row.get('read'),errors=row.get('errors',[])[:2])
             for name,row in coverage.get('sources',{}).items()},
+        source_pauses={name:dict(count=len(row.get('paused_routes',[])),details=row.get('paused_routes',[])[:2])
+            for name,row in coverage.get('sources',{}).items() if row.get('paused_routes')},
         selected_count=len(selected),selected_titles=[row['title'] for row in selected],
         selected_reading_scope=selection.get('selected_reading_scope'),
         selected_editorial_counts=selection.get('selected_editorial_counts'),

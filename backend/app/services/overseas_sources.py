@@ -178,10 +178,11 @@ class OverseasCollector:
         return cached(self.hub,'overseas:article:v1:'+url,3600,lambda:parse_article(key,self.get(key,url,deadline),url))
 
     def collect(self,hours=72,budget=40,providers=None):
+        from .source_health import RetiredSourceError
         names=list(providers if providers is not None else SOURCES);now=china_now();cutoff=now-timedelta(hours=hours)
         deadline=time.monotonic()+budget;queues={key:[] for key in names}
         states={key:dict(index=SOURCES[key]['index'],candidates=0,attempted=0,read=0,
-            outside_window=0,date_boundary_uncertain=0,errors=[],complete_window=False) for key in names}
+            outside_window=0,date_boundary_uncertain=0,errors=[],paused_routes=[],complete_window=False) for key in names}
         with ThreadPoolExecutor(max_workers=4) as pool:
             pending={pool.submit(self.index,key,deadline):key for key in names}
             for future in as_completed(pending):
@@ -200,6 +201,8 @@ class OverseasCollector:
                             end=(day+timedelta(days=1)).astimezone(CST).replace(tzinfo=None)
                             if end<cutoff or start>now:states[key]['outside_window']+=1;continue
                         queues[key].append(row)
+                except RetiredSourceError as error:
+                    states[key]['paused_routes'].append(dict(stage='index',reason=self.failure_detail('overseas:index:v1:'+key,error)))
                 except Exception as error:states[key]['errors'].append(dict(stage='index',error=type(error).__name__,
                     reason=self.failure_detail('overseas:index:v1:'+key,error)))
         articles=[]
@@ -230,13 +233,17 @@ class OverseasCollector:
                             +'原始来源时点：'+row['original_time']+'；精度：'+row['precision']+'；存储时间为北京时间。'
                             +'正文为原语言公开主体，未调用模型翻译；报道及官方声明均不等于独立证实。'))
                     states[key]['read']+=1
+                except RetiredSourceError as error:
+                    states[key]['paused_routes'].append(dict(stage='article',url=candidate['url'],
+                        reason=self.failure_detail('overseas:article:v1:'+candidate['url'],error)))
                 except Exception as error:
                     states[key]['errors'].append(dict(url=candidate['url'],error=type(error).__name__,
                         reason=self.failure_detail('overseas:article:v1:'+candidate['url'],error)))
                 finally:fill()
         for key,state in states.items():
             state['not_attempted']=len(queues[key])
-            state['status']='partial' if state['errors'] or queues[key] else 'ok' if state['read'] else 'no_recent_material'
+            state['status']='partial' if state['errors'] or queues[key] or state['paused_routes'] else 'ok' if state['read'] else 'no_recent_material'
             if not state['read'] and state['errors']:state['status']='failed'
+            elif not state['read'] and not queues[key] and state['paused_routes']:state['status']='paused'
         return articles,dict(sources=states,read=len(articles),window_hours=hours,seconds=budget,complete_window=False,
             limitation='仅列明已验证公开正文的海外入口；不含彭博/WSJ/路透直连或CNBC付费预览。有限列表不代表全量；日精度跨窗口边界时不冒充72小时内发布，原文事件日与发布时间分开。')
