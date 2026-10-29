@@ -1,0 +1,34 @@
+{
+  "title": "海外利率与AI融资：谨慎评估科技反弹持续性",
+  "summary": "历史截面下，科技指数已有反弹但结构偏弱；海外政策与部分AI债券报道增加风险关注，尚不足以判断实际融资成本、AI需求或市场主导原因。未来数日持续走强会削弱短线偏谨慎判断，中期趋势另行观察。",
+  "core_opinions": [
+    "偏谨慎评估未来数日反弹持续性，不断言必跌或已经反转。",
+    "部分债券价格压力提示潜在融资渠道，不能直接证明实际成本上升或需求下修。",
+    "消息后持续走强可削弱短线判断，不能据此识别市场主导原因；趋势确认与短线反弹分开。"
+  ],
+  "decision_notes": [
+    {
+      "claim": "未来数日对科技反弹持续性偏谨慎",
+      "horizon": "未来数个交易日",
+      "price_structure": "此前两科技指数反弹但仍低于20日和60日均线",
+      "possible_drivers": "利率与信用环境可能影响估值和融资可得性，未识别本次行情主导因素",
+      "main_alternative": "风险已有部分预期或其他因素抵消，反弹继续",
+      "watch": "消息之后恒生科技、科创50能否持续修复",
+      "invalidation": "未来数个交易日两指数持续走强",
+      "why_invalidation_matters": "削弱对短线反弹持续性的担忧，不说明市场主导因素；中期趋势另看高低点",
+      "support_ids": [
+        "overseas-a0c3e1be77e8b5a27f797ac2",
+        "media-4c1a6c01d2672d5d10bad344",
+        "media-b4afd4dd5dded7eac0f39dc0"
+      ],
+      "counterevidence_ids": []
+    }
+  ],
+  "status": "human_edited_historical_input_only",
+  "not_validated": [
+    "autonomous_analysis",
+    "live_facts",
+    "audio",
+    "investment_outcome"
+  ]
+}
