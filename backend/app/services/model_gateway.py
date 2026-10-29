@@ -164,7 +164,8 @@ async def complete(task, messages, max_tokens=4000):
     # Report only metadata, never prompts, keys, raw errors, or reasoning content.
     log.info("model_task=%s provider=%s model=%s effort=%s", task, route.provider, route.model, route.effort)
     async with httpx.AsyncClient(timeout=settings.ai_timeout_seconds) as client:
-        for attempt in range(2):
+        retries=settings.model_http_retries
+        for attempt in range(retries+1):
             ensure_models_enabled()
             from .episode_workspace import current_workspace
             from .watchlist_repository import assert_watchlist_current
@@ -176,23 +177,35 @@ async def complete(task, messages, max_tokens=4000):
                 response = await client.post(url, headers=headers, json=body)
             except httpx.TransportError as error:
                 record_usage(task,route,body['max_tokens'],error=error,elapsed=time.monotonic()-started,request_characters=request_characters)
-                if attempt == 0:
+                if attempt < retries:
                     await asyncio.sleep(1)
                     continue
                 raise RuntimeError(f"{task}模型网络请求失败") from None
             record_usage(task,route,body['max_tokens'],response=response,elapsed=time.monotonic()-started,request_characters=request_characters)
             if response.status_code == 429 or response.status_code >= 500:
-                if attempt == 0:
+                if attempt < retries:
                     await asyncio.sleep(1)
                     continue
             if response.is_error:
                 raise service_error(task, response)
             try:
-                return completed_text(route, response.json())
+                payload=response.json()
+                return completed_text(route, payload)
             except IncompleteOutputError as error:
-                # Discard the partial review. Retry the complete request only for
-                # an explicit token limit, with one bounded increase in budget.
-                if (task == "review" and attempt == 0
+                # Preserve visible partial text without provider thinking, credentials,
+                # or error bodies. Never treat it as a completed report.
+                from .report_diagnostics import save_generation_stage
+                if route.provider in {'anthropic','ofox_anthropic'}:
+                    visible='\n'.join(block['text'] for block in payload.get('content',[])
+                        if isinstance(block,dict) and block.get('type')=='text' and isinstance(block.get('text'),str))
+                else:
+                    choices=payload.get('choices') or []
+                    message=choices[0].get('message',{}) if choices else {}
+                    visible=message.get('content','') if isinstance(message,dict) else ''
+                save_generation_stage('incomplete_response',visible if isinstance(visible,str) and visible.strip() else '[未返回可见正文]',
+                    context=dict(task=task,model=route.model,stop_reason=error.reason,max_tokens=body['max_tokens'],publishable=False))
+                # Optional configured retry only; never raise the default budget silently.
+                if (task == "review" and attempt < retries
                         and error.reason in {"max_tokens", "length"}
                         and body["max_tokens"] < 8000):
                     body["max_tokens"] = min(8000, body["max_tokens"] * 2)

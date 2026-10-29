@@ -19,6 +19,8 @@ import feedparser
 
 class ReviewTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.repair_config=patch("app.services.ai_analyzer.settings.report_auto_repair_enabled",True)
+        self.repair_config.start();self.addCleanup(self.repair_config.stop)
         self.service = AIAnalyzerService.__new__(AIAnalyzerService)
         self.report = SimpleNamespace(content="完整事实及限制条件")
 

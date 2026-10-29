@@ -36,7 +36,7 @@ def mark_spoken_case(path,status,error=None):
 
 def save_generation_stage(stage,response,directory=None,*,context=None):
     """Checkpoint completed text before parsing or another paid call; no headers/reasoning."""
-    if stage not in {'draft_response','repair_response','review_response','spoken_review_response','spoken_response','watchlist_changed_response'} or not isinstance(response,str) or not response.strip():
+    if stage not in {'incomplete_response','draft_response','repair_response','review_response','spoken_review_response','spoken_response','watchlist_changed_response'} or not isinstance(response,str) or not response.strip():
         raise ValueError('invalid_generation_checkpoint')
     from .research_hub import save_json
     from .time_context import china_now

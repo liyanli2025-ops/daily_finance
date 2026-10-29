@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     ai_model: Optional[str] = Field(default=None, description="兼容旧配置的明确模型名；不再默认过期模型")
     ai_timeout_seconds: int = Field(default=300, ge=10, le=900)
     model_max_calls_per_report: int = Field(default=8, ge=1, le=12, description='整期模型HTTP请求上限，含网络重试与审查修复；不是金额上限')
+    model_http_retries: int = Field(default=0, ge=0, le=1, description='默认不自动重复付费HTTP请求；显式设置1才允许一次重试')
+    report_auto_repair_enabled: bool = Field(default=False, description='默认保留审查失败稿待编辑，不自动整篇付费重写')
 
     # 备用 AI 服务（主服务挂了自动切换，强烈推荐配置！）
     # 例如：主用 DeepSeek，备用硅基流动

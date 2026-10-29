@@ -64,7 +64,7 @@ class MaintenanceTests(unittest.IsolatedAsyncioTestCase):
             client.post.side_effect=post
             with patch.object(gateway,'MODEL_PAUSE_FILE',flag),patch.object(gateway,'resolve_route',return_value=SimpleNamespace(provider='fixture',model='fixture',effort='none')), \
                     patch.object(gateway,'request_for',return_value=('https://fixture.invalid',{},dict(max_tokens=100))), \
-                    patch.object(gateway.httpx,'AsyncClient',return_value=client),patch.object(gateway.asyncio,'sleep',AsyncMock()), \
+                    patch.object(gateway.httpx,'AsyncClient',return_value=client),patch.object(gateway.asyncio,'sleep',AsyncMock()), patch.object(gateway.settings,'model_http_retries',1), \
                     patch('app.services.model_usage.reserve_call') as reserve,patch('app.services.model_usage.record_usage'):
                 with self.assertRaisesRegex(RuntimeError,'维护暂停'):await gateway.complete('review',[])
             client.post.assert_awaited_once();self.assertEqual(reserve.call_count,1)

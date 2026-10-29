@@ -23,11 +23,11 @@ class ProductionResponseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body["thinking"], {"type": "adaptive"})
         self.assertEqual(body["output_config"], {"effort": "high"})
 
-    async def run_review(self, reasons):
+    async def run_review(self, reasons, retries=1):
         calls = []
         config = Settings(_env_file=None, openai_api_key="test-not-real",
                           openai_base_url="https://api.ofox.io/v1",
-                          ai_model="anthropic/claude-sonnet-5.5")
+                          ai_model="anthropic/claude-sonnet-5.5",model_http_retries=retries)
         reasons = iter(reasons)
 
         def respond(request):

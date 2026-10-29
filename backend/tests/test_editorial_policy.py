@@ -42,7 +42,7 @@ class EditorialGatesTests(unittest.IsolatedAsyncioTestCase):
              'check_kind':'reasoning','report_quote':'经营改善'}]})
         analyzer._call_ai = AsyncMock(return_value=rejected)
         analyzer._ai_fix_report = AsyncMock(return_value=report)
-        with patch('app.services.ai_analyzer.save_review_case'):
+        with patch('app.services.ai_analyzer.save_review_case'), patch('app.services.ai_analyzer.settings.report_auto_repair_enabled',True):
             with self.assertRaisesRegex(RuntimeError, '复核'):
                 await analyzer._review_and_fix_report(report, '', '', '原始材料', '', ReportType.MORNING)
         # A high numerical editing score must not overrule unresolved issues.

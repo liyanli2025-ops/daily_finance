@@ -163,7 +163,7 @@ class RevisionTests(unittest.IsolatedAsyncioTestCase):
         import httpx
         from app.services import model_gateway as gateway
         from app.config import Settings
-        config=Settings(_env_file=None,openai_api_key='test',openai_base_url='https://api.ofox.io/v1',ai_model='anthropic/claude-sonnet-5.5')
+        config=Settings(_env_file=None,model_http_retries=1,openai_api_key='test',openai_base_url='https://api.ofox.io/v1',ai_model='anthropic/claude-sonnet-5.5')
         calls=[]
         def respond(request):calls.append(request);return httpx.Response(503,json={'error':{'message':'temporary'}})
         original=httpx.AsyncClient

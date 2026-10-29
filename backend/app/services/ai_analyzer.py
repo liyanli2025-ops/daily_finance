@@ -712,6 +712,9 @@ App当前自选股与行情快照：
         )
         
         if needs_ai_fix:
+            if not settings.report_auto_repair_enabled:
+                raise ReviewNeedsHuman('报告需修正，已保存稿件与问题；自动付费重写未启用，停止发布',reason='paid_repair_not_enabled')
+            # Explicitly enabled path still requires a second review and call budget.
             # AI 完整修复
             print(f"[AI] 🔧 第二步：问题较多/严重，启动 AI 深度修复...", flush=True)
             report = await self._ai_fix_report(
