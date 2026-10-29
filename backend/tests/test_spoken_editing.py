@@ -1,3 +1,4 @@
+from spoken_fixtures import reply
 from datetime import date,datetime,timedelta
 import json
 from pathlib import Path
@@ -86,19 +87,19 @@ class SpokenCheckpointTests(unittest.IsolatedAsyncioTestCase):
         from app.models.report import ReportType
         generator=PodcastGeneratorService.__new__(PodcastGeneratorService);generator.ai_client=True
         raw='未来1—3日，如果指标≤30，观察反弹（市场处于过渡区间，不代表已经反转）。[SECTION_BREAK]如果回落，原判断失效。'
-        generator._call_ai_for_podcast=AsyncMock(return_value=raw)
+        generator._call_ai_for_podcast=AsyncMock(return_value=reply(raw,'事实与条件'))
         generator._verify_podcast_script=AsyncMock()
         generator._generate_tts_edge_with_fallback=AsyncMock(return_value=True)
         report=SimpleNamespace(content='事实与条件',title='测试',id='id',summary='',core_opinions=[])
         with tempfile.TemporaryDirectory() as folder:
-            def save(report,raw,script,load):return save_spoken_case(report,raw,script,load,folder)
+            def save(report,raw,script,load,**kwargs):return save_spoken_case(report,raw,script,load,folder,**kwargs)
             with patch('app.services.report_diagnostics.save_spoken_case',side_effect=save):
                 script=await generator._generate_ai_podcast_script(report,'',date(2026,10,28),ReportType.MORNING,False)
             # A concise script is valid input for review; there is no 200-character floor.
             self.assertLess(len(script),200)
             generator._verify_podcast_script.assert_awaited_once_with(script,report)
             case=json.loads(next(Path(folder).glob('spoken-*.json')).read_text(encoding='utf-8'))
-            self.assertEqual(case['script'],script);self.assertEqual(case['raw_script'],raw)
+            self.assertEqual(case['script'],script);self.assertEqual(case['raw_script'],reply(raw,report.content))
             import hashlib
             self.assertEqual(case['script_sha256'],hashlib.sha256(script.encode('utf-8')).hexdigest())
             with patch('edge_tts.Communicate',side_effect=AssertionError('no TTS network')):
@@ -128,10 +129,10 @@ class SpokenCheckpointTests(unittest.IsolatedAsyncioTestCase):
     async def test_failed_model_review_keeps_paid_script_and_recovery_needs_no_model(self):
         report=SimpleNamespace(content='事实与条件',title='报告',id='report-id',summary='',core_opinions=[])
         generator=PodcastGeneratorService.__new__(PodcastGeneratorService);generator.ai_client=True
-        generator._call_ai_for_podcast=AsyncMock(return_value='（仅作历史背景，不能认定当日催化）事实解释和反证。'*15)
+        generator._call_ai_for_podcast=AsyncMock(return_value=reply('（仅作历史背景，不能认定当日催化）事实解释和反证。'*15,report.content))
         generator._verify_podcast_script=AsyncMock(side_effect=RuntimeError('review failed'))
         with tempfile.TemporaryDirectory() as folder:
-            def save(report,raw,script,load):return save_spoken_case(report,raw,script,load,folder)
+            def save(report,raw,script,load,**kwargs):return save_spoken_case(report,raw,script,load,folder,**kwargs)
             with patch('app.services.report_diagnostics.save_spoken_case',side_effect=save),patch('requests.get',side_effect=AssertionError('no network')):
                 with self.assertRaisesRegex(RuntimeError,'review failed'):
                     await generator._generate_ai_podcast_script(report,'',date(2026,10,28),__import__('app.models.report',fromlist=['ReportType']).ReportType.MORNING,False)
@@ -145,7 +146,7 @@ class SpokenCheckpointTests(unittest.IsolatedAsyncioTestCase):
     async def test_checkpoint_failure_stops_before_another_paid_review(self):
         report=SimpleNamespace(content='事实',title='报告')
         generator=PodcastGeneratorService.__new__(PodcastGeneratorService);generator.ai_client=True
-        generator._call_ai_for_podcast=AsyncMock(return_value='已有事实与条件。'*40)
+        generator._call_ai_for_podcast=AsyncMock(return_value=reply('已有事实与条件。'*40,report.content))
         generator._verify_podcast_script=AsyncMock()
         from app.models.report import ReportType
         with patch('app.services.report_diagnostics.save_spoken_case',side_effect=RuntimeError('disk failure')):

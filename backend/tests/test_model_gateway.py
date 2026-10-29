@@ -1,3 +1,4 @@
+from spoken_fixtures import reply
 import json
 import tempfile
 import unittest
@@ -163,7 +164,7 @@ class AppDatabaseTests(unittest.IsolatedAsyncioTestCase):
                 responses = iter([
                     body + "\n```json\n" + json.dumps(metadata, ensure_ascii=False) + "\n```",
                     '{"overall_quality":8,"issues":[]}',
-                    ("本段只验证既有报告到口播的代码流程，保留事实边界与限制条件，不是真实财经内容。" * 7),
+                    reply("本段只验证既有报告到口播的代码流程，保留事实边界与限制条件，不是真实财经内容。" * 7, body),
                     '{"passed":true,"issues":[]}',
                 ])
                 requests = []

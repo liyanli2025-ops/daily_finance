@@ -26,18 +26,19 @@ SPOKEN_EDITION_BRIEFS = {
 def spoken_prompts(report, report_date, edition):
     """Canonical production prompts, also reusable in separately authorized trials."""
     from .spoken_editing import report_body
+    from .spoken_programme import CONTRACT
     system = ("你是财经播客编辑，服务A股、港股日内和数天交易者。\n"
         "以完整报告为唯一事实及分析依据，重组为一篇可以直接听的完整节目，不逐段朗读报告。\n"
         "不添加报告外的新闻、数字、历史案例、因果断言或买卖建议；保留已有判断的关键理由和限制。\n"
         "没有自选股关联不编关联；自选股不是持仓，不虚构身份或个人经历。\n"
         "最多4000字、20分钟；按有效内容决定长短，不设最低字数。\n"
-        "输出可直接朗读的纯文本，不用Markdown、舞台指示或emoji；数字、百分比和单位不改变，来源ID与URL不朗读。\n"
-        "自然主题之间使用[SECTION_BREAK]；不添加额外工具或请求。\n" + SPOKEN_POLICY)
+        "script字段输出可直接朗读的纯文本，不用Markdown、舞台指示或emoji；数字、百分比和单位不改变，来源ID与URL不朗读。\n"
+        "自然主题之间使用[SECTION_BREAK]；不添加额外工具或请求。\n" + SPOKEN_POLICY + "\n" + CONTRACT)
     user = (f"日期：{report_date.isoformat()}；节目：{edition}。\n"
         f"节目定位：{edition_brief(edition)}\n"
         f"口播交付要求：{SPOKEN_EDITION_BRIEFS.get(edition, SPOKEN_EDITION_BRIEFS['即时更新'])}\n"
         f"完整分析正文（只省略文末来源目录，正文引用仍保留）：\n{report_body(report.content)}\n"
-        "请把报告中最值得听的变化、因果机制与决策含义讲完整；只使用上述材料，直接输出节目，不说明写作或核验过程。")
+        "请把报告中最值得听的变化、因果机制与决策含义讲完整；只使用上述材料，只输出规定JSON；编排摘要和口播正文分开，不在script说明写作或核验过程。")
     return system, user
 
 

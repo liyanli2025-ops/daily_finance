@@ -6,7 +6,7 @@ import tempfile
 import uuid
 
 
-def save_spoken_case(report,raw,script,audit,directory=None):
+def save_spoken_case(report,raw,script,audit,directory=None,editorial_plan=None):
     from .research_hub import save_json
     from .spoken_editing import TTS_TEXT_VERSION
     import hashlib
@@ -16,7 +16,7 @@ def save_spoken_case(report,raw,script,audit,directory=None):
     try:
         save_json(target,dict(owner='finance-spoken-v1',at=china_now().isoformat(),
             status='not_approved',report_id=getattr(report,'id',None),
-            report_content=report.content,raw_script=raw,script=script,reading_load=audit,
+            report_content=report.content,raw_script=raw,script=script,reading_load=audit,editorial_plan=editorial_plan,
             tts_text_version=TTS_TEXT_VERSION,script_sha256=hashlib.sha256(script.encode('utf-8')).hexdigest(),
             limitation='生成/清洗检查点，不代表通过事实核验、音频合成或人工听感验收'))
     except OSError as error:
@@ -36,7 +36,7 @@ def mark_spoken_case(path,status,error=None):
 
 def save_generation_stage(stage,response,directory=None):
     """Checkpoint completed text before parsing or another paid call; no headers/reasoning."""
-    if stage not in {'draft_response','repair_response','review_response','spoken_review_response','watchlist_changed_response'} or not isinstance(response,str) or not response.strip():
+    if stage not in {'draft_response','repair_response','review_response','spoken_review_response','spoken_response','watchlist_changed_response'} or not isinstance(response,str) or not response.strip():
         raise ValueError('invalid_generation_checkpoint')
     from .research_hub import save_json
     from .time_context import china_now

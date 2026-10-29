@@ -1,3 +1,4 @@
+from spoken_fixtures import reply
 """Check active report-to-speech wiring, not subjective listening quality."""
 from datetime import date
 from pathlib import Path
@@ -35,10 +36,11 @@ class OriginalProgrammeIntegrationTests(unittest.IsolatedAsyncioTestCase):
                ('即时更新',True,'即时更新｜报告',ReportType.MORNING)]
         for period,weekend,title,kind in cases:
             generator=PodcastGeneratorService.__new__(PodcastGeneratorService);generator.ai_client=True
-            generator._call_ai_for_podcast=AsyncMock(return_value='已有事实、条件和反证。')
+            generator._call_ai_for_podcast=AsyncMock()
             generator._verify_podcast_script=AsyncMock()
             content='完整正文开始。'+('重要分析及限定。'*400)+'原文结尾反证不能截断。'
             report=SimpleNamespace(title=title,content=content,summary='',core_opinions=[])
+            generator._call_ai_for_podcast.return_value=reply('已有事实、条件和反证。',content)
             with (patch('app.services.report_diagnostics.save_spoken_case',return_value=Path('fixture.json')),
                   patch('app.services.report_diagnostics.mark_spoken_case')):
                 await generator._generate_ai_podcast_script(report,'',date(2026,10,29),kind,weekend)

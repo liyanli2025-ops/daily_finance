@@ -1,3 +1,4 @@
+from spoken_fixtures import reply
 import hashlib
 import importlib.util
 import json
@@ -26,6 +27,9 @@ class SpokenAcceptanceTests(unittest.TestCase):
         services.mkdir(parents=True)
         for name in runner.SOURCES:
             shutil.copyfile(REPO/'backend/app/services'/name, services/name)
+        fixture_sources={name:hashlib.sha256((services/name).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for name in runner.SOURCES}
+        source_patch=patch.object(runner,'SOURCES',fixture_sources)
+        source_patch.start();self.addCleanup(source_patch.stop)
         origin = self.root/'data/diagnostics/staged-report'
         origin.mkdir(parents=True)
         (origin/(runner.ORIGIN_SHA+'.report.json')).write_text(json.dumps(dict(status='completed_for_human_review', input_sha256=runner.ORIGIN_SHA)), encoding='utf-8')
@@ -137,7 +141,7 @@ class CanonicalSpeechTests(unittest.IsolatedAsyncioTestCase):
         raw = '若未来1—3日保持优势，保留判断。\n\n条件≤30时回查。\n\n反证仍保留。\n\n还有一个相关变化。'
         service = PodcastGeneratorService.__new__(PodcastGeneratorService)
         service.ai_client = True
-        service._call_ai_for_podcast = AsyncMock(return_value=raw)
+        service._call_ai_for_podcast = AsyncMock(return_value=reply(raw,'原事实和条件'))
         service._verify_podcast_script = AsyncMock()
         report = SimpleNamespace(title='早报', content='原事实和条件')
         with patch('app.services.report_diagnostics.save_spoken_case', return_value=Path('fixture.json')), patch('app.services.report_diagnostics.mark_spoken_case'):

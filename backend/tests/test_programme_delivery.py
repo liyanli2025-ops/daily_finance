@@ -1,3 +1,4 @@
+from spoken_fixtures import reply
 """Actual speech requests share the delivery contract and invalidate old caches."""
 from datetime import date
 from pathlib import Path
@@ -17,7 +18,7 @@ class ProgrammeDeliveryTests(unittest.IsolatedAsyncioTestCase):
         report = SimpleNamespace(title='2026-10-29早报', content='关键新增事实。'+('传导、比较和有条件应对。'*400)+'最后一段反证不可遗漏。')
         generator = PodcastGeneratorService.__new__(PodcastGeneratorService)
         generator.ai_client = True
-        generator._call_ai_for_podcast = AsyncMock(return_value='这次变化影响短线选择，依据和条件来自原报告。')
+        generator._call_ai_for_podcast = AsyncMock(return_value=reply('这次变化影响短线选择，依据和条件来自原报告。',report.content))
         generator._verify_podcast_script = AsyncMock()
         expected = spoken_prompts(report, date(2026, 10, 29), '早报')
         with patch('app.services.podcast_generator.spoken_prompts', wraps=spoken_prompts) as builder, \

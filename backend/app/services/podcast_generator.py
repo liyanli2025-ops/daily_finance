@@ -968,6 +968,11 @@ class PodcastGeneratorService:
         
         if script:
             raw_script=script
+            from .report_diagnostics import save_generation_stage
+            self._last_spoken_response_path=save_generation_stage('spoken_response',raw_script)
+            from .spoken_programme import parse_response,delivery_leaks
+            programme,script=parse_response(raw_script,report.content)
+            self._last_spoken_programme=programme
             # 清理可能的 Markdown 残留
             script = self._clean_for_tts(script)
             
@@ -986,11 +991,14 @@ class PodcastGeneratorService:
             from .spoken_editing import audit,tts_text
             script=tts_text(script)
             from .report_diagnostics import save_spoken_case,mark_spoken_case
-            checkpoint=save_spoken_case(report,raw_script,script,audit(script))
+            checkpoint=save_spoken_case(report,raw_script,script,audit(script),editorial_plan=programme)
             # Preserve the paid reply before any format/review failure.
             if not script.replace('[SECTION_BREAK]','').strip():
                 mark_spoken_case(checkpoint,'format_rejected','empty')
                 return None
+            if delivery_leaks(script):
+                mark_spoken_case(checkpoint,'format_rejected','editorial_notes_in_script')
+                raise RuntimeError('口播仍包含编辑说明，保留稿件，停止后续审查或合成，不自动重写')
             if len(script) > 4000:
                 mark_spoken_case(checkpoint,'format_rejected','too_long')
                 raise RuntimeError("播客脚本超过4000字，请压缩后重新生成")

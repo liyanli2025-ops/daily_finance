@@ -1,3 +1,4 @@
+from spoken_fixtures import reply
 """Offline safety regressions, not evidence of prediction or listening quality."""
 import json
 from datetime import date
@@ -58,7 +59,7 @@ class EditorialGatesTests(unittest.IsolatedAsyncioTestCase):
     async def test_spoken_editing_uses_existing_generation_and_review_calls(self):
         generator = PodcastGeneratorService.__new__(PodcastGeneratorService)
         generator.ai_client = True
-        generator._call_ai_for_podcast = AsyncMock(return_value='有来源的新增变化。' * 30)
+        generator._call_ai_for_podcast = AsyncMock(return_value=reply('有来源的新增变化。' * 30,'事实与条件'))
         generator._verify_podcast_script = AsyncMock()
         report = SimpleNamespace(title='测试', content='事实与条件', summary='', core_opinions=[])
         await generator._generate_ai_podcast_script(report, '', date(2026, 10, 25), ReportType.MORNING, True)
