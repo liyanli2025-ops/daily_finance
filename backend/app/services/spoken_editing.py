@@ -47,6 +47,22 @@ def report_body(text):
     return text
 
 
+def spoken_input(text):
+    """Separate only explicitly labeled editor sections; never guess from caution words."""
+    body=report_body(text)
+    pattern=r'(?m)^## 编辑说明（不朗读）[ \t]*$'
+    notes=[];chunks=[];cursor=0
+    for match in re.finditer(pattern,body):
+        if match.start()<cursor:continue
+        following=re.search(r'(?m)^#{1,2} [^\n]+$',body[match.end():])
+        end=match.end()+following.start() if following else len(body)
+        chunks.append(body[cursor:match.start()])
+        notes.append(body[match.end():end].strip());cursor=end
+    chunks.append(body[cursor:])
+    return dict(analysis='\n\n'.join(c.strip() for c in chunks if c.strip()),
+                editor_notes='\n\n'.join(n for n in notes if n))
+
+
 def stage_only(value):
     # Do not treat a bare “背景/过渡/语气” as a stage direction.
     value=value.casefold().strip()

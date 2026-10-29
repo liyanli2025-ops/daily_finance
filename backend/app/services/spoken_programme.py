@@ -4,7 +4,7 @@ import re
 
 FORMAT_VERSION='spoken-programme-json-v1'
 
-CONTRACT='口播交付为严格JSON对象，不输出JSON外的文字：\n{"programme":{"mainline":"一条主线，最多160字","choices":[{"topic":"选题，最多100字","editorial_reason":"为何值得本期展开，最多200字","report_quotes":["报告中逐字摘录的依据，每条2—240字，1—3条"]}],"omitted":["合并或舍弃的话题及简短理由，最多6项，每项160字"]},"script":"完整口播纯文本，以[SECTION_BREAK]分主题"}\nchoices为1—3个值得展开的问题，不要求每只自选股占位；有技术上的决策价值也可选，不以是否有公司新闻决定。programme是简短可审阅的编排摘要，不是推理过程，不进入语音。先作取舍，再重组script，不能把报告的章节顺序和全部指标照搬。只保留改变判断的数值，报告中的“只讲结构、不编消息、不能混淆口径”等编辑说明改为必要的分析限定或省略，不念给听众。关键事实、反方和条件不能因精简被改义。\n'
+CONTRACT='口播交付为严格JSON对象，不输出JSON外的文字：\n{"programme":{"mainline":"一条主线，最多160字","choices":[{"topic":"选题，最多100字","editorial_reason":"为何值得本期展开，最多200字","report_quotes":["报告中逐字摘录的依据，每条2—240字，1—3条"]}],"omitted":["合并或舍弃的话题及简短理由，最多6项，每项160字"]},"script":"完整口播纯文本，以[SECTION_BREAK]分主题"}\nchoices为1—3个值得展开的问题，不要求每只自选股占位；有技术上的决策价值也可选，不以是否有公司新闻决定。programme是简短可审阅的编排摘要，不是推理过程，不进入语音。mainline说明听众为何值得听下去，用报告中的具体变化或分歧承接，不写核验工作总结。choices按听众理解顺序排列，最多三个问题也可以只有一个。先作取舍，再重组script，不能把报告的章节顺序和全部指标照搬。只保留改变判断的数值，报告中的“只讲结构、不编消息、不能混淆口径”等编辑说明改为必要的分析限定或省略，不念给听众。关键事实、反方和条件不能因精简被改义。\n'
 
 
 def _text(value,limit):
@@ -24,8 +24,8 @@ def parse_response(raw,report):
     if not isinstance(choices,list) or not 1<=len(choices)<=3:raise RuntimeError('口播选题必须为1至3项')
     if not isinstance(omitted,list) or len(omitted)>6 or any(not _text(item,160) for item in omitted):
         raise RuntimeError('口播舍弃说明格式错误')
-    from .spoken_editing import report_body
-    source=re.sub(r'\s+',' ',report_body(report)).strip()
+    from .spoken_editing import spoken_input
+    source=re.sub(r'\s+',' ',spoken_input(report)['analysis']).strip()
     for row in choices:
         if not isinstance(row,dict) or not _text(row.get('topic'),100) or not _text(row.get('editorial_reason'),200):
             raise RuntimeError('口播选题摘要不完整')
@@ -41,4 +41,5 @@ def parse_response(raw,report):
 def delivery_leaks(script):
     patterns=(r'(?m)^\s*(?:其他[^\n。]{0,16}[，,：:]\s*)?只(?:讲|给)结构[，,、\s]*不编消息[。.!！]?\s*$',
               r'(?m)^\s*(?:以下|下面)(?:是|为)[^\n。]{0,16}(?:口播稿|播客脚本)[：:。]?\s*$')
+    patterns += (r'这是报道中有归属的说法',r'报告没有给出[^。！？\n]{0,50}这里也不编',r'(?m)^\s*后台编辑备注[^\n]*$',)
     return [match.group().strip() for pattern in patterns for match in re.finditer(pattern,script)]

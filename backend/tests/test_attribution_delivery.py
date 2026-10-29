@@ -18,13 +18,15 @@ class AttributionDeliveryTests(unittest.TestCase):
             market_data_text='',finance_summary='',cross_border_summary='')
         review=analyzer._build_review_prompt(report.content,'','','',ReportType.MORNING)
         speech,_=spoken_prompts(report,date(2026,10,29),'早报')
-        for prompt in (analysis,review,speech):
+        for prompt in (analysis,review):
             self.assertEqual(prompt.count(ATTRIBUTION_AND_HORIZON_POLICY),1)
+        self.assertNotIn(ATTRIBUTION_AND_HORIZON_POLICY,speech)
+        self.assertIn("条件必须保持原来的对象、期限和强度",speech)
 
     def test_changed_delivery_rules_do_not_reuse_old_verified_script_key(self):
         report=SimpleNamespace(content='历史相对弱势，未来仍可能反弹。')
         current=cache.signature(report,'')
-        with patch.object(cache,'SPOKEN_POLICY',cache.SPOKEN_POLICY.replace(ATTRIBUTION_AND_HORIZON_POLICY,'')):
+        with patch.object(cache,'SPOKEN_POLICY','previous spoken editorial policy'):
             self.assertNotEqual(cache.signature(report,''),current)
         with patch.object(cache,'REVIEW_CONTRACT', 'older review contract'):
             self.assertNotEqual(cache.signature(report,''),current)
