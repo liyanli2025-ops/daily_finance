@@ -235,6 +235,7 @@ def prompt(stocks,root=None,now=None):
         'drawdown_20d_pct是距最近20个收盘价最高值的回撤，不是距盘中最高价；prior20_high/low才使用前20期盘中高低，排除当期。'
         'RSI14低于30可按传统口径描述为技术性超卖；不等于估值便宜或反弹已获确认，允许结合其他证据提出反弹或趋势延续假设。'
         'RSI14、ATR14不提供已校准胜率；不同源报价与复权日线不得不注明口径直接拼接。')
+    lines.append('短线先核对最近已完成日线return_1d_pct（单日），再与5/20期结构对照。最近一天上涨而中期下降可以同时成立；不得把20期下跌写成昨日下跌，也不得忽略已发生的反弹而写成尚未反弹。')
     lines.append('新增技术口径：MACD为SMA预热EMA12-EMA26及DIF的EMA9，柱值不乘2；ADX为Wilder14，只有强度没有方向。'
         '布林带为20期均值±2倍总体标准差，日收益波动为20期对数收益总体标准差，不年化。'
         'VWMA是日收盘按成交量加权，不是盘中VWAP；方向成交量余额不是实际资金流。'
@@ -251,7 +252,7 @@ def prompt(stocks,root=None,now=None):
         if row['status']!='ok':
             lines.append(row['name']+'：数据缺口 '+str(row.get('reason',row.get('error'))))
             continue
-        metric_keys=['as_of','close','return_5d_pct','return_20d_pct','ma20','ma60','drawdown_20d_pct',
+        metric_keys=['as_of','close','return_1d_pct','return_5d_pct','return_20d_pct','ma20','ma60','drawdown_20d_pct',
                      'volume_vs_prior20','rsi14','atr14','close_above_prior20_high']
         lines.append(json.dumps(dict(symbol=row['symbol'],name=row['provider_name'],kind=row['kind'],
             adjustment=row['adjustment'],observed_at=row['observed_at'],

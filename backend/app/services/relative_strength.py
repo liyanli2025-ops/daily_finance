@@ -115,10 +115,11 @@ def compact(context):
             key=(row['benchmark'],value['start'],value['end'],value['periods'],value['benchmark_return_pct'])
             if key not in windows:windows[key]='w'+str(len(windows)+1)
             item[period]=[windows[key],value['excess_return_percentage_points']]
+        item['instrument_returns_pct']={period:row[period].get('instrument_return_pct') for period in ('recent5','prior5','latest20')}
         item['excess_change_5_vs_prior5_pp']=row['excess_change_5_vs_prior5_percentage_points']
         rows.append(item)
     return dict(status=context['status'],
         windows=[dict(id=identifier,benchmark=key[0],start=key[1],end=key[2],periods=key[3],benchmark_return_pct=key[4])
             for key,identifier in windows.items()],comparisons=rows,proxy_samples=context['proxy_samples'],
         definition=context.get('definition'),limitation=context.get('limitation'),
-        value_columns='recent5/prior5/latest20的数组为[窗口ID,相对基准收益差百分点]；差值变化不是个股/ETF本身涨幅变化。')
+        value_columns='recent5/prior5/latest20的数组为[窗口ID,相对基准收益差百分点]；instrument_returns_pct单独给出同窗口标的自身收益率百分比。超额收益与自身涨跌不得混用；差值变化不是个股/ETF本身涨幅变化。')
