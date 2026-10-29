@@ -1034,6 +1034,8 @@ class PodcastGeneratorService:
         )
         if not response:
             raise RuntimeError("口播核验无响应，停止生成音频")
+        from .report_diagnostics import save_generation_stage
+        self._last_spoken_review_response_path=save_generation_stage('spoken_review_response',response)
         value = response.strip()
         if value.startswith("```") and value.endswith("```"):
             value = value.split("\n", 1)[1].rsplit("```", 1)[0].strip()

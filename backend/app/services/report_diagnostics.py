@@ -36,7 +36,7 @@ def mark_spoken_case(path,status,error=None):
 
 def save_generation_stage(stage,response,directory=None):
     """Checkpoint completed text before parsing or another paid call; no headers/reasoning."""
-    if stage not in {'draft_response','repair_response','watchlist_changed_response'} or not isinstance(response,str) or not response.strip():
+    if stage not in {'draft_response','repair_response','review_response','spoken_review_response','watchlist_changed_response'} or not isinstance(response,str) or not response.strip():
         raise ValueError('invalid_generation_checkpoint')
     from .research_hub import save_json
     from .time_context import china_now
@@ -76,8 +76,7 @@ def save_review_case(report, metadata, review, finance, cross, market, context,
         print(f'[诊断] 完整审查材料已保存：{target}', flush=True)
         return target
     except OSError as error:
-        print(f'[诊断] 保存失败：{type(error).__name__}', flush=True)
-        return None
+        raise RuntimeError('审查材料保存失败，停止后续模型请求：'+type(error).__name__) from None
     finally:
         if temporary is not None and temporary.exists():
             temporary.unlink()

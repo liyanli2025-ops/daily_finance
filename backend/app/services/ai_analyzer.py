@@ -639,6 +639,12 @@ App当前自选股与行情快照：
         if not review_response:
             raise RuntimeError("审查返回空响应，禁止发布未经核验的报告")
         
+        # Preserve the already-paid reply before JSON parsing can reject it.
+        # This is a recovery checkpoint, never a review approval.
+        if not citation_error:
+            from .report_diagnostics import save_generation_stage
+            self._last_review_response_path=save_generation_stage('review_response',review_response)
+
         # 解析审查结果
         # Do not salvage malformed/truncated review JSON into an apparent pass.
         review_text = review_response.strip()
@@ -666,6 +672,8 @@ App当前自选股与行情快照：
         self._last_review_path=save_review_case(report, metadata, review_data, finance_summary,
                          cross_border_summary, market_data_text,
                          getattr(self, '_generation_context', ''), _repair_attempted)
+        if self._last_review_path is None:
+            raise RuntimeError('审查材料未保存，停止后续模型请求')
         if not feedback['all_anchors_valid']:
             raise ReviewNeedsHuman('审查意见缺少可核对原句或存在数字比较矛盾，停止自动修稿，待人工复核')
         if not issues and overall_quality<7:
