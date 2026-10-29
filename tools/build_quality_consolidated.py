@@ -1,4 +1,4 @@
-"""Build the consolidated analysis/speech release from exact confirmed v10 + allocation archives."""
+"""Build the consolidated analysis/speech release from immutable confirmed v10, allocation and optional v11-r2 archives."""
 import argparse
 from contextlib import closing
 import hashlib
@@ -12,13 +12,14 @@ import tempfile
 import zipfile
 
 V10_SHA='94554a1b14e16fa70f91cb5290571902a9c9962964bfe272f07c7e9d63b7efb5'
+V11_SHA='143ec09bcfb285ebc6208f31760804a7b7f7f5267ee0ab163316a8427e8bd8a8'
 ALLOCATION_SHA='c2f08e103293aea7a51a029d31c62a4b124c95354705de2edf674f57fca9e4e7'
 
 
 def digest(value):return hashlib.sha256(value.replace(b'\r\n',b'\n')).hexdigest()
 
 
-def build(output,baseline_archive,allocation_archive):
+def build(output,baseline_archive,allocation_archive,installed_archive=None):
     repo=Path(__file__).resolve().parents[1]
     if subprocess.check_output(['git','-C',str(repo),'status','--porcelain']).strip():
         raise RuntimeError('Commit reviewed sources before building')
@@ -48,19 +49,23 @@ def build(output,baseline_archive,allocation_archive):
         original=prior.get(name,v10.get(name))
         if original is not None and digest(original)!=patch['files'][name]['old_sha256']:
             raise RuntimeError('Allocation baseline does not match confirmed v10: '+name)
-    old={name:allocated.get(name,prior[name]) for name in names}
+    allocation_state={name:allocated.get(name,prior[name]) for name in names}
+    installed={}
+    if installed_archive is not None:
+        _,installed=read_bundle(installed_archive,'finance-quality-consolidated-20261029-v11-r2',V11_SHA)
+    old={name:installed.get(name,allocation_state[name]) for name in names}
     new={name:(repo/name).read_bytes() for name in names}
     output=Path(output).resolve()
     if output.exists() or output.with_suffix('.zip').exists():raise RuntimeError('Immutable output exists')
     output.mkdir(parents=True)
     revision=subprocess.check_output(['git','-C',str(repo),'rev-parse','HEAD']).decode().strip()
     manifest=dict(settings={},source_revision=revision,source_worktree_dirty=False,
-        reviewed_installed_v10_artifact_sha256=V10_SHA,reviewed_allocation_artifact_sha256=ALLOCATION_SHA,files={name:dict(old_sha256=digest(old[name]) if old[name] is not None else None,new_sha256=digest(value),additional_old_sha256=[digest(prior[name]) if prior[name] is not None else None]) for name,value in new.items()})
+        reviewed_installed_v11_artifact_sha256=V11_SHA if installed_archive else None,reviewed_installed_v10_artifact_sha256=V10_SHA,reviewed_allocation_artifact_sha256=ALLOCATION_SHA,files={name:dict(old_sha256=digest(old[name]) if old[name] is not None else None,new_sha256=digest(value),additional_old_sha256=list(dict.fromkeys(digest(v) if v is not None else None for v in (prior[name],allocation_state[name])))) for name,value in new.items()})
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
     (output/'install_upgrade.py').write_bytes((repo/'tools/install_paused_upgrade.py').read_bytes())
     with zipfile.ZipFile(output/'payload.zip','w',zipfile.ZIP_DEFLATED) as payload:
         for name,value in new.items():payload.writestr(name,value)
-    (output/'README.txt').write_text('合并源码更新：资料去重/阅读分配、经营证据定位、RSI分类、口播审查对照及免费回放。只接受已确认v10/分配修复基线或本包新文件；冲突停止，不能绕过。\n默认只验证；--apply --restart私有备份并仅重启finance-daily，要求暂停与数据库健康。\n不改.env、数据库、前端静态文件或其他项目，不调用模型/TTS，不恢复定时任务。保留所有旧付费验收标记。\n安装后仅运行app.selection_check和app.research_input_check免费回放；禁止重跑旧付费试验。\n',encoding='utf-8')
+    (output/'README.txt').write_text('合并源码更新：资料去重/阅读分配、经营证据定位、RSI分类、口播审查对照、归因/期限一致性及默认关闭失败重试与自动修稿。只接受清单中已确认的v10/分配修复/v11-r2指纹或本包新文件；冲突停止，不能绕过。\n默认只验证；--apply --restart私有备份并仅重启finance-daily，要求暂停与数据库健康。\n不改.env、数据库、前端静态文件或其他项目，不调用模型/TTS，不恢复定时任务。保留所有旧付费验收标记。\n安装后仅运行app.selection_check和app.research_input_check免费回放；禁止重跑旧付费试验。\n',encoding='utf-8')
     with tempfile.TemporaryDirectory(prefix='finance-consolidated-quality-') as temporary:
         root=Path(temporary)/'finance-daily'
         for name,value in old.items():
@@ -77,7 +82,7 @@ def build(output,baseline_archive,allocation_archive):
         other=Path(temporary)/'other-project/keep';other.parent.mkdir();other.write_bytes(b'untouched')
         command=[sys.executable,'-X','utf8',str(output/'install_upgrade.py'),'--project',str(root),'--backup-root',str(Path(temporary)/'backups')]
         # Unknown changes and a missing pause must stop before writes.
-        first=root/names[0];original=first.read_bytes();first.write_bytes(b'unknown-conflict')
+        first=next(root/name for name in names if (root/name).exists());original=first.read_bytes();first.write_bytes(b'unknown-conflict')
         assert subprocess.run(command+['--apply'],capture_output=True).returncode!=0
         assert first.read_bytes()==b'unknown-conflict' and env.read_bytes()==env_value
         first.write_bytes(original);flag.rename(data/'pause-sentinel')
@@ -88,6 +93,13 @@ def build(output,baseline_archive,allocation_archive):
         assert env.read_bytes()==env_value and flag.read_bytes()==b'preserve-pause'
         assert other.read_bytes()==b'untouched' and marker.read_bytes()==b'never-rebill'
         with closing(sqlite3.connect(db)) as connection:assert connection.execute('SELECT value FROM sentinel').fetchone()[0]=='preserved'
+        # Previous allocation state remains accepted, without skipping conflicts.
+        for name,value in allocation_state.items():
+            path=root/name
+            if value is None: path.unlink(missing_ok=True)
+            else: path.write_bytes(value)
+        subprocess.run(command+['--apply'],check=True)
+        assert all((root/name).read_bytes()==value for name,value in new.items())
         # Exact v10 baseline without the small allocation patch is supported too.
         for name,value in prior.items():
             path=root/name
@@ -98,7 +110,7 @@ def build(output,baseline_archive,allocation_archive):
         assert env.read_bytes()==env_value and flag.read_bytes()==b'preserve-pause' and marker.read_bytes()==b'never-rebill'
     with zipfile.ZipFile(output.with_suffix('.zip'),'w',zipfile.ZIP_DEFLATED) as archive:
         for path in output.iterdir():archive.write(path,output.name+'/'+path.name)
-    return dict(file=str(output.with_suffix('.zip')),sha256=hashlib.sha256(output.with_suffix('.zip').read_bytes()).hexdigest(),files=len(names),rehearsal='v10_and_allocation_conflict_pause_apply_idempotence_and_preservation_passed_no_service_or_model_calls')
+    return dict(file=str(output.with_suffix('.zip')),sha256=hashlib.sha256(output.with_suffix('.zip').read_bytes()).hexdigest(),files=len(names),rehearsal='confirmed_baselines_conflict_pause_apply_idempotence_and_preservation_passed_no_service_or_model_calls')
 
 
 if __name__=='__main__':
@@ -106,4 +118,5 @@ if __name__=='__main__':
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--baseline-archive',type=Path,required=True)
     parser.add_argument('--allocation-archive',type=Path,required=True)
-    args=parser.parse_args();print(json.dumps(build(args.output,args.baseline_archive,args.allocation_archive),ensure_ascii=False,indent=2))
+    parser.add_argument('--installed-archive',type=Path,help='Exact confirmed v11-r2 artifact')
+    args=parser.parse_args();print(json.dumps(build(args.output,args.baseline_archive,args.allocation_archive,args.installed_archive),ensure_ascii=False,indent=2))
