@@ -264,6 +264,8 @@ class AIAnalyzerService:
         from .prior_report_context import comparison_context
         self._prior_report_context = comparison_context(morning_report,today) if report_type==ReportType.EVENING else '不适用'
         morning_context = self._prior_report_context
+        from .analysis_grounding import research_contrast_index
+        contrast_index = research_contrast_index(finance_summary)
         return f"""{self._get_writing_philosophy()}
 {REPORT_POLICY}
 任务：生成{today.isoformat()}的A股/港股短线财经{period}。
@@ -288,6 +290,9 @@ class AIAnalyzerService:
 评论、传闻及其数字仅能归属为该来源的说法；有冲突且不能核实时删除结论，不裁定哪条属实。
 触发条件必须来自有证据的事件或可观测变化；禁止自行创造支撑位、阻力位和整数价位门槛。
 正文按有效证据充分展开，不设固定字数目标或最低字数；关键变化、比较、传导和应对讲完整，不用短篇要求挤掉论证。不写固定投资课堂、行情概率、无依据仓位和目标价。
+
+本期经营变化定位（正文论证须回到来源与期间；不是额外独立证据）：
+{contrast_index}
 
 App当前自选股与行情快照：
 {watchlist_text or 'App当前未设置自选股；仍可分析市场，不虚构关注标的。'}

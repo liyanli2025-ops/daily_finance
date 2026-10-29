@@ -63,6 +63,8 @@ def save_review_case(report, metadata, review, finance, cross, market, context,
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         directory.chmod(0o700)
         # No environment, credentials, model request headers, or provider responses.
+        from .analysis_grounding import decision_pairs
+        metadata=dict(metadata,decision_pair_check=decision_pairs(metadata.get('decision_notes',[])))
         case = dict(content=report.content, metadata=metadata, review=review,
                     finance_evidence=finance, cross_evidence=cross,
                     market_evidence=market, generation_context=context, repaired=repaired)
