@@ -71,12 +71,14 @@ class SpokenReviewRecoveryTests(unittest.IsolatedAsyncioTestCase):
         service._call_ai_for_podcast=AsyncMock(return_value=raw)
         report=SimpleNamespace(content='原报告有限判断',summary='摘要',core_opinions=[])
         with tempfile.TemporaryDirectory() as folder:
-            with patch('app.services.report_diagnostics.save_generation_stage',side_effect=lambda stage,response:save_generation_stage(stage,response,folder)):
+            with patch('app.services.report_diagnostics.save_generation_stage',side_effect=lambda stage,response,**kwargs:save_generation_stage(stage,response,folder,**kwargs)):
                 with self.assertRaises(json.JSONDecodeError):
                     await service._verify_podcast_script('有限判断的口播',report)
             saved=json.loads(service._last_spoken_review_response_path.read_text(encoding='utf-8'))
             self.assertEqual(saved['response'],raw)
             self.assertEqual(saved['stage'],'spoken_review_response')
+            self.assertEqual(saved['context']['script'],'有限判断的口播')
+            self.assertEqual(saved['context']['report_body'],report.content)
             self.assertEqual(saved['status'],'unreviewed')
         service._call_ai_for_podcast.assert_awaited_once()
 

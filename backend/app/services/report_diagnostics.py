@@ -34,7 +34,7 @@ def mark_spoken_case(path,status,error=None):
     save_json(Path(path),data)
 
 
-def save_generation_stage(stage,response,directory=None):
+def save_generation_stage(stage,response,directory=None,*,context=None):
     """Checkpoint completed text before parsing or another paid call; no headers/reasoning."""
     if stage not in {'draft_response','repair_response','review_response','spoken_review_response','spoken_response','watchlist_changed_response'} or not isinstance(response,str) or not response.strip():
         raise ValueError('invalid_generation_checkpoint')
@@ -45,7 +45,7 @@ def save_generation_stage(stage,response,directory=None):
     from .episode_workspace import current_workspace
     workspace=current_workspace()
     try:
-        save_json(path,dict(stage=stage,at=china_now().isoformat(),response=response,
+        save_json(path,dict(stage=stage,at=china_now().isoformat(),response=response,context=context,
             evidence_usage=workspace.usage() if workspace is not None else None,
             status='unreviewed',limitation='完整模型回复，仅供恢复及核验；不代表已通过审查或可发布'))
     except OSError as error:

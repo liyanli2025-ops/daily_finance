@@ -1,3 +1,4 @@
+from spoken_fixtures import review_reply
 """Offline regression tests: no API keys, network, or production database."""
 import json
 import tempfile
@@ -135,7 +136,7 @@ class PodcastTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_script_review_fails_closed(self):
         report = SimpleNamespace(content="report", summary="summary", core_opinions=[])
-        for response in [None, "{}", "[]", '{"passed":true}',
+        for response in [None, '{"passed":true,"issues":[]}', "{}", "[]", '{"passed":true}',
                          '{"passed":true,"issues":["新增数字"]}',
                          '{"passed":false,"issues":[]}']:
             self.service._call_ai_for_podcast = AsyncMock(return_value=response)
@@ -143,7 +144,7 @@ class PodcastTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises((RuntimeError, ValueError)):
                     await self.service._verify_podcast_script("script", report)
         self.service._call_ai_for_podcast = AsyncMock(
-            return_value='{"passed":true,"issues":[]}')
+            return_value=review_reply('report','script'))
         await self.service._verify_podcast_script("script", report)
 
     async def test_failed_script_does_not_use_unreviewed_template(self):

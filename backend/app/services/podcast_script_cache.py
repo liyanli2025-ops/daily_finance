@@ -7,6 +7,7 @@ from ..config import settings
 from .research_hub import save_json
 from .spoken_editing import tts_text,TTS_TEXT_VERSION
 from .spoken_programme import FORMAT_VERSION
+from .spoken_fidelity import VERSION as REVIEW_VERSION, CONTRACT as REVIEW_CONTRACT
 from .editorial_policy import SPOKEN_POLICY,EDITION_BRIEFS,SPOKEN_EDITION_BRIEFS
 
 ROOT=Path(__file__).resolve().parents[2]/'data/diagnostics/verified-scripts'
@@ -17,7 +18,7 @@ def signature(report,nickname):
     routing={name:getattr(settings,name,None) for name in ['ai_provider','ai_model','podcast_provider','podcast_model',
         'podcast_reasoning_effort','review_provider','review_model','review_reasoning_effort',
         'openai_base_url','backup_ai_model','backup_ai_base_url']}
-    value=json.dumps(dict(format_version=FORMAT_VERSION,policy=SPOKEN_POLICY,edition_briefs=EDITION_BRIEFS,spoken_edition_briefs=SPOKEN_EDITION_BRIEFS,tts_text_version=TTS_TEXT_VERSION,facts=facts,routing=routing,nickname=nickname),
+    value=json.dumps(dict(review_version=REVIEW_VERSION,review_contract=REVIEW_CONTRACT,format_version=FORMAT_VERSION,policy=SPOKEN_POLICY,edition_briefs=EDITION_BRIEFS,spoken_edition_briefs=SPOKEN_EDITION_BRIEFS,tts_text_version=TTS_TEXT_VERSION,facts=facts,routing=routing,nickname=nickname),
                      ensure_ascii=False,sort_keys=True,default=str)
     return hashlib.sha256(value.encode()).hexdigest()
 
