@@ -1317,7 +1317,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
             content_preview=reading['text']
             self._news_briefing.setdefault('initial_reading',[]).append(dict(id=news.id,
                 ranges=reading['ranges'],selected_characters=reading['selected_characters'],budget=reading_budget,
-                collected_text_fully_provided=reading['collected_text_fully_provided']))
+                collected_text_fully_provided=reading['collected_text_fully_provided'],followup_ranges=reading['followup_ranges']))
             workspace=current_workspace()
             if workspace is not None and news.id in workspace.documents and reading['ranges']:
                 workspace.prepare_ranges(news.id,reading['ranges'],'initial_news')

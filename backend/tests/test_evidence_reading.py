@@ -77,3 +77,30 @@ class EvidenceReadingTests(unittest.TestCase):
         for value in (0,-1,True,3.5):
             with self.assertRaises(ValueError):
                 read_news('正文', budget=value)
+
+    def test_old_earnings_caveat_cannot_crowd_out_later_demand_qualification(self):
+        early='利润同比增长80%，但主要受低基数影响。'
+        body='行业财报。'+early+('利润增长与营业收入改善，季度盈利仍在恢复。'*30)
+        claim='分析师表示，十月需求不及预期，价格下跌，供应宽松。'
+        counter='不过，分析师对短期行情并不悲观。他指出，需求并未崩塌，年末备货可能释放。'
+        body+=claim+'旺季排产在调整，局部库存仍高。'+counter+('一般介绍。'*40)
+        result=read_news(body, '利润增长和需求变化', 280)
+        self.assertIn(claim, result['text'])
+        self.assertIn('需求并未崩塌', result['text'])
+        self.assertLessEqual(result['selected_characters'], 280)
+
+    def test_nearby_unread_qualification_is_explicit_when_budget_cannot_fit_it(self):
+        claim='分析师表示，需求下降，价格回落。'
+        counter='不过，需求并未消失，'+('局部市场需要进一步核实，'*15)+'仍需按时间和区域区分。'
+        body=claim+counter+('一般背景介绍。'*50)
+        result=read_news(body, '需求和价格回落', 90)
+        self.assertIn(claim, result['text'])
+        self.assertTrue(result['followup_ranges'])
+        self.assertIn('邻近限定候选尚未提供', result['text'])
+        self.assertNotIn(counter, result['text'])
+        self.assertLessEqual(result['selected_characters'], 90)
+
+    def test_full_short_text_has_no_false_followup(self):
+        result=read_news('公司表示，需求下降，但订单尚未取消。', budget=300)
+        self.assertEqual(result['followup_ranges'], [])
+        self.assertTrue(result['collected_text_fully_provided'])

@@ -32,6 +32,7 @@ def read_news(text,title='',budget=1200,focus_terms=()):
     footer=re.search(r'(?m)^\s*相关阅读[：:]?\s*$',text)
     end=footer.start() if footer else len(text)
     body=text[:end]
+    followup=[]
     if len(body)<=budget:
         ranges=[[0,end]] if end else []
     else:
@@ -70,19 +71,40 @@ def read_news(text,title='',budget=1200,focus_terms=()):
         # These lanes are linguistic roles, not bullish/bearish classifications.
         lanes=[lambda row:row['direct'],
                lambda row:row['qualifier'],lambda row:row['observation']]
+        anchor=None
+        def distance(row,other):
+            return max(0,row['start']-other['end'],other['start']-row['end'])
+        def qualifier_key(row):
+            # A remote low-base caveat is not a replacement for a later
+            # qualification of the selected current-period claim. Proximity
+            # is only a reading lead, never proof that subjects are identical.
+            return (int(bool(anchor and anchor['focus'] and not row['focus'])),
+                distance(row,anchor) if anchor else 0,-int(row['explicit']),-row['focus'],-row['overlap'],row['start'])
         for role,lane in enumerate(lanes):
-            ranked=sorted((row for row in candidates if lane(row)),
-                key=lambda row:(-int(row['explicit']) if role==1 else 0,-row['focus'],-row['overlap'],row['start']))
+            pool=[row for row in candidates if lane(row)]
+            if role==0 and not pool:pool=[row for row in candidates if row['observation']]
+            ranked=sorted(pool,key=qualifier_key if role==1 else
+                lambda row:(-row['focus'],-row['overlap'],row['start']))
             for candidate in ranked:
-                if take(candidate):break
+                already_included=any(start<=candidate['start'] and stop>=candidate['end'] for start,stop in ranges)
+                if (role==0 and already_included) or take(candidate):
+                    if role==0:anchor=candidate
+                    break
         for candidate in sorted(candidates,key=lambda row:(-row['focus'],-row['overlap'],row['start'])):
             if sum(b-a for a,b in ranges)>=budget:break
             take(candidate)
+        if anchor:
+            neighbors=sorted((row for row in candidates if row['qualifier'] and distance(row,anchor)<=budget),key=qualifier_key)
+            for row in neighbors:
+                if any(start<=row['start'] and stop>=row['end'] for start,stop in ranges):continue
+                followup.append([row['start'],row['end']])
+                if len(followup)==2:break
     full=bool(ranges==[[0,len(text)]])
     if full:rendered=text
     else:
         rendered='【入模完整句摘录，未提供全文；原文字符偏移从0起。选句是阅读辅助，不是财务结论或独立核实。未读部分可用read_material继续读取。】'
         if not ranges:rendered+='\n本预算内没有可完整提供的句子，需继续读取原文，不从标题补写事实。'
         for start,stop in ranges:rendered+=f'\n【原文字符{start}:{stop} / 总长{len(text)}】\n'+text[start:stop]
+        if followup:rendered+='\n【邻近限定候选尚未提供，原文字符区间：'+str(followup)+'。仅为词项与位置线索；未继续read_material核对前，不认为已掌握完整语境。】'
     return dict(text=rendered,ranges=ranges,selected_characters=sum(b-a for a,b in ranges),budget=budget,
-        collected_text_fully_provided=full,limitation='完整句不等于完整上下文或独立核实；未读取的材料不能冒充已读。')
+        collected_text_fully_provided=full,followup_ranges=followup,limitation='完整句不等于完整上下文或独立核实；未读取的材料不能冒充已读。')
