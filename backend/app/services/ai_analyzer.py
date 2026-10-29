@@ -1310,11 +1310,11 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         for i, news in enumerate(sorted_news, 1):
             # The episode workspace retains the full bodies. Only a bounded,
             # explicitly labelled reading window belongs in the initial prompt.
-            from .evidence_reading import read_news
+            from .evidence_reading import read_news,render_initial_news
             reading_budget=min(1200,max(300,18000//max(1,len(sorted_news))))
             focus_terms=[value for stock in stocks if matches_watchlist(news,[stock]) for value in (stock.name,stock.code) if value]
             reading=read_news(news.content,news.title,reading_budget,focus_terms)
-            content_preview=reading['text']
+            content_preview=render_initial_news(news.content,reading)
             self._news_briefing.setdefault('initial_reading',[]).append(dict(id=news.id,
                 ranges=reading['ranges'],selected_characters=reading['selected_characters'],budget=reading_budget,
                 collected_text_fully_provided=reading['collected_text_fully_provided'],followup_ranges=reading['followup_ranges']))
@@ -1328,12 +1328,16 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
 - 阅读范围：{scope_label(news)}
 - 原文链接：{news.source_url or "未提供，不可视为已验证"}
 - 时间：{publication_label(news)}
-- 关联边界：{news.market_impact or "未确定与自选股的直接关系"}
 - 采集文本（按上述阅读范围使用）：{content_preview}
 """)
         
-        allowed = ' '.join(f'[N:{item.id}]' for item in self._selected_evidence_news)
-        return ('本组允许引用的完整标记（逐字复制，禁止缩写、占位或另造编号）：' + allowed
+        # Full IDs remain in each heading and in the structured association
+        # audit. Do not repeat the ID catalogue or collector-inferred impact
+        # tags as if they were another independent source of facts.
+        return ('本组允许引用的完整标记见各条标题，逐字复制，禁止缩写或另造编号。'
+                '阅读范围标签描述存储材料，实际入模只以字符区间为准；未提供全文的条目不能冒充全文已读。'
+                '区间从0起，选句是阅读辅助而非核验；缺失部分可用read_material读取。'
+                '关联边界见上方统一结构化核对，业务交集不证明该公司受益或供货，也不证明订单。'
                 + '\n' + "\n".join(summary_parts))
     
     def _prepare_sentiment_index(self, news_list: List[News], cross_border_news: List[News]) -> str:

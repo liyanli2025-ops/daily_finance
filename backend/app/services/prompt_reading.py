@@ -89,11 +89,11 @@ def compact_market(text):
     for row in parsed:
         if row:visit(row[1])
     # Keep identity, time, units and source keys immediately legible.
-    keep={'source_quote_time','timestamp_span_seconds','source_url','time_basis','adjustment',
+    keep={'symbol','code','name','benchmark','status','source_quote_time','timestamp_span_seconds','source_url','time_basis','adjustment',
           'collected_at','observed_at','as_of','calendar_status','source_clock_usable'}
     mapping={};legend={};reserved=set(counts)
     for key,count in sorted(counts.items()):
-        if key in keep or len(key)<12 or count<3:continue
+        if key in keep or len(key)<6 or count<3:continue
         number=len(mapping)
         alias='f'+str(number)
         while alias in reserved:

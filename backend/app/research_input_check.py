@@ -18,6 +18,7 @@ def inspect(stocks,hub=None,details=False):
         cached_materials=sum(len(row.get('materials',[])) for row in contexts),
         prepared_materials=len(evidence),prepared_unique_source_documents=len({item.source_id for item in evidence}),prompt_characters=len(prompt),prompt_character_budget=8000,
         prepared_original_characters=sum(row['selected_characters'] for row in ledger),
+        prepared_source_body_characters=sum(row.get('source_body_characters',0) for row in ledger),
         reading_status_counts=dict(Counter(row['status'] for row in ledger)),
         prepared_kind_counts=dict(Counter(item.kind for item in evidence)),
         prepared_titles=[dict(id=item.id,source_id=item.source_id,title=item.title,kind=item.kind,scope=item.scope) for item in evidence][:12],

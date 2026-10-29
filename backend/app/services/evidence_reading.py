@@ -124,3 +124,15 @@ def read_news(text,title='',budget=1200,focus_terms=()):
         if followup:rendered+='\n【邻近限定候选尚未提供，原文字符区间：'+str(followup)+'。仅为词项与位置线索；未继续read_material核对前，不认为已掌握完整语境。】'
     return dict(text=rendered,ranges=ranges,selected_characters=sum(b-a for a,b in ranges),budget=budget,
         collected_text_fully_provided=full,followup_ranges=followup,limitation='完整句不等于完整上下文或独立核实；未读取的材料不能冒充已读。')
+
+
+def render_initial_news(text,reading):
+    """Shared scope instructions are emitted once by the initial news builder."""
+    if reading['collected_text_fully_provided']:return text
+    parts=['【节选；实际提供范围如下】']
+    for start,end in reading['ranges']:
+        parts.append(f'【原文字符{start}:{end} / 总长{len(text)}】\n'+text[start:end])
+    if not reading['ranges']:parts.append('本预算无完整句，需read_material继续读取，不从标题补事实。')
+    if reading['followup_ranges']:
+        parts.append('【邻近限定候选未提供：'+str(reading['followup_ranges'])+'；仅词项/位置线索，需read_material核对，不冒充已读。】')
+    return '\n'.join(parts)

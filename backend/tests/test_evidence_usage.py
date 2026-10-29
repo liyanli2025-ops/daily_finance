@@ -112,10 +112,11 @@ class UsageTests(unittest.TestCase):
             with patch('app.services.ai_analyzer.get_watchlist_service',return_value=SimpleNamespace(get_all_stocks=lambda:[])),patch.object(ResearchHub,'load',return_value=[]):
                 text=AIAnalyzerService()._prepare_news_summary_with_sentiment([self.item])
         finally:_current.reset(token)
-        from app.services.evidence_reading import read_news
+        from app.services.evidence_reading import read_news,render_initial_news
         reading=read_news(self.item.content,self.item.title,1200)
         expected=reading['ranges']
-        self.assertIn(reading['text'],text)
+        self.assertIn(render_initial_news(self.item.content,reading),text)
+        for start,end in expected:self.assertIn(self.item.content[start:end],text)
         self.assertEqual(self.workspace.merged_ranges(self.workspace.prepared['new']),[list(span) for span in expected])
         self.assertEqual(self.workspace.usage()['confirmed_sources'],0)
 

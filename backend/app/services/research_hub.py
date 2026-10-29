@@ -585,6 +585,8 @@ class ResearchHub:
                       'company_research':3,'industry_research':4,'event_calendar':5,
                       'operating_release':6,'financial_baseline':7,'financial_report':8}
             def background(item):
+                from .research_relevance import conditional_plan_reminder
+                if item['kind']=='primary_notice' and conditional_plan_reminder(item['title'],item['body']):return True
                 published=parse_date(item.get('published_at'))
                 age=china_now()-published if published else None
                 if item['kind'] in {'financial_baseline','financial_report','operating_release'}:
@@ -644,11 +646,12 @@ class ResearchHub:
                     limit=max(1,limit-max(40,len(snippet)-slot_budget))
                     reading=read_research(material.body,material.kind,material.title,limit,focus)
                     snippet=material.prompt(body_text=reading['text'],compact=True)
-                provided=bool(reading['ranges'] and len(snippet)<=slot_budget)
+                provided=bool(reading['ranges'] and reading['source_body_characters']>0 and len(snippet)<=slot_budget)
                 self.prompt_reading.append(dict(id=material.id,source_id=material.source_id,kind=material.kind,scope=material.scope,requested_scope=item['scope'],
                     ranges=reading['ranges'] if provided else [],selected_characters=reading['selected_characters'] if provided else 0,
                     stored_characters=len(material.body),rendered_characters=len(snippet) if provided else 0,
-                    status='provided' if provided else 'not_provided_within_budget',omitted=reading['omitted']))
+                    source_body_characters=reading['source_body_characters'] if provided else 0,
+                    status='provided' if provided else 'not_provided_source_preamble_only' if reading['ranges'] and not reading['source_body_characters'] else 'not_provided_within_budget',omitted=reading['omitted']))
                 if not provided:continue
                 parts.append(snippet)
                 evidence.append(material)
