@@ -18,8 +18,8 @@
 
 ## 用户操作顺序
 
-下载 finance-quality-consolidated-20261029-v11.zip 上传服务器/tmp，使用交付消息中的SHA256校验并解压到/tmp/finance-quality-consolidated-upload-v11。
-先运行解压目录 finance-quality-consolidated-20261029-v11/install_upgrade.py（不带参数），通过后同脚本加 --apply --restart。
+下载 finance-quality-consolidated-20261029-v11-r2.zip 上传服务器/tmp，使用交付消息中的SHA256校验并解压到/tmp/finance-quality-consolidated-upload-v11-r2。
+先运行解压目录 finance-quality-consolidated-20261029-v11-r2/install_upgrade.py（不带参数），通过后同脚本加 --apply --restart。
 
 安装后只运行：
 

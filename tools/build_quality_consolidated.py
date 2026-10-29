@@ -55,7 +55,7 @@ def build(output,baseline_archive,allocation_archive):
     output.mkdir(parents=True)
     revision=subprocess.check_output(['git','-C',str(repo),'rev-parse','HEAD']).decode().strip()
     manifest=dict(settings={},source_revision=revision,source_worktree_dirty=False,
-        reviewed_installed_v10_artifact_sha256=V10_SHA,reviewed_allocation_artifact_sha256=ALLOCATION_SHA,files={name:dict(old_sha256=digest(old[name]) if old[name] is not None else None,new_sha256=digest(value),additional_old_sha256=[digest(prior[name])] if prior[name] is not None else []) for name,value in new.items()})
+        reviewed_installed_v10_artifact_sha256=V10_SHA,reviewed_allocation_artifact_sha256=ALLOCATION_SHA,files={name:dict(old_sha256=digest(old[name]) if old[name] is not None else None,new_sha256=digest(value),additional_old_sha256=[digest(prior[name]) if prior[name] is not None else None]) for name,value in new.items()})
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
     (output/'install_upgrade.py').write_bytes((repo/'tools/install_paused_upgrade.py').read_bytes())
     with zipfile.ZipFile(output/'payload.zip','w',zipfile.ZIP_DEFLATED) as payload:
