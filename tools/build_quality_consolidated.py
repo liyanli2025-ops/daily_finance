@@ -1,4 +1,4 @@
-"""Build the consolidated analysis/speech release from immutable confirmed v10, allocation and optional v11-r2 archives."""
+"""Build the consolidated analysis/speech release from immutable confirmed v10, allocation and confirmed installed archives."""
 import argparse
 from contextlib import closing
 import hashlib
@@ -13,6 +13,8 @@ import zipfile
 
 V10_SHA='94554a1b14e16fa70f91cb5290571902a9c9962964bfe272f07c7e9d63b7efb5'
 V11_SHA='143ec09bcfb285ebc6208f31760804a7b7f7f5267ee0ab163316a8427e8bd8a8'
+V12_SHA='54fd66764715cb8edbbfed206a6fb13529f7c317f22326815eaeb9787a504022'
+INSTALLED_ARCHIVES={V11_SHA:'finance-quality-consolidated-20261029-v11-r2',V12_SHA:'finance-editorial-cost-20261029-v12'}
 ALLOCATION_SHA='c2f08e103293aea7a51a029d31c62a4b124c95354705de2edf674f57fca9e4e7'
 
 
@@ -50,9 +52,11 @@ def build(output,baseline_archive,allocation_archive,installed_archive=None):
         if original is not None and digest(original)!=patch['files'][name]['old_sha256']:
             raise RuntimeError('Allocation baseline does not match confirmed v10: '+name)
     allocation_state={name:allocated.get(name,prior[name]) for name in names}
-    installed={}
+    installed={};installed_sha=None
     if installed_archive is not None:
-        _,installed=read_bundle(installed_archive,'finance-quality-consolidated-20261029-v11-r2',V11_SHA)
+        installed_sha=hashlib.sha256(Path(installed_archive).read_bytes()).hexdigest()
+        if installed_sha not in INSTALLED_ARCHIVES:raise RuntimeError('Unknown installed release archive')
+        _,installed=read_bundle(installed_archive,INSTALLED_ARCHIVES[installed_sha],installed_sha)
     old={name:installed.get(name,allocation_state[name]) for name in names}
     new={name:(repo/name).read_bytes() for name in names}
     output=Path(output).resolve()
@@ -60,12 +64,12 @@ def build(output,baseline_archive,allocation_archive,installed_archive=None):
     output.mkdir(parents=True)
     revision=subprocess.check_output(['git','-C',str(repo),'rev-parse','HEAD']).decode().strip()
     manifest=dict(settings={},source_revision=revision,source_worktree_dirty=False,
-        reviewed_installed_v11_artifact_sha256=V11_SHA if installed_archive else None,reviewed_installed_v10_artifact_sha256=V10_SHA,reviewed_allocation_artifact_sha256=ALLOCATION_SHA,files={name:dict(old_sha256=digest(old[name]) if old[name] is not None else None,new_sha256=digest(value),additional_old_sha256=list(dict.fromkeys(digest(v) if v is not None else None for v in (prior[name],allocation_state[name])))) for name,value in new.items()})
+        reviewed_installed_artifact_sha256=installed_sha,reviewed_installed_v10_artifact_sha256=V10_SHA,reviewed_allocation_artifact_sha256=ALLOCATION_SHA,files={name:dict(old_sha256=digest(old[name]) if old[name] is not None else None,new_sha256=digest(value),additional_old_sha256=list(dict.fromkeys(digest(v) if v is not None else None for v in (prior[name],allocation_state[name])))) for name,value in new.items()})
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
     (output/'install_upgrade.py').write_bytes((repo/'tools/install_paused_upgrade.py').read_bytes())
     with zipfile.ZipFile(output/'payload.zip','w',zipfile.ZIP_DEFLATED) as payload:
         for name,value in new.items():payload.writestr(name,value)
-    (output/'README.txt').write_text('合并源码更新：资料去重/阅读分配、经营证据定位、RSI分类、口播审查对照、归因/期限一致性及默认关闭失败重试与自动修稿。只接受清单中已确认的v10/分配修复/v11-r2指纹或本包新文件；冲突停止，不能绕过。\n默认只验证；--apply --restart私有备份并仅重启finance-daily，要求暂停与数据库健康。\n不改.env、数据库、前端静态文件或其他项目，不调用模型/TTS，不恢复定时任务。保留所有旧付费验收标记。\n安装后仅运行app.selection_check和app.research_input_check免费回放；禁止重跑旧付费试验。\n',encoding='utf-8')
+    (output/'README.txt').write_text('合并源码更新：资料去重/阅读分配、经营证据定位、RSI分类、口播审查对照、归因/期限一致性、听众导向口播与编辑备注分离，以及默认关闭失败重试与自动修稿。只接受清单中已确认的v10/分配修复/指定已安装版本指纹或本包新文件；冲突停止，不能绕过。\n默认只验证；--apply --restart私有备份并仅重启finance-daily，要求暂停与数据库健康。\n不改.env、数据库、前端静态文件或其他项目，不调用模型/TTS，不恢复定时任务。保留所有旧付费验收标记。\n安装后按本次发布文档运行免费检查；不重复采集，不重跑旧付费试验。\n',encoding='utf-8')
     with tempfile.TemporaryDirectory(prefix='finance-consolidated-quality-') as temporary:
         root=Path(temporary)/'finance-daily'
         for name,value in old.items():
@@ -118,5 +122,5 @@ if __name__=='__main__':
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--baseline-archive',type=Path,required=True)
     parser.add_argument('--allocation-archive',type=Path,required=True)
-    parser.add_argument('--installed-archive',type=Path,help='Exact confirmed v11-r2 artifact')
+    parser.add_argument('--installed-archive',type=Path,help='Exact confirmed v11-r2 or v12 artifact')
     args=parser.parse_args();print(json.dumps(build(args.output,args.baseline_archive,args.allocation_archive,args.installed_archive),ensure_ascii=False,indent=2))
