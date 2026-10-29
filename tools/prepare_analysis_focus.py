@@ -51,7 +51,7 @@ def prepare(source,news,output):
     analyzer=AIAnalyzerService.__new__(AIAnalyzerService)
     analyzer._edition_label='早报'
     analyzer._generation_context='历史分析验收，资料截面2026-10-29 07:32；只写宁德时代与锂价相关的一个研究问题，不扩写整期早报或其他自选股。不是实时建议。'
-    market='已完成日线，截至2026-10-28；个股前复权，指数未复权，不拼接其他时点报价。return_1d_pct为单日，return_5d/20d_pct为相应期累计收益，excess为同期收益之差（百分点）。RSI严格小于30才属传统超卖，不代表反弹；未知资金流、估值和一致预期不补造。\n'+json.dumps(metrics,ensure_ascii=False)
+    market='已完成日线，截至2026-10-28；个股前复权，指数未复权，不拼接其他时点报价。return_1d_pct为单日，return_5d/20d_pct为相应期累计收益，excess为同期收益之差（百分点）。drawdown_20d_pct是相对最近20个收盘价最高值的回撤，包含当期；prior20_high/low才是排除当期的前20期盘中高低点，不混用。volume_vs_prior20是当期成交量除以前20期均量，不能解释为资金流。RSI严格小于30才属传统超卖，不代表反弹；未知资金流、估值和一致预期不补造。\n'+json.dumps(metrics,ensure_ascii=False)
     with patch('requests.sessions.Session.request',side_effect=AssertionError('No network')),patch('httpx.AsyncClient.send',new=AsyncMock(side_effect=AssertionError('No network'))):
         prompt=analyzer._build_editorial_report_prompt(today=datetime(2026,10,29).date(),report_type=ReportType.MORNING,
             is_trading_day='独立日历未核验',watchlist_text='本次只讨论App自选股宁德时代（A:300750），不是用户持仓。',

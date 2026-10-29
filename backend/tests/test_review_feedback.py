@@ -60,6 +60,15 @@ class FeedbackTests(unittest.TestCase):
         for value in [[self.note()]*4,[dict(self.note(),support_ids=['invented'])],[dict(self.note(),claim=True)],{}]:
             with self.assertRaises(RuntimeError):decision_notes(value,{'source'})
 
+    def test_display_prefix_normalizes_only_exact_known_ids(self):
+        note=dict(self.note(),support_ids=['N:source'])
+        self.assertEqual(decision_notes([note],{'source'})[0]['support_ids'],['source'])
+        self.assertEqual(note['support_ids'],['N:source'])
+        self.assertEqual(decision_notes([note],{'N:source','source'})[0]['support_ids'],['N:source'])
+        for bad in ['N:unknown','N:N:source',' source','SOURCE']:
+            with self.assertRaises(RuntimeError):
+                decision_notes([dict(note,support_ids=[bad])],{'source'})
+
     def test_report_parser_retains_decision_notes_for_review_not_app_schema(self):
         from datetime import date
         from app.models.news import News

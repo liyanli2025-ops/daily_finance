@@ -64,8 +64,13 @@ def decision_notes(value,allowed_ids):
         output={key:row[key] for key in fields}
         for key in ('support_ids','counterevidence_ids'):
             ids=row.get(key)
-            if not isinstance(ids,list) or len(ids)>8 or any(not isinstance(item,str) or item not in allowed_ids for item in ids):
+            if not isinstance(ids,list) or len(ids)>8 or any(not isinstance(item,str) for item in ids):
                 raise RuntimeError('判断清单引用未知证据ID')
-            output[key]=ids
+            # Normalize only a redundant display prefix on an exact known ID.
+            # Preserve IDs that genuinely begin with N:; never invent or fuzzy-match.
+            canonical=[item if item in allowed_ids else item[2:] if item.startswith('N:') and item[2:] in allowed_ids else item for item in ids]
+            if any(item not in allowed_ids for item in canonical):
+                raise RuntimeError('判断清单引用未知证据ID')
+            output[key]=canonical
         result.append(output)
     return result
