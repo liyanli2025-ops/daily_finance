@@ -7,6 +7,9 @@ ATTRIBUTED=re.compile(r'\b(?:said|stated|preferred|decided|expects?|approved)\b|
 DIRECT_SOURCE=re.compile(r'\b(?:committee|company|management|officials|analysts|chair)\b[^.!?\n]{0,80}\b(?:said|stated|preferred|decided|expects?|maintain\w*)\b|(?:公司|管理层|负责人|分析师|工作人员|他|她)[^。！？]{0,35}(?:表示|指出|称)|(?:业绩说明会|投资者关系|三季报|公告)[^。！？]{0,15}(?:表示|称|提到)',re.I)
 QUALIFIER=re.compile(r'\b(?:while|however|although|uncertainty|but|not necessarily|rather than)\b|并未|并非|不代表|不意味着|不等于|未必|不过|但是|然而|尚未|仍需|不及预期|低基数|一次性|受到.{0,12}支撑',re.I)
 EXPLICIT_QUALIFIER=re.compile(r'并未|并非|不代表|不意味着|不等于|未必|低基数|一次性')
+PROMOTIONAL=re.compile(r'报名课程|课程.{0,50}(?:报名|实操|限额)|(?:零基础|手把手).{0,50}(?:课程|报名)|点击.{0,30}(?:报名|购买课程)')
+MARKET_LABEL=re.compile(r'^\s*(美股|美债|外汇|海外股市|美国国债|汇市)\s*[：:]')
+
 PRONOUN=re.compile(r'^[\s“”]*(?:公司|该公司|他(?:指出|表示|称)|她(?:指出|表示|称)|其(?!中|他|余))')
 
 
@@ -52,12 +55,14 @@ def read_news(text,title='',budget=1200,focus_terms=()):
                 # predecessor even when it names a different company.
                 if len(previous)+len(sentence)>budget:continue
                 start=units[context_index][0];context=body[start:stop]
+            if PROMOTIONAL.search(context):continue
             focus=sum(term in context.casefold() for term in terms)
             overlap=sum(term.casefold() in context.casefold() for term in title_terms)
             observation=bool(OPERATING.search(context) and CHANGE.search(context))
             attributed=bool(ATTRIBUTED.search(sentence) and observation)
             qualifier=bool(QUALIFIER.search(sentence) and (OPERATING.search(context) or CHANGE.search(context) or EXPLICIT_QUALIFIER.search(sentence)))
             candidates.append(dict(start=start,end=stop,focus=focus,overlap=overlap,observation=observation,
+                market_label=(MARKET_LABEL.match(sentence).group(1) if MARKET_LABEL.match(sentence) and CHANGE.search(sentence) else None),
                 attributed=attributed,direct=bool(attributed and DIRECT_SOURCE.search(sentence)),qualifier=qualifier,explicit=bool(EXPLICIT_QUALIFIER.search(sentence))))
         ranges=[]
         def take(candidate):
@@ -67,7 +72,18 @@ def read_news(text,title='',budget=1200,focus_terms=()):
             ranges[:]=trial;return True
         # Preserve a short opening/source caveat without spending most of the
         # window on the opening industry summary.
-        if units and units[0][1]<=max(120,budget//4):take(dict(start=0,end=units[0][1]))
+        market_rows=[row for row in candidates if row['market_label']]
+        # Explicit cross-asset recap labels are reading leads, not validation.
+        # Preserve equities, bonds and FX before company detail in a digest.
+        # Never match a forecast merely mentioning an index inside a paragraph.
+        market_groups={'美股':'equity','海外股市':'equity','美债':'bond','美国国债':'bond','外汇':'fx','汇市':'fx'}
+        groups={market_groups[row['market_label']] for row in market_rows}
+        if len(groups)>=2 and not terms:
+            seen=set()
+            for row in market_rows:
+                group=market_groups[row['market_label']]
+                if group not in seen and take(row):seen.add(group)
+        elif units and not PROMOTIONAL.search(body[:units[0][1]]) and units[0][1]<=max(120,budget//4):take(dict(start=0,end=units[0][1]))
         # These lanes are linguistic roles, not bullish/bearish classifications.
         lanes=[lambda row:row['direct'],
                lambda row:row['qualifier'],lambda row:row['observation']]

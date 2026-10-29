@@ -104,3 +104,21 @@ class EvidenceReadingTests(unittest.TestCase):
         result=read_news('公司表示，需求下降，但订单尚未取消。', budget=300)
         self.assertEqual(result['followup_ranges'], [])
         self.assertTrue(result['collected_text_fully_provided'])
+
+    def test_cross_asset_digest_reads_actual_recap_before_advertising_and_company_detail(self):
+        body='报名课程，了解投资方法。'+('公司表示，利润增长20%。'*50)
+        equity=' 美股：标普500涨0.28%，纳指涨0.27%。'
+        bond=' 美债：10年期收益率升2.08个基点，2年期下降3.95个基点。'
+        fx=' 外汇：美元指数跌0.19%，离岸人民币上涨。'
+        body+=equity+bond+fx+('分析师预计美债收益率可能下降。'*40)
+        result=read_news(body,'每日财经早餐',240)
+        for value in (equity,bond,fx):self.assertIn(value,result['text'])
+        self.assertNotIn('报名课程',result['text'])
+        self.assertLessEqual(result['selected_characters'],240)
+
+    def test_forecast_mentions_are_not_cross_asset_recap_labels(self):
+        body='行业变化。'+('公司表示，订单增长20%。'*40)
+        body+='分析师预计美股或上涨，美债收益率或下降，美元指数可能走弱。'
+        result=read_news(body,'行业订单',180,['公司'])
+        self.assertIn('公司表示，订单增长20%',result['text'])
+        self.assertNotIn('分析师预计美股',result['text'])
