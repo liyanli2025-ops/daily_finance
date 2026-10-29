@@ -47,12 +47,14 @@ def build(review,research_archive,output):
     return dict(mode='free_preview',trial=TRIAL_ID,input_sha256=INPUT_SHA,
         snapshot_collected_at=packet['snapshot_collected_at'],research_exported_at=packet['research_exported_at'],
         input_characters=packet['input_characters'],model=MODEL,max_output_tokens=MAX_TOKENS,
-        max_http_requests=1,retries=0,http_requests_performed=0,watchlist=packet['watchlist'],
+        max_http_requests=1,retries=0,http_requests_performed=0,reasoning_policy='沿用服务器 analysis 配置；实际值随执行结果保存',watchlist=packet['watchlist'],
         selected_news=packet['selected_news'],research_views=packet['research_views'],research_source_documents=packet['research_source_documents'],
         limitation='新历史资料报告验收，不再使用人工修正版报告；默认免费预览，--run才收费一次。无自动审查/修稿/口播/TTS/发布，不恢复调度。未接补查工具，不验收实时采集或完整生产流程。字符不是token，实际账单以服务商为准。')
 
 """
     source=source[:start]+preview+source[end:]
+    source=source.replace("    route=replace(route,effort='none')\n", "    # Preserve the production analysis reasoning configuration.\n")
+    source=source.replace("model=MODEL,max_output_tokens=MAX_TOKENS,http_requests=0,retries=0,", "model=MODEL,reasoning_effort=route.effort,max_output_tokens=MAX_TOKENS,http_requests=0,retries=0,")
     source=source.replace('import argparse\n','import argparse\nimport re\n',1)
     source=source.replace('    save(state,data)\n    started=time.monotonic()',"    save(folder/(TRIAL_ID+'.input.json'),packet)\n    save(state,data)\n    started=time.monotonic()",1)
     source=source.replace("        data['status']='completed_for_human_review'", "        cited=set(re.findall(r'\\[N:([^\\]\\s]+)\\]',data['response']))\n        data['citation_check']=dict(unprovided_ids=sorted(cited-set(packet['allowed_citation_ids'])),limitation='ID存在不代表支持具体主张，仍待人工核验')\n        data['status']='completed_for_human_review'")
@@ -76,6 +78,8 @@ def build(review,research_archive,output):
         state=module.execute(backend,packet,gateway,factory,usage,Mock())
         result=json.loads(state.read_text(encoding='utf-8'))
         assert result['status']=='completed_for_human_review'
+        assert result['reasoning_effort']=='high'
+        assert gateway.request_for.call_args.args[0].effort=='high'
         assert result['citation_check']['unprovided_ids']==['unprovided-test']
         assert (state.parent/(TRIAL+'.input.json')).is_file()
         module.execute(backend,packet,gateway,factory,usage,Mock());client.post.assert_called_once()
