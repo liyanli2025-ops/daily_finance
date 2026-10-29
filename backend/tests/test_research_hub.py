@@ -151,7 +151,7 @@ class ResearchTests(unittest.TestCase):
         materials=[]
         for i,kind in enumerate(kinds):
             item=Material(str(i),kind,'测试来源','https://example.com/doc/'+str(i),kind,'A:123456',
-                          '测试原文'*1800,datetime.now(),datetime.now().isoformat())
+                          '测试经营原文，需求仍有风险。'*1800,datetime.now(),datetime.now().isoformat())
             materials.append({**asdict(item),'published_at':item.published_at.isoformat()})
         context=dict(key='A:123456',name='新关注公司',profile=None,coverage={},materials=materials)
         with patch.object(self.hub,'load',return_value=[context]):

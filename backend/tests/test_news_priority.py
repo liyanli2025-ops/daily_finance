@@ -62,7 +62,7 @@ class BackgroundPriorityTests(unittest.TestCase):
                 old=kind.startswith('financial')
                 date=NOW-timedelta(days=60) if old else NOW-timedelta(hours=12)
                 item=Material('id'+str(i),kind,'来源','https://example.com/'+str(i),kind,'A:123456',
-                              ('背景' if old else '近期新增')*5000,date,NOW.isoformat())
+                              ('背景。' if old else '近期新增。')*5000,date,NOW.isoformat())
                 materials.append({**asdict(item),'published_at':date.isoformat()})
             context=dict(key='A:123456',name='任意自选股',profile=None,coverage={},materials=materials)
             with patch.object(hub,'load',return_value=[context]), \

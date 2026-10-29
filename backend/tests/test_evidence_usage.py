@@ -80,7 +80,7 @@ class UsageTests(unittest.TestCase):
             self.assertIn('new',self.workspace.prepared)
         finally:_current.reset(token)
 
-    def test_research_records_only_selected_body_prefix(self):
+    def test_research_records_only_selected_complete_ranges(self):
         from dataclasses import asdict
         from app.services.research_hub import ResearchHub,Material
         from app.services.watchlist_service import WatchlistStock
@@ -94,7 +94,8 @@ class UsageTests(unittest.TestCase):
         self.assertEqual([item.id for item in evidence],['research'])
         start,end=hub.prompt_ranges['research'][0]
         self.assertEqual(start,0);self.assertLess(end,len(material.body))
-        self.assertIn(material.prompt(end),text)
+        self.assertIn(material.body[start:end],text)
+        self.assertEqual(hub.prompt_reading[0]['ranges'],hub.prompt_ranges['research'])
 
     def test_historical_scope_is_unknown_and_read_only(self):
         path=Path(self.tmp.name)/'old.json'
