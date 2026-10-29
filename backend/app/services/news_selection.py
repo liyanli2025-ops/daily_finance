@@ -3,8 +3,15 @@ import re
 from datetime import timedelta, timezone
 
 
+def matching_text(title, body):
+    """Footer link titles are not reporting about the company/industry."""
+    body = re.split(r'(?m)^\s*相关阅读[：:]?\s*$', body or '', maxsplit=1)[0]
+    return title + ' ' + body
+
+
 def industry_terms(text, terms):
     """Lexical leads only; ambiguous utility words need hydropower context."""
+    text = re.split(r'(?m)^\s*相关阅读[：:]?\s*$', text, maxsplit=1)[0]
     clean = re.sub(r'自来水|水电(?:费|气|煤|工|维修|安装)', '', text)
     # A mine/factory purchasing electricity from a plant is not a report about
     # a hydropower producer's operations. Mask only the consumer-side clause
@@ -18,10 +25,11 @@ def industry_terms(text, terms):
 
 
 def matches_watchlist(item, stocks):
-    text = (item.title + " " + (item.content or "")).casefold()
+    text = matching_text(item.title, item.content).casefold()
+    has_related_footer = bool(re.search(r'(?m)^\s*相关阅读[：:]?\s*$',item.content or ''))
     related = set(item.related_stocks or [])
     for stock in stocks:
-        if stock.code in related:
+        if stock.code in related and not has_related_footer:
             return True
         if stock.name and stock.name.casefold() in text:
             return True

@@ -4,7 +4,7 @@ import json
 import re
 from urllib.parse import urlsplit
 
-from .news_selection import matches_watchlist
+from .news_selection import matches_watchlist,matching_text
 from .news_quality import reading_scope,company_focus,priority
 from .editorial_value import profile as editorial_profile,rank as editorial_rank
 
@@ -20,6 +20,8 @@ def editorial_exclusion(item, stocks):
     if promotion_reason(title):
         return 'commercial_promotion_not_primary_story'
     if re.search(r'论坛成功举办|采标企业名单.*揭晓|【直播(?:中)?】',title) and not any(company_focus(item,stock) for stock in stocks):
+        return 'conference_promotion_not_primary_story'
+    if re.search(r'(?:年会|大会|论坛|峰会).{0,24}(?:圆满|成功)(?:落幕|闭幕|举办|召开)',title) and not any(company_focus(item,stock) for stock in stocks):
         return 'conference_promotion_not_primary_story'
     if re.search(r'女首富|男首富|富豪榜|身家.{0,12}亿元',title) and not re.search(r'增持|减持|收购|质押|重组|控制权',title):
         return 'wealth_profile_without_operating_event'
@@ -62,11 +64,21 @@ def consultation_key(item):
     return item.source,match.group(1),item.published_at.date().isoformat(),'consultation'
 
 
+def primary_rate_decision(item):
+    """One verified-address policy anchor, not every government item or forecast."""
+    parts=urlsplit(item.source_url or '')
+    return (item.source=='美联储公开原文' and parts.hostname=='www.federalreserve.gov'
+        and bool(re.fullmatch(r'/newsevents/pressreleases/monetary\d{8}a\.htm',parts.path))
+        and bool(re.search(r'\bFOMC\b.*\bstatement\b|联邦公开市场委员会.*声明',item.title,re.I)))
+
+
 def topic(item):
     text=item.title
     if '公开市场业务' in text:return '国内流动性操作'
     if '私募投资母基金' in text:return '国内私募基金监管'
-    if any(word in text for word in ('美联储','加息预期','议息')):return '美国货币政策'
+    if any(word in text for word in ('美联储','加息预期','议息')) or re.search(r'\bFOMC\b',text,re.I):return '美国货币政策'
+    if (re.search(r'公募|基金',text) and re.search(r'季报|季度|Q[1-4]',text,re.I)
+            and re.search(r'持仓|重仓|调仓|科技降温',text)):return '公募季度持仓'
     if any(word in text for word in ('AI','人工智能')) and any(word in text for word in ('抛售','止跌','发债','资本开支','高盛','对冲基金')):
         return '海外AI交易与融资'
     if any(word in text for word in ('原油','油价','石油','阿联酋')):return '能源供给与价格'
@@ -75,7 +87,7 @@ def topic(item):
 
 def associations(item,stocks,profiles):
     """Overlap grades are reading guidance, never evidence of beneficiary or causation."""
-    text=item.title+' '+(item.content or '')
+    text=matching_text(item.title,item.content)
     result=[]
     for stock in stocks:
         key=str(getattr(stock.market,'value',stock.market))+':'+stock.code

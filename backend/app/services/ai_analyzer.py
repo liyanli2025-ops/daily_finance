@@ -1103,8 +1103,10 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         research_background = []
         stocks = get_watchlist_service().get_all_stocks()
         from .research_hub import ResearchHub
-        from .news_briefing import associations,topic,briefing,consultation_key,diverse_rank,editorial_exclusion,prompt as briefing_prompt
+        from .news_briefing import associations,topic,briefing,consultation_key,diverse_rank,editorial_exclusion,primary_rate_decision,prompt as briefing_prompt
         profiles={row['key']:row['profile'] for row in ResearchHub().load(stocks) if row.get('profile')}
+        self._selection_context=dict(watchlist=[dict(code=stock.code,name=stock.name,
+            market=str(getattr(stock.market,'value',stock.market))) for stock in stocks],profiles=profiles)
         editorial_counts=Counter(editorial_exclusion(item,stocks) for item in news_list if editorial_exclusion(item,stocks))
         self._news_quality_exclusions.update(editorial_counts)
         news_list=[item for item in news_list if not editorial_exclusion(item,stocks)]
@@ -1189,7 +1191,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                     continue
                 scope=reading_scope(n)
                 editorial_kind=editorial_profile(n)['kind']
-                background=editorial_kind in {'recap','routine_quote','general_opinion'}
+                background=editorial_kind in {'recap','routine_quote','routine_disclosure','general_opinion'}
                 if background and (sum(background_counts.values())>=2 or background_counts[editorial_kind]>=1):
                     continue
                 if scope=='feed_excerpt' and scope_counts.get(scope,0)>=6:
@@ -1213,6 +1215,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                     added += 1
         
         # 保底配额
+        add_news([n for n in news_list if primary_rate_decision(n)],1,'重大议息原文')
         add_news(sorted([n for n in news_list if '全市场事件入口' in (n.market_impact or '')],
             key=lambda n:(n.category=='监管原文',n.importance_score,n.published_at),reverse=True),3,'全市场')
         watchlist_start=len(selected)

@@ -56,15 +56,21 @@ def build(output):
     spoken={name:git('show',SPOKEN_REF+':'+name) for name in SPOKEN_HASHES}
     if any(digest(value)!=SPOKEN_HASHES[name] for name,value in spoken.items()):
         raise RuntimeError('Reviewed spoken-integrity source no longer matches its fixed fingerprint')
+    deployed=json.loads(Path(__file__).with_name('reviewed_finance_v4_baseline.json').read_text(encoding='utf-8'))
+    v4={name:git('show',deployed['source_revision']+':'+name) for name in names if name in deployed['files']}
+    if any(digest(value)!=deployed['files'][name] for name,value in v4.items()):
+        raise RuntimeError('Reviewed installed v4 source does not match its release manifest')
     output=Path(output).resolve()
     if output.exists() or output.with_suffix('.zip').exists():raise RuntimeError('Immutable output already exists')
     output.mkdir(parents=True)
     manifest=dict(settings={},baseline=baseline,source_revision=git('rev-parse','HEAD').decode().strip(),
         source_worktree_dirty=bool(git('status','--porcelain').strip()),deployed_file_refs=DEPLOYED_FILE_REFS,
         frontend_static_deployed=False,reviewed_spoken_integrity_ref=SPOKEN_REF,
+        reviewed_installed_v4_artifact_sha256=deployed['artifact_sha256'],
         files={name:dict(old_sha256=digest(old[name]),new_sha256=digest(value),
             additional_old_sha256=([PAUSED_HASHES[name]] if name in PAUSED_HASHES else [])+
-                ([SPOKEN_HASHES[name]] if name in SPOKEN_HASHES else [])) for name,value in new.items()})
+                ([SPOKEN_HASHES[name]] if name in SPOKEN_HASHES else [])+
+                ([digest(v4[name])] if name in v4 else [])) for name,value in new.items()})
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
     (output/'install_upgrade.py').write_bytes((repo/'tools/install_paused_upgrade.py').read_bytes())
     with zipfile.ZipFile(output/'payload.zip','w',zipfile.ZIP_DEFLATED) as archive:
@@ -106,6 +112,20 @@ def build(output):
         assert all((root/name).read_bytes()==value for name,value in new.items())
         with closing(sqlite3.connect(db)) as connection:
             assert connection.execute('SELECT code FROM stocks').fetchone()[0]=='dynamic'
+        # Rehearse the now-confirmed v4 installation as well, using only exact
+        # files listed in that delivered artifact, not an arbitrary Git tree.
+        for name,value in old.items():
+            target=root/name
+            if value is None:target.unlink()
+            else:target.write_bytes(value)
+        for name,value in v4.items():
+            target=root/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(value)
+        for options in ([],['--apply']):subprocess.run(command+options,check=True)
+        assert all((root/name).read_bytes()==value for name,value in new.items())
+        assert env.read_bytes()==env_bytes and flag.read_bytes()==b'preserve-pause'
+        assert other.read_bytes()==b'other-project'
+        with closing(sqlite3.connect(db)) as connection:
+            assert connection.execute('SELECT code FROM stocks').fetchone()[0]=='dynamic'
         # Reconstruct the earlier baseline with the seven exact deployed spoken
         # files, then validate and apply together. Do not merely trust new code
         # idempotence as proof that the alternate old hashes are accepted.
@@ -123,7 +143,7 @@ def build(output):
             assert connection.execute('SELECT code FROM stocks').fetchone()[0]=='dynamic'
     with zipfile.ZipFile(output.with_suffix('.zip'),'w',zipfile.ZIP_DEFLATED) as archive:
         for path in output.iterdir():archive.write(path,output.name+'/'+path.name)
-    return dict(file=str(output.with_suffix('.zip')),sha256=hashlib.sha256(output.with_suffix('.zip').read_bytes()).hexdigest(),files=len(names),rehearsal='baseline_and_confirmed_spoken_variant_passed_no_service_or_model_calls')
+    return dict(file=str(output.with_suffix('.zip')),sha256=hashlib.sha256(output.with_suffix('.zip').read_bytes()).hexdigest(),files=len(names),rehearsal='baseline_spoken_and_installed_v4_passed_no_service_or_model_calls')
 
 
 if __name__=='__main__':

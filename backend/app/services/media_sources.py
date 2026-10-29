@@ -68,8 +68,8 @@ def query_plan(stocks,profiles,limit=12):
 
 
 def relation(title,body,stocks,terms):
-    from .news_selection import industry_terms
-    text=title+' '+body
+    from .news_selection import industry_terms,matching_text
+    text=matching_text(title,body)
     # Search hit != company mention, and industry hit != company beneficiary.
     direct=[stock.code for stock in stocks if stock.name and stock.name in text]
     industry={stock.code:industry_terms(text,terms.get(stock.code,[]))

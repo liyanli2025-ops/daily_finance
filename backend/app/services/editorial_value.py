@@ -1,8 +1,8 @@
 """Explainable reading priorities, not truth scores or estimated trading returns."""
 import re
 
-VARIABLE=re.compile(r'订单|库存|交期|排产|产能|产量|销量|售价|报价|利润|收入|营收|成本|毛利|开工|运价|出口|进口|赎回|资本开支|算力|供应|需求|成交|利率|汇率|收益率')
-CHANGE=re.compile(r'增长|下降|下滑|减少|增加|回落|降至|升至|跌至|涨至|扩产|提价|降价|上调|下调|取消|短缺|收缩|修复|亏损|新低|新高|突破|瓶颈|砍单')
+VARIABLE=re.compile(r'订单|库存|交期|排产|产能|产量|销量|售价|报价|利润|收入|营收|成本|毛利|开工|运价|出口|进口|赎回|资本开支|算力|供应|需求|成交|利率|汇率|收益率|溢价|折价|价差')
+CHANGE=re.compile(r'增长|下降|下滑|减少|增加|回落|降至|升至|跌至|涨至|扩产|提价|降价|上调|下调|取消|短缺|收缩|修复|亏损|新低|新高|突破|瓶颈|砍单|扩大|收窄|骤降')
 NUMBER=re.compile(r'\d+(?:\.\d+)?\s*(?:%|亿|万|倍|吨|元|个月|周|天)')
 
 
@@ -27,6 +27,12 @@ def profile(item):
     body=item.content or ''
     result=dict(kind='unclassified',priority=1,reasons=['尚未识别具体经营/政策/交易增量'],
         limitation='词项线索只用于阅读排序，不证明事实正确、原创、未定价或投资价值')
+    if re.search(r'翌日披露[报報]表',title):
+        result.update(kind='routine_disclosure',priority=0,reasons=['例行股份变动披露，须另核本期新增事实；不因公告标题就占重要催化位'])
+        return result
+    if re.search(r'\bFOMC\b.*\bstatement\b',title,re.I):
+        result.update(kind='policy_or_calendar',priority=3,reasons=['议息声明线索；须核对原文、时点和政策阶段，不代表超预期'])
+        return result
     promotion=promotion_reason(title)
     if promotion:
         result.update(kind='commercial_promotion',priority=-1,reasons=[promotion])

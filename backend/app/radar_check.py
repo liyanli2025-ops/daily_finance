@@ -12,6 +12,14 @@ from .services.news_briefing import briefing
 from .services.time_context import china_now
 
 
+def snapshot_article(item):
+    """Preserve ranking/association inputs, not just title/body, for replay."""
+    return dict(id=item.id,title=item.title,source=item.source,url=item.source_url,
+        published=item.published_at.isoformat(),content=item.content,association=item.market_impact,
+        importance_score=item.importance_score,related_stocks=item.related_stocks,
+        category=item.category,news_type=getattr(item.news_type,'value',item.news_type))
+
+
 def summarize_saved(root=None):
     """Compact read-only inspection; never re-fetches or generates anything."""
     root=Path(root) if root is not None else ROOT
@@ -81,8 +89,8 @@ async def inspect(hours,full_news=False):
     if not isinstance(source_inventory,dict):source_inventory={}
     snapshot=ROOT/'news-acceptance.json'
     save_json(snapshot,dict(collected_at=china_now().isoformat(),hours=hours,full_collection=full_news,china_filter_relaxed=relaxed,
-        raw_articles=[dict(id=item.id,title=item.title,source=item.source,url=item.source_url,
-                           published=item.published_at.isoformat(),content=item.content,association=item.market_impact) for item in raw],
+        raw_articles=[snapshot_article(item) for item in raw],
+        selection_context=getattr(analyzer,'_selection_context',{}),
         selection=selection,news_input=report_input,
         collection_funnel=getattr(collector,'_collection_funnel',{}) if isinstance(getattr(collector,'_collection_funnel',{}),dict) else {},
         source_inventory=source_inventory,

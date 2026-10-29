@@ -247,7 +247,7 @@ class NewsCollectorService:
         """
         采集所有来源的新闻
         
-        增强版：RSS + AKShare + 同花顺快讯
+        公开新闻、原文雷达及短期历史；停用通道不重探
         
         Args:
             hours: 采集最近多少小时的新闻
@@ -290,13 +290,10 @@ class NewsCollectorService:
             except Exception as e:
                 print(f"[AKShare] 新闻采集失败: {e}")
         
-        # 4. 【新增】采集同花顺快讯
-        try:
-            ths_news = await self._collect_10jqka_news()
-            all_news.extend(ths_news)
-            print(f"[同花顺] 快讯补充 {len(ths_news)} 条")
-        except Exception as e:
-            print(f"[同花顺] 快讯采集失败: {e}")
+        # The server's 20 THS rows all had homepage URLs and unverified times.
+        # Do not fetch a known unusable adapter merely to discard every item.
+        self._rss_coverage['同花顺快讯']=dict(status='disabled',
+            reason='homepage_url_and_unverified_publication_no_automatic_retest')
         
         # 5. 【新增】采集自选股相关新闻（个股 + 行业）
         try:
@@ -501,55 +498,9 @@ class NewsCollectorService:
     
     
     async def _collect_10jqka_news(self) -> List[News]:
-        """
-        采集同花顺24小时滚动快讯
-        
-        同花顺是国内主流炒股软件，其快讯非常及时
-        """
-        news_list = []
-        
-        try:
-            # 同花顺快讯页面
-            url = "https://news.10jqka.com.cn/tapp/news/push/stock/"
-            response = await self.client.get(url)
-            
-            if response.status_code == 200:
-                data = response.json()
-                items = data.get("data", {}).get("list", [])
-                
-                for item in items[:30]:
-                    title = item.get("title", "")
-                    digest = item.get("digest", "")
-                    ctime = item.get("ctime", "")
-                    
-                    if not title:
-                        continue
-                    
-                    # 解析时间
-                    try:
-                        published = datetime.strptime(ctime, "%Y-%m-%d %H:%M:%S")
-                    except:
-                        published = china_now()
-                    
-                    news_list.append(News(
-                        id=str(uuid.uuid4()),
-                        title=title,
-                        content=digest or title,
-                        summary=digest[:200] if digest else title,
-                        source="同花顺快讯",
-                        source_url=f"https://news.10jqka.com.cn/",
-                        published_at=published,
-                        news_type=NewsType.FINANCE,
-                        sentiment=SentimentType.NEUTRAL,
-                        importance_score=0.65,
-                        is_china_related=True,
-                        category="股票快讯"
-                    ))
-        except Exception as e:
-            print(f"  [同花顺] 快讯采集失败: {e}")
-        
-        return news_list
-    
+        """Retired: homepage links and fallback collection timestamps are not news evidence."""
+        return []
+
     async def _collect_watchlist_news(self, hours: int = 24) -> List[News]:
         """
         采集自选股相关新闻
