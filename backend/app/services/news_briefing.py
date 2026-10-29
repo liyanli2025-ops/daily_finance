@@ -85,6 +85,33 @@ def topic(item):
     return None
 
 
+def operating_context(item,profile):
+    """Narrow operating-variable reading leads, not a beneficiary assertion.
+
+    This protects business evidence that lacks the watchlist name in its title.
+    Fund holding lists and related links do not establish operating exposure.
+    """
+    if topic(item)=='公募季度持仓':return None
+    business=' '.join(str((profile or {}).get(field) or '') for field in ('industry','business'))
+    text=matching_text(item.title,item.content);lead=text[:800]
+    from .editorial_value import CHANGE,NUMBER
+    if not (CHANGE.search(lead) or NUMBER.search(lead)):return None
+    if any(word in business for word in ('塑封料','环氧塑封','封装材料')):
+        if re.search(r'塑封料|环氧模塑料|环氧塑封|封装材料',lead) and re.search(r'订单|需求|产能|售价|成本|库存',lead):
+            return '封装材料经营变量'
+    elif any(word in business for word in ('动力电池','锂电池','锂电')):
+        if re.search(r'碳酸锂|锂价|锂盐',item.title) and re.search(r'价|库存|供给|供应|需求',lead):
+            return '电池原料价格与供需'
+    elif any(word in business for word in ('水电','水力发电')):
+        from .news_selection import industry_terms
+        if re.search(r'水电|流域|来水|水库',item.title) and industry_terms(text,('来水','水电发电量','水电电价')):
+            return '水电经营与同业对照'
+    elif any(word in business for word in ('生猪','养猪')):
+        if re.search(r'猪价|生猪价格|能繁母猪|养殖成本|饲料价格',lead):
+            return '养殖价格与供需'
+    return None
+
+
 def associations(item,stocks,profiles):
     """Overlap grades are reading guidance, never evidence of beneficiary or causation."""
     text=matching_text(item.title,item.content)
@@ -92,13 +119,14 @@ def associations(item,stocks,profiles):
     for stock in stocks:
         key=str(getattr(stock.market,'value',stock.market))+':'+stock.code
         profile=profiles.get(key) or {}
+        context=operating_context(item,profile)
         business=' '.join(str(profile.get(field) or '') for field in ('industry','business'))
         if matches_watchlist(item,[stock]):
             result.append(dict(stock=key,level='company_mention',focus='company_specific' if company_focus(item,stock) else 'body_mention',
-                reason='原文提及名称或代码；不是独立核实、持仓或受益证明；综述提及不等于公司新增事件'))
+                reason='原文提及名称或代码；不是独立核实、持仓或受益证明；综述提及不等于公司新增事件',operating_context=context))
             continue
         label='行业关联 '+key+'（'
-        if label not in (item.market_impact or ''):
+        if label not in (item.market_impact or '') and not context:
             continue
         level='keyword_only';reason='只有行业词匹配，尚未证明具体产品、经营指标或交易影响'
         if any(word in business for word in ('塑封料','环氧塑封','封装材料')):
@@ -117,7 +145,9 @@ def associations(item,stocks,profiles):
                 level='business_overlap';reason='涉及水电经营变量；流域、交易电价及公司敞口仍需核验'
             else:
                 reason='旧行业标签仅词匹配；其他项目向水电站购电等背景不构成水电经营变化或公司关联'
-        result.append(dict(stock=key,level=level,reason=reason))
+        if context:
+            level='business_overlap';reason='经营变量存在文本交集；具体产品、流域、定价与公司敞口仍需核验'
+        result.append(dict(stock=key,level=level,reason=reason,operating_context=context))
     return result
 
 

@@ -1216,14 +1216,21 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         
         # 保底配额
         add_news([n for n in news_list if primary_rate_decision(n)],1,'重大议息原文')
-        add_news(sorted([n for n in news_list if '全市场事件入口' in (n.market_impact or '')],
-            key=lambda n:(n.category=='监管原文',n.importance_score,n.published_at),reverse=True),3,'全市场')
         watchlist_start=len(selected)
         # Give every current watchlist company a place before one busy company
         # can consume the entire watchlist quota.
         for stock in stocks:
             add_news([n for n in watchlist_news if company_focus(n,stock)], 1, "自选股")
+        # A quoted company metric or a narrowly matched operating variable is
+        # useful context even when it is not a company-specific headline. Give
+        # every current company one such lead before generic news fills slots.
+        for stock in stocks:
+            key=str(getattr(stock.market,'value',stock.market))+':'+stock.code
+            add_news([n for n in news_list if not company_focus(n,stock) and any(
+                row['stock']==key and row.get('operating_context') for row in associations(n,[stock],profiles))],1,'经营变量对照')
         add_news(watchlist_news, max(0, 5 - (len(selected)-watchlist_start)), "自选股")
+        add_news(sorted([n for n in news_list if '全市场事件入口' in (n.market_impact or '')],
+            key=lambda n:(n.category=='监管原文',n.importance_score,n.published_at),reverse=True),3,'全市场')
         add_news([item for item in news_list if '行业关联 ' in (item.market_impact or '')
                   and any(row['level']=='business_overlap' for row in associations(item,stocks,profiles))], 4, "自选股行业")
         add_news(global_macro_news, 5, "外盘/大宗")

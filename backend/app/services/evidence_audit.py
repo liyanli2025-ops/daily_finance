@@ -61,6 +61,9 @@ def audit(candidates, selected, stocks, profiles):
             full = reading_scope(item) == 'full_text' and not title_only(item)
             if company_focus(item, stock):
                 (company if full else excerpts).append(item.id)
+            elif full and any(row['stock']==key and row.get('operating_context')
+                              for row in associations(item,[stock],profiles)):
+                industry.append(item.id)
             elif matches_watchlist(item, [stock]):
                 mentions.append(item.id)
             elif any(row['stock']==key and row['level']=='business_overlap'

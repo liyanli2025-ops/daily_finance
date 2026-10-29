@@ -54,9 +54,11 @@ async def inspect(root=None):
         selected_titles=[row.title for row in new.values()],
         selected_editorial_counts=selection['selected_editorial_counts'],
         selected_reading_scope=selection['selected_reading_scope'],excluded_by_reason=selection['excluded_by_reason'],
+        per_stock=selection.get('evidence_audit',{}).get('per_stock',[]),
         limitation='仅重选原快照已准入候选，不重新抓取、不恢复原先排除的文章；旧快照未保存分类/重要性时使用明确默认值，不能宣称完全还原原排序。不改变原快照或行情时效，不代表正文事实已核实。')
     # Save a separate diagnostic, never silently replace the accepted source snapshot.
-    save_json(root/'selection-replay.json',dict(result,selection=selection,news_input=report_input))
+    save_json(root/'selection-replay.json',dict(result,selection=selection,news_input=report_input,
+        selection_context=getattr(analyzer,'_selection_context',{})))
     return result
 
 
