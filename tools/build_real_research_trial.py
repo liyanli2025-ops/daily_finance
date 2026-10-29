@@ -14,7 +14,10 @@ import zipfile
 TRIAL='real-research-report-20261029-v1'
 
 
-def build(review,research_archive,output):
+def build(review,research_archive,output,*,trial_id=TRIAL,max_output_tokens=8000,input_guard=100000):
+    import re
+    if not re.fullmatch(r"[a-z0-9-]{1,80}",trial_id) or not 1000<=max_output_tokens<=8000 or not 1000<=input_guard<=100000:
+        raise ValueError("Invalid frozen trial budget or identifier")
     repo=Path(__file__).resolve().parents[1]
     data=json.loads(Path(review).read_text(encoding='utf-8'))
     if data.get('model_requests')!=0 or data.get('confirmed_sources')!=0:raise RuntimeError('Expected never-sent local review')
@@ -22,10 +25,11 @@ def build(review,research_archive,output):
     rows=[dict(market=c['key'].split(':')[0],code=c['key'].split(':')[1],name=c['name']) for c in research['contexts']]
     messages=[dict(role='user',content=data['single_report_prompt'])]
     characters=len(json.dumps(messages,ensure_ascii=False,separators=(',',':')))
-    if not 0<characters<=100000:raise RuntimeError('Fixed input exceeds character guard')
+    if not 0<characters<=input_guard:raise RuntimeError('Fixed input exceeds character guard')
     packet=dict(owner='finance-staged-report-input-v1',messages=messages,watchlist=rows,
         snapshot_collected_at=data['news_snapshot'],research_exported_at=data['research_export'],
-        input_characters=characters,max_output_tokens=8000,max_http_requests=1,retries=0,
+        input_characters=characters,max_output_tokens=max_output_tokens,max_http_requests=1,retries=0,
+        acceptance_scope=data.get('limitation'),source_input_sha256=data.get('source_input_sha256'),
         allowed_citation_ids=data['prepared_citation_ids'],source_revision=subprocess.check_output(['git','-C',str(repo),'rev-parse','HEAD']).decode().strip(),
         news_candidates=data['news_candidates'],selected_news=data['selected_news'],research_views=data['research_views'],
         research_source_documents=data['research_source_documents'],
@@ -38,7 +42,9 @@ def build(review,research_archive,output):
     # Keep the old completed trial untouched. This new immutable copy uses the
     # same reviewed one-POST routine, with its own stable marker and input SHA.
     source=(repo/'tools/run_frozen_report_once.py').read_text(encoding='utf-8')
-    source=source.replace("INPUT_SHA='0bf1cb2e8646ca392e318385e973ff0987a1085a90733b2f941c2fab240bfeb2'",f"INPUT_SHA='{sha}'\nTRIAL_ID='{TRIAL}'")
+    source=source.replace("INPUT_SHA='0bf1cb2e8646ca392e318385e973ff0987a1085a90733b2f941c2fab240bfeb2'",f"INPUT_SHA='{sha}'\nTRIAL_ID='{trial_id}'")
+    source=source.replace('MAX_TOKENS=8000',f'MAX_TOKENS={max_output_tokens}')
+    source=source.replace('0<chars<=100000',f'0<chars<={input_guard}')
     source=source.replace("path=Path(backend)/'data/diagnostics/staged-report'/(INPUT_SHA+'.input.json')", "path=Path(__file__).with_name('real-report.input.json')")
     source=source.replace("folder=backend/'data/diagnostics/staged-report'", "folder=backend/'data/diagnostics/staged-real-report'\n    folder.mkdir(parents=True,exist_ok=True,mode=0o700)")
     source=source.replace("marker=folder/(INPUT_SHA+'.report.started')", "marker=folder/(TRIAL_ID+'.started')").replace("state=folder/(INPUT_SHA+'.report.json')", "state=folder/(TRIAL_ID+'.json')")
@@ -48,7 +54,7 @@ def build(review,research_archive,output):
         snapshot_collected_at=packet['snapshot_collected_at'],research_exported_at=packet['research_exported_at'],
         input_characters=packet['input_characters'],model=MODEL,max_output_tokens=MAX_TOKENS,
         max_http_requests=1,retries=0,http_requests_performed=0,reasoning_policy='沿用服务器 analysis 配置；实际值随执行结果保存',watchlist=packet['watchlist'],
-        selected_news=packet['selected_news'],research_views=packet['research_views'],research_source_documents=packet['research_source_documents'],
+        acceptance_scope=packet.get('acceptance_scope'),selected_news=packet['selected_news'],research_views=packet['research_views'],research_source_documents=packet['research_source_documents'],
         limitation='新历史资料报告验收，不再使用人工修正版报告；默认免费预览，--run才收费一次。无自动审查/修稿/口播/TTS/发布，不恢复调度。未接补查工具，不验收实时采集或完整生产流程。字符不是token，实际账单以服务商为准。')
 
 """
@@ -81,9 +87,9 @@ def build(review,research_archive,output):
         assert result['reasoning_effort']=='high'
         assert gateway.request_for.call_args.args[0].effort=='high'
         assert result['citation_check']['unprovided_ids']==['unprovided-test']
-        assert (state.parent/(TRIAL+'.input.json')).is_file()
+        assert (state.parent/(trial_id+'.input.json')).is_file()
         module.execute(backend,packet,gateway,factory,usage,Mock());client.post.assert_called_once()
-    (output/'README.txt').write_text('默认只免费预览；--run只一次完整报告写作。无需安装生产补丁，不改服务或.env、数据库及暂停。\n输入是用户已导出的历史新闻/研究/技术片段，不是人工修正报告；不提供检索工具、不刷新行情，不自动审查/修稿/口播/语音/发布。\n结果与永久开始标记在backend/data/diagnostics/staged-real-report/real-research-report-20261029-v1.*；不删除标记重扣费。\n完整输入与原回复保留，默认没有模型请求；生成成功不代表专业性、准确率或可发布。\n',encoding='utf-8')
+    (output/'README.txt').write_text('默认只免费预览；--run只一次报告写作。无需安装生产补丁，不改服务或.env、数据库及暂停。\n输入是用户已导出的历史新闻/研究/技术片段，不是人工修正报告；不提供检索工具、不刷新行情，不自动审查/修稿/口播/语音/发布。\n结果与永久开始标记在backend/data/diagnostics/staged-real-report/对应trial标识.*；不删除标记重扣费。\n完整输入与原回复保留，默认没有模型请求；生成成功不代表专业性、准确率或可发布。\n',encoding='utf-8')
     with zipfile.ZipFile(output.with_suffix('.zip'),'w',zipfile.ZIP_DEFLATED) as archive:
         for file in output.iterdir():archive.write(file,output.name+'/'+file.name)
     return dict(file=str(output.with_suffix('.zip')),sha256=hashlib.sha256(output.with_suffix('.zip').read_bytes()).hexdigest(),input_sha256=sha,input_characters=characters,max_http_requests=1,real_http_requests=0,rehearsal='free_load_simulated_one_POST_citation_warning_stable_marker_passed')
@@ -92,4 +98,5 @@ def build(review,research_archive,output):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--review',type=Path,required=True);parser.add_argument('--research-archive',type=Path,required=True);parser.add_argument('--output',type=Path,required=True)
-    args=parser.parse_args();print(json.dumps(build(args.review,args.research_archive,args.output),ensure_ascii=False,indent=2))
+    parser.add_argument('--trial-id',default=TRIAL);parser.add_argument('--max-output-tokens',type=int,default=8000);parser.add_argument('--input-guard',type=int,default=100000)
+    args=parser.parse_args();print(json.dumps(build(args.review,args.research_archive,args.output,trial_id=args.trial_id,max_output_tokens=args.max_output_tokens,input_guard=args.input_guard),ensure_ascii=False,indent=2))

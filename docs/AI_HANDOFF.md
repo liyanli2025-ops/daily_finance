@@ -1,3 +1,7 @@
+## 最新：准备一次小范围语义验收，尚未调用（2026-10-29）
+
+v11-r2已安装确认。单主题analysis-focus-20261029-v1准备为默认免费、一次显式POST；约1.28万输入字符，最多4000输出token，沿用analysis推理。使用真实已提供片段和当前正式报告提示词，不点评旧稿、不预写答案。范围和局限见[验收说明](analysis_focus_acceptance_20261029.md)。不得将人工定题结果当成全市场或自主检索能力通过，不重复旧整篇试验，不恢复调度。
+
 ## 服务器确认：v11-r2已安装（2026-10-29）
 
 用户已返回27文件校验及应用成功，备份 /var/backups/finance-daily/20261029T083627492924Z。安装器确认healthy、database connected、automation paused、scheduler stopped；随后curl输出与下一命令混行，不能将混行本身认作服务异常。selection_check通过shell &&进入research_input_check，但其详细结果在/tmp/finance-v11-selection.log，未回传。
