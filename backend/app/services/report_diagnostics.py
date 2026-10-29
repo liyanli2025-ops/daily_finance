@@ -47,7 +47,7 @@ def save_generation_stage(stage,response,directory=None,*,context=None):
     try:
         save_json(path,dict(stage=stage,at=china_now().isoformat(),response=response,context=context,
             evidence_usage=workspace.usage() if workspace is not None else None,
-            status='unreviewed',limitation='完整模型回复，仅供恢复及核验；不代表已通过审查或可发布'))
+            status='unreviewed',limitation=('截断可见正文，仅供恢复及核验，禁止发布' if stage=='incomplete_response' else '完整模型回复，仅供恢复及核验；不代表已通过审查或可发布')))
     except OSError as error:
         # Do not spend more on review/repair if an already-paid result cannot be preserved.
         raise RuntimeError('模型回复检查点保存失败，停止后续模型请求：'+type(error).__name__) from None

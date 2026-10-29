@@ -2,7 +2,7 @@
 import math
 import re
 
-DECISION_NOTES_INSTRUCTION='''decision_notes为最多3项简短可核查判断摘要，不是思维过程。每项包含claim、horizon、price_structure、possible_drivers、main_alternative、watch、invalidation、why_invalidation_matters字符串（每项不超过120字），support_ids和counterevidence_ids为材料ID数组（无反方材料可为空）。价格结构与可能驱动分别填写，可同时成立；why_invalidation_matters解释条件出现为何削弱claim，不重复条件本身。条件必须削弱同一个claim，不能悄悄换成另一项预测：例如claim为“下降结构中的反弹、尚非反转”，回吐支持而非推翻它；持续形成更高高低点等结构改善才可能削弱它。若claim为“反弹将延续”，回吐才可能是反证。历史事实本身不因未来表现失效。不新增事实或未经校准概率；这份清单不在播客中逐项朗读。'''
+DECISION_NOTES_INSTRUCTION='''decision_notes为最多3项简短可核查判断摘要，不是思维过程。每项包含claim、horizon、price_structure、possible_drivers、main_alternative、watch、invalidation、why_invalidation_matters字符串（每项不超过120字），support_ids和counterevidence_ids为材料ID数组（无反方材料可为空）。价格结构与可能驱动分别填写，可同时成立；why_invalidation_matters解释条件出现为何削弱claim，不重复条件本身。条件必须削弱同一个claim，不能悄悄换成另一项预测：例如claim为“下降结构中的反弹、尚非反转”，回吐支持而非推翻它；持续形成更高高低点等结构改善才可能削弱它。若claim为“反弹将延续”，回吐才可能是反证。历史事实本身不因未来表现失效。不新增事实或未经校准概率；possible_drivers只列有材料支持的可能机制，价格弱势不是卖压证据；watch注明条件服务于反弹还是趋势确认。与正文及核心观点保持同一期限和条件强度，不把可选分支改成必需条件。这份清单不在播客中逐项朗读。'''
 
 
 class ReviewNeedsHuman(RuntimeError):
