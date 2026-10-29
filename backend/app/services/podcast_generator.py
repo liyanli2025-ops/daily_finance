@@ -25,7 +25,7 @@ from ..config import settings
 from ..models.report import Report, ReportType
 from .audio_mixer import get_audio_mixer
 from .model_gateway import complete
-from .editorial_policy import SPOKEN_POLICY, edition_brief
+from .editorial_policy import spoken_prompts
 
 
 class PodcastGeneratorService:
@@ -959,23 +959,7 @@ class PodcastGeneratorService:
             podcast_type = '即时更新'
         elif is_weekend:
             podcast_type = '周末回顾'
-        system_prompt = """你是财经播客编辑，服务A股、港股日内和数天交易者。
-严格忠实于完整报告，不添加新闻、数字、因果关系、历史案例或买卖建议。
-保留事实/推断/情景的区别、数据对应日期、来源限定、反证和失效条件。
-没有自选股不编自选股；自选股不是持仓。不虚构资历或亲密关系。
-最多三个重点；每个重点说明新增变化、关联标的、影响路径、下一步验证信号。
-海外事件只讲对A/H股的影响。不要无关天气、强行科普、反复称呼、空话收尾。
-长短取决于有效信息，最多4000字，没有最低目标字数，不凑时长。
-只输出能直接朗读的纯文本，不用Markdown、舞台指示或emoji。
-数字适合朗读，百分比和单位不改变；来源ID与URL不朗读。
-每个自然主题之间用[SECTION_BREAK]分段。""" + "\n" + SPOKEN_POLICY
-        from .spoken_editing import report_body
-        user_prompt = (
-            f"日期：{report_date.isoformat()}；节目：{podcast_type}。\n"
-            f"节目定位：{edition_brief(podcast_type)}\n"
-            f"完整分析正文（只省略文末来源目录，正文引用仍保留）：\n{report_body(report.content)}\n"
-            "只使用上述材料，直接写口播稿。"
-        )
+        system_prompt, user_prompt = spoken_prompts(report, report_date, podcast_type)
         podcast_max_tokens = 8000
 
         # 调用 AI 生成
