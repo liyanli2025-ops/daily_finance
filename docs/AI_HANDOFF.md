@@ -4,6 +4,8 @@
 
 ## 本轮增量：先读这里
 
+**v9单次programme试验已完成，但人工质量未通过：** 用户返回2026-10-29 12:47:48 HTTP200，4376输入/2595输出token，18.805秒，零缓存；结果staged-programme/programme-report-20261029-v1.json。3选题+编排格式有效，正文仍按原报告逐股报数，念出“而不是收复昨日跌幅”“过去五期表现不会作废”等源报告纠错说明。不能再标待运行，不能称口播通过。保留v7/v9全部输入/结果/.started，不改ID再次收费试这个固定样本，不TTS、不发布、不恢复调度。旧人工修正版未包含v9补入的市场反应，不能冒充新版上游分析结果；下一阶段先免费核对实际研究输入与论证，不继续以润色旧样本取代研究质量。详见[本次实际结果](programme_trial_result_20261029.md)。
+
 **v9服务器安装及免费预检已由用户确认：** zip SHA246f021271bf406bfc88125dc60a54672a4105af529b37a89b98a7fb90d67f27匹配，81文件校验/应用成功，私有备份/var/backups/finance-daily/20261029T044622225711Z；服务healthy、数据库connected、automation paused、scheduler stopped，未改模型/凭据。app.programme_acceptance返回free_preview，4722字符，输入SHA927379a4e6c012bb3e03f4b6853db9105a766b39a5e62134d948cc5342f2e12d，HTTP=0。新版programme试验仍未执行；不要将免费预检当口播质量通过。下一步可由用户明确运行一次--run+该SHA，保留稳定marker，零自动审查/修稿/TTS/发布。
 
 **v9交付准备（2026-10-29）：** 合并b514744邻近限定和17306cd全市场取材；新增app.programme_acceptance，默认免费预检、显式--run+输入SHA才一次写稿，稳定试验ID不随prompt改变，零自动审查/修稿/TTS。正式与试验共用prepare_script。原v7工具/结果/marker保持不变。当前正式提示词4722字符，仅本地重建；服务器未预检、新试验未执行。526项模拟/离线后端测试通过；构建器新增源于不可变v8部署包的精确指纹并演练升级，不能绕过服务器冲突。详见[安装及验收边界](programme_delivery_release_20261029.md)。这不是新的专业性、预测或音频通过，自动任务保持暂停。
