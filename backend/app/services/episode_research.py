@@ -12,7 +12,7 @@ INSTRUCTIONS='''
 若缺少会改变判断的重要材料，整条回复只输出JSON：
 {"action":"request_evidence","requests":[{"tool":"search_materials","query":"明确问题关键词","reason":"缺什么证据"}]}
 可用工具：search_materials(query)，read_material(id,offset,characters)，search_public(query,hours)。
-search_materials检索本期已收集但可能未预选的正文、摘要及研究资料；结果是片段，可按ID读取更多。
+search_materials检索本期已收集但可能未预选的正文、摘要及研究资料；结果是片段，可按ID读取更多。按ranges/offset核对实际提供范围；unread_before=true表示前文仍未提供，next_offset仅是继续读取线索。no_body_provided仅有元信息，不可作为正文证据。
 read_material每次最多6000字符，明确offset和has_more，不把局部读取当全文阅读。
 search_public只补查公开媒体原文，不能查询私人账户、资金意图或调用尚未授权的IMA库。query用资料检索词，不写长推理。
 每轮最多3项取材请求，最多2轮；这是分析请求/耗时保护，不是知识库文章数量限制。

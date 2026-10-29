@@ -127,24 +127,23 @@ class EpisodeWorkspace:
             limitation='prepared仅是已组装片段；confirmed表示对应分析请求返回完整回复，不能证明模型认真读过或事实正确。覆盖率只相对存储文本，摘要/节选100%也不是读完原文。未完成请求的接收情况未知。')
 
     def search(self,query,limit=5):
-        tokens=terms(query)
+        from .evidence_search import token_weights,score,search_window,query_phrases
+        tokens=terms(query);phrases=query_phrases(query)
+        weights=token_weights(tokens,[item.title+' '+body(item) for item in self.documents.values()])
         ranked=[]
         for item in self.documents.values():
-            title=item.title.casefold();text=body(item).casefold()
-            score=sum(4*(token in title)+(token in text) for token in tokens)
-            if score:ranked.append((score,item))
-        ranked.sort(key=lambda row:(row[0],row[1].published_at.isoformat() if row[1].published_at else ''),reverse=True)
+            relevance=4*score(item.title,weights)+score(body(item),weights)
+            hits=[phrase for phrase in phrases if phrase in (item.title+' '+body(item)).casefold()]
+            if relevance:ranked.append((len(hits),relevance,item,hits))
+        ranked.sort(key=lambda row:(row[0],row[1],row[2].published_at.isoformat() if row[2].published_at else ''),reverse=True)
         rows=[]
-        for score,item in ranked[:limit]:
-            text=body(item)
-            positions=[text.casefold().find(token) for token in tokens if token in text.casefold()]
-            offset=max(0,min(positions)-150) if positions else 0
-            self.accessed[item.id]=item
-            self.prepare_ranges(item.id,[(offset,min(offset+800,len(text)))],'search_excerpt')
-            rows.append(dict(**self.metadata(item),score=score,offset=offset,
-                excerpt=text[offset:offset+800],has_more=offset+800<len(text),
-                model_input_scope='tool_return_fragment' if offset or len(text)>800 else 'all_stored_text'))
-        return dict(method='标题/正文词项匹配，非语义检索或事实核实',results=rows)
+        for _,relevance,item,hits in ranked[:limit]:
+            window=search_window(body(item),weights)
+            if window['ranges']:
+                self.accessed[item.id]=item
+                self.prepare_ranges(item.id,window['ranges'],'search_excerpt')
+            rows.append(dict(**self.metadata(item),score=round(relevance,6),query_phrase_matches=hits,**window))
+        return dict(method='当期词项匹配，按池内出现频率降权常见词；优先覆盖明确查询词组；完整句窗口，非语义检索或事实核实',results=rows)
 
     def read(self,identifier,offset=0,characters=6000):
         if identifier not in self.documents:return dict(status='not_found',id=identifier)
