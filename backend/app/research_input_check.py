@@ -20,6 +20,8 @@ def inspect(stocks,hub=None,details=False):
         prepared_original_characters=sum(row['selected_characters'] for row in ledger),
         reading_status_counts=dict(Counter(row['status'] for row in ledger)),
         prepared_kind_counts=dict(Counter(item.kind for item in evidence)),
+        prepared_titles=[dict(id=item.id,title=item.title,kind=item.kind,scope=item.scope) for item in evidence][:12],
+        additional_prepared_titles=max(0,len(evidence)-12),
         limitation='只回放当前有效研究缓存和正式8000字符初始底稿分配；不采集、不调用模型/TTS、不写App或恢复调度。'
         '缓存过期不自动补采；prepared表示已准备而非模型读过。存储文本可能本来只是摘要/前部/带页码节选，覆盖存储文本不等于读完原报告。')
     if details:
