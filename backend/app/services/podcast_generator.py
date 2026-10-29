@@ -973,23 +973,8 @@ class PodcastGeneratorService:
             from .spoken_programme import parse_response,delivery_leaks
             programme,script=parse_response(raw_script,report.content)
             self._last_spoken_programme=programme
-            # 清理可能的 Markdown 残留
-            script = self._clean_for_tts(script)
-            
-            # 确保有分段标记
-            if "[SECTION_BREAK]" not in script:
-                # AI 可能没有加分段标记，手动添加一些
-                paragraphs = script.split("\n\n")
-                if len(paragraphs) > 3:
-                    # 每 2-3 个段落加一个分段
-                    new_paragraphs = []
-                    for i, p in enumerate(paragraphs):
-                        new_paragraphs.append(p)
-                        if (i + 1) % 3 == 0 and i < len(paragraphs) - 1:
-                            new_paragraphs.append("[SECTION_BREAK]")
-                    script = "\n\n".join(new_paragraphs)
-            from .spoken_editing import audit,tts_text
-            script=tts_text(script)
+            from .spoken_editing import audit,prepare_script
+            script=prepare_script(script)
             from .report_diagnostics import save_spoken_case,mark_spoken_case
             checkpoint=save_spoken_case(report,raw_script,script,audit(script),editorial_plan=programme)
             # Preserve the paid reply before any format/review failure.

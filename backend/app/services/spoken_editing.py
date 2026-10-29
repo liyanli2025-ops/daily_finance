@@ -123,6 +123,20 @@ def clean(text):
     return text.strip()
 
 
+def prepare_script(text):
+    """Same pre-review canonical script for production and isolated acceptance."""
+    text=clean(text)
+    if '[SECTION_BREAK]' not in text:
+        paragraphs=text.split('\n\n')
+        if len(paragraphs)>3:
+            result=[]
+            for index,paragraph in enumerate(paragraphs):
+                result.append(paragraph)
+                if (index+1)%3==0 and index<len(paragraphs)-1:result.append('[SECTION_BREAK]')
+            text='\n\n'.join(result)
+    return tts_text(text)
+
+
 def audit(text):
     """Advisory surface checks, never a factual, investing or listening score."""
     visible=text.replace('[SECTION_BREAK]','')
