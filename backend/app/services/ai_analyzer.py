@@ -1310,12 +1310,17 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         for i, news in enumerate(sorted_news, 1):
             # The episode workspace retains the full bodies. Only a bounded,
             # explicitly labelled reading window belongs in the initial prompt.
-            from .prompt_reading import excerpt,reading_ranges
+            from .evidence_reading import read_news
             reading_budget=min(1200,max(300,18000//max(1,len(sorted_news))))
-            content_preview = excerpt(news.content,news.title,budget=reading_budget)
+            focus_terms=[value for stock in stocks if matches_watchlist(news,[stock]) for value in (stock.name,stock.code) if value]
+            reading=read_news(news.content,news.title,reading_budget,focus_terms)
+            content_preview=reading['text']
+            self._news_briefing.setdefault('initial_reading',[]).append(dict(id=news.id,
+                ranges=reading['ranges'],selected_characters=reading['selected_characters'],budget=reading_budget,
+                collected_text_fully_provided=reading['collected_text_fully_provided']))
             workspace=current_workspace()
-            if workspace is not None and news.id in workspace.documents:
-                workspace.prepare_ranges(news.id,reading_ranges(news.content,news.title,reading_budget),'initial_news')
+            if workspace is not None and news.id in workspace.documents and reading['ranges']:
+                workspace.prepare_ranges(news.id,reading['ranges'],'initial_news')
             
             summary_parts.append(f"""
 ### {i}. [N:{news.id}] {news.title}

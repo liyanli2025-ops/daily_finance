@@ -65,11 +65,12 @@ async def execute(workspace,requests,stocks,public_budget=35):
 
 
 def questions(stocks):
-    rows=['市场：重要事件对应趋势、动量、波动及相对强弱如何变化？缺失宽度/盘中数据时哪些解释仍无法区分？']
-    for stock in stocks:
-        rows.append(str(getattr(stock.market,'value',stock.market))+':'+stock.code+' '+stock.name+
-            '：公司与行业有哪些实际新增？盘面支持哪种解释、主要反证是什么？')
-    return '\n'.join(rows)
+    names=[str(getattr(stock.market,'value',stock.market))+':'+stock.code+' '+stock.name for stock in stocks]
+    return '\n'.join([
+        '全市场或行业：哪一两项新增事实真正改变日内至数日的决策前提？不限于自选股，不把每条新闻都当研究题。',
+        '对选中的问题：先对齐主体、事件时间与统计期，比较此前状态、最新价格反应及竞争解释，说明经营/估值/交易行为哪一环有证据。',
+        '资料不完整时只补查可能改变判断的具体缺口；不为逐股凑覆盖请求工具，不把未命中解释成没有消息。',
+        '当前名单仅供关联参考，有实质决策价值才展开：'+('；'.join(names) or '未设置自选股，仍研究重要市场与行业变化。')])
 
 
 async def complete_with_research(analyzer,prompt,max_tokens,workspace,stocks):

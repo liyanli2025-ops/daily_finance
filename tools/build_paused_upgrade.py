@@ -68,6 +68,10 @@ def build(output):
     v6={name:git('show',installed_v6['source_revision']+':'+name) for name in names if name in installed_v6['files']}
     if any(digest(value)!=installed_v6['files'][name] for name,value in v6.items()):
         raise RuntimeError('Reviewed installed v6 source does not match its release manifest')
+    installed_v7=json.loads(Path(__file__).with_name('reviewed_finance_v7_baseline.json').read_text(encoding='utf-8'))
+    v7={name:git('show',installed_v7['source_revision']+':'+name) for name in names if name in installed_v7['files']}
+    if any(digest(value)!=installed_v7['files'][name] for name,value in v7.items()):
+        raise RuntimeError('Reviewed installed v7 source does not match its release manifest')
     output=Path(output).resolve()
     if output.exists() or output.with_suffix('.zip').exists():raise RuntimeError('Immutable output already exists')
     output.mkdir(parents=True)
@@ -77,12 +81,14 @@ def build(output):
         reviewed_installed_v4_artifact_sha256=deployed['artifact_sha256'],
         reviewed_installed_v5_artifact_sha256=installed_v5['artifact_sha256'],
         reviewed_installed_v6_artifact_sha256=installed_v6['artifact_sha256'],
+        reviewed_installed_v7_artifact_sha256=installed_v7['artifact_sha256'],
         files={name:dict(old_sha256=digest(old[name]),new_sha256=digest(value),
             additional_old_sha256=([PAUSED_HASHES[name]] if name in PAUSED_HASHES else [])+
                 ([SPOKEN_HASHES[name]] if name in SPOKEN_HASHES else [])+
                 ([digest(v4[name])] if name in v4 else [])+
                 ([digest(v5[name])] if name in v5 else [])+
-                ([digest(v6[name])] if name in v6 else [])) for name,value in new.items()})
+                ([digest(v6[name])] if name in v6 else [])+
+                ([digest(v7[name])] if name in v7 else [])) for name,value in new.items()})
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
     (output/'install_upgrade.py').write_bytes((repo/'tools/install_paused_upgrade.py').read_bytes())
     with zipfile.ZipFile(output/'payload.zip','w',zipfile.ZIP_DEFLATED) as archive:
@@ -166,6 +172,20 @@ def build(output):
         assert other.read_bytes()==b'other-project'
         with closing(sqlite3.connect(db)) as connection:
             assert connection.execute('SELECT code FROM stocks').fetchone()[0]=='dynamic'
+        # Rehearse the v7 speech-verified release installation as well, using only exact
+        # files listed in that delivered artifact, not an arbitrary Git tree.
+        for name,value in old.items():
+            target=root/name
+            if value is None:target.unlink()
+            else:target.write_bytes(value)
+        for name,value in v7.items():
+            target=root/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(value)
+        for options in ([],['--apply']):subprocess.run(command+options,check=True)
+        assert all((root/name).read_bytes()==value for name,value in new.items())
+        assert env.read_bytes()==env_bytes and flag.read_bytes()==b'preserve-pause'
+        assert other.read_bytes()==b'other-project'
+        with closing(sqlite3.connect(db)) as connection:
+            assert connection.execute('SELECT code FROM stocks').fetchone()[0]=='dynamic'
         # Reconstruct the earlier baseline with the seven exact deployed spoken
         # files, then validate and apply together. Do not merely trust new code
         # idempotence as proof that the alternate old hashes are accepted.
@@ -183,7 +203,7 @@ def build(output):
             assert connection.execute('SELECT code FROM stocks').fetchone()[0]=='dynamic'
     with zipfile.ZipFile(output.with_suffix('.zip'),'w',zipfile.ZIP_DEFLATED) as archive:
         for path in output.iterdir():archive.write(path,output.name+'/'+path.name)
-    return dict(file=str(output.with_suffix('.zip')),sha256=hashlib.sha256(output.with_suffix('.zip').read_bytes()).hexdigest(),files=len(names),rehearsal='baseline_spoken_and_installed_v4_v5_v6_passed_no_service_or_model_calls')
+    return dict(file=str(output.with_suffix('.zip')),sha256=hashlib.sha256(output.with_suffix('.zip').read_bytes()).hexdigest(),files=len(names),rehearsal='baseline_spoken_and_installed_v4_v5_v6_v7_passed_no_service_or_model_calls')
 
 
 if __name__=='__main__':
