@@ -261,7 +261,9 @@ class AIAnalyzerService:
         period = getattr(self, '_edition_label', "晚报" if report_type == ReportType.EVENING else "早报")
         if period != '即时更新' and today.weekday() >= 5:
             period = '周末回顾'
-        morning_context = morning_report.content if morning_report is not None else "没有当日早报，不得编造早报观点或命中率。"
+        from .prior_report_context import comparison_context
+        self._prior_report_context = comparison_context(morning_report,today) if report_type==ReportType.EVENING else '不适用'
+        morning_context = self._prior_report_context
         return f"""{self._get_writing_philosophy()}
 {REPORT_POLICY}
 任务：生成{today.isoformat()}的A股/港股短线财经{period}。
@@ -666,12 +668,14 @@ App当前自选股与行情快照：
         print(f"[AI] 🔍 审查完成：质量评分 {overall_quality}/10，发现 {len(issues)} 个问题", flush=True)
         from .review_feedback import assess,ReviewNeedsHuman
         feedback=(dict(all_anchors_valid=True,origin='program_citation_check') if citation_error else
-            assess(issues,review_subject,'\n'.join((market_data_text,finance_summary,cross_border_summary))))
+            assess(issues,review_subject,'\n'.join((market_data_text,finance_summary,cross_border_summary,
+                getattr(self,'_prior_report_context','') if report_type==ReportType.EVENING else ''))))
         review_data['feedback_checks']=feedback
         self._last_reviewed_report=report
         self._last_review_path=save_review_case(report, metadata, review_data, finance_summary,
                          cross_border_summary, market_data_text,
-                         getattr(self, '_generation_context', ''), _repair_attempted)
+                         getattr(self, '_generation_context', '')+'\n'+
+                         (getattr(self,'_prior_report_context','') if report_type==ReportType.EVENING else ''), _repair_attempted)
         if self._last_review_path is None:
             raise RuntimeError('审查材料未保存，停止后续模型请求')
         if not feedback['all_anchors_valid']:
@@ -745,6 +749,9 @@ App当前自选股与行情快照：
 ### 报告正文（待审查）
 
 {report_content}
+
+### 与写稿阶段相同的早报对照底稿
+{getattr(self, '_prior_report_context', '没有合格早报，不判断早报命中。') if report_type == ReportType.EVENING else '不适用'}
 
 ### 原始市场快照（查询日期不等于来源行情时间；未标时间的数字不能作实时依据）
 
@@ -872,6 +879,9 @@ App当前自选股与行情快照：
 ## 与生成和审查相同的已提供新闻阅读片段及证据ID（不代表全文）
 {finance_summary}
 {cross_border_summary}
+
+## 与写稿、审查相同的早报对照底稿
+{getattr(self, '_prior_report_context', '没有合格早报，不判断早报命中。') if report_type == ReportType.EVENING else '不适用'}
 
 ## 待修复的报告全文
 

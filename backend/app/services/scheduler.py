@@ -754,7 +754,13 @@ class SchedulerService:
             query = select(ReportModel).where(
                 and_(
                     ReportModel.report_date == today,
-                    ReportModel.report_type == "morning"
+                    ReportModel.report_type == "morning",
+                    # MORNING also stores intraday updates. Do not grade an
+                    # afternoon observation as an advance morning judgment.
+                    ReportModel.created_at >= datetime.combine(today, datetime.min.time()),
+                    ReportModel.created_at < datetime.combine(today, datetime.min.time()).replace(hour=9),
+                    ~ReportModel.title.contains("即时更新"),
+                    ~ReportModel.title.contains("周末回顾")
                 )
             ).order_by(ReportModel.created_at.desc()).limit(1)
             
