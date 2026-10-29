@@ -16,11 +16,11 @@ def inspect(stocks,hub=None,details=False):
         watchlist=[dict(key=row['key'],name=row['name'],cached_materials=len(row.get('materials',[])),
             collection_status=row.get('coverage',{}).get('collection',{}).get('status','unknown')) for row in contexts],
         cached_materials=sum(len(row.get('materials',[])) for row in contexts),
-        prepared_materials=len(evidence),prompt_characters=len(prompt),prompt_character_budget=8000,
+        prepared_materials=len(evidence),prepared_unique_source_documents=len({item.source_id for item in evidence}),prompt_characters=len(prompt),prompt_character_budget=8000,
         prepared_original_characters=sum(row['selected_characters'] for row in ledger),
         reading_status_counts=dict(Counter(row['status'] for row in ledger)),
         prepared_kind_counts=dict(Counter(item.kind for item in evidence)),
-        prepared_titles=[dict(id=item.id,title=item.title,kind=item.kind,scope=item.scope) for item in evidence][:12],
+        prepared_titles=[dict(id=item.id,source_id=item.source_id,title=item.title,kind=item.kind,scope=item.scope) for item in evidence][:12],
         additional_prepared_titles=max(0,len(evidence)-12),
         limitation='只回放当前有效研究缓存和正式8000字符初始底稿分配；不采集、不调用模型/TTS、不写App或恢复调度。'
         '缓存过期不自动补采；prepared表示已准备而非模型读过。存储文本可能本来只是摘要/前部/带页码节选，覆盖存储文本不等于读完原报告。')

@@ -55,13 +55,16 @@ class EpisodeWorkspace:
             fingerprint=hashlib.sha256(body(item).encode('utf-8')).hexdigest()
             if item.id in self.documents and self.document_hashes[item.id]!=fingerprint:
                 raise ValueError('episode_evidence_id_collision')
+            if isinstance(item,Material) and isinstance(self.documents.get(item.id),Material):
+                from .material_identity import merge_same_view
+                item=merge_same_view(self.documents[item.id],item)
             self.documents[item.id]=item
             self.document_hashes[item.id]=fingerprint
         save_json(self.path/'materials.json',[dict(**self.metadata(item),text=body(item)) for item in self.documents.values()])
 
     def metadata(self,item):
         from .evidence import publication_label
-        return dict(id=item.id,title=item.title,source=item.source,url=item.source_url,
+        return dict(**(dict(source_id=item.source_id,scope_links=item.scope_links) if isinstance(item,Material) else {}),id=item.id,title=item.title,source=item.source,url=item.source_url,
             published=(item.published_at.isoformat() if item.published_at else None) if isinstance(item,Material) else publication_label(item),
             reading_scope=item.reading_status if isinstance(item,Material) else reading_scope(item),
             kind=getattr(item,'kind','news'),scope=getattr(item,'scope',''),period=getattr(item,'period',''),
