@@ -2,9 +2,12 @@
 
 包括v14之后的全市场入口、事件占位、明确生成稿识别，以及全池发现目录和按字符预算初读。后端源码/文档更新；默认暂停、零重试、不自动整篇修稿。完整新资料与模型测试仍未完成。
 
+发布记录：源码a97e21c，62个运行/文档文件；包SHA256为`b111678268b641f73af4be46953363f16c7843ac5ff827b048274b300b3e0677`。604项离线测试及精确v14/旧基线、冲突、缺暂停、重复安装、备份与数据保留本地演练通过。未进行服务器安装或真实模型验收。
+
 先把finance-discovery-budget-20261030-v15.zip上传到服务器/tmp。校验指纹后验证安装包：
 
 ```bash
+echo 'b111678268b641f73af4be46953363f16c7843ac5ff827b048274b300b3e0677  /tmp/finance-discovery-budget-20261030-v15.zip' | sha256sum -c - &&
 python3 -m zipfile -e /tmp/finance-discovery-budget-20261030-v15.zip /tmp/finance-discovery-budget-upload-v15 &&
 sudo /var/www/finance-daily/backend/venv/bin/python /tmp/finance-discovery-budget-upload-v15/finance-discovery-budget-20261030-v15/install_upgrade.py
 ```
