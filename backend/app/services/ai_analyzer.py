@@ -1128,7 +1128,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         research_background = []
         stocks = get_watchlist_service().get_all_stocks()
         from .research_hub import ResearchHub
-        from .news_briefing import associations,topic,briefing,consultation_key,regulatory_population_key,diverse_rank,editorial_exclusion,primary_rate_decision,prompt as briefing_prompt
+        from .news_briefing import associations,topic,briefing,consultation_key,regulatory_population_key,company_reporting_event,diverse_rank,editorial_exclusion,primary_rate_decision,prompt as briefing_prompt
         profiles={row['key']:row['profile'] for row in ResearchHub().load(stocks) if row.get('profile')}
         self._selection_context=dict(watchlist=[dict(code=stock.code,name=stock.name,
             market=str(getattr(stock.market,'value',stock.market))) for stock in stocks],profiles=profiles)
@@ -1210,6 +1210,9 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                 theme=topic(n)
                 consultation=consultation_key(n)
                 if consultation and any(consultation_key(existing)==consultation for existing in selected):
+                    continue
+                company_event=company_reporting_event(n,stocks)
+                if company_event and sum(company_reporting_event(existing,stocks)==company_event for existing in selected)>=2:
                     continue
                 warning=regulatory_population_key(n)
                 if warning and any(regulatory_population_key(existing)==warning for existing in selected):
@@ -1301,6 +1304,9 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         sorted_news = sorted(selected, key=editorial_rank, reverse=True)
         self._selected_evidence_news = sorted_news
         self._news_briefing=briefing(news_list,stocks,profiles,sorted_news)
+        self._news_briefing['company_reporting_events']=[dict(event=list(event),prepared_ids=[item.id for item in sorted_news if company_reporting_event(item,stocks)==event],
+            related_ids=[item.id for item in news_list if company_reporting_event(item,stocks)==event])
+            for event in sorted({company_reporting_event(item,stocks) for item in sorted_news if company_reporting_event(item,stocks)})]
         self._news_briefing['regulatory_supplements']=[dict(primary=item.id,related_ids=[other.id for other in news_list
             if other.id!=item.id and regulatory_population_key(other)==regulatory_population_key(item)])
             for item in sorted_news if regulatory_population_key(item)]
@@ -1315,6 +1321,8 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         self._news_briefing['evidence_audit']=self._evidence_audit
         summary_parts.append(audit_prompt(self._evidence_audit))
         summary_parts.append(briefing_prompt(sorted_news,stocks,profiles))
+        if self._news_briefing['company_reporting_events']:
+            summary_parts.append('同一公司财报披露事件的原文与解读共用一个分析问题，累计/单季、成本、现金流等事实仍分口径；其余材料可检索，不重复计作多个催化：'+json.dumps(self._news_briefing['company_reporting_events'],ensure_ascii=False,separators=(',',':')))
         if self._news_briefing['regulatory_supplements']:
             summary_parts.append('同批监管警示的其他报道保留原文供检索；未读不引用，不算独立验证：'+json.dumps(self._news_briefing['regulatory_supplements'],ensure_ascii=False,separators=(',',':')))
         if self._news_briefing['statistical_event_supplements']:

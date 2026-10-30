@@ -39,6 +39,9 @@ def excluded_reason(item):
     parts=urlsplit(item.source_url)
     if parts.hostname in {'wallstreetcn.com','www.wallstreetcn.com'} and re.match(r'^/(member|premium|vip)/',parts.path):
         return 'restricted_article'
+    footer=(item.content or '')[-600:]
+    if re.search(r'(?m)^\s*(?:本文|本稿|本报道)\s*(?:由|系|为)?\s*(?:AI|人工智能)\s*(?:自动)?生成',footer,re.I):
+        return 'disclosed_ai_generated_article'
     if ('自动生成快讯' in (item.source or '') or '/aiassist/' in parts.path
             or AUTOMATED.search(item.title)):
         return 'automated_market_bulletin'

@@ -17,6 +17,8 @@ def editorial_exclusion(item, stocks):
     """
     title=item.title
     from .editorial_value import promotion_reason
+    if re.search(r'融资|热钱|引入.{0,8}资本|获.{0,8}投资',title) and editorial_profile(item)['kind']=='private_consumer_funding' and not matches_watchlist(item,stocks):
+        return 'private_consumer_funding_without_watchlist_link'
     if promotion_reason(title):
         return 'commercial_promotion_not_primary_story'
     if re.search(r'论坛成功举办|采标企业名单.*揭晓|【直播(?:中)?】',title) and not any(company_focus(item,stock) for stock in stocks):
@@ -80,6 +82,31 @@ def regulatory_population_key(item):
     if not (actor and count and concentration):return None
     return ('hk_sfc_batch_concentration_warning',item.published_at.date().isoformat(),
             int(count.group(1)),float(concentration.group(1)))
+
+
+def company_reporting_event(item, stocks):
+    """Group current-company quarter disclosures and coverage, not different facts.
+
+    An explicit report year and quarter/period are required. Publication year is
+    never substituted. This limits initial reading only; all source IDs survive.
+    """
+    def focused_company(stock):
+        if company_focus(item,stock):return True
+        alias=re.sub(r'(?:股份|集团|控股|有限公司)+$','',stock.name)
+        return len(alias)>=2 and item.title.startswith(alias) and stock.name in (item.content or '')[:600]
+    if re.search(r'业绩预告|预告修正|更正|修订|收购|并购|诉讼|立案|处罚|股权激励',item.title):return None
+    focused=[stock for stock in stocks if focused_company(stock)]
+    if len(focused)!=1:return None
+    text=matching_text(item.title,item.content)
+    if not re.search(r'季报|季度报告|业绩|净利润|归母|调研活动|投资者关系|交流会',text[:2500]):return None
+    fiscal=re.search(r'(20\d{2})\s*年\s*(?:(?:第|前)?\s*([一二三四1234])\s*季度|([半全])年度?(?:报告|业绩)|1\s*[-—至]\s*(3|6|9|12)\s*月)',text[:4000])
+    if not fiscal:return None
+    year=fiscal.group(1)
+    quarter=({'一':1,'二':2,'三':3,'四':4}.get(fiscal.group(2),fiscal.group(2))
+             if fiscal.group(2) else (2 if fiscal.group(3)=='半' else 4) if fiscal.group(3)
+             else int(fiscal.group(4))//3)
+    stock=focused[0]
+    return str(getattr(stock.market,'value',stock.market))+':'+stock.code,year,int(quarter)
 
 
 def primary_rate_decision(item):

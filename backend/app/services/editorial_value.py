@@ -45,6 +45,11 @@ def profile(item):
             and not re.search(r'净利润|亏损|增长\d|下降\d|上调|下调',title)):
         result.update(kind='corporate_feature',priority=0,reasons=['企业综述性宣传线索；具体经营变化需另读，不优先于市场事件'])
         return result
+    if (re.search(r'融资|热钱|引入.{0,8}资本|获.{0,8}投资',title)
+            and re.search(r'新消费|消费品牌|餐饮|茶饮|冰淇淋|连锁品牌',title+' '+body[:600])
+            and not re.search(r'上市|IPO|收购|并购|行业融资|全行业',title,re.I)):
+        result.update(kind='private_consumer_funding',priority=0,reasons=['单品牌消费融资，未从标题建立上市市场或行业重大变化；仅作按需背景'])
+        return result
     benchmarks=re.findall(r'创业板|科创50|恒科|恒指|沪指|上证|深成指|纳指|标普',title)
     if (len(set(benchmarks))>=2 and re.search(r'涨|跌',title) and '%' in title
             and not re.search(r'为何|为什么|背后|解读|财报|业绩|政策|关税|降息|降准',title)):
