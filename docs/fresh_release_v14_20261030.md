@@ -4,11 +4,18 @@
 
 当前未安装到服务器，没有新一期采集或模型结果。安装与公开资料验证都不恢复调度。新资料准备通过后才安排正式新报告及口播，旧历史试验不重跑。
 
+## 发布记录
+
+- 包：`finance-fresh-episode-20261030-v14.zip`；源码提交：`7f4e147`；51个运行/文档文件。
+- SHA256：`2f355b5936507a22f4bd3bcf9eb6a4eb12f6cca86a573e15642a16405f625c12`。
+- 587项离线测试通过；精确v13、v10/分配基线、未知冲突、缺暂停、重复安装、备份、数据库/密钥/付费标记/其他项目保留的本地演练通过。没有真实服务重启、模型请求或新资料采集。
+
 ## 安装
 
 把finance-fresh-episode-20261030-v14.zip上传到服务器/tmp，按发布记录核对SHA256后执行：
 
 ```bash
+echo '2f355b5936507a22f4bd3bcf9eb6a4eb12f6cca86a573e15642a16405f625c12  /tmp/finance-fresh-episode-20261030-v14.zip' | sha256sum -c - &&
 python3 -m zipfile -e /tmp/finance-fresh-episode-20261030-v14.zip /tmp/finance-fresh-episode-upload-v14 &&
 sudo /var/www/finance-daily/backend/venv/bin/python /tmp/finance-fresh-episode-upload-v14/finance-fresh-episode-20261030-v14/install_upgrade.py
 ```
