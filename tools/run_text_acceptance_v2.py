@@ -33,7 +33,7 @@ def load(root,now):
     digest=hashlib.sha256(raw).hexdigest()
     if replay['snapshot_sha256']!=digest:
         raise RuntimeError('重选结果与原始快照不匹配，停止模型请求')
-    pool=candidates(snapshot)
+    pool=candidates(snapshot, bool(replay.get("restored_market_events", False)))
     by_id={row.id:row for row in pool}
     selected=[row['id'] for row in replay['selection']['articles'] if row.get('selected')]
     if not selected or len(selected)!=len(set(selected)) or set(selected)-set(by_id):

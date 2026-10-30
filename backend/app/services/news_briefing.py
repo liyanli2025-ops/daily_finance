@@ -64,6 +64,24 @@ def consultation_key(item):
     return item.source,match.group(1),item.published_at.date().isoformat(),'consultation'
 
 
+def regulatory_population_key(item):
+    """Narrow same-day batch warning anchor; changed counts/metrics stay distinct.
+
+    Only an initial-reading slot is shared. All original reports remain searchable.
+    """
+    title=item.title
+    if not re.search(r'点名|警示|警告',title):return None
+    actor=re.search(r'香港证监会|香港證監會',title)
+    count=re.search(r'(\d+)\s*(?:只港股|家(?:公司|企业))',title)
+    text=matching_text(title,item.content)
+    concentration=re.search(r'(?:股权|股權).{0,12}集中度.{0,20}?(\d+(?:\.\d+)?)\s*%',text)
+    if concentration is None and re.search(r'股权.{0,8}集中|股權.{0,8}集中',text):
+        concentration=re.search(r'股东[^。！？]{0,140}(?:合计|共计|总计)[^。！？]{0,20}?(\d+(?:\.\d+)?)\s*%',text)
+    if not (actor and count and concentration):return None
+    return ('hk_sfc_batch_concentration_warning',item.published_at.date().isoformat(),
+            int(count.group(1)),float(concentration.group(1)))
+
+
 def primary_rate_decision(item):
     """One verified-address policy anchor, not every government item or forecast."""
     parts=urlsplit(item.source_url or '')
@@ -176,10 +194,13 @@ def briefing(news,stocks,profiles,selected=None):
 
 
 def prompt(news,stocks,profiles):
+    from .market_coverage import coverage_audit
     data=briefing(news,stocks,profiles)
     lines=['## 选题与业务关联核对',data['limitation'],
         '相同主题最多选一个主问题，其他报道用作补充或反证，不分成多个重复重点。',
         'keyword_only不能充当公司新增事实或核心短线理由；business_overlap仍需原文证明影响机制。']
+    lines.append('市场覆盖阅读线索（不是已核实的交易日或因果）：'+json.dumps(coverage_audit(news,news),ensure_ascii=False,separators=(',',':')))
+    lines.append('收盘综述可提供当天实际走势、量价与板块分化；媒体解释保留归属。月度/单日、盘前/收盘分开，不把先后发生当传导已证实；缺某市场材料不补编。')
     lines.append('阅读排序标签只来自文本线索，不是事实核验或投资评分；具体变化先核对口径，forecast_or_hypothesis必须保留预测归属和反证。')
     lines.append('commercial_promotion是展会招揽或产品推介线索，不作为核心投资理由；recap是带时点综述，不重复包装成多个独立催化。')
     for item in data['articles']:

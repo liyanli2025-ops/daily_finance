@@ -16,7 +16,7 @@ def assemble(snapshot, replay, raw_sha, stocks, market):
     from app.services.prompt_reading import input_characters
     if replay.get('snapshot_sha256') != raw_sha:
         raise RuntimeError('重选与原始资料不匹配，停止；不会重新采集')
-    pool={item.id:item for item in candidates(snapshot)}
+    pool={item.id:item for item in candidates(snapshot, bool(replay.get("restored_market_events", False)))}
     selected=[row['id'] for row in replay['selection']['articles'] if row.get('selected')]
     if not selected or len(selected)!=len(set(selected)) or set(selected)-set(pool):
         raise RuntimeError('入选清单为空、重复或缺原文')

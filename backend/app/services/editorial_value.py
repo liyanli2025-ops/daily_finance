@@ -37,6 +37,14 @@ def profile(item):
     if promotion:
         result.update(kind='commercial_promotion',priority=-1,reasons=[promotion])
         return result
+    if (re.search(r'沙龙|论坛|峰会|研讨会',title) and re.search(r'探析|共话|研讨|交流|举行|举办',title)
+            and not re.search(r'发布.{0,8}(?:新规|政策)|关税|出口管制|降息|降准',title)):
+        result.update(kind='event_commentary',priority=0,reasons=['活动/讨论报道；不因正文出现经营词就升级为市场变化'])
+        return result
+    if (re.search(r'生态持续完善|协同优势.{0,8}夯实|转型与渠道拓展持续推进',title)
+            and not re.search(r'净利润|亏损|增长\d|下降\d|上调|下调',title)):
+        result.update(kind='corporate_feature',priority=0,reasons=['企业综述性宣传线索；具体经营变化需另读，不优先于市场事件'])
+        return result
     benchmarks=re.findall(r'创业板|科创50|恒科|恒指|沪指|上证|深成指|纳指|标普',title)
     if (len(set(benchmarks))>=2 and re.search(r'涨|跌',title) and '%' in title
             and not re.search(r'为何|为什么|背后|解读|财报|业绩|政策|关税|降息|降准',title)):

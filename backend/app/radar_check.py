@@ -71,7 +71,8 @@ async def inspect(hours,full_news=False):
         collector=NewsCollectorService(sentiment=False)
         try:
             articles=await asyncio.wait_for(collector.collect_all(hours),300)
-            finance=collector.get_news_by_type(articles).get('finance',[])
+            from .services.market_coverage import market_candidates
+            finance=market_candidates(articles)
             eligible=collector.filter_china_related(finance)
             relaxed=len(eligible)<20 and len(finance)>len(eligible)
             if relaxed:eligible=finance

@@ -25,6 +25,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from ..config import settings
 from .news_collector import get_news_collector
+from .market_coverage import market_candidates
 from .ai_analyzer import get_ai_analyzer
 from .podcast_generator import get_podcast_generator
 from .signal_tracker import get_signal_tracker
@@ -324,7 +325,7 @@ class SchedulerService:
                 
                 # 分离财经新闻和跨界新闻
                 news_by_type = collector.get_news_by_type(all_news)
-                finance_news = news_by_type.get('finance', [])
+                finance_news = market_candidates(all_news)
                 
                 # 详细日志：各类型新闻数量
                 print(f"   [新闻分类] 总 {len(all_news)} 条 → "
@@ -530,7 +531,7 @@ class SchedulerService:
             
             # 分离新闻
             news_by_type = collector.get_news_by_type(all_news)
-            finance_news = news_by_type.get('finance', [])
+            finance_news = market_candidates(all_news)
             
             # 详细日志：各类型新闻数量
             print(f"   [新闻分类] 总 {len(all_news)} 条 → "

@@ -1262,6 +1262,11 @@ class NewsCollectorService:
         keyword_match_count = 0
         
         for news in news_list:
+            from .market_coverage import cross_category_reason
+            if cross_category_reason(news) and news.importance_score >= min_score:
+                filtered_news.append(news)
+                bypass_count += 1
+                continue
             source = news.source or ""
             if ('全市场事件入口' in (news.market_impact or '') and article_url(news.source_url)
                     and news.importance_score>=min_score):

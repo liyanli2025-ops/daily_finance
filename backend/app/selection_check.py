@@ -14,7 +14,7 @@ from .services.time_context import china_now
 from .services.watchlist_repository import refresh_app_watchlist
 
 
-def candidates(data):
+def candidates(data, restore_market_events=False):
     if data.get('full_collection') is not True:
         raise ValueError('需要已有完整采集快照；本工具不会启动采集')
     admitted={row['id'] for row in data['selection']['articles']}
@@ -22,20 +22,34 @@ def candidates(data):
     if not admitted or admitted-set(originals):
         raise ValueError('原采集候选缺少正文，停止重选')
     result=[]
-    for key in sorted(admitted):
+    keys=set(admitted)
+    if restore_market_events:
+        keys.update(originals)
+    for key in sorted(keys):
         row=originals[key]
-        result.append(News(id=key,title=row['title'],content=row['content'],source=row['source'],
+        item=News(id=key,title=row['title'],content=row['content'],source=row['source'],
             source_url=row['url'],published_at=datetime.fromisoformat(row['published']),
             market_impact=row.get('association') or '',category=row.get('category'),
-            related_stocks=row.get('related_stocks') or [],importance_score=row.get('importance_score',.5)))
+            related_stocks=row.get('related_stocks') or [],importance_score=row.get('importance_score',.5),news_type=row.get('news_type','finance'))
+        if key not in admitted:
+            from .services.market_coverage import cross_category_reason
+            from .services.time_context import CHINA_TIME
+            from datetime import timedelta
+            at=datetime.fromisoformat(data['collected_at'])
+            published=item.published_at
+            if at.tzinfo is not None:at=at.astimezone(CHINA_TIME).replace(tzinfo=None)
+            if published.tzinfo is not None:published=published.astimezone(CHINA_TIME).replace(tzinfo=None)
+            if not cross_category_reason(item) or not timedelta()<=at-published<=timedelta(hours=data.get('hours',24)):
+                continue
+        result.append(item)
     return result
 
 
-async def inspect(root=None):
+async def inspect(root=None,restore_market_events=False):
     root=Path(root) if root is not None else ROOT
     raw=(root/'news-acceptance.json').read_bytes()
     data=json.loads(raw)
-    news=candidates(data)
+    news=candidates(data,restore_market_events)
     await refresh_app_watchlist()  # App read plus process-local configuration only.
     analyzer=AIAnalyzerService.__new__(AIAnalyzerService)
     report_input=analyzer._prepare_news_summary(news)
@@ -52,10 +66,11 @@ async def inspect(root=None):
             or '排序、背景配额或去重后未入选') for key,row in old.items() if key not in new],
         added=[dict(id=key,title=row.title) for key,row in new.items() if key not in old],
         selected_titles=[row.title for row in new.values()],
+        restored_market_events=restore_market_events,market_coverage=selection.get('market_coverage',{}),
         selected_editorial_counts=selection['selected_editorial_counts'],
         selected_reading_scope=selection['selected_reading_scope'],excluded_by_reason=selection['excluded_by_reason'],
         per_stock=selection.get('evidence_audit',{}).get('per_stock',[]),
-        limitation='仅重选原快照已准入候选，不重新抓取、不恢复原先排除的文章；旧快照未保存分类/重要性时使用明确默认值，不能宣称完全还原原排序。不改变原快照或行情时效，不代表正文事实已核实。')
+        limitation='默认重选已准入候选；显式restore时仅补回原始池中有金融/经营/传导线索且在原窗口内的材料，仍走正文准入；不重新抓取；旧快照未保存分类/重要性时使用明确默认值，不能宣称完全还原原排序。不改变原快照或行情时效，不代表正文事实已核实。')
     # Save a separate diagnostic, never silently replace the accepted source snapshot.
     save_json(root/'selection-replay.json',dict(result,selection=selection,news_input=report_input,
         selection_context=getattr(analyzer,'_selection_context',{})))
@@ -65,5 +80,6 @@ async def inspect(root=None):
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--snapshot-root',type=Path,default=ROOT)
+    parser.add_argument('--restore-market-events',action='store_true',help='从当前快照原始池恢复被类型/地区筛选遗漏的市场事件；不联网')
     args=parser.parse_args()
-    print(json.dumps(asyncio.run(inspect(args.snapshot_root)),ensure_ascii=False,indent=2))
+    print(json.dumps(asyncio.run(inspect(args.snapshot_root,args.restore_market_events)),ensure_ascii=False,indent=2))
