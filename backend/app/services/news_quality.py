@@ -25,7 +25,8 @@ def reading_scope(item):
             or source.startswith('上市公司公告-东方财富披露镜像-')):
         return 'full_text'
     if source.startswith('微信公众号原文-'):return 'full_text'
-    if source in {'经济观察网公开原文','界面新闻公开原文','上海有色网公开原文','TrendForce公开研究发布'}:return 'full_text'
+    if source in {'经济观察网公开原文','界面新闻公开原文','上海有色网公开原文','TrendForce公开研究发布',
+                  '澎湃财经公开原文','钛媒体公开原文','财经网公开原文'}:return 'full_text'
     if source in {'BBC公开原文','Guardian公开原文','美联储公开原文','美国财政部公开原文','EIA公开原文',
                   'TechCrunch公开原文','FastBull公开原文'}:return 'full_text'
     if source in {'财联社公开原文','中国证券网公开原文','第一财经公开原文','21世纪经济报道公开原文',

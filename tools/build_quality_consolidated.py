@@ -17,14 +17,15 @@ V12_SHA='54fd66764715cb8edbbfed206a6fb13529f7c317f22326815eaeb9787a504022'
 V13_SHA='0648cff8973271df55c233aeaf8de8e3a42b31a6be5725fd04ed53490f9ab32b'
 V14_SHA='2f355b5936507a22f4bd3bcf9eb6a4eb12f6cca86a573e15642a16405f625c12'
 V15_SHA='b111678268b641f73af4be46953363f16c7843ac5ff827b048274b300b3e0677'
-INSTALLED_ARCHIVES={V15_SHA:'finance-discovery-budget-20261030-v15',V14_SHA:'finance-fresh-episode-20261030-v14',V13_SHA:'finance-listener-flow-20261030-v13',V11_SHA:'finance-quality-consolidated-20261029-v11-r2',V12_SHA:'finance-editorial-cost-20261029-v12'}
+V16_SHA='97e034e4dfebb6badfbdce94e4ac0cace167979115ececa39858ec2f129099d0'
+INSTALLED_ARCHIVES={V16_SHA:'finance-source-focus-20261031-v16-r2',V15_SHA:'finance-discovery-budget-20261030-v15',V14_SHA:'finance-fresh-episode-20261030-v14',V13_SHA:'finance-listener-flow-20261030-v13',V11_SHA:'finance-quality-consolidated-20261029-v11-r2',V12_SHA:'finance-editorial-cost-20261029-v12'}
 ALLOCATION_SHA='c2f08e103293aea7a51a029d31c62a4b124c95354705de2edf674f57fca9e4e7'
 
 
 def digest(value):return hashlib.sha256(value.replace(b'\r\n',b'\n')).hexdigest()
 
 
-def build(output,baseline_archive,allocation_archive,installed_archive=None):
+def build(output,baseline_archive,allocation_archive,installed_archive=None,compatible_archives=()):
     repo=Path(__file__).resolve().parents[1]
     if subprocess.check_output(['git','-C',str(repo),'status','--porcelain']).strip():
         raise RuntimeError('Commit reviewed sources before building')
@@ -61,13 +62,21 @@ def build(output,baseline_archive,allocation_archive,installed_archive=None):
         if installed_sha not in INSTALLED_ARCHIVES:raise RuntimeError('Unknown installed release archive')
         _,installed=read_bundle(installed_archive,INSTALLED_ARCHIVES[installed_sha],installed_sha)
     old={name:installed.get(name,allocation_state[name]) for name in names}
+    compatible_states=[];compatible_shas=[]
+    for archive in compatible_archives:
+        sha=hashlib.sha256(Path(archive).read_bytes()).hexdigest()
+        if sha not in INSTALLED_ARCHIVES:raise RuntimeError('Unknown compatible release archive')
+        _,values=read_bundle(archive,INSTALLED_ARCHIVES[sha],sha)
+        compatible_states.append({name:values.get(name,allocation_state[name]) for name in names})
+        compatible_shas.append(sha)
     new={name:(repo/name).read_bytes() for name in names}
     output=Path(output).resolve()
     if output.exists() or output.with_suffix('.zip').exists():raise RuntimeError('Immutable output exists')
     output.mkdir(parents=True)
     revision=subprocess.check_output(['git','-C',str(repo),'rev-parse','HEAD']).decode().strip()
     manifest=dict(settings={},source_revision=revision,source_worktree_dirty=False,
-        reviewed_installed_artifact_sha256=installed_sha,reviewed_installed_v10_artifact_sha256=V10_SHA,reviewed_allocation_artifact_sha256=ALLOCATION_SHA,files={name:dict(old_sha256=digest(old[name]) if old[name] is not None else None,new_sha256=digest(value),additional_old_sha256=list(dict.fromkeys(digest(v) if v is not None else None for v in (prior[name],allocation_state[name])))) for name,value in new.items()})
+        reviewed_compatible_artifact_sha256=compatible_shas,
+        reviewed_installed_artifact_sha256=installed_sha,reviewed_installed_v10_artifact_sha256=V10_SHA,reviewed_allocation_artifact_sha256=ALLOCATION_SHA,files={name:dict(old_sha256=digest(old[name]) if old[name] is not None else None,new_sha256=digest(value),additional_old_sha256=list(dict.fromkeys(digest(v) if v is not None else None for v in (prior[name],allocation_state[name],*(state[name] for state in compatible_states))))) for name,value in new.items()})
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
     (output/'install_upgrade.py').write_bytes((repo/'tools/install_paused_upgrade.py').read_bytes())
     with zipfile.ZipFile(output/'payload.zip','w',zipfile.ZIP_DEFLATED) as payload:
@@ -97,6 +106,13 @@ def build(output,baseline_archive,allocation_archive,installed_archive=None):
         (data/'pause-sentinel').rename(flag)
         for options in ([],['--apply'],['--apply']):subprocess.run(command+options,check=True)
         assert all((root/name).read_bytes()==value for name,value in new.items())
+        for state in compatible_states:
+            for name,value in state.items():
+                path=root/name
+                if value is None:path.unlink(missing_ok=True)
+                else:path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(value)
+            for options in ([],['--apply']):subprocess.run(command+options,check=True)
+            assert all((root/name).read_bytes()==value for name,value in new.items())
         assert env.read_bytes()==env_value and flag.read_bytes()==b'preserve-pause'
         assert other.read_bytes()==b'untouched' and marker.read_bytes()==b'never-rebill'
         with closing(sqlite3.connect(db)) as connection:assert connection.execute('SELECT value FROM sentinel').fetchone()[0]=='preserved'
@@ -125,5 +141,6 @@ if __name__=='__main__':
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--baseline-archive',type=Path,required=True)
     parser.add_argument('--allocation-archive',type=Path,required=True)
-    parser.add_argument('--installed-archive',type=Path,help='Exact confirmed v11-r2, v12, v13, v14 or v15 artifact')
-    args=parser.parse_args();print(json.dumps(build(args.output,args.baseline_archive,args.allocation_archive,args.installed_archive),ensure_ascii=False,indent=2))
+    parser.add_argument('--installed-archive',type=Path,help='Exact registered immutable release artifact')
+    parser.add_argument('--compatible-archive',type=Path,action='append',default=[],help='Additional exact registered release to accept')
+    args=parser.parse_args();print(json.dumps(build(args.output,args.baseline_archive,args.allocation_archive,args.installed_archive,args.compatible_archive),ensure_ascii=False,indent=2))

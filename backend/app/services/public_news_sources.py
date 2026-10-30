@@ -6,6 +6,7 @@ Latest-page coverage is explicitly partial, even when every candidate was read.
 from concurrent.futures import ThreadPoolExecutor,as_completed
 from datetime import datetime,timedelta,timezone
 import hashlib
+from html import escape
 import json
 import re
 import time
@@ -32,7 +33,10 @@ SOURCES={
  'eeo':dict(index='https://www.eeo.com.cn/',name='经济观察网公开原文',host='www.eeo.com.cn',path=r'/\d{4}/\d{4}/\d+\.shtml',role='财经记者报道或分析，具体作者与事实归属以正文为准'),
  'jiemian':dict(index='https://www.jiemian.com/',name='界面新闻公开原文',host='www.jiemian.com',path=r'/article/\d+\.html',role='商业报道或评论，记者分析不是独立核实的事实'),
  'smm':dict(index='https://news.smm.cn/',name='上海有色网公开原文',host='news.smm.cn',path=r'/news/\d+',role='产业机构公开报道/市场观察；非交易所行情，观点、样本及数据口径需另核验'),
- 'trendforce':dict(index='https://www.trendforce.com/presscenter',name='TrendForce公开研究发布',host='www.trendforce.com',path=r'/presscenter/news/\d{8}-\d+\.html',role='机构公开研究发布文章；不是订阅报告全文，预测必须归属TrendForce')}
+ 'trendforce':dict(index='https://www.trendforce.com/presscenter',name='TrendForce公开研究发布',host='www.trendforce.com',path=r'/presscenter/news/\d{8}-\d+\.html',role='机构公开研究发布文章；不是订阅报告全文，预测必须归属TrendForce'),
+ 'thepaper':dict(index='https://api.thepaper.cn/contentapi/nodeCont/getByChannelId',name='澎湃财经公开原文',host='m.thepaper.cn',path=r'/newsDetail_forward_\d+',role='澎湃财经频道；保留作者和转载来源，不将转载计作独立核实'),
+ 'tmtpost':dict(index='https://api.tmtpost.com/v1/lists/new?limit=30',name='钛媒体公开原文',host='www.tmtpost.com',path=r'/\d+\.html',role='包含钛度号作者投稿；作者观点不等于钛媒体记者调查或公司公告'),
+ 'caijing':dict(index='https://roll.caijing.com.cn/json/lists1.json',name='财经网公开原文',host=('stock.caijing.com.cn','economy.caijing.com.cn','finance.caijing.com.cn','industry.caijing.com.cn','yuanchuang.caijing.com.cn','tech.caijing.com.cn'),path=r'/(?:\d{8}|\d{4}/\d{4})/\d+\.shtml',role='财经网滚动入口；含转载和普通公司稿，仍需事件范围筛选')}
 FINANCE=('A股','港股','股市','上市','公司','收购','三季报','半年报','财报','银行','金融','证券','基金','政策','电力','能源',
  '电价','芯片','半导体','存储','科技','AI','资本','人民币','出口','外贸','国务院','经济','猪价','生猪','养殖','水电','煤炭',
  '原油','铜','黄金','债券','ETF','美联储','关税','需求','供给','发改委','价格','投资','产能','消费','工业','就业','地产',
@@ -45,7 +49,8 @@ def permitted(provider,url,index=False):
     config=SOURCES[provider];parts=urlsplit(url)
     if parts.scheme!='https' or parts.username or parts.password or parts.query or parts.fragment:return False
     if index:return url==config['index']
-    return parts.hostname==config['host'] and bool(re.fullmatch(config['path'],parts.path))
+    hosts=config['host'] if isinstance(config['host'],tuple) else (config['host'],)
+    return parts.hostname in hosts and bool(re.fullmatch(config['path'],parts.path))
 
 
 def text(node):
@@ -62,6 +67,17 @@ def date_value(raw):
 
 
 def discover(provider,html,stocks,terms,profiles=None):
+    if provider in {'thepaper','tmtpost','caijing'}:
+        from .domestic_discovery import entries
+        candidates=entries(provider,html)
+        # Reuse the same strict host/path, editorial scope and operating-topic
+        # checks as HTML publishers, never follow arbitrary returned links.
+        anchors=''.join('<a href="'+escape(row['url'],quote=True)+'">'+escape(row['title'])+'</a>' for row in candidates)
+        return discover_html(provider,anchors,stocks,terms,profiles)
+    return discover_html(provider,html,stocks,terms,profiles)
+
+
+def discover_html(provider,html,stocks,terms,profiles=None):
     soup=BeautifulSoup(html,'html.parser');result={}
     for anchor in soup.select('a[href]'):
         url=urljoin(SOURCES[provider]['index'],anchor['href'])
@@ -94,6 +110,9 @@ def parse_article(provider,html,url):
     if not permitted(provider,url):raise ValueError('publisher_article_url_rejected')
     soup=BeautifulSoup(html,'html.parser');config=SOURCES[provider]
     title='';body='';raw_date='';upstream='';precision=None
+    if provider in {'thepaper','tmtpost','caijing'}:
+        from .domestic_discovery import article
+        return article(provider,html,url)
     if provider in {'cls','cnstock'}:
         script=soup.select_one('#__NEXT_DATA__')
         if not script:raise ValueError('publisher_public_page_state_missing')
@@ -187,7 +206,9 @@ class PublicNewsCollector:
         if not permitted(provider,url,index):raise ValueError('publisher_host_or_path_rejected')
         remaining=deadline-time.monotonic()
         if remaining<=0:raise TimeoutError('publisher_time_budget_exhausted')
-        response=requests.get(url,headers={'User-Agent':'Mozilla/5.0'},timeout=min(7,remaining),allow_redirects=False)
+        kwargs=dict(headers={'User-Agent':'Mozilla/5.0','app-version':'web1.0'},timeout=min(7,remaining),allow_redirects=False)
+        response=(requests.post(url,json={'channelId':'25951'},**kwargs) if provider=='thepaper' and index
+                  else requests.get(url,**kwargs))
         response.raise_for_status()
         if response.status_code!=200 or len(response.content)>3*1024*1024:
             raise ValueError('publisher_response_invalid')

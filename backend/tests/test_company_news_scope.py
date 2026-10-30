@@ -23,7 +23,10 @@ class CompanyNewsScopeTests(unittest.TestCase):
         self.assertFalse(decision(item('普通公司：三季度净利润增长4%', '文章末尾提到动态自选甲'),[self.stock])['keep'])
 
     def test_market_and_industry_are_preserved(self):
-        for title in ('A股收评：全市场4600只下跌','多家芯片公司财报后下跌，产业链订单出现变化','全球能源供应链遭遇冲击'):
+        for title in ('A股收评：全市场4600只下跌','多家芯片公司财报后下跌，产业链订单出现变化','全球能源供应链遭遇冲击',
+                      '五大上市险企前三季度净利润承压，保险主业表现如何？',
+                      '百亿私募三季报重仓路径曝光，高毅景林买了哪些股？',
+                      '订单规模扩大 半导体设备商业绩频报喜'):
             self.assertTrue(decision(item(title),[])['keep'],title)
 
     def test_concrete_controversy_is_a_lead_not_verified_heat(self):
