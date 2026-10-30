@@ -61,7 +61,7 @@ def date_value(raw):
     return datetime.fromisoformat(value),'second' if len(value)==19 else 'minute' if len(value)==16 else 'day'
 
 
-def discover(provider,html,stocks,terms):
+def discover(provider,html,stocks,terms,profiles=None):
     soup=BeautifulSoup(html,'html.parser');result={}
     for anchor in soup.select('a[href]'):
         url=urljoin(SOURCES[provider]['index'],anchor['href'])
@@ -73,6 +73,13 @@ def discover(provider,html,stocks,terms):
         heading=anchor.select_one('h2,h3,h4')
         title=(heading or anchor).get_text(' ',strip=True)
         if not 6<=len(title)<=180 or ROBOT.search(title):continue
+        from types import SimpleNamespace
+        from .company_news_scope import decision
+        # Headline screen before downloading unrelated routine company bodies.
+        # A headline-only decision cannot invent a business relationship.
+        probe=SimpleNamespace(title=title,content='',category='',related_stocks=[],
+                              source='',published_at=china_now())
+        if not decision(probe,stocks,profiles)['keep']:continue
         direct,industry,macro=relation(title,'',stocks,terms)
         if not (direct or industry or macro or any(word in title for word in FINANCE)):continue
         rank=10*bool(direct)+5*bool(industry)+2*bool(macro)
@@ -211,7 +218,7 @@ class PublicNewsCollector:
             for future in as_completed(pending):
                 key=pending[future]
                 try:
-                    queues[key]=discover(key,future.result(),stocks,terms)
+                    queues[key]=discover(key,future.result(),stocks,terms,profiles)
                     statuses[key]['candidates']=len(queues[key])
                 except RetiredSourceError:
                     statuses[key]['paused_routes'].append(dict(stage='index',reason='source_paused_no_automatic_retest'))

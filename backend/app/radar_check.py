@@ -101,6 +101,7 @@ async def inspect(hours,full_news=False):
         selection=selection,news_input=report_input,
         collection_funnel=getattr(collector,'_collection_funnel',{}) if isinstance(getattr(collector,'_collection_funnel',{}),dict) else {},
         source_inventory=source_inventory,
+        company_scope_exclusions=getattr(collector,'_company_scope_exclusions',[]) if isinstance(getattr(collector,'_company_scope_exclusions',[]),list) else [],
         coverage=getattr(collector,'_radar_coverage',{})))
     technical=getattr(collector,'_technical_snapshot',{})
     for row in technical.get('instruments',[]):

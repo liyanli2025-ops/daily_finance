@@ -46,6 +46,8 @@ def permanent_reason(error):
     status=getattr(response,'status_code',None)
     if status in {400,401,403,404,405,410}:return 'http_'+str(status)
     if isinstance(error,requests.exceptions.SSLError):return 'tls_verification_failed'
+    if isinstance(error,requests.exceptions.Timeout):return 'observed_request_timeout_no_auto_retest'
+    if isinstance(error,requests.exceptions.ConnectionError):return 'observed_connection_failure_no_auto_retest'
     # Article-specific admission failures, not a ban on the entire publisher.
     if str(error) in {'media_identity_or_access_rejected','media_access_unknown','media_full_body_unavailable',
         'media_publication_missing','media_article_structure_missing',

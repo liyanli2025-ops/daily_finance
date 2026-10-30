@@ -23,7 +23,9 @@ SOURCES={
  'guardian':dict(index='https://www.theguardian.com/uk/business',host='www.theguardian.com',name='Guardian公开原文',path=r'/business/\d{4}/[a-z]{3}/\d{2}/[^/]+'),
  'fed':dict(index='https://www.federalreserve.gov/json/ne-press.json',host='www.federalreserve.gov',name='美联储公开原文',path=r'/newsevents/pressreleases/[a-z]+\d{8}[a-z]\.htm'),
  'treasury':dict(index='https://home.treasury.gov/news/press-releases',host='home.treasury.gov',name='美国财政部公开原文',path=r'/news/press-releases/[a-z]{1,4}\d+/?'),
- 'eia':dict(index='https://www.eia.gov/todayinenergy/',host='www.eia.gov',name='EIA公开原文',path=r'/todayinenergy/detail\.php')}
+ 'eia':dict(index='https://www.eia.gov/todayinenergy/',host='www.eia.gov',name='EIA公开原文',path=r'/todayinenergy/detail\.php'),
+ 'techcrunch':dict(index='https://techcrunch.com/news-sitemap.xml',host='techcrunch.com',name='TechCrunch公开原文',path=r'/\d{4}/\d{2}/\d{2}/[a-z0-9-]+/'),
+ 'fastbull':dict(index='https://www.fastbull.com/cn/news',host='www.fastbull.com',name='FastBull公开原文',path=r'/cn/news-detail/\d+_\d+')}
 FINANCE=re.compile(r'\b(stock\w*|market\w*|econom\w*|inflation|bank\w*|interest|central|fed|trade|tariff\w*|china|chinese|hong kong|asia\w*|semiconductor\w*|chip\w*|ai|artificial intelligence|oil|gas|energy|electric\w*|power|copper|metal\w*|gold|bond\w*|treasury|dollar|yen|euro\w*|debt|sanction\w*|export\w*|supply|demand|earning\w*|invest\w*|capital|manufactur\w*)\b',re.I)
 RESTRICTED=re.compile(r'subscribe to (?:continue|read|unlock)|sign in to (?:continue|read)|subscription required|already a subscriber|remaining content.{0,30}subscriber',re.I)
 
@@ -53,6 +55,11 @@ def iso_time(raw):
 
 
 def publication(soup,provider):
+    if provider=='fastbull':
+        node=soup.select_one('.news-detail-main .detail-description .timedate[data-time]')
+        try:stamp=datetime.fromtimestamp(int(node['data-time'])/1000,timezone.utc).astimezone(CST).replace(tzinfo=None)
+        except (TypeError,ValueError,KeyError,OverflowError,OSError):raise ValueError('overseas_source_time_missing')
+        return stamp,stamp,'millisecond',str(node['data-time'])+' (Unix milliseconds)'
     if provider=='fed':
         day=plain(soup.select_one('.article__time'))
         release=plain(soup.select_one('.releaseTime'))
@@ -107,6 +114,10 @@ def parse_article(provider,html,url):
         blocks=article.select('[data-component="text-block"],[data-component="subheadline-block"]') if article else []
         body='\n'.join(plain(node) for node in blocks)
     elif provider=='guardian':body=plain(soup.select_one('.article-body-commercial-selector'))
+    elif provider=='techcrunch':
+        node=soup.select_one('div.entry-content')
+        body='\n'.join(plain(part) for part in node.select(':scope > p,:scope > h2,:scope > ul > li')) if node else ''
+    elif provider=='fastbull':body=plain(soup.select_one('.news-detail-main .news-detail-content'))
     elif provider=='treasury':body=plain(soup.select_one('.field--name-field-news-body'))
     elif provider=='eia':
         node=soup.select_one('.tie-article')
@@ -127,7 +138,17 @@ def parse_article(provider,html,url):
 
 
 def discover(provider,content):
-    if provider=='fed':
+    if provider=='techcrunch':
+        soup=BeautifulSoup(content,'xml');rows=[]
+        for node in soup.find_all('url'):
+            loc=node.find('loc');title=node.find('title')
+            if loc and title:rows.append(dict(title=title.get_text(),url=loc.get_text()))
+    elif provider=='fastbull':
+        soup=BeautifulSoup(content,'html.parser');rows=[]
+        for node in soup.select('.trending_type[href]'):
+            title=node.select_one('.title')
+            if title:rows.append(dict(title=title.get_text(' ',strip=True),url=urljoin(SOURCES[provider]['index'],node['href'])))
+    elif provider=='fed':
         data=json.loads(content.lstrip('\ufeff'))
         rows=[dict(title=BeautifulSoup(row.get('t',''),'html.parser').get_text(),url=urljoin(SOURCES[provider]['index'],row.get('l','')),
             date_hint=row.get('d')) for row in data if row.get('pt') in {'Monetary Policy','Other Announcements'}]
@@ -138,7 +159,8 @@ def discover(provider,content):
             if 15<=len(title)<=240:rows.append(dict(title=title,url=urljoin(SOURCES[provider]['index'],a['href'])))
     result={}
     for row in rows:
-        if permitted(provider,row['url']) and (provider in {'fed','eia','treasury'} or FINANCE.search(row['title'])):
+        chinese_finance=provider=='fastbull' and re.search(r'市场|经济|央行|利率|美联储|能源|原油|通胀|关税|股|汇率|债|资本|芯片|供应|贸易',row['title'])
+        if permitted(provider,row['url']) and (provider in {'fed','eia','treasury'} or FINANCE.search(row['title']) or chinese_finance):
             result.setdefault(row['url'],row)
     return list(result.values())
 
@@ -154,7 +176,7 @@ class OverseasCollector:
         if path.exists():
             try:
                 reason=json.loads(path.read_text(encoding='utf-8')).get('reason','')
-                if re.fullmatch(r'http_\d{3}|tls_verification_failed|legacy_negative_result_requires_review|overseas_\w+',reason):
+                if re.fullmatch(r'http_\d{3}|tls_verification_failed|legacy_negative_result_requires_review|overseas_\w+|observed_(?:request_timeout|connection_failure)_no_auto_retest',reason):
                     return reason
             except (ValueError,OSError):pass
         reason=str(error)

@@ -330,7 +330,8 @@ class NewsCollectorService:
 
         from .research_hub import ResearchHub, tag_industry_news
         current_stocks = get_watchlist_service().get_all_stocks()
-        profiles = [item.get('profile') for item in ResearchHub().load(current_stocks)]
+        research_rows = ResearchHub().load(current_stocks)
+        profiles = [item.get('profile') for item in research_rows]
         tag_industry_news(all_news, profiles)
 
         # Filter before deduplication: an old high-score copy must not displace
@@ -348,7 +349,11 @@ class NewsCollectorService:
         self._collection_funnel=dict(retrieved=len(retrieved),history_restored=len(history),in_window=len(in_window))
         unique_news = self._deduplicate(in_window)
         self._collection_funnel['after_dedup']=len(unique_news)
-        filtered_news = unique_news
+        from .company_news_scope import partition
+        scope_profiles={row['key']:row['profile'] for row in research_rows if row.get('profile')}
+        filtered_news,self._company_scope_exclusions=partition(unique_news,current_stocks,scope_profiles)
+        self._collection_funnel['after_company_scope']=len(filtered_news)
+        self._collection_funnel['company_scope_excluded']=len(self._company_scope_exclusions)
         try:
             from .event_observations import EventObservations
             EventObservations().observe(in_window,dict(

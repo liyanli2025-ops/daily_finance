@@ -16,7 +16,8 @@ V11_SHA='143ec09bcfb285ebc6208f31760804a7b7f7f5267ee0ab163316a8427e8bd8a8'
 V12_SHA='54fd66764715cb8edbbfed206a6fb13529f7c317f22326815eaeb9787a504022'
 V13_SHA='0648cff8973271df55c233aeaf8de8e3a42b31a6be5725fd04ed53490f9ab32b'
 V14_SHA='2f355b5936507a22f4bd3bcf9eb6a4eb12f6cca86a573e15642a16405f625c12'
-INSTALLED_ARCHIVES={V14_SHA:'finance-fresh-episode-20261030-v14',V13_SHA:'finance-listener-flow-20261030-v13',V11_SHA:'finance-quality-consolidated-20261029-v11-r2',V12_SHA:'finance-editorial-cost-20261029-v12'}
+V15_SHA='b111678268b641f73af4be46953363f16c7843ac5ff827b048274b300b3e0677'
+INSTALLED_ARCHIVES={V15_SHA:'finance-discovery-budget-20261030-v15',V14_SHA:'finance-fresh-episode-20261030-v14',V13_SHA:'finance-listener-flow-20261030-v13',V11_SHA:'finance-quality-consolidated-20261029-v11-r2',V12_SHA:'finance-editorial-cost-20261029-v12'}
 ALLOCATION_SHA='c2f08e103293aea7a51a029d31c62a4b124c95354705de2edf674f57fca9e4e7'
 
 
@@ -124,5 +125,5 @@ if __name__=='__main__':
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--baseline-archive',type=Path,required=True)
     parser.add_argument('--allocation-archive',type=Path,required=True)
-    parser.add_argument('--installed-archive',type=Path,help='Exact confirmed v11-r2, v12, v13 or v14 artifact')
+    parser.add_argument('--installed-archive',type=Path,help='Exact confirmed v11-r2, v12, v13, v14 or v15 artifact')
     args=parser.parse_args();print(json.dumps(build(args.output,args.baseline_archive,args.allocation_archive,args.installed_archive),ensure_ascii=False,indent=2))

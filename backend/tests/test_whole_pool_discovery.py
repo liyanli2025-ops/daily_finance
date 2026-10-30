@@ -13,7 +13,9 @@ NOW=datetime(2026,10,30,17)
 
 def item(i,large=False):
     name='独立企业'+str(i)
-    title=name+'净利润增长'+str(i+1)+'%'
+    # Directory budget tests use admissible industry leads. Routine unrelated
+    # individual earnings are now intentionally outside the episode scope.
+    title='产业链观察'+str(i)+'订单增长'+str(i+1)+'%'
     text=(name+'披露收入增长'+str(i+3)+'%，现金流变化需核对。')*(120 if large else 4)
     return News(id='id-'+str(i),title=title,content=text,source='财联社公开原文',
         source_url='https://www.cls.cn/detail/'+str(i+1000),published_at=NOW-timedelta(minutes=i),importance_score=.8)

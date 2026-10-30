@@ -1125,6 +1125,10 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         from .research_hub import ResearchHub
         from .news_briefing import associations,topic,briefing,consultation_key,regulatory_population_key,company_reporting_event,diverse_rank,editorial_exclusion,primary_rate_decision,prompt as briefing_prompt
         profiles={row['key']:row['profile'] for row in ResearchHub().load(stocks) if row.get('profile')}
+        from .company_news_scope import partition
+        news_list,self._company_scope_exclusions=partition(news_list,stocks,profiles)
+        catalogue_pool=list(news_list)
+        self._news_quality_exclusions.update(Counter(row['reason'] for row in self._company_scope_exclusions))
         self._selection_context=dict(watchlist=[dict(code=stock.code,name=stock.name,
             market=str(getattr(stock.market,'value',stock.market))) for stock in stocks],profiles=profiles)
         from .news_workspace_brief import catalogue,reading_budget,render_article
@@ -1322,6 +1326,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         self._selected_evidence_news = sorted_news
         self._news_briefing=briefing(news_list,stocks,profiles,sorted_news)
         self._news_briefing['catalogue_refs']=discovery['references']
+        self._news_briefing['company_scope_exclusions']=self._company_scope_exclusions
         self._news_briefing['discovery_catalogue']=dict(entries=discovery['entry_count'],heuristic_groups=discovery['event_count'],characters=discovery['characters'],complete=discovery['complete'],scope='metadata_only_not_body_reading')
         self._news_briefing['company_reporting_events']=[dict(event=list(event),prepared_ids=[item.id for item in sorted_news if company_reporting_event(item,stocks)==event],
             related_ids=[item.id for item in news_list if company_reporting_event(item,stocks)==event])

@@ -1,3 +1,11 @@
+## 2026年10月31日 新闻采集参考研读与个股范围修正
+
+优先阅读docs/source_reference_review_20261031.md。用户要求个股新闻聚焦动态自选股、可证相关公司/行业重要公司、重大舆情公司事件；不把大量普通财报当覆盖。新增company_news_scope用于公开媒体发现、collect_all及分析输入，逐条记录排除但保留raw文本；行业经营变量和有来源有效期的related_companies例外保留。完整动态同业/供应链重要公司关系表尚未自动构建，不宣称解决全部龙头识别。
+
+本地零模型网络实测：MKTNews 50快讯、FastBull 75列表/50快讯、Google News40目录、TechCrunch38sitemap；FastBull及TechCrunch各两篇正文与来源日期验证。Rest of World超时且不重试。FastBull和TechCrunch专用解析器已加入OverseasCollector，其他仅诊断不直接纳入正文。新增app.reference_source_check默认不联网，--run最多8次公开HTTP，稳定标记避免重复，供合并安装后服务器核验；保持自动化暂停。旧失败路由不探测。来源HTTP/结构成功不代表事实准确或新闻重要。
+
+用户已补回discovery-report-20261030-v1状态：一次HTTP、63770输入/3827输出token，无补读，机械检查无报错。确认旧目录策略未起到关键文章补读作用；不能继续付费重跑同一trial。此前手工复核问题仍未通过。目录挤占正文和编辑发现/补读流程尚待单独修正，不因新增来源或排除财报而宣称完成。
+
 ## 用户已返回新资料报告：人工复核未通过
 
 discovery-report-20261030-v1正文已回传，A/H主线和多数指标改善，但存在未读目录参与论证、牧原价格/成本错误二分、市场驱动排他推断及短线/趋势条件混用。详见discovery_trial_report_review_20261030.md。实际HTTP次数/用量/补读记录尚未回传，不推定没补读；先免费读状态与tools.json。不进入口播/TTS，不付费审查或重跑，保留稳定marker与所有原稿。

@@ -44,7 +44,9 @@ class SourceHealthTests(unittest.TestCase):
 
     def test_transient_and_budget_errors_do_not_retire_entire_source(self):
         self.assertIsNone(permanent_reason(TimeoutError('budget')))
-        self.assertIsNone(permanent_reason(requests.Timeout()))
+        # Observed transport failures now pause the exact adapter key under
+        # the user's no-repeat requirement; this does not ban the publisher.
+        self.assertEqual(permanent_reason(requests.Timeout()),'observed_request_timeout_no_auto_retest')
         self.assertEqual(permanent_reason(requests.exceptions.SSLError()),'tls_verification_failed')
         for status in [429,500,503]:
             response=requests.Response();response.status_code=status
