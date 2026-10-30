@@ -16,7 +16,9 @@ import zipfile
 def digest(raw):return hashlib.sha256(raw).hexdigest()
 
 
-def build(output,result_log):
+def build(output,result_log,trial_id='macro-spoken-20261029-v1'):
+    if trial_id not in ('macro-spoken-20261029-v1','macro-spoken-listener-20261030-v2'):
+        raise ValueError('Unknown reviewed speech trial')
     repo=Path(__file__).resolve().parents[1];backend=repo/'backend'
     sys.path.insert(0,str(backend))
     from app.services.editorial_policy import spoken_prompts
@@ -28,11 +30,12 @@ def build(output,result_log):
     encoded=json.dumps(messages,ensure_ascii=False,separators=(',',':')).encode()
     if len(encoded.decode())>12000:raise RuntimeError('Preview input too large')
     sources={name:digest((backend/'app/services'/name).read_bytes().replace(b'\r\n',b'\n')) for name in ('editorial_policy.py','spoken_programme.py','spoken_editing.py','podcast_generator.py')}
-    packet=dict(owner='macro-spoken-20261029-v1',report=report.content,report_sha256=digest(body),
+    packet=dict(owner=trial_id,report=report.content,report_sha256=digest(body),
         messages=messages,input_sha256=digest(encoded),input_characters=len(encoded.decode()),source_sha256=sources,
         max_output_tokens=4000,max_http_requests=1,retries=0)
     raw=json.dumps(packet,ensure_ascii=False,indent=2).encode()
     source=(repo/'tools/run_macro_spoken_once.py').read_text(encoding='utf-8').replace('BUILD_PACKET_SHA',digest(raw)).replace('BUILD_RUNNER_SHA',digest((backend/'app/programme_acceptance.py').read_bytes().replace(b'\r\n',b'\n')))
+    source=source.replace("TRIAL='macro-spoken-20261029-v1'","TRIAL="+repr(trial_id))
     output=Path(output).resolve()
     if output.exists() or output.with_suffix('.zip').exists():raise RuntimeError('Immutable output exists')
     output.mkdir(parents=True)
@@ -84,4 +87,5 @@ def build(output,result_log):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',type=Path,required=True);parser.add_argument('--result-log',type=Path,required=True)
-    args=parser.parse_args();print(json.dumps(build(args.output,args.result_log),ensure_ascii=False,indent=2))
+    parser.add_argument('--trial-id',default='macro-spoken-20261029-v1',choices=('macro-spoken-20261029-v1','macro-spoken-listener-20261030-v2'))
+    args=parser.parse_args();print(json.dumps(build(args.output,args.result_log,args.trial_id),ensure_ascii=False,indent=2))
