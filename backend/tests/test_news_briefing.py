@@ -135,6 +135,8 @@ class FullCollectionAcceptanceTests(unittest.IsolatedAsyncioTestCase):
         collector._technical_snapshot={};collector._radar_coverage={'sources':{}}
         with tempfile.TemporaryDirectory() as temporary, \
                 patch.object(radar_check,'ROOT',__import__('pathlib').Path(temporary)), \
+                patch('app.services.watchlist_repository.refresh_app_watchlist',AsyncMock(return_value=SimpleNamespace(get_all_stocks=lambda:[]))), \
+                patch('app.services.watchlist_repository.assert_watchlist_current',AsyncMock()) as unchanged, \
                 patch.object(radar_check,'NewsCollectorService',return_value=collector) as factory, \
                 patch('app.services.ai_analyzer.get_watchlist_service',return_value=SimpleNamespace(get_all_stocks=lambda:[])), \
                 patch('app.services.research_hub.ResearchHub.load',return_value=[]), \
@@ -148,6 +150,9 @@ class FullCollectionAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             import json
             from pathlib import Path
             saved=json.loads(Path(result['snapshot_path']).read_text(encoding='utf-8'))
+            unchanged.assert_awaited_once_with(())
+            self.assertEqual(saved['watchlist_signature'],[])
+            self.assertLessEqual(saved['collection_started_at'],saved['collected_at'])
             self.assertIn('[N:actual]',saved['news_input'])
             self.assertEqual(saved['raw_articles'][0]['content'],news.content)
             self.assertTrue(result['full_collection'])

@@ -62,6 +62,10 @@ def summarize_saved(root=None):
 
 
 async def inspect(hours,full_news=False):
+    from .services.watchlist_repository import refresh_app_watchlist, watchlist_signature, assert_watchlist_current
+    started = china_now()
+    service = await refresh_app_watchlist()
+    watchlist = watchlist_signature(service.get_all_stocks())
     # Avoid NewsCollector initialization (sentiment/model loading not needed).
     if full_news:
         collector=NewsCollectorService(sentiment=False)
@@ -87,8 +91,10 @@ async def inspect(hours,full_news=False):
     if not isinstance(raw,list):raw=articles
     source_inventory=getattr(collector,'_source_inventory',{})
     if not isinstance(source_inventory,dict):source_inventory={}
+    await assert_watchlist_current(watchlist)
     snapshot=ROOT/'news-acceptance.json'
-    save_json(snapshot,dict(collected_at=china_now().isoformat(),hours=hours,full_collection=full_news,china_filter_relaxed=relaxed,
+    save_json(snapshot,dict(collection_started_at=started.isoformat(),watchlist_signature=watchlist,
+        collected_at=china_now().isoformat(),hours=hours,full_collection=full_news,china_filter_relaxed=relaxed,
         raw_articles=[snapshot_article(item) for item in raw],
         selection_context=getattr(analyzer,'_selection_context',{}),
         selection=selection,news_input=report_input,
