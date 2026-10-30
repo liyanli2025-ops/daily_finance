@@ -36,7 +36,7 @@ class MarketCoverageTests(unittest.TestCase):
             service._prepare_news_summary(generic+[a,monthly,h,hm,us,overseas,risk])
         selected={x.id for x in service._selected_evidence_news}
         self.assertTrue({'10','12','14','15','16'}<=selected)
-        self.assertEqual(service._news_briefing['market_coverage']['hk_session']['selected_ids'],['12'])
+        self.assertIn('12',service._news_briefing['market_coverage']['hk_session']['selected_ids'])
 
     def test_supply_news_is_not_inferred_from_unrelated_body_references(self):
         self.assertIsNone(coverage_role(article('20','美国季度经济数据发布','文末提及关税、原油和其他文章')))

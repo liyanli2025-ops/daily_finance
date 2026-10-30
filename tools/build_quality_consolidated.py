@@ -15,7 +15,8 @@ V10_SHA='94554a1b14e16fa70f91cb5290571902a9c9962964bfe272f07c7e9d63b7efb5'
 V11_SHA='143ec09bcfb285ebc6208f31760804a7b7f7f5267ee0ab163316a8427e8bd8a8'
 V12_SHA='54fd66764715cb8edbbfed206a6fb13529f7c317f22326815eaeb9787a504022'
 V13_SHA='0648cff8973271df55c233aeaf8de8e3a42b31a6be5725fd04ed53490f9ab32b'
-INSTALLED_ARCHIVES={V13_SHA:'finance-listener-flow-20261030-v13',V11_SHA:'finance-quality-consolidated-20261029-v11-r2',V12_SHA:'finance-editorial-cost-20261029-v12'}
+V14_SHA='2f355b5936507a22f4bd3bcf9eb6a4eb12f6cca86a573e15642a16405f625c12'
+INSTALLED_ARCHIVES={V14_SHA:'finance-fresh-episode-20261030-v14',V13_SHA:'finance-listener-flow-20261030-v13',V11_SHA:'finance-quality-consolidated-20261029-v11-r2',V12_SHA:'finance-editorial-cost-20261029-v12'}
 ALLOCATION_SHA='c2f08e103293aea7a51a029d31c62a4b124c95354705de2edf674f57fca9e4e7'
 
 
@@ -70,7 +71,7 @@ def build(output,baseline_archive,allocation_archive,installed_archive=None):
     (output/'install_upgrade.py').write_bytes((repo/'tools/install_paused_upgrade.py').read_bytes())
     with zipfile.ZipFile(output/'payload.zip','w',zipfile.ZIP_DEFLATED) as payload:
         for name,value in new.items():payload.writestr(name,value)
-    (output/'README.txt').write_text('合并源码更新：资料去重/阅读分配、经营证据定位、RSI分类、口播审查对照、归因/期限一致性、听众导向口播与编辑备注分离，以及默认关闭失败重试与自动修稿。只接受清单中已确认的v10/分配修复/指定已安装版本指纹或本包新文件；冲突停止，不能绕过。\n默认只验证；--apply --restart私有备份并仅重启finance-daily，要求暂停与数据库健康。\n不改.env、数据库、前端静态文件或其他项目，不调用模型/TTS，不恢复定时任务。保留所有旧付费验收标记。\n安装后按本次发布文档运行免费检查；本轮新资料验证按发布文档手动采集一次；不重跑旧付费试验。\n',encoding='utf-8')
+    (output/'README.txt').write_text('合并源码更新：资料去重/阅读分配、经营证据定位、RSI分类、口播审查对照、归因/期限一致性、听众导向口播与编辑备注分离、全市场事件入口、全池发现目录及按字符预算初读，以及默认关闭失败重试与自动修稿。只接受清单中已确认的v10/分配修复/指定已安装版本指纹或本包新文件；冲突停止，不能绕过。\n默认只验证；--apply --restart私有备份并仅重启finance-daily，要求暂停与数据库健康。\n不改.env、数据库、前端静态文件或其他项目，不调用模型/TTS，不恢复定时任务。保留所有旧付费验收标记。\n安装后按本次发布文档运行免费检查；本轮新资料验证按发布文档手动采集一次；不重跑旧付费试验。\n',encoding='utf-8')
     with tempfile.TemporaryDirectory(prefix='finance-consolidated-quality-') as temporary:
         root=Path(temporary)/'finance-daily'
         for name,value in old.items():
@@ -123,5 +124,5 @@ if __name__=='__main__':
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--baseline-archive',type=Path,required=True)
     parser.add_argument('--allocation-archive',type=Path,required=True)
-    parser.add_argument('--installed-archive',type=Path,help='Exact confirmed v11-r2, v12 or v13 artifact')
+    parser.add_argument('--installed-archive',type=Path,help='Exact confirmed v11-r2, v12, v13 or v14 artifact')
     args=parser.parse_args();print(json.dumps(build(args.output,args.baseline_archive,args.allocation_archive,args.installed_archive),ensure_ascii=False,indent=2))

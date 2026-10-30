@@ -35,7 +35,7 @@ class EpisodeWorkspace:
         self.root.mkdir(parents=True,exist_ok=True,mode=0o700)
         self.path=Path(tempfile.mkdtemp(prefix='episode-',dir=self.root))
         self.now=now or china_now();self.documents={};self.accessed={};self.journal=[]
-        self.document_hashes={};self.prepared={};self.confirmed={};self.completed_rounds=0
+        self.catalogue_refs={};self.document_hashes={};self.prepared={};self.confirmed={};self.completed_rounds=0
         self.cited_ids=set();self.claim_refs=[]
         self.meta=dict(owner='finance-episode-v1',created_at=self.now.isoformat(),
             expires_at=(self.now+timedelta(hours=24)).isoformat(),status='working')
@@ -52,6 +52,8 @@ class EpisodeWorkspace:
             else:
                 if not all(hasattr(item,field) for field in ('content','title','source','source_url','published_at')):continue
                 if excluded_reason(item):continue
+            if item.id in self.catalogue_refs and self.catalogue_refs[item.id]!=item.id:
+                raise ValueError('catalogue_reference_collision')
             fingerprint=hashlib.sha256(body(item).encode('utf-8')).hexdigest()
             if item.id in self.documents and self.document_hashes[item.id]!=fingerprint:
                 raise ValueError('episode_evidence_id_collision')
@@ -148,7 +150,18 @@ class EpisodeWorkspace:
             rows.append(dict(**self.metadata(item),score=round(relevance,6),query_phrase_matches=hits,**window))
         return dict(method='当期词项匹配，按池内出现频率降权常见词；优先覆盖明确查询词组；完整句窗口，非语义检索或事实核实',results=rows)
 
+    def bind_catalogue(self,references):
+        if not isinstance(references,dict):raise ValueError('invalid_catalogue_references')
+        for ref,identifier in references.items():
+            if not re.fullmatch(r'C[0-9]{4,}',ref) or identifier not in self.documents:
+                raise ValueError('catalogue_reference_outside_pool')
+            if ref in self.documents and ref!=identifier:raise ValueError('catalogue_reference_collision')
+            if ref in self.catalogue_refs and self.catalogue_refs[ref]!=identifier:
+                raise ValueError('catalogue_reference_changed')
+        self.catalogue_refs.update(references)
+
     def read(self,identifier,offset=0,characters=6000):
+        identifier=self.catalogue_refs.get(identifier,identifier)
         if identifier not in self.documents:return dict(status='not_found',id=identifier)
         if type(offset) is not int or offset<0 or type(characters) is not int or not 1<=characters<=6000:
             raise ValueError('invalid_evidence_read_range')

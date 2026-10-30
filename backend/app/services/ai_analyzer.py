@@ -742,6 +742,8 @@ App当前自选股与行情快照：
         审查员只负责找问题，不需要修复。
         专注于批判性审查，输出结构化问题清单。
         """
+        from .news_workspace_brief import without_catalogue
+        finance_summary=without_catalogue(finance_summary)
         type_name = "早报" if report_type == ReportType.MORNING else "晚报" if report_type == ReportType.EVENING else "非交易日深度早报"
         
         return f"""你是财经报告事实与决策价值审查员。你的**唯一任务**是审查以下财经报告，找出所有问题。
@@ -1091,18 +1093,10 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         return self._prepare_news_summary_with_sentiment(news_list)
     
     def _prepare_news_summary_with_sentiment(self, news_list: List[News]) -> str:
-        """
-        准备新闻摘要文本（增强版：分类保底配额 + 情感分析标签）
-        
-        策略：不是简单按重要性取前N条，而是按分类保底配额，
-        确保每个维度的信息都有覆盖，避免同一热点的不同报道挤占所有名额。
-        
-          配额分配（总量上限28条）：
-        - A股/国内财经新闻：至少12条，上限18条
-        - 自选股相关新闻：至少5条（如有）
-        - 大宗商品/外盘/宏观新闻：至少5条
-        - 投资者观点（雪球等）：至少3条
-        - 其他财经新闻：填满剩余名额
+        """全池发现目录加按字符预算选出的初读，正文保留精确范围。
+
+        市场覆盖和当前公司/经营线索决定阅读顺序；分桶名额只是优先队列，
+        不设总篇数目标或填满标准。未初读材料仍可从目录定位后读取。
         """
         # Untraceable entries must not consume a quota or become writing material.
         from collections import Counter
@@ -1114,10 +1108,11 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         eligible = [item for item in news_list if excluded_reason(item) is None]
         print(f'[证据筛选] 财经材料 {len(news_list)} 条，符合输入规则 {len(eligible)} 条；排除原因 {self._news_quality_exclusions}', flush=True)
         news_list = eligible
+        catalogue_pool=list(eligible)
         summary_parts = []
         
         # ===== 分类保底配额选取 =====
-        TOTAL_LIMIT = 28
+        # Article count is not a budget; all discovery metadata remains visible.
         
         # 分类桶
         a_stock_news = []       # A股/国内财经
@@ -1132,6 +1127,17 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         profiles={row['key']:row['profile'] for row in ResearchHub().load(stocks) if row.get('profile')}
         self._selection_context=dict(watchlist=[dict(code=stock.code,name=stock.name,
             market=str(getattr(stock.market,'value',stock.market))) for stock in stocks],profiles=profiles)
+        from .news_workspace_brief import catalogue,reading_budget,render_article
+        from .evidence_reading import read_news
+        discovery=catalogue(catalogue_pool,stocks)
+        news_budget=settings.news_initial_prompt_characters
+        # Reserve bounded space for source/association and coverage explanations.
+        reading_limit=news_budget-discovery['characters']-6000
+        if reading_limit<1000:
+            raise RuntimeError('全池发现目录超出新闻预算，未发送模型请求；请先按事件整理目录或显式调整字符预算，不能静默截断候选池')
+        workspace=current_workspace()
+        if workspace is not None:workspace.bind_catalogue(discovery['references'])
+        prepared_readings={};reading_spent=0
         editorial_counts=Counter(editorial_exclusion(item,stocks) for item in news_list if editorial_exclusion(item,stocks))
         self._news_quality_exclusions.update(editorial_counts)
         news_list=[item for item in news_list if not editorial_exclusion(item,stocks)]
@@ -1203,9 +1209,10 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
             return len(sa & sb) / len(sa | sb)
         
         def add_news(source_list, quota, label, market_anchor=False):
+            nonlocal reading_spent
             added = 0
             for n in diverse_rank(source_list):
-                if added >= quota or len(selected) >= TOTAL_LIMIT:
+                if added >= quota:
                     break
                 theme=topic(n)
                 consultation=consultation_key(n)
@@ -1238,6 +1245,16 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                     _jaccard_sim(norm,_normalize_for_dedup(existing.title))>0.7
                     and not retain_distinct_full_bodies(n,existing)) for existing in selected)
                 if not is_dup:
+                    if n.id not in prepared_readings:
+                        focus=[value for stock in stocks if matches_watchlist(n,[stock]) for value in (stock.name,stock.code) if value]
+                        reading=read_news(n.content,n.title,reading_budget(n,stocks),focus)
+                        block=render_article(n,reading)
+                        prepared_readings[n.id]=(reading,block)
+                    reading,block=prepared_readings[n.id]
+                    # Rendering overhead counts too; never cut sentences to fit.
+                    cost=len(block)+8
+                    if not reading['ranges'] or reading_spent+cost>reading_limit:continue
+                    reading_spent+=cost
                     seen_norm_titles.append(norm)
                     selected.append(n)
                     if background and not market_anchor:background_counts[editorial_kind]+=1
@@ -1278,7 +1295,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         add_news(a_stock_news, 12, "A股财经")
         
         # 剩余名额按重要性从所有未选中的新闻中填充
-        remaining_quota = TOTAL_LIMIT - len(selected)
+        remaining_quota = len(news_list)
         if remaining_quota > 0:
             all_remaining = []
             for bucket in [a_stock_news, watchlist_news, global_macro_news, investor_opinion]:
@@ -1298,12 +1315,14 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
             matches_watchlist(item,stocks)
             or (topic(item) is not None and topic(item) in chosen_topics)
             or any(row['level']=='business_overlap' for row in associations(item,stocks,profiles)))]
-        add_news(related_research,min(2,TOTAL_LIMIT-len(selected)),"研报观点背景")
+        add_news(related_research,2,"研报观点背景")
         
         # 最终按重要性排序
         sorted_news = sorted(selected, key=editorial_rank, reverse=True)
         self._selected_evidence_news = sorted_news
         self._news_briefing=briefing(news_list,stocks,profiles,sorted_news)
+        self._news_briefing['catalogue_refs']=discovery['references']
+        self._news_briefing['discovery_catalogue']=dict(entries=discovery['entry_count'],heuristic_groups=discovery['event_count'],characters=discovery['characters'],complete=discovery['complete'],scope='metadata_only_not_body_reading')
         self._news_briefing['company_reporting_events']=[dict(event=list(event),prepared_ids=[item.id for item in sorted_news if company_reporting_event(item,stocks)==event],
             related_ids=[item.id for item in news_list if company_reporting_event(item,stocks)==event])
             for event in sorted({company_reporting_event(item,stocks) for item in sorted_news if company_reporting_event(item,stocks)})]
@@ -1319,6 +1338,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                 and statistical_event_key(other)==statistical_event_key(item) for other in news_list)]
         self._evidence_audit=audit_evidence(audit_candidates,sorted_news,stocks,profiles)
         self._news_briefing['evidence_audit']=self._evidence_audit
+        summary_parts.append(discovery["text"])
         summary_parts.append(audit_prompt(self._evidence_audit))
         summary_parts.append(briefing_prompt(sorted_news,stocks,profiles))
         if self._news_briefing['company_reporting_events']:
@@ -1330,7 +1350,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                 json.dumps(self._news_briefing['statistical_event_supplements'],ensure_ascii=False,separators=(',',':')))
 
         selected_ids = {n.id for n in sorted_news}
-        print(f"[新闻配额] 总计 {len(sorted_news)} 条 | "
+        print(f"[初始阅读] 目录提供 {discovery['entry_count']} 条线索，正文 {len(sorted_news)} 条 | "
               f"自选股 {sum(matches_watchlist(n, stocks) for n in sorted_news)} | "
               f"外盘/大宗 {sum(n.id in selected_ids for n in global_macro_news)} | "
               f"投资者观点 {sum(n.id in selected_ids for n in investor_opinion)} | "
@@ -1342,37 +1362,30 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
             print(f"[自选股入选] {stock.market}:{stock.code} 候选={matched} 入选={selected_count}")
         
         for i, news in enumerate(sorted_news, 1):
-            # The episode workspace retains the full bodies. Only a bounded,
-            # explicitly labelled reading window belongs in the initial prompt.
-            from .evidence_reading import read_news,render_initial_news
-            reading_budget=min(1200,max(300,18000//max(1,len(sorted_news))))
-            focus_terms=[value for stock in stocks if matches_watchlist(news,[stock]) for value in (stock.name,stock.code) if value]
-            reading=read_news(news.content,news.title,reading_budget,focus_terms)
-            content_preview=render_initial_news(news.content,reading)
+            reading,block=prepared_readings[news.id]
             self._news_briefing.setdefault('initial_reading',[]).append(dict(id=news.id,
-                ranges=reading['ranges'],selected_characters=reading['selected_characters'],budget=reading_budget,
+                ranges=reading['ranges'],selected_characters=reading['selected_characters'],budget=reading['budget'],
                 collected_text_fully_provided=reading['collected_text_fully_provided'],followup_ranges=reading['followup_ranges']))
             workspace=current_workspace()
             if workspace is not None and news.id in workspace.documents and reading['ranges']:
                 workspace.prepare_ranges(news.id,reading['ranges'],'initial_news')
-            
-            summary_parts.append(f"""
-### {i}. [N:{news.id}] {news.title}
-- 来源：{news.source}
-- 阅读范围：{scope_label(news)}
-- 原文链接：{news.source_url or "未提供，不可视为已验证"}
-- 时间：{publication_label(news)}
-- 采集文本（按上述阅读范围使用）：{content_preview}
-""")
-        
+            summary_parts.append(block)
+
         # Full IDs remain in each heading and in the structured association
         # audit. Do not repeat the ID catalogue or collector-inferred impact
         # tags as if they were another independent source of facts.
-        return ('本组允许引用的完整标记见各条标题，逐字复制，禁止缩写或另造编号。'
+        result=('本组允许引用的完整标记见各条标题，逐字复制，禁止缩写或另造编号。'
                 '阅读范围标签描述存储材料，实际入模只以字符区间为准；未提供全文的条目不能冒充全文已读。'
                 '区间从0起，选句是阅读辅助而非核验；缺失部分可用read_material读取。'
                 '关联边界见上方统一结构化核对，业务交集不证明该公司受益或供货，也不证明订单。'
                 + '\n' + "\n".join(summary_parts))
+        self._news_briefing['initial_budget']=dict(limit=news_budget,actual_characters=len(result),
+            catalogue_characters=discovery['characters'],reading_blocks_characters=reading_spent,
+            selected_articles=len(sorted_news),article_count_limit=None)
+        if len(result)>news_budget:
+            raise RuntimeError(f'新闻初始输入{len(result)}字符超过{news_budget}预算；未发送请求，不截断目录或原句')
+        return result
+
     
     def _prepare_sentiment_index(self, news_list: List[News], cross_border_news: List[News]) -> str:
         """

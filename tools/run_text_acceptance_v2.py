@@ -57,10 +57,19 @@ class SnapshotAnalyzer(AIAnalyzerService):
         from app.services.episode_workspace import current_workspace
         from app.services.prompt_reading import excerpt,reading_ranges
         workspace=current_workspace()
+        if workspace is not None:workspace.bind_catalogue(self.replay.get('selection',{}).get('catalogue_refs',{}))
+        saved_readings={row['id']:row for row in self.replay.get('selection',{}).get('initial_reading',[])}
         budget=min(1200,max(300,18000//max(1,len(self.selected))))
         for item in self.selected:
             # Historical snapshots can have a different reading format. Do not
             # retroactively claim exposure unless this exact excerpt is present.
+            saved=saved_readings.get(item.id)
+            if saved:
+                from app.services.evidence_reading import render_initial_news
+                preview=render_initial_news(item.content,saved)
+                if workspace is not None and item.id in workspace.documents and preview and preview in self.replay['news_input']:
+                    workspace.prepare_ranges(item.id,saved['ranges'],'initial_news')
+                continue
             preview=excerpt(item.content,item.title,budget)
             if workspace is not None and item.id in workspace.documents and preview and preview in self.replay['news_input']:
                 workspace.prepare_ranges(item.id,reading_ranges(item.content,item.title,budget),'initial_news')

@@ -113,7 +113,8 @@ class UsageTests(unittest.TestCase):
                 text=AIAnalyzerService()._prepare_news_summary_with_sentiment([self.item])
         finally:_current.reset(token)
         from app.services.evidence_reading import read_news,render_initial_news
-        reading=read_news(self.item.content,self.item.title,1200)
+        from app.services.news_workspace_brief import reading_budget
+        reading=read_news(self.item.content,self.item.title,reading_budget(self.item,[]))
         expected=reading['ranges']
         self.assertIn(render_initial_news(self.item.content,reading),text)
         for start,end in expected:self.assertIn(self.item.content[start:end],text)

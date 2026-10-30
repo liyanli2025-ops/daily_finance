@@ -67,6 +67,7 @@ async def inspect(root=None,restore_market_events=False):
         added=[dict(id=key,title=row.title) for key,row in new.items() if key not in old],
         selected_titles=[row.title for row in new.values()],
         restored_market_events=restore_market_events,market_coverage=selection.get('market_coverage',{}),
+        discovery_catalogue=selection.get('discovery_catalogue',{}),initial_budget=selection.get('initial_budget',{}),
         selected_editorial_counts=selection['selected_editorial_counts'],
         selected_reading_scope=selection['selected_reading_scope'],excluded_by_reason=selection['excluded_by_reason'],
         per_stock=selection.get('evidence_audit',{}).get('per_stock',[]),

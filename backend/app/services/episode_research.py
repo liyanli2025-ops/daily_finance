@@ -8,7 +8,7 @@ from .research_hub import ResearchHub
 
 INSTRUCTIONS='''
 ## 当期取材工具
-初始材料只是起点。你可以先补查再写稿；不必为了工具调用而调用。
+初始材料只是起点。先浏览全池目录，按当期重要变化选择问题，不将已给正文的条目当作全市场。目录中的重要反方或缺少上下文、足以改变结论的线索须先读取，再决定是否使用。目录编号Cxxxx可用read_material定位，返回的完整证据ID才可引用。标题未读不能写成事实。你可以先补查再写稿；不必为了工具调用而调用。
 若缺少会改变判断的重要材料，整条回复只输出JSON：
 {"action":"request_evidence","requests":[{"tool":"search_materials","query":"明确问题关键词","reason":"缺什么证据"}]}
 可用工具：search_materials(query)，read_material(id,offset,characters)，search_public(query,hours)。
@@ -76,9 +76,11 @@ def questions(stocks):
 
 async def complete_with_research(analyzer,prompt,max_tokens,workspace,stocks):
     initial=prompt+INSTRUCTIONS+'\n研究问题（按实际重要性选择，不强行每只股票一段）：\n'+questions(stocks)
+    from .news_workspace_brief import without_catalogue
+    followup_initial=without_catalogue(initial)
     transcript=[]
     for round_number in range(3):
-        current=initial+'\n\n'+ '\n\n'.join(transcript)
+        current=(initial if round_number==0 else followup_initial)+'\n\n'+ '\n\n'.join(transcript)
         if round_number==2:
             current+='\n本期取材轮次已用完，请直接输出完整报告；保留未解决缺口，不再请求工具。'
         response=await analyzer._call_ai(current,max_tokens=max_tokens)
