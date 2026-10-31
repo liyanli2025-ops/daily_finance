@@ -21,7 +21,7 @@ def prune_material_caches(base=None,now=None):
     if diagnostics.is_dir() and not diagnostics.is_symlink():
         for pattern in ('generation-*.json','review-*.json','text-acceptance-*.json','spoken-*.json'):
             candidates.extend(diagnostics.glob(pattern))
-    for name in ('news-acceptance.json','technical.json','microstructure.json'):
+    for name in ('news-acceptance.json','technical.json','microstructure.json','discussion-check.json'):
         candidates.append(base/'radar'/name)
     for path in candidates:
         if path.is_symlink() or not path.resolve().is_relative_to(base) or not path.is_file():continue

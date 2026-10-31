@@ -36,6 +36,8 @@ def capabilities():
         configured=bool(settings.research_web_search_api_key and settings.research_web_search_api_key.get_secret_value().strip()),
         max_search_http_requests=settings.research_web_search_max_requests,
         fixed_media_search_scope=['wallstreetcn','stcn'],
+        public_discussion_tool='collect_discussions',discussion_providers=['guba','jisilu','taoguba','tradingview'],
+        discussion_status='local_public_samples_verified_server_network_not_verified',
         limitation='配置状态不是联网验收；搜索目录不是正文，聊天工具不能自动供服务器调用。')
 
 

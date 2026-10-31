@@ -27,6 +27,8 @@ def decision(item, stocks=(), profiles=None):
     profiles = profiles or {}
     title = item.title or ''
     body = item.content or ''
+    if (item.source or '').startswith('公开参与者讨论-'):
+        return dict(keep=True,reason='participant_statement_pending_editorial_assessment')
     for stock in stocks:
         if company_focus(item, stock):
             return dict(keep=True, reason='watchlist_company', stock=stock.code)

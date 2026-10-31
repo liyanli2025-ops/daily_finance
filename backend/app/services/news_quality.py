@@ -27,6 +27,7 @@ def company_focus(item,stock):
 
 def reading_scope(item):
     source=item.source or ''
+    if source.startswith('公开参与者讨论-'):return 'public_statement'
     if source.startswith('公开网页可见正文-'):return 'visible_body'
     if source=='东方财富研报':return 'research_excerpt'
     if (source in {'华尔街见闻原文','证券时报原文','证监会原文','央行新闻原文','央行公开市场操作原文',
@@ -63,12 +64,13 @@ def excluded_reason(item):
 
 def priority(item):
     # This is evidence completeness, NOT truth, independent corroboration or importance.
-    rank={'full_text':3,'visible_body':2,'wire_text':2,'feed_excerpt':1,'research_excerpt':0,'unverified_text':0}
+    rank={'full_text':3,'visible_body':2,'wire_text':2,'feed_excerpt':1,'research_excerpt':0,'unverified_text':0,'public_statement':1}
     return rank[reading_scope(item)],item.importance_score,item.published_at
 
 
 def scope_label(item):
     return {'full_text':'已读取原文主体；不代表独立核实',
+            'public_statement':'公开用户发言/可见回复片段；作者身份及说法未独立核实，不是已确认新闻事实',
             'visible_body':'公开网页可见正文；未确认完整稿或独立核验，按实际提供区间使用',
             'feed_excerpt':'RSS采集文本/摘要，未核验完整正文；只能按所给文本引用',
             'research_excerpt':'研报采集摘要，未核验完整PDF；仅为带归属的观点背景',

@@ -243,7 +243,7 @@ class NewsCollectorService:
             except Exception as e:
                 print(f"[WARN] NewsCollector: 情感分析服务初始化失败: {e}")
     
-    async def collect_all(self, hours: int = 24) -> List[News]:
+    async def collect_all(self, hours: int = 24, primary_news=None) -> List[News]:
         """
         采集所有来源的新闻
         
@@ -255,6 +255,10 @@ class NewsCollectorService:
         Returns:
             去重后的新闻列表
         """
+        if primary_news is not None:
+            return await self._collect_primary_supplements(primary_news,hours)
+        # Legacy callers have no search input. Keep this explicit, rather than
+        # mislabelling their fixed-source scan as the search-primary workflow.
         # 每次采集前清空去重缓存，避免跨次调用（如早报->晚报）时误过滤
         self._seen_hashes.clear()
         self._rss_coverage={feed['name']:dict(status='disabled',reason=feed['disabled_reason'])
@@ -590,6 +594,48 @@ class NewsCollectorService:
         
         return news_list
     
+    async def _collect_primary_supplements(self,primary_news,hours):
+        """Search input supplied: participant supplements, no parallel media scan.
+
+        This does not perform the primary search or turn it on. Callers must
+        provide its actual admitted bodies; an empty/search-title pool fails.
+        """
+        from .community_sources import CommunityCollector
+        from .news_quality import excluded_reason,reading_scope
+        from .technical_radar import TechnicalRadar
+        from .microstructure import MicrostructureRadar
+        from .source_inventory import inventory
+        from .news_archive import identity
+        now=china_now()
+        primary=[item for item in primary_news if isinstance(item,News)
+            and within_window(item,now,hours) and not excluded_reason(item)
+            and reading_scope(item) in {'full_text','visible_body','wire_text','public_statement'}]
+        if not primary or not any(reading_scope(item)!='public_statement' for item in primary):
+            raise RuntimeError('主动搜索主资料未提供可用报道正文/快讯；不回退为媒体扫库或论坛代替主资料')
+        rows=await self._load_db_watchlist()
+        stocks=[WatchlistStock(row['code'],row['name'],row['market']) for row in rows]
+        discussions,technical,micro=await asyncio.gather(
+            asyncio.to_thread(CommunityCollector().collect,stocks,hours,25,None,primary),
+            asyncio.to_thread(TechnicalRadar().collect,stocks),
+            asyncio.to_thread(MicrostructureRadar().collect,stocks),return_exceptions=True)
+        self._technical_snapshot=(dict(status='failed',error=type(technical).__name__) if isinstance(technical,Exception) else technical)
+        self._microstructure_snapshot=(dict(status='failed',error=type(micro).__name__) if isinstance(micro,Exception) else micro)
+        if isinstance(discussions,Exception):
+            additions=[];coverage=dict(status='failed',read=0,errors=[dict(error=type(discussions).__name__)])
+        else:additions,coverage=discussions
+        seen=set();result=[]
+        for item in primary+additions:
+            key=identity(item)
+            if key in seen:continue
+            seen.add(key);result.append(item)
+        self._radar_coverage=dict(mode='search_primary_participant_supplements',
+            primary_documents=len(primary),sources={'participant_discussions':coverage},
+            status='partial',broad_media_scan=False,
+            limitation='主资料由调用者提供；正文/话题覆盖质量另验。未运行RSS、通用媒体/政策扫描或历史媒体补回；技术行情独立采集。')
+        self._rss_coverage={'legacy_media':dict(status='not_requested',reason='primary_search_supplied_incremental_supplements_only')}
+        self._source_inventory=inventory(result,[],now,hours,self._rss_coverage,dict(status='not_requested'))
+        return result
+
     async def _collect_radar_news(self,hours=24):
         from .media_sources import MediaCollector
         from .policy_sources import PolicyCollector
