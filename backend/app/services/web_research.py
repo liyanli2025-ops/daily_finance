@@ -207,6 +207,25 @@ def parse_visible_article(html,url,now=None,hours=72):
 def read_public(workspace,url,hours=72,deadline=None,characters=6000):
     from .event_observations import canonical
     url=canonical(url) or url
+    # Reuse admitted body text across discovery channels, not just this tool's
+    # own cache. A feed/search snippet at the same URL cannot satisfy this.
+    from .news_quality import reading_scope
+    from .news_selection import within_window
+    reusable=[item for item in workspace.documents.values()
+        if canonical(item.source_url)==url and hasattr(item,'content')
+        and len(item.content.strip())>=100
+        and reading_scope(item) in {'full_text','visible_body'}
+        and within_window(item,workspace.now,hours)]
+    if reusable:
+        def latest(row):
+            stamp=row.published_at
+            if stamp.tzinfo is not None:stamp=stamp.astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None)
+            return stamp,len(row.content)
+        item=max(reusable,key=latest)
+        return dict(status='ok',url=url,material=workspace.read(item.id,characters=characters),
+            reused_within_episode=True,reused_from='episode_body_pool',http_requests_performed=0,
+            remote_version_checked=False,reading_status='stored_text_not_new_remote_verification',
+            limitation='复用本期已存文字，不证明远端未更新或已读完整原文；新版本/修订须另核，不以同链接认定事件无增量。')
     root=ResearchHub().root;key='research-public-url:'+str(url).split('#',1)[0]
     try:
         if url in PAUSED_PUBLIC_ARTICLES:raise RetiredSourceError('public_article_paused')

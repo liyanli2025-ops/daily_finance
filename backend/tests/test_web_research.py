@@ -30,6 +30,35 @@ class WebResearchTests(unittest.TestCase):
         with patch('app.services.web_research.requests.post') as post,patch.object(settings,'research_web_search_api_key',SecretStr('')):
             self.assertFalse(capabilities()['configured']);self.assertEqual(search(self.workspace,'行业变化')['status'],'unavailable');post.assert_not_called()
 
+    def test_existing_fixed_source_body_is_reused_without_new_http(self):
+        item=News(id='fixed',title='行业订单与库存变化',content='已取得的记者正文与统计口径。'*50,
+            source='证券时报原文',source_url=URL,published_at=NOW)
+        self.workspace.add([item])
+        with patch('app.services.web_research.fetch_html_once') as fetch:
+            result=read_public(self.workspace,URL+'?utm_source=search',characters=120)
+        fetch.assert_not_called()
+        self.assertEqual(result['material']['id'],'fixed')
+        self.assertEqual(len(result['material']['text']),120)
+        self.assertEqual(result['http_requests_performed'],0)
+        self.assertFalse(result['remote_version_checked'])
+
+    def test_same_url_feed_text_does_not_replace_reading_the_article(self):
+        self.workspace.add([News(id='feed',title='行业订单与库存变化',content='这是订阅摘要，并非全文。'*30,
+            source='未知RSS摘要',source_url=URL,published_at=NOW)])
+        with patch('app.services.web_research.fetch_html_once',return_value=(200,{},page().encode())) as fetch:
+            result=read_public(self.workspace,URL)
+        fetch.assert_called_once()
+        self.assertNotEqual(result['material']['id'],'feed')
+
+    def test_same_title_at_different_url_still_allows_a_counter_report(self):
+        self.workspace.add([News(id='first',title='行业订单与库存变化',content='原有报告正文。'*50,
+            source='证券时报原文',source_url='https://publisher.example/news/other',published_at=NOW)])
+        with patch('app.services.web_research.fetch_html_once',return_value=(200,{},page().encode())) as fetch:
+            result=read_public(self.workspace,URL)
+        fetch.assert_called_once()
+        self.assertEqual(result['status'],'ok')
+        self.assertNotEqual(result['material']['id'],'first')
+
     def test_search_results_remain_directory_and_cache_does_not_spend_again(self):
         response=Mock(status_code=200);response.json.return_value=dict(results=[dict(title='新行业变量',url=URL,content='摘要内容',published_date='2026-10-30')])
         with patch('app.services.web_research.requests.post',return_value=response) as post:
