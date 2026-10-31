@@ -1175,7 +1175,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
             if any(company_focus(news,stock) for stock in stocks) or (industry_related and overlap):
                 watchlist_news.append(news)
             # 投资者观点
-            elif "雪球" in source or "投资者观点" in category or "雪球讨论" in category:
+            elif reading_scope(news)=='public_statement' or "雪球" in source or "投资者观点" in category or "雪球讨论" in category:
                 investor_opinion.append(news)
             # 大宗商品/外盘/宏观
             elif category=='海外市场原文' or any(kw in text for kw in global_keywords):

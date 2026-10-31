@@ -5,7 +5,7 @@ No LLM/TTS, report publication, App writes or scheduler changes.
 import argparse,asyncio,json
 from pathlib import Path
 
-from .services.community_sources import CommunityCollector,INDEXES,NAMES,provider_for,discover,parse_thread
+from .services.community_sources import CommunityCollector,INDEXES,EXTRA_INDEXES,NAMES,provider_for,discover,parse_thread
 from .services.research_hub import save_json
 from .services.time_context import china_now
 
@@ -59,7 +59,7 @@ async def run():
     rows=await read_app_watchlist()
     stocks=[WatchlistStock(row['code'],row['name'],row['market']) for row in rows]
     with marker.open('x',encoding='utf-8') as f:f.write(china_now().isoformat())
-    news,coverage=await asyncio.to_thread(CommunityCollector().collect,stocks)
+    news,coverage=await asyncio.to_thread(CommunityCollector().collect,stocks,granularity='statements')
     result=dict(owner='finance-discussion-check-v1',mode='public_network_sample',
         collected_at=china_now().isoformat(),**coverage)
     save_json(OUTPUT,result);return result
@@ -67,12 +67,16 @@ async def run():
 
 def main():
     parser=argparse.ArgumentParser()
-    mode=parser.add_mutually_exclusive_group();mode.add_argument('--samples');mode.add_argument('--run',action='store_true')
+    mode=parser.add_mutually_exclusive_group();mode.add_argument('--samples');mode.add_argument('--run',action='store_true');mode.add_argument('--contributions',action='store_true')
     args=parser.parse_args()
+    if args.contributions:
+        from .services.discussion_contributions import summary as contribution_summary
+        print(json.dumps(contribution_summary(),ensure_ascii=False,indent=2));return
     if args.samples:result=replay(args.samples)
     elif args.run:result=asyncio.run(run())
     else:
-        result=dict(mode='free_preview',providers=NAMES,indexes=INDEXES,
+        result=dict(mode='free_preview',providers=NAMES,indexes=INDEXES,additional_indexes=EXTRA_INDEXES,
+            granularity='statements',
             local_body_samples_verified=['guba','jisilu','taoguba','tradingview'],
             server_network_verified=False,http_requests=0,model_requests=0,
             note='--samples仅回放已有HTML；--run读取App动态名单并做一次公开网络样本，不生成节目或恢复调度。')

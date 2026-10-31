@@ -14,7 +14,7 @@ INSTRUCTIONS='''
 回复封装及research底稿字段见下方研究协议，取材请求也必须保留研究状态。
 可用工具：search_materials(query)，read_material(id,offset,characters)，search_public(query,hours)。
 另有read_materials(items,total_characters)，search_web(queries,hours)，read_public_url(url,hours,characters)。
-补充素材可用collect_discussions(hours,urls可选)：按需读取集思录、淘股吧复盘、TradingView美股观点与当前A股自选的股吧公开页面；传urls时只读这些已支持的帖子链接，不再扫目录。返回的是用户说法/猜测和公开可见回复，不是确认事实。先检索已有素材；说明为何需要新增参与者声音，不重复收集主资料里的媒体转述。无需为每条线索先形成交易结论；不是全网论坛搜索，不承诺当前窗口一定有新帖，也未取得雪球或私人群聊。
+补充素材可用collect_discussions(hours,urls可选,granularity可选)：按需读取集思录（含债券/可转债、套利目录）、淘股吧复盘、TradingView美股观点与当前A股自选的股吧公开页面；传urls时只读这些已支持的帖子链接，不再扫目录。默认granularity=statements，将后部回复也列为独立发言素材，优先提供有具体细节/反方表述的片段；这只是文字线索排序，不是可信度或投资价值评分。可按完整ID补读其余发言；需要整页上下文时传原链接及granularity=thread。返回的是用户说法/猜测和公开可见回复，不是确认事实。先检索已有素材；说明为何需要新增参与者声音，不重复收集主资料里的媒体转述。无需为每条线索先形成交易结论；不是全网论坛搜索，不承诺当前窗口一定有新帖，也未取得雪球或私人群聊。没有核实发言者的从业身份，不称其行业专家或游资。
 read_materials的items为[{"id":"完整ID或C编号","offset":0,"characters":2000}]，每包正文合计最多18000字符，各项最多6000，最多12项是工具包保护而非资料篇数限制。
 search_web的queries为最多3个具体检索词；搜索仅在显式配置与启用后可用，不回退成模型编造的搜索结果。
 search_materials检索本期已收集但可能未预选的正文、摘要及研究资料；结果是片段，可按ID读取更多。按ranges/offset核对实际提供范围；unread_before=true表示前文仍未提供，next_offset仅是继续读取线索。no_body_provided仅有元信息，不可作为正文证据。
@@ -88,8 +88,10 @@ async def execute(workspace,requests,stocks,public_budget=35):
             remaining=deadline-time.monotonic()
             if remaining<=0:result=dict(status='budget_exhausted',materials=[])
             else:
+                granularity=request.get('granularity','statements')
+                if granularity not in {'thread','statements'}:raise ValueError('discussion_granularity_invalid')
                 news,coverage=await asyncio.to_thread(CommunityCollector().collect,stocks,hours,
-                    min(25,remaining),urls,tuple(workspace.documents.values()))
+                    min(25,remaining),urls,tuple(workspace.documents.values()),granularity)
                 workspace.add(news)
                 # Full per-author records stay in diagnostics; this packet is
                 # bounded and remaining texts can be read by their actual IDs.
@@ -102,8 +104,12 @@ async def execute(workspace,requests,stocks,public_budget=35):
                     row=workspace.read(item.id,characters=min(2000,left));materials.append(row)
                     left-=len(row.get('text',''))
                 result=dict(status=coverage['status'],materials=materials,
-                    discovered_documents=[workspace.metadata(item) for item in news if item.id in workspace.documents],
+                    discovered_documents=[dict(id=item.id,title=item.title,source=item.source)
+                        if granularity=='statements' else workspace.metadata(item)
+                        for item in news if item.id in workspace.documents],
+                    discovery_scope='完整发言标题目录；正文只按materials中范围提供，其余可按ID补读',
                     reused=coverage['reused'],errors=coverage['errors'],scope=coverage['scope'],
+                    granularity=granularity,
                     limitation=coverage['limitation'],diagnostic='discussion-supplement.json')
         elif tool in {'search_materials','search_public'}:
             query=request.get('query')

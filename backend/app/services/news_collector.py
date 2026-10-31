@@ -615,7 +615,7 @@ class NewsCollectorService:
         rows=await self._load_db_watchlist()
         stocks=[WatchlistStock(row['code'],row['name'],row['market']) for row in rows]
         discussions,technical,micro=await asyncio.gather(
-            asyncio.to_thread(CommunityCollector().collect,stocks,hours,25,None,primary),
+            asyncio.to_thread(CommunityCollector().collect,stocks,hours,25,None,primary,'statements'),
             asyncio.to_thread(TechnicalRadar().collect,stocks),
             asyncio.to_thread(MicrostructureRadar().collect,stocks),return_exceptions=True)
         self._technical_snapshot=(dict(status='failed',error=type(technical).__name__) if isinstance(technical,Exception) else technical)

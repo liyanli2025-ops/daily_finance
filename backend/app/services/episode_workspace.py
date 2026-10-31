@@ -183,6 +183,9 @@ class EpisodeWorkspace:
         self.meta['status']='complete' if success else 'failed'
         usage=self.usage()
         save_json(self.path/'usage.json',usage)
+        if self.root.resolve()==ROOT.resolve():
+            from .discussion_contributions import record
+            record(self,usage,success)
         if success:
             save_json(self.path/'sources.json',usage['sources'])
             for name in ('materials.json','retrieval.json'):

@@ -24,6 +24,8 @@ INDEXES={
     'taoguba':'https://www.tgb.cn/talk/talkSeq/21325',
     'tradingview':'https://www.tradingview.com/markets/stocks-usa/ideas/',
 }
+EXTRA_INDEXES={'https://www.jisilu.cn/category/4':'bonds_convertibles',
+               'https://www.jisilu.cn/category/5':'arbitrage'}
 NAMES={'guba':'东方财富股吧','jisilu':'集思录','taoguba':'淘股吧','tradingview':'TradingView'}
 
 
@@ -32,6 +34,7 @@ def provider_for(url,index=False):
     if p.scheme!='https' or p.username or p.password or p.port not in (None,443) or p.query or p.fragment:
         raise ValueError('discussion_url_rejected')
     if index and url in INDEXES.values():return next(k for k,v in INDEXES.items() if v==url)
+    if index and url in EXTRA_INDEXES:return 'jisilu'
     if p.hostname=='guba.eastmoney.com' and re.fullmatch(r'/list,\d{6}\.html' if index else r'/news,\d{6},\d+\.html',p.path):return 'guba'
     if not index:
         if p.hostname=='www.jisilu.cn' and re.fullmatch(r'/question/\d+',p.path):return 'jisilu'
@@ -84,17 +87,28 @@ def discover(provider,raw,url):
                     or not str(row.get('post_id','')).isdigit()):continue
             target=f'https://guba.eastmoney.com/news,{board},{row["post_id"]}.html'
             rows[target]=dict(url=target,title=row.get('post_title',''),
-                author=row.get('user_nickname'),updated_hint=row.get('post_last_time'),
+                author=row.get('user_nickname'),published_hint=row.get('post_publish_time'),updated_hint=row.get('post_last_time'),
                 status='directory_not_body')
     else:
-        links=soup.select('.question_list .title a[href]') if provider=='jisilu' else soup.select('a[href]')
+        links=(soup.select('.question_list .title a[href], .aw-all-question .aw-questoin-content h4 a[href]')
+               if provider=='jisilu' else soup.select('a[href]'))
         for a in links:
             target=urljoin(url,a['href']);title=a.get_text(' ',strip=True)
             if not title:continue
             try:
                 if provider_for(target)!=provider:continue
             except ValueError:continue
-            rows.setdefault(target,dict(url=target,title=title,status='directory_not_body'))
+            row=dict(url=target,title=title,status='directory_not_body',directory_url=url,
+                     directory_role=EXTRA_INDEXES.get(url,'general'))
+            if provider=='jisilu' and url in EXTRA_INDEXES:
+                container=a.find_parent(class_='aw-questoin-content')
+                meta=container.select_one('.aw-text-color-999') if container else None
+                text=plain(meta)
+                try:
+                    row['updated_hint']=stamp(text)
+                    row['update_kind']='reply' if '回复' in text else 'directory_activity_unknown'
+                except ValueError:pass
+            rows.setdefault(target,row)
     return list(rows.values())
 
 
@@ -164,45 +178,103 @@ class CommunityCollector:
     """Called explicitly for supplements; never expands legacy media scanning."""
     def __init__(self,root=None):self.hub=ResearchHub(root)
 
-    def get(self,url,deadline,index=False):
+    def get(self,url,deadline,index=False,revision=None):
         provider_for(url,index)
         if url in PAUSED_PUBLIC_ARTICLES:raise RetiredSourceError('source_paused_no_automatic_retest')
+        from .source_health import ensure_active,record_failure
+        basekey='community-page:'+url
+        ensure_active(self.hub.root,basekey)
         def fetch():
             remaining=deadline-time.monotonic()
             if remaining<=0:raise TimeoutError('discussion_time_budget_exhausted')
-            r=requests.get(url,headers={'User-Agent':'Mozilla/5.0'},timeout=min(7,remaining),allow_redirects=False)
-            r.raise_for_status()
-            if r.status_code!=200 or len(r.content)>3*1024*1024:raise ValueError('discussion_response_invalid')
+            try:
+                r=requests.get(url,headers={'User-Agent':'Mozilla/5.0'},timeout=min(7,remaining),allow_redirects=False)
+                r.raise_for_status()
+            except Exception as error:
+                if not record_failure(self.hub.root,basekey,error):
+                    record_failure(self.hub.root,basekey,ValueError('web_research_failed_no_auto_retest'),detail_code=type(error).__name__)
+                raise
             r.encoding=r.apparent_encoding or 'utf-8'
             try:
+                if r.status_code!=200 or len(r.content)>3*1024*1024:raise ValueError('discussion_response_invalid')
                 # Cache the raw page only if its expected structure is usable.
                 discover(provider_for(url,True),r.text,url) if index else parse_thread(r.text,url)
             except ValueError as error:
-                from .source_health import record_failure
                 record_failure(self.hub.root,'community-page:'+url,
                     ValueError('web_research_failed_no_auto_retest'),detail_code=str(error))
                 raise
             return r.text
-        return cached(self.hub,'community-page:'+url,600,fetch)
+        # A dated new-reply hint permits a success-cache refresh. A different
+        # cache key must never bypass the original URL's permanent failure.
+        key=basekey+(':update:'+stamp(revision) if revision else '')
+        return cached(self.hub,key,600,fetch)
 
-    def collect(self,stocks=(),hours=72,budget=25,urls=None,existing=()):
+    def collect(self,stocks=(),hours=72,budget=25,urls=None,existing=(),granularity='thread'):
+        if granularity not in {'thread','statements'}:raise ValueError('discussion_granularity_invalid')
         # The search-primary path bypasses the legacy collector's housekeeping.
         # Apply existing owned-cache expiry here; custom/test roots stay isolated.
         if self.hub.root.resolve()==Path(__file__).resolve().parents[2]/'data'/'research':
             from .material_lifecycle import prune_material_caches
             prune_material_caches()
         now=china_now();deadline=time.monotonic()+budget;cutoff=now-timedelta(hours=hours)
-        queues={};errors=[];rows=[];items=[];reused=[];attempted=[];unread_directories=[]
+        queues={};errors=[];rows=[];items=[];reused=[];attempted=[];unread_directories=[];directory_records=[]
         from .event_observations import canonical
         from .news_quality import reading_scope
         from .news_selection import within_window
-        known={canonical(x.source_url):x for x in existing if hasattr(x,'content')
-            and reading_scope(x) in {'public_statement','full_text','visible_body'} and within_window(x,now,hours)}
+        def known_time(item):
+            value=item.published_at
+            return value.astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None) if value.tzinfo else value
+        known={}
+        for x in existing:
+            if (not hasattr(x,'content') or reading_scope(x) not in {'public_statement','full_text','visible_body'}
+                or not within_window(x,now,hours)
+                or (granularity=='thread' and x.id.startswith('discussion-statement-'))):continue
+            key=canonical(x.source_url)
+            if key not in known or known_time(x)>known_time(known[key]):known[key]=x
+        seen=set()
+        def consume(provider,candidate):
+            url=candidate['url']
+            if url in seen:return
+            hint=None
+            try:hint=datetime.fromisoformat(stamp(candidate.get('updated_hint')))
+            except ValueError:pass
+            changed=url in known and hint is not None and known_time(known[url])<hint<=now
+            if url in known and not changed:
+                reused.append(dict(id=known[url].id,url=url,remote_version_checked=False));return
+            seen.add(url)
+            attempted.append(url)
+            try:
+                raw=self.get(url,deadline,revision=hint.isoformat()) if changed else self.get(url,deadline)
+                thread=parse_thread(raw,url)
+                fresh=[s for s in thread['statements'] if cutoff<=datetime.fromisoformat(s['published_at'])<=now]
+                rows.append(dict(**thread,current_statement_ids=[s['id'] for s in fresh],
+                    directory_update_hint=hint.isoformat() if hint else None,
+                    directory_hint_is_not_verified_reply=True))
+                if not fresh:return
+                # Old parent context may accompany new replies; keep dates
+                # per statement, never label the old claim as newly posted.
+                selected=[s for i,s in enumerate(thread['statements'])
+                    if datetime.fromisoformat(s['published_at'])<=now and (i==0 or s in fresh)]
+                pieces=[]
+                for s in selected:
+                    pieces.append(f'[{s["position"]} | {s["published_at"]} | 公开账号：{s["author"] or "未取得"} | 未核实说法]\n'+s['text'])
+                    for quote in s['quoted_context']:pieces.append('[该回复引用的上下文；被引作者未核]\n'+quote)
+                content='\n\n'.join(pieces)
+                identifier='discussion-'+hashlib.sha256((url+'\0'+content).encode()).hexdigest()[:24]
+                related=[stock.code for stock in stocks if stock.name in thread['title'] or re.search(r'(?<!\d)'+re.escape(stock.code)+r'(?!\d)',url)]
+                items.append(News(id=identifier,title=thread['title'],content=content,
+                    source='公开参与者讨论-'+NAMES[provider],source_url=url,
+                    published_at=max(datetime.fromisoformat(s['published_at']) for s in fresh),
+                    category='参与者说法与讨论',related_stocks=related,importance_score=.5,
+                    market_impact=thread['source_role']+'；'+thread['replies_scope']+
+                        '；News时间仅表示本页本次所见最新窗口内发言，每条原帖/回复时间分别保留，不是事件发生时间。'))
+            except Exception as error:errors.append(self.error(url,'body',error))
+
         if urls is not None:
             for url in urls:
                 provider=provider_for(url);queues.setdefault(provider,deque()).append(dict(url=url,title='待读取'))
         else:
-            indexes=list(INDEXES.values())
+            indexes=list(INDEXES.values())+list(EXTRA_INDEXES)
             for stock in stocks:
                 if str(getattr(stock.market,'value',stock.market))=='A' and re.fullmatch(r'\d{6}',stock.code):
                     indexes.append(f'https://guba.eastmoney.com/list,{stock.code}.html')
@@ -212,45 +284,48 @@ class CommunityCollector:
                 try:
                     provider=provider_for(url,True)
                     found=discover(provider,self.get(url,deadline,True),url)
+                    directory_records.append(dict(url=url,candidates=found))
                     queues.setdefault(provider,deque()).extend(found)
+                    # Interleave discovery and a body read: many directories or
+                    # new watchlist boards must not consume the entire deadline
+                    # before even one participant statement can be obtained.
+                    for candidate in found:
+                        if time.monotonic()>=deadline:break
+                        before=len(attempted);consume(provider,candidate)
+                        if len(attempted)>before:break
                 except Exception as error:errors.append(self.error(url,'directory',error))
-        seen=set()
-        # Round robin; elapsed-time budget, not a daily article quota.
+        # The same thread can appear in several directories. Merge its latest
+        # dated activity hint before reuse decisions, rather than letting an
+        # earlier homepage entry hide a later category's new-reply hint.
+        for provider,queue in queues.items():
+            merged={}
+            for candidate in queue:
+                url=candidate['url']
+                if url not in merged:merged[url]=dict(candidate,discovered_via=[])
+                row=merged[url]
+                if candidate.get('directory_url') and candidate['directory_url'] not in row['discovered_via']:
+                    row['discovered_via'].append(candidate['directory_url'])
+                try:
+                    hint=stamp(candidate.get('updated_hint'))
+                    previous=stamp(row.get('updated_hint')) if row.get('updated_hint') else ''
+                    if hint>previous:row.update(updated_hint=hint,update_kind=candidate.get('update_kind'))
+                except ValueError:pass
+            queues[provider]=deque(merged.values())
+        # Round robin through remaining unique candidates after each directory
+        # already received a first body-reading opportunity.
         while any(queues.values()) and time.monotonic()<deadline:
             for provider,queue in queues.items():
-                if not queue or time.monotonic()>=deadline:continue
-                candidate=queue.popleft();url=candidate['url']
-                if url in seen:continue
-                seen.add(url)
-                if url in known:
-                    reused.append(dict(id=known[url].id,url=url,remote_version_checked=False));continue
-                attempted.append(url)
-                try:
-                    thread=parse_thread(self.get(url,deadline),url)
-                    fresh=[s for s in thread['statements'] if cutoff<=datetime.fromisoformat(s['published_at'])<=now]
-                    rows.append(dict(**thread,current_statement_ids=[s['id'] for s in fresh]))
-                    if not fresh:continue
-                    # Old parent context may accompany new replies; keep dates
-                    # per statement, never label the old claim as newly posted.
-                    selected=[s for i,s in enumerate(thread['statements'])
-                        if datetime.fromisoformat(s['published_at'])<=now and (i==0 or s in fresh)]
-                    pieces=[]
-                    for s in selected:
-                        pieces.append(f'[{s["position"]} | {s["published_at"]} | 公开账号：{s["author"] or "未取得"} | 未核实说法]\n'+s['text'])
-                        for quote in s['quoted_context']:pieces.append('[该回复引用的上下文；被引作者未核]\n'+quote)
-                    content='\n\n'.join(pieces)
-                    identifier='discussion-'+hashlib.sha256((url+'\0'+content).encode()).hexdigest()[:24]
-                    related=[stock.code for stock in stocks if stock.name in thread['title'] or re.search(r'(?<!\d)'+re.escape(stock.code)+r'(?!\d)',url)]
-                    items.append(News(id=identifier,title=thread['title'],content=content,
-                        source='公开参与者讨论-'+NAMES[provider],source_url=url,
-                        published_at=max(datetime.fromisoformat(s['published_at']) for s in fresh),
-                        category='参与者说法与讨论',related_stocks=related,importance_score=.5,
-                        market_impact=thread['source_role']+'；'+thread['replies_scope']+
-                            '；News时间仅表示本页本次所见最新窗口内发言，每条原帖/回复时间分别保留，不是事件发生时间。'))
-                except Exception as error:errors.append(self.error(url,'body',error))
+                if queue and time.monotonic()<deadline:consume(provider,queue.popleft())
+        statement_catalogue=[]
+        if granularity=='statements':
+            from .discussion_briefing import statement_documents
+            items,statement_catalogue=statement_documents(items,rows,now,hours)
         # No account profiles, emails, locations or inferred expertise are stored.
         return items,dict(status='partial' if errors or any(queues.values()) or unread_directories else 'sampled',
-            read=len(items),threads=rows,reused=reused,attempted=attempted,errors=errors,
+            read=len(items),read_unit='statements' if granularity=='statements' else 'thread_pages',
+            threads=rows,reused=reused,attempted=attempted,errors=errors,
+            granularity=granularity,statement_catalogue=statement_catalogue,directories=directory_records,
+            participant_roles_not_verified=['industry_practitioners','independent_researchers'],
             unread_directories=unread_directories,
             unread_candidates=[row for queue in queues.values() for row in queue],
             scope='public_current_pages_not_all_forums',model_requests=0,
