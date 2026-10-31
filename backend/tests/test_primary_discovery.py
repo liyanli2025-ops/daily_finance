@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock,Mock,patch
 from app.config import settings
 from app.models.news import News
 from app.services.episode_workspace import EpisodeWorkspace
-from app.services.primary_discovery import Limits,discover,prompt
+from app.services.primary_discovery import Limits,discover,prompt,context
 from app.services.search_primary_collection import LANES
 
 NOW=datetime(2026,10,31,16)
@@ -125,6 +125,16 @@ class DiscoveryTests(unittest.IsolatedAsyncioTestCase):
 
 
 class BriefTests(unittest.TestCase):
+    def test_context_removes_duplicate_envelopes_without_cutting_returned_text(self):
+        material=dict(id='body',offset=0,text='必须保留的后部反证和详细数据。'*100,has_more=True)
+        receipt=dict(request=read(),result=dict(status='ok',material=material))
+        state=dict(candidates={'S1':dict(url=URL,title='完整标题',snippet='目录文本')},receipts=[receipt,receipt])
+        packet=context(state)
+        self.assertEqual(len(packet['body_packets']),1)
+        self.assertEqual(packet['body_packets'][0]['text'],material['text'])
+        self.assertEqual(packet['tool_history'][1]['result']['material'],{'body_packet':0})
+        self.assertEqual(state['receipts'][1]['result']['material']['text'],material['text'])
+
     def test_shared_brief_keeps_global_and_participant_requirements(self):
         value=prompt([dict(market='HK',code='01234',name='动态公司')],NOW,Limits())
         for phrase in ('美股与重要外盘','知情人士','猜测','原始','动态公司','HK','交易日期','候选'):
