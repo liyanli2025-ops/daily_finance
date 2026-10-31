@@ -100,6 +100,40 @@ def order(items,stocks=(),profiles=None):
     return result
 
 
+def discovery_order(rows, stocks=(), profiles=None):
+    """Balance *fetch opportunities* before costly body requests.
+
+    Input order is the within-question tie-breaker, not proof of significance.
+    All candidates survive, including repeated headlines as later corroboration
+    candidates. No URL/date hint is upgraded to a publication timestamp.
+    """
+    from types import SimpleNamespace
+    from .time_context import china_now
+    from .news_quality import company_focus
+    now=china_now();groups=defaultdict(deque);repeated=[];seen=set()
+    for row in rows:
+        probe=SimpleNamespace(title=row['title'],content='',category='',source='',
+            related_stocks=[],published_at=now)
+        assignment=assess(probe,stocks,profiles)
+        row=dict(row,assignment=assignment)
+        title=re.sub(r'\s+','',row['title']).casefold()
+        if title in seen:
+            repeated.append(row);continue
+        seen.add(title)
+        question=assignment['question']
+        if assignment['lane']=='watchlist':
+            question+=':'+','.join(stock.code for stock in stocks if company_focus(probe,stock))
+        groups[(assignment['reading_priority']>=2,question)].append(row)
+    result=[]
+    for important_lead in (True,False):
+        keys=[key for key in groups if key[0]==important_lead]
+        keys.sort(key=lambda key:-groups[key][0]['assignment']['reading_priority'])
+        while any(groups[key] for key in keys):
+            for key in keys:
+                if groups[key]:result.append(groups[key].popleft())
+    return result+repeated
+
+
 def audit(items,readings,stocks=(),profiles=None):
     provided={row['id']:row for row in readings};rows=[]
     for item in items:

@@ -275,20 +275,11 @@ class MediaCollector:
         for provider in ('wscn','stcn'):
             ranked=sorted([key for key in candidates if key[0]==provider],
                 key=lambda key:(candidates[key][1],candidates[key][2]),reverse=True)
-            # Reserve three originals outside keyword searches, then fill by relevance.
-            reserved=sorted([key for key in ranked if key in market_keys],
-                key=lambda key:(market_priority(candidates[key][0]),candidates[key][2]),reverse=True)[:3]
-            # Reserve a company and a product-variable candidate per current
-            # stock, before one busy company can consume the remaining slots.
-            for stock in stocks:
-                for field in ('company','industry'):
-                    for key in ranked:
-                        direct,industry,_=relation(candidates[key][0],'',stocks,terms)
-                        matched=stock.code in (direct if field=='company' else industry)
-                        if matched and key not in reserved:
-                            reserved.append(key);break
-            selected.extend(reserved)
-            queues[provider]=[key for key in ranked if key not in reserved]
+            from .news_assignment import discovery_order
+            # Balance market questions before requests, not only after bodies
+            # have already consumed the collection deadline. Preserve all keys.
+            queues[provider]=[row['key'] for row in discovery_order(
+                [dict(key=key,title=candidates[key][0]) for key in ranked],stocks,profiles)]
         while any(queues.values()):
             for provider in queues:
                 if queues[provider]:selected.append(queues[provider].pop(0))

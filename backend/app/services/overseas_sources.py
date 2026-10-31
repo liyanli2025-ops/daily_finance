@@ -227,6 +227,8 @@ class OverseasCollector:
                     states[key]['paused_routes'].append(dict(stage='index',reason=self.failure_detail('overseas:index:v1:'+key,error)))
                 except Exception as error:states[key]['errors'].append(dict(stage='index',error=type(error).__name__,
                     reason=self.failure_detail('overseas:index:v1:'+key,error)))
+        from .news_assignment import discovery_order
+        queues={key:discovery_order(rows) for key,rows in queues.items()}
         articles=[]
         with ThreadPoolExecutor(max_workers=4) as pool:
             pending={};busy=set();turn=0

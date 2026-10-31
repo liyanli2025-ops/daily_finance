@@ -105,7 +105,9 @@ def discover_html(provider,html,stocks,terms,profiles=None):
         day_hint=(hint.group(1) or hint.group(2)) .replace('-','') if hint else ''
         result.setdefault(url,dict(url=url,title=title,rank=rank,url_day_hint=day_hint,assignment=assignment))
     # URL dates prioritize reads only; they never substitute for source publication.
-    return sorted(result.values(),key=lambda row:(row['assignment']['reading_priority'],row['rank'],row['url_day_hint']),reverse=True)
+    from .news_assignment import discovery_order
+    ranked=sorted(result.values(),key=lambda row:(row['assignment']['reading_priority'],row['rank'],row['url_day_hint']),reverse=True)
+    return discovery_order(ranked,stocks,profiles)
 
 
 def parse_article(provider,html,url):
