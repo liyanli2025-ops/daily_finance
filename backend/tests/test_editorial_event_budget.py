@@ -38,17 +38,20 @@ class EditorialEventBudgetTests(unittest.TestCase):
         self.assertIsNone(company_reporting_event(correction,[STOCK]))
         self.assertNotEqual(company_reporting_event(formal,[STOCK]),company_reporting_event(other,[STOCK]))
 
-    def test_financial_event_has_two_initial_sources_and_retains_other_ids(self):
+    def test_reporting_question_has_one_initial_entry_and_retains_all_supplements(self):
         rows=[article('8','新农股份：2026年第三季度报告'),
               article('9','新农前三季度亏损','新农股份披露2026年第三季度报告，补充经营信息。'),
               article('10','新农股份前三季度亏损','2026年第三季度报告。')]
         analyzer=AIAnalyzerService.__new__(AIAnalyzerService)
         with patch('app.services.ai_analyzer.get_watchlist_service',return_value=SimpleNamespace(get_all_stocks=lambda:[STOCK])),patch('app.services.research_hub.ResearchHub.load',return_value=[]):
             text=analyzer._prepare_news_summary(rows)
-        self.assertEqual(len(analyzer._selected_evidence_news),2)
+        self.assertEqual(len(analyzer._selected_evidence_news),1)
         group=analyzer._news_briefing['company_reporting_events'][0]
         self.assertEqual(set(group['related_ids']),{'8','9','10'})
-        self.assertIn('共用一个分析问题',text)
+        self.assertIn('其他原文和解读保留补读',text)
+        self.assertEqual(sum(row['provided'] for row in analyzer._news_briefing['initial_reading_decisions']),1)
+        self.assertEqual({row['reason'] for row in analyzer._news_briefing['initial_reading_decisions'] if not row['provided']},
+                         {'same_reporting_question_supplement_on_demand_not_identical_facts'})
 
     def test_private_consumer_funding_stays_searchable_but_not_initial_story(self):
         row=article('11','消费品牌在降温期拿到热钱','冰淇淋连锁品牌宣布首轮融资。')

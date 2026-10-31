@@ -91,9 +91,7 @@ def company_reporting_event(item, stocks):
     never substituted. This limits initial reading only; all source IDs survive.
     """
     def focused_company(stock):
-        if company_focus(item,stock):return True
-        alias=re.sub(r'(?:股份|集团|控股|有限公司)+$','',stock.name)
-        return len(alias)>=2 and item.title.startswith(alias) and stock.name in (item.content or '')[:600]
+        return company_focus(item,stock)
     if re.search(r'业绩预告|预告修正|更正|修订|收购|并购|诉讼|立案|处罚|股权激励',item.title):return None
     focused=[stock for stock in stocks if focused_company(stock)]
     if len(focused)!=1:return None

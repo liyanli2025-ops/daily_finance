@@ -10,9 +10,17 @@ FEEDS={'金十数据','东方财富研报','百度财经焦点','百度股票焦
 AUTOMATED=re.compile(r'获融资买入|融资余额.*占流通|(?:融资|融券)余额.*分位|主力资金净流入')
 
 
+def company_alias_headline(title,stock):
+    """A conservative short-name headline lead, not issuer confirmation."""
+    alias=re.sub(r'(?:股份|集团|控股|有限公司)+$','',stock.name)
+    return bool(len(alias)>=2 and re.match(re.escape(alias)+
+        r'(?:[前净营亏盈利发披预回宣上下第：:\s，,（(拟将称停大获重]|20\d{2})',title))
+
+
 def company_focus(item,stock):
     """A body mention alone does not earn a company-specific editorial slot."""
-    return bool((stock.name and stock.name in item.title)
+    short_headline=(company_alias_headline(item.title,stock) and stock.name in (item.content or '')[:600])
+    return bool(short_headline or (stock.name and stock.name in item.title)
         or re.search(r'(?<!\d)'+re.escape(stock.code)+r'(?!\d)',item.title)
         or ((item.source or '').startswith('上市公司公告-') and stock.code in (item.related_stocks or [])))
 

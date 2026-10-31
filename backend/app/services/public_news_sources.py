@@ -99,11 +99,13 @@ def discover_html(provider,html,stocks,terms,profiles=None):
         direct,industry,macro=relation(title,'',stocks,terms)
         if not (direct or industry or macro or any(word in title for word in FINANCE)):continue
         rank=10*bool(direct)+5*bool(industry)+2*bool(macro)
+        from .news_assignment import assess
+        assignment=assess(probe,stocks,profiles)
         hint=re.search(r'/(\d{4}-\d{2}-\d{2})/|/article/(\d{8})/',urlsplit(url).path)
         day_hint=(hint.group(1) or hint.group(2)) .replace('-','') if hint else ''
-        result.setdefault(url,dict(url=url,title=title,rank=rank,url_day_hint=day_hint))
+        result.setdefault(url,dict(url=url,title=title,rank=rank,url_day_hint=day_hint,assignment=assignment))
     # URL dates prioritize reads only; they never substitute for source publication.
-    return sorted(result.values(),key=lambda row:(row['rank'],row['url_day_hint']),reverse=True)
+    return sorted(result.values(),key=lambda row:(row['assignment']['reading_priority'],row['rank'],row['url_day_hint']),reverse=True)
 
 
 def parse_article(provider,html,url):

@@ -6,13 +6,14 @@ not automatically enter the episode merely because a publisher supplied a body.
 from datetime import datetime
 import re
 
-REPORT = re.compile(r'财报|季报|年报|业绩|净利|营收|营业收入|归母|earnings|quarterly results', re.I)
+REPORT = re.compile(r'财报|季度报告|年度报告|季报|年报|业绩|净利|利润|亏损|净赚|营收|营业收入|归母|earnings|quarterly results', re.I)
 COMPANY = re.compile(r'^.{2,35}?[：:]|公司公告|公司报道|个股|上市公司')
 MARKET = re.compile(r'收评|复盘|全市场|三大指数|A股|港股|美股|恒指|恒生|创业板|科创50|沪指|标普|纳指|行业|产业链|板块|多家|巨头|全线')
 MAJOR = re.compile(r'财务造假|财务舞弊|欺诈|立案调查|立案告知|强制退市|债务违约|破产重整|破产清算|重大安全事故|大规模召回|重大数据泄露|停产.{0,8}(?:全球|供应|产能)|全球.{0,12}(?:断供|停产)|fraud|bankruptcy|default on|mass recall', re.I)
 OPERATING = re.compile(r'订单|供给|供应|需求|产能|价格|成本|毛利|库存|出货|销量|资本开支|cash flow|capex|capacity|supply|demand', re.I)
 SYSTEMIC = re.compile(r'全球|全行业|产业链|供应链|行业龙头|行业第一|市场份额|全球最大|全球主要|world.s largest|industry leader', re.I)
 AGGREGATE = re.compile(r'(?:私募|公募|基金).{0,24}(?:重仓|持仓|配置)|(?:多家|[一二三四五六七八九十两\d]+[家大]).{0,12}(?:公司|企业|险企|银行)|(?:厂商|设备商|车企|险企).{0,15}(?:业绩|订单|供需|利润)')
+MACRO_AGGREGATE = re.compile(r'工业(?:企业)?利润|规上工业企业')
 
 
 def decision(item, stocks=(), profiles=None):
@@ -22,14 +23,16 @@ def decision(item, stocks=(), profiles=None):
     the current stock and a dated, linked relationship/sector-role source. A
     shared sector word alone cannot create a supplier or industry leader.
     """
-    from .news_quality import company_focus
+    from .news_quality import company_focus,company_alias_headline
     profiles = profiles or {}
     title = item.title or ''
     body = item.content or ''
     for stock in stocks:
         if company_focus(item, stock):
             return dict(keep=True, reason='watchlist_company', stock=stock.code)
-    if AGGREGATE.search(title):
+        if not body and company_alias_headline(title,stock):
+            return dict(keep=True,reason='watchlist_alias_discovery_lead_not_confirmed_company',stock=stock.code)
+    if AGGREGATE.search(title) or MACRO_AGGREGATE.search(title):
         return dict(keep=True, reason='multi_company_or_institutional_position_lead')
     company = bool(COMPANY.search(title) or REPORT.search(title)
                    or re.search(r'公司报道|个股|公司公告', item.category or ''))

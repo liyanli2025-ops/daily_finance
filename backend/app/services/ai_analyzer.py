@@ -1141,7 +1141,10 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
             raise RuntimeError('全池发现目录超出新闻预算，未发送模型请求；请先按事件整理目录或显式调整字符预算，不能静默截断候选池')
         workspace=current_workspace()
         if workspace is not None:workspace.bind_catalogue(discovery['references'])
-        prepared_readings={};reading_spent=0
+        prepared_readings={};reading_spent=0;initial_skip={}
+        assignment_pool=list(news_list)
+        initial_skip.update({item.id:'editorial_exclusion:'+editorial_exclusion(item,stocks)
+                             for item in assignment_pool if editorial_exclusion(item,stocks)})
         editorial_counts=Counter(editorial_exclusion(item,stocks) for item in news_list if editorial_exclusion(item,stocks))
         self._news_quality_exclusions.update(editorial_counts)
         news_list=[item for item in news_list if not editorial_exclusion(item,stocks)]
@@ -1212,35 +1215,49 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                 return 1.0 if a == b else 0.0
             return len(sa & sb) / len(sa | sb)
         
-        def add_news(source_list, quota, label, market_anchor=False):
+        def add_news(source_list, quota, label, market_anchor=False,ordered=False):
             nonlocal reading_spent
             added = 0
-            for n in diverse_rank(source_list):
+            for n in (source_list if ordered else diverse_rank(source_list)):
                 if added >= quota:
                     break
+                from .market_coverage import coverage_role
+                market_role=coverage_role(n)
+                if (not market_anchor and market_role in {'a_session','hk_session','us_session'}
+                        and any(coverage_role(existing)==market_role and existing.published_at.date()==n.published_at.date() for existing in selected)):
+                    initial_skip[n.id]='same_market_publication_day_intro_supplement_not_identical_facts'
+                    continue
                 theme=topic(n)
                 consultation=consultation_key(n)
                 if consultation and any(consultation_key(existing)==consultation for existing in selected):
+                    initial_skip[n.id]='same_consultation_question_supplement_on_demand'
                     continue
                 company_event=company_reporting_event(n,stocks)
-                if company_event and sum(company_reporting_event(existing,stocks)==company_event for existing in selected)>=2:
+                if company_event and any(company_reporting_event(existing,stocks)==company_event for existing in selected):
+                    initial_skip[n.id]='same_reporting_question_supplement_on_demand_not_identical_facts'
                     continue
                 warning=regulatory_population_key(n)
                 if warning and any(regulatory_population_key(existing)==warning for existing in selected):
+                    initial_skip[n.id]='same_regulatory_population_supplement_on_demand'
                     continue
                 statistic=statistical_event_key(n)
                 if statistic and any(statistical_event_key(existing)==statistic for existing in selected):
+                    initial_skip[n.id]='same_headline_statistic_supplement_on_demand'
                     continue
                 scope=reading_scope(n)
                 editorial_kind=editorial_profile(n)['kind']
                 background=editorial_kind in {'recap','routine_quote','routine_disclosure','general_opinion','event_commentary','corporate_feature'}
                 if background and not market_anchor and (sum(background_counts.values())>=2 or background_counts[editorial_kind]>=1):
+                    initial_skip[n.id]='background_reading_balance'
                     continue
                 if scope=='feed_excerpt' and scope_counts.get(scope,0)>=6:
+                    initial_skip[n.id]='excerpt_reading_balance'
                     continue
                 if scope=='research_excerpt' and scope_counts.get(scope,0)>=2:
+                    initial_skip[n.id]='research_background_balance'
                     continue
                 if theme and topic_counts.get(theme,0)>=2 and not matches_watchlist(n,stocks):
+                    initial_skip[n.id]='topic_reading_balance_not_event_identity'
                     continue
                 norm = _normalize_for_dedup(n.title)
                 from .event_observations import canonical
@@ -1257,7 +1274,10 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                     reading,block=prepared_readings[n.id]
                     # Rendering overhead counts too; never cut sentences to fit.
                     cost=len(block)+8
-                    if not reading['ranges'] or reading_spent+cost>reading_limit:continue
+                    if not reading['ranges']:
+                        initial_skip[n.id]='no_body_ranges_prepared';continue
+                    if reading_spent+cost>reading_limit:
+                        initial_skip[n.id]='remaining_body_budget_insufficient';continue
                     reading_spent+=cost
                     seen_norm_titles.append(norm)
                     selected.append(n)
@@ -1265,53 +1285,33 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                     if theme:topic_counts[theme]=topic_counts.get(theme,0)+1
                     scope_counts[scope]=scope_counts.get(scope,0)+1
                     added += 1
+                else:initial_skip[n.id]='already_provided_or_copy_rule_match'
         
         # Preserve latest available session/company/risk reading leads before
         # company quotas. Publication day is not a verified trading session.
         from .market_coverage import ROLES,coverage_role,coverage_audit,anchor_rank
+        from .news_assignment import assess as reading_assignment
         for role in ROLES:
             options=[item for item in news_list if coverage_role(item)==role]
+            if role=='overseas_company_event':
+                options=[item for item in options if reading_assignment(item,stocks,profiles)['lane'] in
+                         {'overseas_company','global_market','industry_operating'}]
             if options:
                 newest=max(item.published_at.date() for item in options)
                 best=max((item for item in options if item.published_at.date()==newest),key=lambda item:anchor_rank(item,role))
                 add_news([best],1,'市场覆盖',market_anchor=True)
-        # 保底配额
+        # Current-company financial/operating changes can earn an entry;
+        # ordinary notices do not get automatic places for every watched name.
+        for stock in stocks:
+            changes=[item for item in news_list if company_focus(item,stock)
+                     and reading_assignment(item,stocks,profiles)['reading_priority']>=3]
+            originals=[item for item in changes if item.source.startswith('上市公司公告-')]
+            add_news(originals or changes,1,'自选股实质变化')
+        # One balanced agenda for all remaining market/industry/risk questions.
         add_news([n for n in news_list if primary_rate_decision(n)],1,'重大议息原文')
-        watchlist_start=len(selected)
-        # Give every current watchlist company a place before one busy company
-        # can consume the entire watchlist quota.
-        for stock in stocks:
-            add_news([n for n in watchlist_news if company_focus(n,stock)], 1, "自选股")
-        # A quoted company metric or a narrowly matched operating variable is
-        # useful context even when it is not a company-specific headline. Give
-        # every current company one such lead before generic news fills slots.
-        for stock in stocks:
-            key=str(getattr(stock.market,'value',stock.market))+':'+stock.code
-            add_news([n for n in news_list if not company_focus(n,stock) and any(
-                row['stock']==key and row.get('operating_context') for row in associations(n,[stock],profiles))],1,'经营变量对照')
-        add_news(watchlist_news, max(0, 5 - (len(selected)-watchlist_start)), "自选股")
-        add_news(sorted([n for n in news_list if '全市场事件入口' in (n.market_impact or '')],
-            key=lambda n:(n.category=='监管原文',n.importance_score,n.published_at),reverse=True),3,'全市场')
-        add_news([item for item in news_list if '行业关联 ' in (item.market_impact or '')
-                  and any(row['level']=='business_overlap' for row in associations(item,stocks,profiles))], 4, "自选股行业")
-        add_news(global_macro_news, 5, "外盘/大宗")
-        add_news(investor_opinion, 3, "投资者观点")
-        add_news(a_stock_news, 12, "A股财经")
-        
-        # 剩余名额按重要性从所有未选中的新闻中填充
-        remaining_quota = len(news_list)
-        if remaining_quota > 0:
-            all_remaining = []
-            for bucket in [a_stock_news, watchlist_news, global_macro_news, investor_opinion]:
-                for n in bucket:
-                    norm = _normalize_for_dedup(n.title)
-                    is_dup = any(copy_reason(n,existing) or (
-                        _jaccard_sim(norm,_normalize_for_dedup(existing.title))>0.7
-                        and not retain_distinct_full_bodies(n,existing)) for existing in selected)
-                    if not is_dup:
-                        all_remaining.append(n)
-            all_remaining.sort(key=evidence_priority, reverse=True)
-            add_news(all_remaining, remaining_quota, "补充")
+        from .news_assignment import order as assignment_order
+        add_news(assignment_order([n for n in news_list if reading_scope(n)!='research_excerpt'],stocks,profiles),
+                 len(news_list),'研究问题',ordered=True)
         # Do not pad the input with unrelated brokerage abstracts merely because
         # two background slots remain. A matched existing topic or company is needed.
         chosen_topics={topic(item) for item in selected if topic(item)}
@@ -1322,7 +1322,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         add_news(related_research,2,"研报观点背景")
         
         # 最终按重要性排序
-        sorted_news = sorted(selected, key=editorial_rank, reverse=True)
+        sorted_news = assignment_order(selected,stocks,profiles)
         self._selected_evidence_news = sorted_news
         self._news_briefing=briefing(news_list,stocks,profiles,sorted_news)
         self._news_briefing['catalogue_refs']=discovery['references']
@@ -1347,7 +1347,7 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         summary_parts.append(audit_prompt(self._evidence_audit))
         summary_parts.append(briefing_prompt(sorted_news,stocks,profiles))
         if self._news_briefing['company_reporting_events']:
-            summary_parts.append('同一公司财报披露事件的原文与解读共用一个分析问题，累计/单季、成本、现金流等事实仍分口径；其余材料可检索，不重复计作多个催化：'+json.dumps(self._news_briefing['company_reporting_events'],ensure_ascii=False,separators=(',',':')))
+            summary_parts.append('同一公司财报披露问题只安排一个初读入口，其他原文和解读保留补读；分组不证明事实相同或独立佐证，累计/单季、成本、现金流仍分口径：'+json.dumps(self._news_briefing['company_reporting_events'],ensure_ascii=False,separators=(',',':')))
         if self._news_briefing['regulatory_supplements']:
             summary_parts.append('同批监管警示的其他报道保留原文供检索；未读不引用，不算独立验证：'+json.dumps(self._news_briefing['regulatory_supplements'],ensure_ascii=False,separators=(',',':')))
         if self._news_briefing['statistical_event_supplements']:
@@ -1387,6 +1387,10 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
         self._news_briefing['initial_budget']=dict(limit=news_budget,actual_characters=len(result),
             catalogue_characters=discovery['characters'],reading_blocks_characters=reading_spent,
             selected_articles=len(sorted_news),article_count_limit=None)
+        from .news_assignment import audit as assignment_audit
+        self._news_briefing['reading_assignments']=assignment_audit(assignment_pool,self._news_briefing.get('initial_reading',[]),stocks,profiles)
+        self._news_briefing['initial_reading_decisions']=[dict(id=n.id,provided=n.id in selected_ids,
+            reason='body_ranges_provided' if n.id in selected_ids else initial_skip.get(n.id,'not_selected_after_assignment_order')) for n in assignment_pool]
         if len(result)>news_budget:
             raise RuntimeError(f'新闻初始输入{len(result)}字符超过{news_budget}预算；未发送请求，不截断目录或原句')
         return result
