@@ -1246,6 +1246,12 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                     initial_skip[n.id]='same_headline_statistic_supplement_on_demand'
                     continue
                 scope=reading_scope(n)
+                if scope=='public_statement':
+                    if reading_assignment(n,stocks,profiles)['reading_priority']<2:
+                        initial_skip[n.id]='discussion_without_specific_intro_cues_kept_searchable';continue
+                    from .event_observations import canonical
+                    if any(reading_scope(existing)=='public_statement' and canonical(existing.source_url)==canonical(n.source_url) for existing in selected):
+                        initial_skip[n.id]='same_discussion_intro_further_statements_readable';continue
                 editorial_kind=editorial_profile(n)['kind']
                 background=editorial_kind in {'recap','routine_quote','routine_disclosure','general_opinion','event_commentary','corporate_feature'}
                 if background and not market_anchor and (sum(background_counts.values())>=2 or background_counts[editorial_kind]>=1):
@@ -1301,13 +1307,10 @@ key_factors、opportunities、risks均为字符串数组）。摘要和核心观
                 newest=max(item.published_at.date() for item in options)
                 best=max((item for item in options if item.published_at.date()==newest),key=lambda item:anchor_rank(item,role))
                 add_news([best],1,'市场覆盖',market_anchor=True)
-        # Current-company financial/operating changes can earn an entry;
-        # ordinary notices do not get automatic places for every watched name.
-        for stock in stocks:
-            changes=[item for item in news_list if company_focus(item,stock)
-                     and reading_assignment(item,stocks,profiles)['reading_priority']>=3]
-            originals=[item for item in changes if item.source.startswith('上市公司公告-')]
-            add_news(originals or changes,1,'自选股实质变化')
+        # Watchlist disclosures compete in the same question-balanced agenda.
+        # One financial report per watched company is not an automatic initial
+        # minimum ahead of today's market/macro/industry changes. All remain
+        # in the catalogue and can be read as company-specific reference.
         # One balanced agenda for all remaining market/industry/risk questions.
         add_news([n for n in news_list if primary_rate_decision(n)],1,'重大议息原文')
         from .news_assignment import order as assignment_order

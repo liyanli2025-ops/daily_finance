@@ -12,7 +12,7 @@ def cues(text):
     if re.search(r'https?://\S+',text):tags.append('linked_reference')
     if re.search(r'\d+(?:\.\d+)?\s*(?:%|亿|万|吨|bp|基点|户|元)',text,re.I):tags.append('numeric_claim')
     if re.search(r'相比|比较|占比|降幅|环比|同比|流通市值|前后|相对',text):tags.append('comparison')
-    if re.search(r'库存|排产|订单|交期|报价|回款|渠道|保证金|融资余额|融资融券|兑付|赎回|贴水|折溢价',text):tags.append('operating_or_trading_detail')
+    if re.search(r'库存|排产|订单|交期|报价|回款|渠道|保证金|融资余额|融资融券|货币资金|有息负债|偿债|兑付|赎回|贴水|折溢价',text):tags.append('operating_or_trading_detail')
     if re.search(r'我(?:看到|查到|问|买|卖|持有|参与)|我们(?:公司|厂|店)|据(?:报|说)|听说|称|透露',text):tags.append('attributed_or_personal_observation')
     if re.search(r'不一定|不能|不同意|不算|但|然而|只是|而非',text):tags.append('different_explanation')
     if re.search(r'\b(?:inventory|backlogs?|capacity|deliveries|redemptions?|margin calls?|lead times?)\b',text,re.I):tags.append('operating_or_trading_detail')
@@ -23,14 +23,15 @@ def cues(text):
     # A number alone is not a reason to prioritize; non-numerical industry
     # observations and opposing explanations must also get reading chances.
     substantive=bool(set(tags)&{'linked_reference','operating_or_trading_detail','different_explanation','attributed_or_personal_observation'})
-    return dict(tags=tags,reading_tier=0 if generic else 2 if substantive else 1,
+    detailed=('linked_reference' in tags or ('numeric_claim' in tags and 'comparison' in tags))
+    return dict(tags=tags,reading_tier=0 if generic else 3 if detailed else 2 if substantive else 1,
                 status='textual_cues_not_verified_value',requires_verification=True)
 
 
 def order_records(records):
     """Different threads and speakers get turns; no deletion or daily count cap."""
     result=[]
-    for tier in (2,1,0):
+    for tier in (3,2,1,0):
         threads=defaultdict(lambda:defaultdict(deque))
         for row in records:
             if row['cues']['reading_tier']==tier:
@@ -53,6 +54,22 @@ def order_records(records):
                 q=threads.popleft();result.append(q.popleft())
                 if q:threads.append(q)
     return result
+
+
+def own_text(item):
+    # Context copied from an old parent must not award a generic reply the
+    # parent's concrete cues. This is only for our own labelled evidence format.
+    text=re.split(r'\n\n\[(?:引用上下文|原帖背景|范围说明)',item.content)[0]
+    return text.split('\n',1)[-1] if text.startswith('[发言位置：') else text
+
+
+def rank_news(items):
+    rows=[]
+    for item in items:
+        author=re.search(r'公开账号：([^；\]\n]+)',item.content)
+        rows.append(dict(item=item,url=item.source_url or item.id,
+            statement=dict(author=author[1] if author else None),cues=cues(own_text(item))))
+    return [row['item'] for row in order_records(rows)]
 
 
 def statement_documents(thread_news,threads,now,hours):

@@ -25,14 +25,15 @@ def market_candidates(items):
 
 def coverage_role(item):
     """Headline scope is a reading lead, never a verified session/date label."""
+    if (getattr(item,'source','') or '').startswith('公开参与者讨论-'):return None
     title=item.title
     lead=title+' '+(item.content or '')[:1200]
-    close=bool(re.search(r'收评|收盘|复盘',title))
+    us_close=re.search(r'美股收盘|美股.{0,10}(?:收涨|收跌|三连涨|三连跌)|(?:纳指|标普|道指).{0,8}(?:收涨|收跌|三连涨|三连跌)',title)
+    if us_close and not re.search(r'盘前|盘后|期货',title):return 'us_session'
+    close=bool(re.search(r'收评|收盘|复盘',title) or ('行情收官' in title and re.search(r'收盘|收市',lead)))
     if close and not re.search(r'ETF|基金|可转债|期货',title,re.I):
         if re.search(r'港股|恒生|恒指|恒科',title):return 'hk_session'
         if re.search(r'A股|沪指|上证|创业板|科创|两市|三大指数|全市场',title):return 'a_session'
-    us_close=re.search(r'美股收盘|美股.{0,10}(?:收涨|收跌|三连涨|三连跌)|(?:纳指|标普|道指).{0,8}(?:收涨|收跌|三连涨|三连跌)',title)
-    if us_close and not re.search(r'盘前|盘后|期货',title):return 'us_session'
     geographic=title+' '+(item.content or '')[:200]
     if (re.search(r'财报|现金流|资本开支|盈利指引|earnings|cash flow|capex',lead,re.I)
             and re.search(r'美股|华尔街|纳指|纳斯达克|标普|纽交所|Nasdaq|NYSE',geographic,re.I)):

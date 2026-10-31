@@ -5,7 +5,7 @@ that account key, cookies, or application credentials to publishers.
 """
 from datetime import datetime,timedelta,timezone
 import hashlib,ipaddress,json,re,socket,time
-from urllib.parse import urlsplit,urljoin
+from urllib.parse import urlsplit,urljoin,parse_qs
 import requests
 import urllib3
 from bs4 import BeautifulSoup
@@ -132,6 +132,24 @@ def parse_visible_article(html,url,now=None,hours=72):
     from .overseas_sources import ld_restricted
     if ld_restricted(soup) or re.search(r'订阅后阅读|登录后阅读|subscribe to continue|sign in to continue',soup.get_text(' ',strip=True),re.I):
         raise ValueError('web_source_access_restricted')
+    parts=urlsplit(url)
+    if (parts.hostname in {'money.finance.sina.com.cn','vip.stock.finance.sina.com.cn'}
+            and parts.path=='/corp/view/vCB_AllBulletinDetail.php'):
+        params=parse_qs(parts.query);code=params.get('stockid',[''])[0]
+        article=soup.select_one('#content');text=article.get_text('\n',strip=True) if article else ''
+        date=re.search(r'公告日期\s*[:：]\s*(\d{4}-\d{2}-\d{2})',soup.get_text(' ',strip=True))
+        if (not re.fullmatch(r'\d{6}',code) or not re.fullmatch(r'\d+',params.get('id',[''])[0])
+            or not re.search(r'证券代码\s*[:：]?\s*'+code+r'(?!\d)',text)):
+            raise ValueError('web_source_not_admitted')
+        if not date:raise ValueError('web_source_time_missing')
+        stamp=datetime.fromisoformat(date[1])
+        if stamp>now or stamp<now-timedelta(hours=hours):raise ValueError('web_source_time_outside_window')
+        if len(text)<80 or soup.title is None:raise ValueError('web_source_body_unavailable')
+        from ..models.news import News
+        return News(id='web-'+hashlib.sha256((url+'\n'+text).encode()).hexdigest()[:24],
+            title=soup.title.get_text(' ',strip=True),content=text,
+            source='公开网页可见正文-新浪公司公告镜像',source_url=url,published_at=stamp,
+            market_impact='原始来源时点：'+date[1]+'；精度：day；HTML公告镜像正文及表格，公告日不等于签署日；未与交易所原文件逐项核对。')
     # Reuse reviewed publisher adapters when the discovered URL matches one.
     # An adapter admission error is NOT bypassed by a weaker generic parser.
     from . import public_news_sources,overseas_sources
@@ -152,6 +170,15 @@ def parse_visible_article(html,url,now=None,hours=72):
     host=urlsplit(url).hostname
     # Verified DOM variants from saved public pages, not a whole-page text fallback.
     template_date=None;heading=soup.find('h1');article=soup.select_one('article,[itemprop="articleBody"]')
+    if article is not None and article.find('h1') is not None:heading=article.find('h1')
+    if (host=='www.intc.com' and re.fullmatch(r'/news-events/press-releases/detail/\d+/[^/]+',urlsplit(url).path)
+            and article is not None):
+        node=article.select_one('time.date')
+        clock=node.get_text(' ',strip=True) if node else ''
+        match=re.fullmatch(r'([A-Z][a-z]{2} \d{1,2}, \d{4})\s*•\s*(\d{1,2}:\d{2} [AP]M) (EDT|EST)',clock)
+        if match:
+            value=datetime.strptime(match[1]+' '+match[2],'%b %d, %Y %I:%M %p')
+            template_date=value.replace(tzinfo=timezone(timedelta(hours=-4 if match[3]=='EDT' else -5))).isoformat()
     if host in {'cj.sina.com.cn','finance.sina.com.cn'} and soup.select_one('#artibody'):
         heading=soup.select_one('h1.main-title');article=soup.select_one('#artibody')
         node=soup.select_one('.date-source .date')

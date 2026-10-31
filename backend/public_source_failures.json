@@ -43,5 +43,6 @@
   "https://www.jiemian.com/article/15236929.html": "publisher_source_date_missing",
   "https://www.jiemian.com/article/15232671.html": "publisher_source_date_missing",
   "https://news.smm.cn/news/103993326": "publisher_full_body_unavailable",
-  "https://news.smm.cn/news/103944164": "publisher_full_body_unavailable"
+  "https://news.smm.cn/news/103944164": "publisher_full_body_unavailable",
+  "https://www.axios.com/2026/10/28/ai-bonds-coreweave-oracle": "http_403_public_article_no_auto_retest"
 }

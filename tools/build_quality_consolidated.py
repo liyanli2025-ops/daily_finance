@@ -18,7 +18,9 @@ V13_SHA='0648cff8973271df55c233aeaf8de8e3a42b31a6be5725fd04ed53490f9ab32b'
 V14_SHA='2f355b5936507a22f4bd3bcf9eb6a4eb12f6cca86a573e15642a16405f625c12'
 V15_SHA='b111678268b641f73af4be46953363f16c7843ac5ff827b048274b300b3e0677'
 V16_SHA='97e034e4dfebb6badfbdce94e4ac0cace167979115ececa39858ec2f129099d0'
+V17_SHA='2f780dc24b2082f84690827c210b0d5d8a7c41530f9ac5ff16cc90cc9ccbf9a0'
 INSTALLED_ARCHIVES={V16_SHA:'finance-source-focus-20261031-v16-r2',V15_SHA:'finance-discovery-budget-20261030-v15',V14_SHA:'finance-fresh-episode-20261030-v14',V13_SHA:'finance-listener-flow-20261030-v13',V11_SHA:'finance-quality-consolidated-20261029-v11-r2',V12_SHA:'finance-editorial-cost-20261029-v12'}
+INSTALLED_ARCHIVES[V17_SHA]='finance-domestic-sources-20261031-v17'
 ALLOCATION_SHA='c2f08e103293aea7a51a029d31c62a4b124c95354705de2edf674f57fca9e4e7'
 
 
@@ -46,7 +48,7 @@ def build(output,baseline_archive,allocation_archive,installed_archive=None,comp
     patch,allocated=read_bundle(allocation_archive,'finance-research-allocation-fix-20261029',ALLOCATION_SHA)
     revision=baseline['source_revision']
     def git(*args):return subprocess.check_output(['git','-C',str(repo),*args])
-    names=git('diff','--name-only',revision,'HEAD','--','backend/app/','docs/').decode().splitlines()
+    names=git('diff','--name-only',revision,'HEAD','--','backend/app/','docs/','backend/public_source_failures.json').decode().splitlines()
     if not names or any(not (repo/name).is_file() for name in names):
         raise RuntimeError('Empty release or source deletion requires explicit review')
     tracked=set(git('ls-tree','-r','--name-only',revision).decode().splitlines())

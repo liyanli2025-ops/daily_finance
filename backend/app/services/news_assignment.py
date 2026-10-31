@@ -7,15 +7,22 @@ from collections import defaultdict, deque
 import re
 
 POLICY = re.compile(r'降准|降息|加息|利率决议|货币政策工具|出口管制|关税|制裁|征求意见|交易规则|FOMC.*statement',re.I)
-OPERATING = re.compile(r'订单|供给|供应|需求|产能|库存|交期|售价|电价|猪价|资本开支|现金流|现金牛|烧钱|CapEx|cash flow|supply|demand|capacity',re.I)
-CHANGE = re.compile(r'扩大|收缩|下降|增长|上调|下调|减少|增加|紧张|短缺|中断|暂停|停产|加速|变动|变化|走弱|收紧|放缓|烧穿|枯竭|跌|涨|\d[\d.,]*\s*(?:%|元|美元|万吨|亿|天)|cut|rais|fall|surge|shortage|disrupt',re.I)
+OPERATING = re.compile(r'订单|供给|供应|需求|产能|库存|交期|出货|报价|售价|电价|猪价|融资|信用利差|违约保护成本|资本开支|现金流|现金牛|烧钱|CapEx|cash flow|supply|demand|capacity',re.I)
+CHANGE = re.compile(r'扩大|收缩|下降|增长|上调|下调|减少|增加|紧张|短缺|中断|暂停|停产|加速|变动|变化|走弱|收紧|放缓|烧穿|枯竭|飙升|新高|跌|涨|\d[\d.,]*\s*(?:%|元|美元|万吨|亿|天)|cut|rais|fall|surge|shortage|disrupt',re.I)
 INDUSTRY = re.compile(r'行业|产业|供应链|全球|厂商|设备商|电网|原料|半导体|芯片|能源|锂|养殖|水电|AI|artificial intelligence',re.I)
-VIEW = re.compile(r'可能|预计|暗示|预测|展望|看好|看空|前官员|专访|观点|呼吁|或再|或将|或会')
+VIEW = re.compile(r'可能|预计|暗示|预测|展望|看好|看空|前官员|专访|观点|呼吁|拟|计划|或再|或将|或会')
 FINANCIAL_SUBJECT = re.compile(r'公司|股份|控股|上市|债券|银行|证券|交易所|破产|bonds?|bankruptcy|listed company|stock market',re.I)
-MACRO_DATA = re.compile(r'\bGDP\b|\bCPI\b|\bPPI\b|\bPMI\b|工业(?:企业)?利润|规上工业企业|非农|社零|社会消费品零售|进出口',re.I)
+MACRO_DATA = re.compile(r'\bGDP\b|\bCPI\b|\bPPI\b|\bPMI\b|采购经理(?:人)?指数|工业(?:企业)?利润|规上工业企业|非农|社零|社会消费品零售|进出口',re.I)
 
 
 def assess(item,stocks=(),profiles=None):
+    if (getattr(item,'source','') or '').startswith('公开参与者讨论-'):
+        from .discussion_briefing import cues,own_text
+        detail=cues(own_text(item))
+        return dict(lane='participant_discussion',question='participant_discussion',
+            reading_priority=2 if detail['reading_tier']>=2 else 1,
+            reason='具体参与者说法的补充阅读线索；不按标题中的加息/暴跌升级为已发生政策或行情',
+            status='reading_lead_not_verified_importance')
     from .news_quality import company_focus
     from .news_briefing import operating_context
     from .company_news_scope import MAJOR,AGGREGATE,REPORT,SYSTEMIC,decision
@@ -84,14 +91,22 @@ def order(items,stocks=(),profiles=None):
         assignment=assess(item,stocks,profiles)
         buckets[(assignment['reading_priority']>=2,assignment['question'])].append(item)
     result=[]
-    for phase in (True,False):
+    # Primary reporting first, participant supplements next, other discovery
+    # last. Discussion is searchable even when no initial body space remains.
+    def phase_for(key):
+        return 1 if key[1]=='participant_discussion' else 0 if key[0] else 2
+    for phase in (0,1,2):
         queues={}
         for key,values in buckets.items():
-            if key[0]!=phase:continue
+            if phase_for(key)!=phase:continue
             # Balance research lanes BEFORE one busy lane's best-quality
             # articles consume the input. Priority is ordinal within a lane.
-            ranked=diverse_rank(values)
-            ranked.sort(key=lambda item:(assess(item,stocks,profiles)['reading_priority'],item.published_at.date()),reverse=True)
+            if key[1]=='participant_discussion':
+                from .discussion_briefing import rank_news
+                ranked=rank_news(values)
+            else:
+                ranked=diverse_rank(values)
+                ranked.sort(key=lambda item:(assess(item,stocks,profiles)['reading_priority'],item.published_at.date()),reverse=True)
             queues[key]=deque(ranked)
         keys=sorted(queues,key=lambda key:(-assess(queues[key][0],stocks,profiles)['reading_priority'],key[1]))
         while any(queues.values()):
