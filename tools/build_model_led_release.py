@@ -13,6 +13,7 @@ import zipfile
 
 BASELINE_SHA='7f509ba026ac0f3923140a32b8276ebf691263cf67543996130db2bdc7069a50'
 NAMES=('backend/app/services/web_research.py','backend/app/services/primary_discovery.py',
+       'backend/app/services/search_objectives.py',
        'backend/app/primary_discovery_check.py','tools/run_primary_collection_once.py',
        'docs/model_led_collection_20261031.md','docs/primary_discovery_release_v19.md')
 

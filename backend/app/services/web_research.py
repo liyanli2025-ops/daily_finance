@@ -43,13 +43,15 @@ def capabilities():
         limitation='配置状态不是联网验收；搜索目录不是正文，聊天工具不能自动供服务器调用。')
 
 
-def search(workspace,query,hours=72,deadline=None,topic='news'):
+def search(workspace,query,hours=72,deadline=None,topic='news',purpose='discovery'):
     from ..config import settings
+    from .search_objectives import request_profile
+    effective_query,profile=request_profile(query,purpose,workspace.now,hours)
     if topic not in {'news','general'}:raise ValueError('search_topic_invalid')
     if not settings.research_web_search_enabled:return dict(status='disabled',scope='general_web',results=[])
     if not settings.research_web_search_api_key or not settings.research_web_search_api_key.get_secret_value().strip():return dict(status='unavailable',reason='search_account_not_configured',scope='general_web',results=[])
     cache=getattr(workspace,'web_search_cache',{})
-    key=(query,hours,topic)
+    key=(effective_query,hours,topic,purpose,tuple(sorted((k,str(v)) for k,v in profile.items())))
     if key in cache:return dict(cache[key],reused_within_episode=True)
     attempts=getattr(workspace,'web_search_attempts',0)
     if attempts>=settings.research_web_search_max_requests:return dict(status='budget_exhausted',scope='general_web',results=[])
@@ -61,9 +63,9 @@ def search(workspace,query,hours=72,deadline=None,topic='news'):
     try:
         response=requests.post('https://api.tavily.com/search',
             headers={'Authorization':'Bearer '+settings.research_web_search_api_key.get_secret_value()},
-            json=dict(query=query,topic=topic,search_depth='basic',max_results=10,
+            json=dict(query=effective_query,topic=topic,search_depth='basic',max_results=10,
                       time_range='day' if hours<=24 else 'week',include_published_date=True,
-                      include_answer=False,include_raw_content=False,auto_parameters=False),
+                      include_answer=False,include_raw_content=False,auto_parameters=False,**profile),
             timeout=min(10,max(.1,deadline-time.monotonic())) if deadline else 10,allow_redirects=False)
         response.raise_for_status()
         if response.status_code!=200:raise ValueError('search_response_not_ok')
@@ -78,7 +80,10 @@ def search(workspace,query,hours=72,deadline=None,topic='news'):
             results.append(dict(title=str(row.get('title') or '')[:300],url=url,
                 snippet=str(row.get('content') or '')[:300],published_hint=row.get('published_date'),
                 reading_status='search_snippet_not_body'))
-        result=dict(status='ok',scope='general_web_search_results_not_exhaustive',query=query,topic=topic,
+        result=dict(status='ok',scope='general_web_search_results_not_exhaustive',query=effective_query,
+            requested_query=query,topic=topic,purpose=purpose,retrieval_profile=profile,
+            requested_max_results=10,provider_returned_results=len(data['results']),
+            processed_results=min(10,len(data['results'])),metadata_results=len(results),
             requested_hours=hours,window='engine_day_or_week_hint_not_verified_article_window',
             results=results,http_attempts=workspace.web_search_attempts,
             limitation='搜索引擎可能漏收、排序失真或返回旧转载；须读取正文核对时间，未入证据池。')

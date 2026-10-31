@@ -1,3 +1,9 @@
+## 2026年10月31日 17条候选盘点回传：只有3份缓存，搜索目的与执行缺口修复（未部署）
+
+先读[17条候选复盘](search_objectives_20261031.md)。用户本地盘点：S1 2130字符、S3 3425字符、S8 3309字符可复用，其余没有匹配缓存。本轮搜索17条包含社交/视频、盘前、会前预测、韩国行情和PDF；6查询未覆盖行业/自选股定向检索。不能称只差正文或资料已足够，也不把预测、滚动稿全删。
+
+新增目的化检索API参数/标题用途提示/实际执行账本，记录服务商原始结果数；latest_close/released_policy带年份和绝对窗口/日期过滤/社交排除，discovery/commentary不全局排除讨论。时间/标题是启发式，不验证交易日、事实或价值。已保留旧共享任务和全部候选，未重跑任何收费服务、未部署，旧marker不动。后续合并再交付，暂不要求用户继续盘点同一批或上传只改词的小包。
+
 ## 2026年10月31日 v20已部署，3条同URL缓存文字复用通过
 
 用户返回v20验证/应用成功，备份`/var/backups/finance-daily/20261031T080810944699Z`；数据库连接正常、维护暂停、scheduler stopped。saved-body-check-v1已执行且marker保留：财联社A股收评、港股收评、华尔街见闻盘中报道均为cached_only，分别提供1800字符片段，非三篇新抓取或读完全文；没有任何新远端正文解析验收。工作区`/var/www/finance-daily/backend/data/episodes/episode-3dd2qyno`，结果`data/radar/cache/saved-body-check-v1.result.json`。

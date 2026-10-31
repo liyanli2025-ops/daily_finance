@@ -16,6 +16,20 @@ def page(date='2026-10-30T18:00:00+08:00',extra=''):
     return '<html><head><meta property="article:published_time" content="'+date+'"></head><body><h1>行业订单与库存变化</h1>'+extra+'<article>'+('记者核对了公司订单与库存数据，所涉期间需要分开理解。'*20)+'</article></body></html>'
 
 class WebResearchTests(unittest.TestCase):
+    def test_latest_close_profile_is_actually_sent_and_not_confused_with_discovery_cache(self):
+        response=Mock(status_code=200);response.json.return_value=dict(results=[])
+        with patch('app.services.web_research.requests.post',return_value=response) as post:
+            first=search(self.workspace,'美股收盘 10月30日',purpose='latest_close')
+            body=post.call_args.kwargs['json']
+            self.assertIn('2026',body['query']);self.assertTrue(body['filter_by_published_date'])
+            self.assertIn('youtube.com',body['exclude_domains']);self.assertEqual(body['search_depth'],'basic')
+            self.assertEqual(first['provider_returned_results'],0)
+            search(self.workspace,'美股收盘 10月30日',purpose='latest_close')
+            self.assertEqual(post.call_count,1)
+            search(self.workspace,'美股收盘 10月30日',purpose='discovery')
+            self.assertEqual(post.call_count,2)
+            self.assertNotIn('filter_by_published_date',post.call_args.kwargs['json'])
+
     def test_explicit_general_search_is_distinct_cached_mode_without_upgrade(self):
         response=Mock(status_code=200);response.json.return_value=dict(results=[])
         with patch('app.services.web_research.requests.post',return_value=response) as post:
