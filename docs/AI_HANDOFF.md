@@ -1,3 +1,9 @@
+## 2026年10月31日 v20已部署，3条同URL缓存文字复用通过
+
+用户返回v20验证/应用成功，备份`/var/backups/finance-daily/20261031T080810944699Z`；数据库连接正常、维护暂停、scheduler stopped。saved-body-check-v1已执行且marker保留：财联社A股收评、港股收评、华尔街见闻盘中报道均为cached_only，分别提供1800字符片段，非三篇新抓取或读完全文；没有任何新远端正文解析验收。工作区`/var/www/finance-daily/backend/data/episodes/episode-3dd2qyno`，结果`data/radar/cache/saved-body-check-v1.result.json`。
+
+旧finish离线细化码为discovery_body_claim_without_evidence，表示必需正文依据为空；可能在coverage声明或events中，未看到旧原回复前不要断言具体哪条或称虚构ID。界面eligible_untried=11实际包含缓存及未尝试候选，不能称11条新/未读文章。下一步免费按旧6次搜索的全部候选盘点正文缓存、实际来源与缺口，再判断是否需要新公开网页检查；不重复付费模型，不删除两个已执行marker，也不把3条缓存成功称新采集全流程通过。
+
 ## 2026年10月31日 v19已部署且真实取材失败，转免费正文链路修复
 
 优先读[实际失败与正文读取修复](reading_pipeline_repair_20261031.md)。用户已安装v19，备份`/var/backups/finance-daily/20261031T073614479472Z`，并明确授权4模型/8搜索上限试验。实际4模型POST、6搜索、9正文尝试、0正文，finish校验`discovery_unprovided_evidence`停止。不能用旧一行报错确定是证据字段缺失还是错误引用；原始回复仍在result.research.decisions。原model-led-primary-v1标记保留，不删除/改名重跑。
