@@ -150,6 +150,9 @@ async def execute(backend,input_sha,*,model_factory=IsolatedModel):
             research=await discover(workspace,stocks,limits=limits,model=model,checkpoint=checkpoint)
         if watchlist_signature(stocks)!=watchlist_signature(await read_app_watchlist()):
             research['status']='watchlist_changed_not_accepted'
+        from app.services.primary_report import save_discovery_input
+        handoff=save_discovery_input(workspace,research)
+        if handoff is not None:research['report_input']=handoff
         state.update(status=research['status'],research=research)
     except Exception as error:
         state.update(status='failed_no_retry',error_type=type(error).__name__)

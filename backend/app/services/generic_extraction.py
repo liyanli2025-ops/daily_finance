@@ -9,6 +9,25 @@ from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
 
 
+def runtime_status():
+    """Load the optional runtime locally; finding a distribution is insufficient.
+
+    This does not extract a page, download models/data or install dependencies.
+    A successful import is still not a real-page or server-network acceptance.
+    """
+    try:
+        from trafilatura import extract
+        version=importlib.metadata.version('trafilatura')
+    except ModuleNotFoundError as error:
+        return dict(ready=False,reason='generic_extractor_not_installed' if error.name=='trafilatura'
+                    else 'generic_extractor_dependency_missing',error_type=type(error).__name__)
+    except Exception as error:
+        return dict(ready=False,reason='generic_extractor_runtime_unavailable',error_type=type(error).__name__)
+    return dict(ready=callable(extract),version=version,
+                reason='import_ready' if callable(extract) else 'generic_extractor_entrypoint_invalid',
+                network_requests=0,real_page_verified=False)
+
+
 def reader_kind(url):
     parts=urlsplit(url);host=parts.hostname or ''
     if host in {'www.jisilu.cn','jisilu.cn','guba.eastmoney.com','www.taoguba.com.cn'}:return 'discussion'

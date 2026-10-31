@@ -109,6 +109,8 @@ def prepare(bundle,now=None):
                 observed_at=observed.isoformat(),remote_version_checked=False,
                 producer_acquisition=row.get('acquisition','provided_external_body'),
                 upstream=row.get('upstream'),input_scope=row['body_scope'],
+                editorial_notes=row.get('editorial_notes', []),
+                short_text_hint=len(body.strip())<160,
                 admission='provided_body_not_independent_verification'))
         except (ValueError,TypeError,KeyError) as error:
             reason=str(error) if isinstance(error,ValueError) and re.fullmatch(r'[a-z][a-z0-9_]+',str(error)) else 'article_fields_invalid'

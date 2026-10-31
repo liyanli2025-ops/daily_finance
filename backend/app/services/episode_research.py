@@ -42,11 +42,14 @@ def requests_from_response(response):
 async def execute(workspace,requests,stocks,public_budget=35):
     results=[]
     deadline=time.monotonic()+public_budget
-    profiles={row['key']:row['profile'] for row in ResearchHub().load(stocks) if row.get('profile')}
     for request in requests:
         if not isinstance(request,dict):raise ValueError('invalid_evidence_request')
         tool=request.get('tool')
-        if tool=='read_material':
+        if (getattr(workspace,'allow_external_evidence_tools',True) is False
+                and tool in {'search_web','read_public_url','collect_discussions','search_public'}):
+            result=dict(status='unavailable',reason='frozen_primary_report_no_external_collection',
+                        limitation='本轮报告只使用已交接资料，可本地检索和补读；资料缺口保留，不自动付费搜索或扫库。')
+        elif tool=='read_material':
             result=workspace.read(request.get('id'),request.get('offset',0),request.get('characters',6000))
         elif tool=='read_materials':
             rows=request.get('items');budget=request.get('total_characters',18000)
@@ -116,6 +119,7 @@ async def execute(workspace,requests,stocks,public_budget=35):
             if not isinstance(query,str) or not 2<=len(query.strip())<=120:
                 raise ValueError('invalid_research_query')
             if tool=='search_public':
+                profiles={row['key']:row['profile'] for row in ResearchHub().load(stocks) if row.get('profile')}
                 hours=request.get('hours',72)
                 if type(hours) is not int or not 1<=hours<=72:raise ValueError('invalid_public_search_window')
                 try:
@@ -146,13 +150,16 @@ def questions(stocks):
         '当前名单仅供关联参考，有实质决策价值才展开：'+('；'.join(names) or '未设置自选股，仍研究重要市场与行业变化。')])
 
 
-def initial_prompt(prompt,stocks):
+def initial_prompt(prompt,stocks,workspace=None):
     from .web_research import capabilities
-    return prompt+INSTRUCTIONS+DESK_INSTRUCTIONS+'\n当前真实工具能力：'+json.dumps(capabilities(),ensure_ascii=False)+'\n研究问题（底稿广泛检查，节目按重要性取舍）：\n'+questions(stocks)
+    result=prompt+INSTRUCTIONS+DESK_INSTRUCTIONS+'\n当前真实工具能力：'+json.dumps(capabilities(),ensure_ascii=False)+'\n研究问题（底稿广泛检查，节目按重要性取舍）：\n'+questions(stocks)
+    if getattr(workspace,'allow_external_evidence_tools',True) is False:
+        result+='\n本次为冻结主动取材报告：仅允许search_materials/read_material/read_materials；所有外部搜索/读取/讨论补采均关闭。先从现有完整正文补读；不足则保留研究缺口，不用标题或旧记忆补造。'
+    return result
 
 
 async def complete_with_research(analyzer,prompt,max_tokens,workspace,stocks):
-    initial=initial_prompt(prompt,stocks)
+    initial=initial_prompt(prompt,stocks,workspace)
     from .news_workspace_brief import without_catalogue
     followup_initial=without_catalogue(initial)
     transcript=[]

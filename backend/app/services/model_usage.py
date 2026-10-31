@@ -1,5 +1,6 @@
 """Per-generation request cap and private usage ledger; no prompts, keys or responses."""
 from contextvars import ContextVar
+from contextlib import contextmanager
 import asyncio
 from functools import wraps
 import json
@@ -38,9 +39,28 @@ def reserve_call():
     run=_run.get()
     if run is None:
         return
-    if run['calls']>=run['limit']:
+    if run['limit'] is not None and run['calls']>=run['limit']:
         raise RuntimeError('本期模型调用次数已达上限，停止额外扣费；保留诊断后人工检查')
     run['calls']+=1
+
+
+@contextmanager
+def collection_usage_scope(input_limit):
+    """Separate ledger scope, not a model-maintenance or retry override.
+
+    Collection controller reserves cumulative input/output before every call.
+    Report generation creates its own normal bounded budget afterwards.
+    """
+    token=_run.set(dict(id=uuid.uuid4().hex,calls=0,limit=None,phase='collection',input_limit=input_limit))
+    try:
+        yield
+    finally:
+        _run.reset(token)
+
+
+def current_input_limit():
+    run=_run.get()
+    return run.get('input_limit',100000) if run else 100000
 
 
 def record_usage(task,route,max_tokens,response=None,error=None,elapsed=None,directory=None,request_characters=None):
@@ -59,6 +79,7 @@ def record_usage(task,route,max_tokens,response=None,error=None,elapsed=None,dir
         usage={}
     run=_run.get()
     row=dict(at=china_now().isoformat(),run_id=run['id'] if run else None,
+             phase=run.get('phase','report') if run else None,
              task=task,provider=route.provider,model=route.model,max_output_tokens=max_tokens,
              http_status=response.status_code if response is not None else None,
              transport_error=type(error).__name__ if error else None,

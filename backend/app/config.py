@@ -43,13 +43,22 @@ class Settings(BaseSettings):
     openai_base_url: Optional[str] = None
     ai_model: Optional[str] = Field(default=None, description="兼容旧配置的明确模型名；不再默认过期模型")
     ai_timeout_seconds: int = Field(default=300, ge=10, le=900)
-    model_max_calls_per_report: int = Field(default=8, ge=1, le=12, description='整期模型HTTP请求上限，含网络重试与审查修复；不是金额上限')
+    model_max_calls_per_report: int = Field(default=8, ge=1, le=12, description='报告阶段模型HTTP请求上限，含重试与审查修复；旧流程仍按原整期口径；新主动取材独立记账')
     news_initial_prompt_characters: int = Field(default=34000, ge=12000, le=80000, description='全池目录、初读正文及新闻说明的字符预算；不是token或费用上限')
     model_http_retries: int = Field(default=0, ge=0, le=1, description='默认不自动重复付费HTTP请求；显式设置1才允许一次重试')
     report_auto_repair_enabled: bool = Field(default=False, description='默认保留审查失败稿待编辑，不自动整篇付费重写')
     research_web_search_enabled: bool = Field(default=False, description='显式启用外部通用搜索；默认不产生搜索API请求')
     research_web_search_api_key: Optional[SecretStr] = None
-    research_web_search_max_requests: int = Field(default=4, ge=1, le=12, description='每期搜索HTTP尝试上限，含失败；不是资料或节目篇数')
+    research_web_search_max_requests: int = Field(default=24, ge=1, le=48, description='每期搜索HTTP尝试上限，含失败；不是资料或节目篇数')
+
+    research_report_model_reserve: Optional[int] = Field(default=None, ge=1, le=6, description='兼容旧.env，已停用；不参与新取材预算计算')
+    research_max_model_calls: Optional[int] = Field(default=None, ge=1, le=128, description='主动取材可选紧急请求数上限；默认按进展、累计用量和时长停止，不从报告预算扣除')
+    research_total_input_characters: int = Field(default=2000000, ge=12000, le=10000000, description='主动取材累计模型输入字符上限，发送前预留；不是token或金额')
+    research_total_output_tokens: int = Field(default=120000, ge=1000, le=500000, description='主动取材累计预留max_tokens上限，按每次请求上限保守记账；不是实际token或金额')
+    research_body_max_urls: int = Field(default=64, ge=1, le=128, description='每轮主动取材新URL读取尝试的硬上限，含失败')
+    research_input_max_characters: int = Field(default=160000, ge=12000, le=300000, description='取材单次模型输入字符硬上限；不是token或金额上限')
+    research_local_read_max_characters: int = Field(default=96000, ge=0, le=240000, description='整轮已存正文额外补读字符硬上限')
+    research_max_seconds: int = Field(default=900, ge=30, le=1800, description='整轮主动取材时长硬上限')
 
     # 备用 AI 服务（主服务挂了自动切换，强烈推荐配置！）
     # 例如：主用 DeepSeek，备用硅基流动

@@ -22,7 +22,10 @@ def finish(ids=(),events=None):
     return json.dumps(dict(action='finish',events=events or [],
         coverage=[dict(lane=x,status='body_provided' if ids and x=='us_market' else 'missing',
                        evidence_ids=list(ids) if x=='us_market' else [],explanation='样本范围；其余未查，不声称无消息') for x in LANES],
-        watchlist_checks=[dict(key='A:002714',status='missing',evidence_ids=[],explanation='未查公司消息')],omissions=[]))
+        watchlist_checks=[dict(key='A:002714',status='missing',evidence_ids=[],explanation='未查公司消息')],omissions=[],
+        deferred_tasks=[dict(task_id='lane:'+lane+':locate_body',reason='本用例只覆盖一个市场，其余明确保留缺口')
+                        for lane in LANES if not ids or lane!='us_market']+
+                       [dict(task_id='stock:A:002714:locate_body',reason='公司研究未在本用例执行')]))
 
 
 class DiscoveryTests(unittest.IsolatedAsyncioTestCase):
@@ -143,4 +146,4 @@ class BriefTests(unittest.TestCase):
         self.assertNotIn('牧原股份',value)
 
     def test_invalid_cost_limits_rejected(self):
-        with self.assertRaises(ValueError):Limits(model_calls=50)
+        with self.assertRaises(ValueError):Limits(model_calls=500)

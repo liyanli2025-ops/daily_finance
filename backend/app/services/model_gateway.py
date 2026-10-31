@@ -156,9 +156,9 @@ def completed_text(route, data):
 
 async def complete(task, messages, max_tokens=4000):
     ensure_models_enabled()
-    from .model_usage import reserve_call, record_usage
+    from .model_usage import reserve_call, record_usage, current_input_limit
     from .prompt_reading import validate_input
-    request_characters=validate_input(messages)
+    request_characters=validate_input(messages,limit=current_input_limit())
     route = resolve_route(task)
     url, headers, body = request_for(route, messages, max_tokens)
     # Report only metadata, never prompts, keys, raw errors, or reasoning content.

@@ -66,11 +66,12 @@ class EpisodeWorkspace:
 
     def metadata(self,item):
         from .evidence import publication_label
+        from .primary_material_quality import review_body
         return dict(**(dict(source_id=item.source_id,scope_links=item.scope_links) if isinstance(item,Material) else {}),id=item.id,title=item.title,source=item.source,url=item.source_url,
             published=(item.published_at.isoformat() if item.published_at else None) if isinstance(item,Material) else publication_label(item),
             reading_scope=item.reading_status if isinstance(item,Material) else reading_scope(item),
             kind=getattr(item,'kind','news'),scope=getattr(item,'scope',''),period=getattr(item,'period',''),
-            characters=len(body(item)))
+            characters=len(body(item)), body_quality=review_body(body(item)))
 
     def prepare_ranges(self,identifier,ranges,channel):
         """Record assembled/tool-returned text; this alone is NOT a model read."""
@@ -214,12 +215,22 @@ def current_workspace():return _current.get()
 def episode_generation(func):
     @wraps(func)
     async def wrapped(*args,**kwargs):
-        if _current.get() is not None:return await func(*args,**kwargs)
+        if _current.get() is not None:
+            supplied=kwargs.get('evidence_workspace')
+            if supplied is not None and supplied is not _current.get():raise ValueError('episode_workspace_changed')
+            return await func(*args,**kwargs)
         EpisodeWorkspace.prune()
         news=list(kwargs.get('news_list',args[1] if len(args)>1 else []) or [])
         cross=kwargs.get('cross_border_news',args[2] if len(args)>2 else [])
         if isinstance(cross,list):news+=cross
-        workspace=EpisodeWorkspace(news);token=_current.set(workspace);success=False
+        workspace=kwargs.get('evidence_workspace')
+        if workspace is not None:
+            if not isinstance(workspace,EpisodeWorkspace):raise ValueError('invalid_evidence_workspace')
+            for item in news:
+                if workspace.document_hashes.get(item.id)!=hashlib.sha256(body(item).encode('utf-8')).hexdigest():
+                    raise ValueError('episode_input_body_changed')
+        else:workspace=EpisodeWorkspace(news)
+        token=_current.set(workspace);success=False
         try:
             result=await func(*args,**kwargs)
             revision=getattr(workspace,'watchlist_signature',None)

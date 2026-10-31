@@ -37,6 +37,7 @@ def failure_reason(error):
 def capabilities():
     from ..config import settings
     import importlib.util
+    from .generic_extraction import runtime_status
     return dict(search_provider='tavily',enabled=settings.research_web_search_enabled,
         configured=bool(settings.research_web_search_api_key and settings.research_web_search_api_key.get_secret_value().strip()),
         max_search_http_requests=settings.research_web_search_max_requests,
@@ -44,8 +45,24 @@ def capabilities():
         public_discussion_tool='collect_discussions',discussion_providers=['guba','jisilu','taoguba','tradingview'],
         discussion_status='local_public_samples_verified_server_network_not_verified',
         generic_extractor_installed=importlib.util.find_spec('trafilatura') is not None,
+        generic_extractor_runtime=runtime_status(),
         public_body_strategy='same_url_cache_then_reviewed_adapter_then_optional_generic_extractor',
         limitation='配置状态不是联网验收；搜索目录不是正文，聊天工具不能自动供服务器调用。')
+
+
+def search_availability():
+    """Local route preflight before buying a collection-model decision."""
+    from ..config import settings
+    if not settings.research_web_search_enabled:
+        return dict(available=False,reason='search_disabled')
+    key=settings.research_web_search_api_key
+    if not key or not key.get_secret_value().strip():
+        return dict(available=False,reason='search_account_not_configured')
+    pause_key='research-web-search:tavily:v1:'+hashlib.sha256(key.get_secret_value().encode()).hexdigest()[:12]
+    try:ensure_active(ResearchHub().root,pause_key)
+    except RetiredSourceError:
+        return dict(available=False,reason='search_route_paused_no_auto_retest')
+    return dict(available=True,reason=None)
 
 
 def search(workspace,query,hours=72,deadline=None,topic='news',purpose='discovery'):
@@ -217,6 +234,28 @@ def parse_visible_article(html,url,now=None,hours=72):
         node=soup.select_one('.date-source .date')
         match=re.search(r'(\d{4})年(\d{2})月(\d{2})日\s*(\d{2}:\d{2})',node.get_text(' ',strip=True) if node else '')
         if match:template_date='-'.join(match.groups()[:3])+'T'+match.group(4)+'+08:00'
+    elif host in {'www.chinanews.com','www.chinanews.com.cn'}:
+        # Explicit visible publication field from a saved live article. Do not
+        # use head comments, URL dates or related-story timestamps. The field
+        # lacks a timezone: keep it naive so the common parser retains only
+        # day precision instead of inventing Beijing publication seconds.
+        article=soup.select_one('.left_zw')
+        node=soup.select_one('#pubtime_baidu')
+        raw_publication=node.get_text(' ',strip=True) if node else ''
+        if re.fullmatch(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',raw_publication):
+            template_date=raw_publication.replace(' ','T')
+    elif host=='wap.boc.cn' and re.fullmatch(r'/bif/bi7/\d{6}/t\d{8}_\d+\.html',parts.path):
+        # Bank-authored market commentary. Keep attribution/disclaimer and
+        # the explicit original time, without inventing a missing timezone.
+        container=soup.select_one('article.content_page')
+        article=container.select_one('#BOC_CONTENT_SECTION') if container else None
+        heading=container.select_one('h2.title') if container else None
+        node=container.select_one('h3.time') if container else None
+        raw_publication=node.get_text(' ',strip=True) if node else ''
+        if article is None or heading is None:raise ValueError('web_source_article_structure_missing')
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',raw_publication):
+            raise ValueError('web_source_time_missing')
+        template_date=raw_publication.replace(' ','T')
     elif host=='www.bea.gov' and urlsplit(url).path.startswith('/news/'):
         headings=soup.select('h1');heading=headings[-1] if headings else None
         article=soup.select_one('.field--name-body')
