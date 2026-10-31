@@ -41,12 +41,13 @@ def capabilities():
         limitation='配置状态不是联网验收；搜索目录不是正文，聊天工具不能自动供服务器调用。')
 
 
-def search(workspace,query,hours=72,deadline=None):
+def search(workspace,query,hours=72,deadline=None,topic='news'):
     from ..config import settings
+    if topic not in {'news','general'}:raise ValueError('search_topic_invalid')
     if not settings.research_web_search_enabled:return dict(status='disabled',scope='general_web',results=[])
     if not settings.research_web_search_api_key or not settings.research_web_search_api_key.get_secret_value().strip():return dict(status='unavailable',reason='search_account_not_configured',scope='general_web',results=[])
     cache=getattr(workspace,'web_search_cache',{})
-    key=(query,hours)
+    key=(query,hours,topic)
     if key in cache:return dict(cache[key],reused_within_episode=True)
     attempts=getattr(workspace,'web_search_attempts',0)
     if attempts>=settings.research_web_search_max_requests:return dict(status='budget_exhausted',scope='general_web',results=[])
@@ -58,7 +59,7 @@ def search(workspace,query,hours=72,deadline=None):
     try:
         response=requests.post('https://api.tavily.com/search',
             headers={'Authorization':'Bearer '+settings.research_web_search_api_key.get_secret_value()},
-            json=dict(query=query,topic='news',search_depth='basic',max_results=10,
+            json=dict(query=query,topic=topic,search_depth='basic',max_results=10,
                       time_range='day' if hours<=24 else 'week',include_published_date=True,
                       include_answer=False,include_raw_content=False,auto_parameters=False),
             timeout=min(10,max(.1,deadline-time.monotonic())) if deadline else 10,allow_redirects=False)
@@ -75,7 +76,7 @@ def search(workspace,query,hours=72,deadline=None):
             results.append(dict(title=str(row.get('title') or '')[:300],url=url,
                 snippet=str(row.get('content') or '')[:300],published_hint=row.get('published_date'),
                 reading_status='search_snippet_not_body'))
-        result=dict(status='ok',scope='general_web_search_results_not_exhaustive',query=query,
+        result=dict(status='ok',scope='general_web_search_results_not_exhaustive',query=query,topic=topic,
             requested_hours=hours,window='engine_day_or_week_hint_not_verified_article_window',
             results=results,http_attempts=workspace.web_search_attempts,
             limitation='搜索引擎可能漏收、排序失真或返回旧转载；须读取正文核对时间，未入证据池。')

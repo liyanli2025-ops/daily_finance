@@ -16,6 +16,17 @@ def page(date='2026-10-30T18:00:00+08:00',extra=''):
     return '<html><head><meta property="article:published_time" content="'+date+'"></head><body><h1>行业订单与库存变化</h1>'+extra+'<article>'+('记者核对了公司订单与库存数据，所涉期间需要分开理解。'*20)+'</article></body></html>'
 
 class WebResearchTests(unittest.TestCase):
+    def test_explicit_general_search_is_distinct_cached_mode_without_upgrade(self):
+        response=Mock(status_code=200);response.json.return_value=dict(results=[])
+        with patch('app.services.web_research.requests.post',return_value=response) as post:
+            search(self.workspace,'公司原披露',topic='general')
+            self.assertEqual(post.call_args.kwargs['json']['topic'],'general')
+            self.assertEqual(post.call_args.kwargs['json']['search_depth'],'basic')
+            search(self.workspace,'公司原披露',topic='news')
+            self.assertEqual(post.call_count,2)
+            cached=search(self.workspace,'公司原披露',topic='general')
+        self.assertTrue(cached['reused_within_episode'])
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.workspace=EpisodeWorkspace([],self.tmp.name,NOW)
