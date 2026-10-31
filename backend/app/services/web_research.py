@@ -27,6 +27,8 @@ def failure_reason(error):
         'web_source_access_restricted','web_source_time_outside_window','web_source_time_missing',
         'web_source_timezone_missing','web_source_redirect_without_location','web_source_redirect_limit',
         'web_source_not_admitted','search_response_not_ok','search_result_shape'}:return code
+    if code in {'web_source_non_html','web_source_response_too_large','web_source_article_structure_missing',
+                'web_source_article_text_too_short','web_source_alias_identity_unverified'}:return code
     return type(error).__name__
 
 
@@ -115,12 +117,12 @@ def fetch_html_once(url,deadline=None):
             timeout=urllib3.Timeout(total=min(8,remaining)),redirect=False,retries=False,preload_content=False)
         if response.status in {301,302,303,307,308}:return response.status,dict(response.headers),b''
         if response.status!=200:raise ValueError('public_http_'+str(response.status))
-        if 'html' not in response.headers.get('Content-Type','').lower():raise ValueError('web_source_body_unavailable')
+        if 'html' not in response.headers.get('Content-Type','').lower():raise ValueError('web_source_non_html')
         chunks=[];size=0
         for chunk in response.stream(65536,decode_content=True):
             if deadline is not None and time.monotonic()>=deadline:raise TimeoutError('public_read_budget_exhausted')
             size+=len(chunk)
-            if size>2*1024*1024:raise ValueError('web_source_body_unavailable')
+            if size>2*1024*1024:raise ValueError('web_source_response_too_large')
             chunks.append(chunk)
         return response.status,dict(response.headers),b''.join(chunks)
     finally:
@@ -154,10 +156,21 @@ def parse_visible_article(html,url,now=None,hours=72):
     # Reuse reviewed publisher adapters when the discovered URL matches one.
     # An adapter admission error is NOT bypassed by a weaker generic parser.
     from . import public_news_sources,overseas_sources
+    provider_url=url;alias_note=''
+    # Reuse the reviewed NBD parser only when this alias page itself declares
+    # the identical article path on nbd.com.cn. No request to the canonical URL.
+    # The actual acquisition host remains visible; canonical is not proof of ownership.
+    if parts.hostname=='www.mrjjxw.com' and re.fullmatch(r'/articles/\d{4}-\d{2}-\d{2}/\d+\.html',parts.path):
+        links=soup.select('link[rel="canonical"]')
+        values={node.get('href') for node in links}
+        expected='https://www.nbd.com.cn'+parts.path
+        if values!={expected}:raise ValueError('web_source_alias_identity_unverified')
+        provider_url=expected
+        alias_note='；实际取得于www.mrjjxw.com，页面声明canonical至每日经济新闻；域名归属未独立核实'
     for module in (public_news_sources,overseas_sources):
         for provider in module.SOURCES:
-            if not module.permitted(provider,url):continue
-            row=module.parse_article(provider,str(soup),url)
+            if not module.permitted(provider,provider_url):continue
+            row=module.parse_article(provider,str(soup),provider_url)
             stamp=datetime.fromisoformat(row.get('publication_start') or row['published'])
             end=datetime.fromisoformat(row.get('publication_end') or row['published'])
             if stamp>now or end<now-timedelta(hours=hours):raise ValueError('web_source_time_outside_window')
@@ -165,12 +178,17 @@ def parse_visible_article(html,url,now=None,hours=72):
             original=row.get('original_time') or (row['published'][:10] if precision=='day' else row['published'])
             from ..models.news import News
             return News(id='web-'+hashlib.sha256((url+'\n'+row['body']).encode()).hexdigest()[:24],
-                title=row['title'],content=row['body'],source=row['source'],source_url=url,published_at=stamp,
+                title=row['title'],content=row['body'],source=row['source']+('（别名页声明，见来源说明）' if alias_note else ''),source_url=url,published_at=stamp,
                 market_impact='原始来源时点：'+original+'；精度：'+precision+'；'+row.get('reading','公开页面正文，非独立核验')+
-                '；转载来源：'+row.get('upstream','未单列'))
+                '；转载来源：'+row.get('upstream','未单列')+alias_note)
     host=urlsplit(url).hostname
     # Verified DOM variants from saved public pages, not a whole-page text fallback.
     template_date=None;heading=soup.find('h1');article=soup.select_one('article,[itemprop="articleBody"]')
+    if host=='finance.eastmoney.com' and re.fullmatch(r'/a/\d+\.html',parts.path):
+        heading=soup.select_one('h1,div.title');article=soup.select_one('#ContentBody')
+        node=soup.select_one('.infos')
+        match=re.search(r'(\d{4})年(\d{2})月(\d{2})日\s*(\d{2}:\d{2}(?::\d{2})?)',node.get_text(' ',strip=True) if node else '')
+        if match:template_date='-'.join(match.groups()[:3])+'T'+match.group(4)+'+08:00'
     if article is not None and article.find('h1') is not None:heading=article.find('h1')
     if (host=='www.intc.com' and re.fullmatch(r'/news-events/press-releases/detail/\d+/[^/]+',urlsplit(url).path)
             and article is not None):
@@ -194,11 +212,11 @@ def parse_visible_article(html,url,now=None,hours=72):
         if match:
             stamp=datetime.strptime(match.group(4)+' '+match.group(1)+' '+('AM' if match.group(2)=='a.m.' else 'PM'),'%B %d, %Y %I:%M %p')
             template_date=stamp.replace(tzinfo=timezone(timedelta(hours=-4 if match.group(3)=='EDT' else -5))).isoformat(timespec='minutes')
-    if heading is None or article is None:raise ValueError('web_source_body_unavailable')
+    if heading is None or article is None:raise ValueError('web_source_article_structure_missing')
     title=heading.get_text(' ',strip=True)
     for node in article.select('script,style,nav,aside,footer,form'):node.decompose()
     content=article.get_text('\n',strip=True)
-    if not 6<=len(title)<=300 or len(content)<160:raise ValueError('web_source_body_unavailable')
+    if not 6<=len(title)<=300 or len(content)<160:raise ValueError('web_source_article_text_too_short')
     dates=[template_date] if template_date else []
     for node in soup.select('meta[property="article:published_time"],meta[itemprop="datePublished"]')+article.select('time[itemprop="datePublished"][datetime]'):
         dates.append(node.get('content') or node.get('datetime'))
@@ -234,6 +252,49 @@ def parse_visible_article(html,url,now=None,hours=72):
         market_impact='原始来源时点：'+raw+'；精度：'+('day' if date_only else 'minute' if re.search(r'T\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$',raw) else 'second')+'；公开可见正文，不宣称完整稿或独立核验')
 
 
+def archived_public_body(url,now,hours=72,root=None):
+    """Exact-URL, recent observed full bodies; read-only, no archive creation."""
+    from pathlib import Path
+    import sqlite3
+    from .news_archive import ROOT
+    from .event_observations import canonical
+    from .news_quality import reading_scope,excluded_reason
+    from .news_selection import within_window
+    from ..models.news import News
+    path=(Path(root) if root is not None else ROOT)/'news-history.db'
+    if not path.is_file():return None
+    try:
+        connection=sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True,timeout=2)
+        try:
+            rows=connection.execute('SELECT payload,last_seen FROM documents WHERE url=? AND last_seen BETWEEN ? AND ? ORDER BY last_seen DESC,published DESC',
+                (canonical(url),(now-timedelta(hours=24)).isoformat(),now.isoformat())).fetchall()
+        finally:connection.close()
+    except sqlite3.Error:return None
+    for payload,observed in rows:
+        try:
+            item=News.model_validate_json(payload)
+            if (canonical(item.source_url)!=canonical(url) or len(item.content.strip())<100
+                or reading_scope(item) not in {'full_text','visible_body'} or excluded_reason(item)
+                or not within_window(item,now,hours)):continue
+            return item,observed
+        except (ValueError,TypeError):continue
+    return None
+
+
+def capture_public_response(workspace,url,status,headers,raw):
+    """Private bytes for offline parser repair; never refetch a failed URL."""
+    from .research_hub import save_json
+    folder=workspace.path/'public-responses';folder.mkdir(exist_ok=True,mode=0o700)
+    key=hashlib.sha256(url.encode()).hexdigest()[:24]
+    target=folder/(key+'.body');target.write_bytes(raw);target.chmod(0o600)
+    meta=dict(url=url,http_status=status,content_type=headers.get('Content-Type') or headers.get('content-type'),
+        observed_at=china_now().isoformat(),snapshot_cutoff=workspace.now.isoformat(),bytes=len(raw),
+        body_sha256=hashlib.sha256(raw).hexdigest(),file=target.name,
+        limitation='原始响应，不代表正文、发布时间或事实已核实；仅随工作区保留，不保存请求头/凭据。')
+    save_json(folder/(key+'.json'),meta)
+    return 'public-responses/'+key+'.json'
+
+
 def read_public(workspace,url,hours=72,deadline=None,characters=6000):
     from .event_observations import canonical
     url=canonical(url) or url
@@ -256,6 +317,14 @@ def read_public(workspace,url,hours=72,deadline=None,characters=6000):
             reused_within_episode=True,reused_from='episode_body_pool',http_requests_performed=0,
             remote_version_checked=False,reading_status='stored_text_not_new_remote_verification',
             limitation='复用本期已存文字，不证明远端未更新或已读完整原文；新版本/修订须另核，不以同链接认定事件无增量。')
+    stored=archived_public_body(url,workspace.now,hours)
+    if stored:
+        item,observed=stored;workspace.add([item])
+        if item.id in workspace.documents:
+            return dict(status='ok',url=url,material=workspace.read(item.id,characters=characters),
+                reused_from='recent_same_url_archive',cache_observed_at=observed,http_requests_performed=0,
+                remote_version_checked=False,reading_status='stored_text_not_new_remote_verification',
+                limitation='复用过去24小时观察到、截止时点前同链接且发布窗口内的已存正文；不是新抓取，不证明远端未修订。')
     root=ResearchHub().root;key='research-public-url:'+str(url).split('#',1)[0]
     try:
         if url in PAUSED_PUBLIC_ARTICLES:raise RetiredSourceError('public_article_paused')
@@ -264,6 +333,7 @@ def read_public(workspace,url,hours=72,deadline=None,characters=6000):
     cached=getattr(workspace,'web_article_cache',{})
     if url in cached:
         return dict(cached[url],material=workspace.read(cached[url]['material']['id'],characters=characters),reused_within_episode=True)
+    capture=None
     try:
         current=url
         for _ in range(3):
@@ -276,10 +346,12 @@ def read_public(workspace,url,hours=72,deadline=None,characters=6000):
                 location=headers.get('Location') or headers.get('location')
                 if not location:raise ValueError('web_source_redirect_without_location')
                 current=urljoin(current,location);continue
+            try:capture=capture_public_response(workspace,current,status,headers,raw)
+            except OSError:capture=None  # Diagnostic disk failure is not publisher failure.
             item=parse_visible_article(raw,current,now=workspace.now,hours=hours)
             workspace.add([item])
             if item.id not in workspace.documents:raise ValueError('web_source_not_admitted')
-            result=dict(status='ok',url=current,observed_at=china_now().isoformat(),reading_status='visible_article_body_not_certified_full_text',
+            result=dict(status='ok',url=current,observed_at=china_now().isoformat(),response_capture=capture,reading_status='visible_article_body_not_certified_full_text',
                         material=workspace.read(item.id,characters=characters))
             cached[url]=result;workspace.web_article_cache=cached
             return result
@@ -288,5 +360,5 @@ def read_public(workspace,url,hours=72,deadline=None,characters=6000):
         # Also pause an alias that redirects to an already retired target.
         record_failure(root,key,ValueError('web_research_failed_no_auto_retest'),detail_code=failure_reason(error))
         return dict(status='failed',url=url,error=type(error).__name__,retries=0,
-                    reason=failure_reason(error),
+                    reason=failure_reason(error),response_capture=capture,
                     limitation='未入正文证据，不把HTTP错误、目录或摘要当全文；失败路径暂停自动重试。')

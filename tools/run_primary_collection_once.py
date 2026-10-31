@@ -158,6 +158,7 @@ async def execute(backend,input_sha,*,model_factory=IsolatedModel):
     research=state.get('research',{})
     summary={k:state[k] for k in ('status','model_http_attempts','error_type','pause_preserved') if k in state}
     summary.update(search_http_attempts=getattr(locals().get('workspace'),'web_search_attempts',0),
+        phase=research.get('phase'),error_code=research.get('error_code'),
         body_url_calls=research.get('body_url_calls',0),provided_body_documents=len(research.get('provided_ids',[])),
         coverage_gaps=research.get('coverage_gaps'),watchlist_gaps=research.get('watchlist_gaps'),
         dossier=research.get('dossier'),result_file=str(result_file),tts_requests=0,

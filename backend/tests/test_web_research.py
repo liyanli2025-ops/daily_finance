@@ -156,7 +156,7 @@ class WebResearchTests(unittest.TestCase):
     def test_failed_body_is_not_retried_or_admitted(self):
         with patch('app.services.web_research.fetch_html_once',return_value=(200,{},b'<h1>Not an article</h1>')) as fetch:
             result=read_public(self.workspace,URL)
-            self.assertEqual(result['status'],'failed');self.assertEqual(result['reason'],'web_source_body_unavailable')
+            self.assertEqual(result['status'],'failed');self.assertEqual(result['reason'],'web_source_article_structure_missing')
             self.assertEqual(read_public(self.workspace,URL)['status'],'unavailable')
         self.assertEqual(fetch.call_count,1);self.assertFalse(self.workspace.documents)
 

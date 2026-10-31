@@ -103,6 +103,15 @@ def landing_page(url):
     return not path or '/all-indexes/' in path or path in {'/news','/markets','/finance','/stock','/business'}
 
 
+def unsupported_page(url):
+    parts=urlsplit(url);host=(parts.hostname or '').lower()
+    if parts.path.lower().endswith(('.pdf','.doc','.docx','.xls','.xlsx')):
+        return 'document_requires_document_reader_not_html'
+    if host in {'instagram.com','www.instagram.com','facebook.com','www.facebook.com','tiktok.com','www.tiktok.com'}:
+        return 'social_page_requires_platform_reader'
+    return None
+
+
 def context(state):
     """Send each candidate/body range once, retaining full returned text.
 
@@ -131,8 +140,9 @@ def context(state):
 def validate_finish(data,provided,stocks,candidates):
     def evidence(row,required=False):
         ids=row.get('evidence_ids')
-        if (not isinstance(ids,list) or any(not isinstance(x,str) or x not in provided for x in ids)
-            or required and not ids):raise ValueError('discovery_unprovided_evidence')
+        if not isinstance(ids,list):raise ValueError('discovery_evidence_list_missing')
+        if any(not isinstance(x,str) or x not in provided for x in ids):raise ValueError('discovery_unprovided_evidence')
+        if required and not ids:raise ValueError('discovery_body_claim_without_evidence')
     def coverage(rows,keys,key):
         if not isinstance(rows,list) or len(rows)!=len(keys) or {r.get(key) for r in rows if isinstance(r,dict)}!=set(keys):
             raise ValueError('discovery_coverage_missing')
@@ -197,8 +207,9 @@ async def discover(workspace,stocks,*,limits=None,model=None,search=None,read=No
             raw=await asyncio.wait_for(model('analysis',[{'role':'user','content':request}],limits.output_tokens),
                                        max(.01,deadline-time.monotonic()))
             state['decisions'].append(raw);save()
-            data=decode(raw)
+            state['phase']='decode_model_response';save();data=decode(raw)
             if data['action']=='finish':
+                state['phase']='validate_finish';state['proposed_dossier']=data;save()
                 validate_finish(data,provided,stocks,candidates)
                 gaps=[r['lane'] for r in data['coverage'] if r['status'] in {'missing','searched'}]
                 stock_gaps=[r['key'] for r in data['watchlist_checks'] if r['status'] in {'missing','searched'}]
@@ -208,6 +219,9 @@ async def discover(workspace,stocks,*,limits=None,model=None,search=None,read=No
                 save();return state
             requests=data.get('requests')
             if not isinstance(requests,list) or not 1<=len(requests)<=6:raise ValueError('discovery_tools_invalid')
+            if turn==limits.model_calls-1:
+                state.update(status='model_budget_exhausted',unexecuted_requests=requests)
+                save();return state
             # Validate the whole packet before any tools can spend money.
             for r in requests:
                 if not isinstance(r,dict):raise ValueError('discovery_tool_invalid')
@@ -253,7 +267,8 @@ async def discover(workspace,stocks,*,limits=None,model=None,search=None,read=No
                 else:
                     item=candidates[r['candidate_id']];url=item['url']
                     company=keys.get(r.get('scope'));hay=item.get('title','')+' '+item.get('snippet','')
-                    if r['relation']=='direct' and not any(s in hay for s in (company['name'],company['code'])):
+                    if unsupported_page(url):result=dict(status='unsupported',reason=unsupported_page(url))
+                    elif r['relation']=='direct' and not any(s in hay for s in (company['name'],company['code'])):
                         result=dict(status='rejected',reason='direct_company_not_in_candidate')
                     elif landing_page(url):result=dict(status='rejected',reason='article_landing_page_not_body')
                     elif url in read_results:result=dict(read_results[url],reused=True)
@@ -269,10 +284,19 @@ async def discover(workspace,stocks,*,limits=None,model=None,search=None,read=No
                             result=dict(status='rejected',reason='direct_company_not_in_body')
                         else:provided.add(identifier)
                 receipt=dict(request=r,result=result);state['receipts'].append(receipt);save()
+            # Three unsuccessful URL reads with no usable body indicate a
+            # broken/unverified reading path. Do not buy further model rounds
+            # merely to narrate missing evidence or retry more blind sources.
+            if state['body_url_calls']>=3 and not provided:
+                state.update(status='reading_pipeline_unverified',phase='body_preflight_required')
+                save();return state
         if state['status']=='running':state['status']='model_budget_exhausted'
         save();return state
     except Exception as error:
-        state.update(status='failed_no_retry',error_type=type(error).__name__);save()
+        import re
+        state.update(status='failed_no_retry',error_type=type(error).__name__)
+        if re.fullmatch(r'discovery_[a-z_]+(?::[a-z_]+)?',str(error)):state['error_code']=str(error)
+        save()
         raise
 
 
