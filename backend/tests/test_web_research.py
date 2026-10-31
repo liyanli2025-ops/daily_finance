@@ -135,10 +135,15 @@ class WebResearchTests(unittest.TestCase):
         self.assertEqual(parse_visible_article(page('2026-10-31'),URL,NOW).market_impact.count('精度：day'),1)
         self.assertIn('日精度',publication_label(parse_visible_article(page('2026-10-31'),URL,NOW)))
 
-    def test_missing_body_time_zone_future_and_paywall_fail_closed(self):
-        for html in [page().replace('<article>','<div>').replace('</article>','</div>'),page('2026-10-30T18:00:00'),
+    def test_missing_body_future_and_paywall_fail_closed(self):
+        for html in ['<h1>只有标题没有正文内容</h1>',
                      page('2026-11-01T18:00:00+08:00'),page(extra='<script type="application/ld+json">{"isAccessibleForFree":false}</script>')]:
             with self.assertRaises(ValueError):parse_visible_article(html,URL,NOW)
+
+    def test_missing_timezone_preserves_explicit_source_day_without_inventing_clock(self):
+        item=parse_visible_article(page('2026-10-30T18:00:00'),URL,NOW)
+        self.assertIn('仅按日期',publication_label(item));self.assertIn('日精度',publication_label(item))
+        self.assertNotEqual(item.published_at,datetime(2026,10,30,18))
 
     def test_sina_article_body_excludes_recommendations_and_preserves_minute(self):
         body='记者核对了股指收盘、业绩披露和市场反应；因果仍需要核对。'*15
@@ -168,9 +173,10 @@ class WebResearchTests(unittest.TestCase):
         self.assertFalse(self.workspace.confirmed)
 
     def test_failed_body_is_not_retried_or_admitted(self):
-        with patch('app.services.web_research.fetch_html_once',return_value=(200,{},b'<h1>Not an article</h1>')) as fetch:
+        with patch('app.services.web_research.fetch_html_once',return_value=(200,{},b'<h1>Not an article</h1>')) as fetch,patch(
+                'app.services.generic_extraction.extract_main_text',return_value={'status':'unavailable'}):
             result=read_public(self.workspace,URL)
-            self.assertEqual(result['status'],'failed');self.assertEqual(result['reason'],'web_source_article_structure_missing')
+            self.assertEqual(result['status'],'failed');self.assertEqual(result['reason'],'web_source_generic_extractor_unavailable')
             self.assertEqual(read_public(self.workspace,URL)['status'],'unavailable')
         self.assertEqual(fetch.call_count,1);self.assertFalse(self.workspace.documents)
 

@@ -28,18 +28,23 @@ def failure_reason(error):
         'web_source_timezone_missing','web_source_redirect_without_location','web_source_redirect_limit',
         'web_source_not_admitted','search_response_not_ok','search_result_shape'}:return code
     if code in {'web_source_non_html','web_source_response_too_large','web_source_article_structure_missing',
-                'web_source_article_text_too_short','web_source_alias_identity_unverified'}:return code
+                'web_source_article_text_too_short','web_source_alias_identity_unverified','web_source_time_invalid',
+                'web_source_day_window_boundary_requires_review','web_source_specialized_reader_required',
+                'web_source_generic_extractor_unavailable'}:return code
     return type(error).__name__
 
 
 def capabilities():
     from ..config import settings
+    import importlib.util
     return dict(search_provider='tavily',enabled=settings.research_web_search_enabled,
         configured=bool(settings.research_web_search_api_key and settings.research_web_search_api_key.get_secret_value().strip()),
         max_search_http_requests=settings.research_web_search_max_requests,
         fixed_media_search_scope=['wallstreetcn','stcn'],
         public_discussion_tool='collect_discussions',discussion_providers=['guba','jisilu','taoguba','tradingview'],
         discussion_status='local_public_samples_verified_server_network_not_verified',
+        generic_extractor_installed=importlib.util.find_spec('trafilatura') is not None,
+        public_body_strategy='same_url_cache_then_reviewed_adapter_then_optional_generic_extractor',
         limitation='配置状态不是联网验收；搜索目录不是正文，聊天工具不能自动供服务器调用。')
 
 
@@ -187,8 +192,12 @@ def parse_visible_article(html,url,now=None,hours=72):
                 market_impact='原始来源时点：'+original+'；精度：'+precision+'；'+row.get('reading','公开页面正文，非独立核验')+
                 '；转载来源：'+row.get('upstream','未单列')+alias_note)
     host=urlsplit(url).hostname
+    from .generic_extraction import reader_kind
+    if reader_kind(url)!='article_candidate':raise ValueError('web_source_specialized_reader_required')
     # Verified DOM variants from saved public pages, not a whole-page text fallback.
-    template_date=None;heading=soup.find('h1');article=soup.select_one('article,[itemprop="articleBody"]')
+    template_date=None
+    heading=next((node for node in soup.select('h1') if 6<=len(node.get_text(' ',strip=True))<=300),None)
+    article=soup.select_one('article,[itemprop="articleBody"]')
     if host=='finance.eastmoney.com' and re.fullmatch(r'/a/\d+\.html',parts.path):
         heading=soup.select_one('h1,div.title');article=soup.select_one('#ContentBody')
         node=soup.select_one('.infos')
@@ -217,13 +226,28 @@ def parse_visible_article(html,url,now=None,hours=72):
         if match:
             stamp=datetime.strptime(match.group(4)+' '+match.group(1)+' '+('AM' if match.group(2)=='a.m.' else 'PM'),'%B %d, %Y %I:%M %p')
             template_date=stamp.replace(tzinfo=timezone(timedelta(hours=-4 if match.group(3)=='EDT' else -5))).isoformat(timespec='minutes')
-    if heading is None or article is None:raise ValueError('web_source_article_structure_missing')
-    title=heading.get_text(' ',strip=True)
-    for node in article.select('script,style,nav,aside,footer,form'):node.decompose()
-    content=article.get_text('\n',strip=True)
-    if not 6<=len(title)<=300 or len(content)<160:raise ValueError('web_source_article_text_too_short')
+    title=heading.get_text(' ',strip=True) if heading is not None else ''
+    if not title:
+        node=soup.select_one('meta[property="og:title"],meta[name="ArticleTitle"]')
+        title=node.get('content','').strip() if node else ''
+    extraction_note=''
+    if article is None:
+        from .generic_extraction import extract_main_text
+        candidate=extract_main_text(html,url)
+        if candidate.get('status')=='unavailable':raise ValueError('web_source_generic_extractor_unavailable')
+        if candidate.get('status')!='text_candidate':raise ValueError('web_source_article_structure_missing')
+        content=candidate['text']
+        extraction_note='；正文算法：'+candidate['method']+' '+candidate['version']+'；未确认完整稿；'+','.join(candidate['warnings'])
+    else:
+        for node in article.select('script,style,nav,aside,footer,form'):node.decompose()
+        content=article.get_text('\n',strip=True)
+    # A short, actually retrieved news item is not a missing article. Keep it
+    # explicitly as short text instead of padding it with navigation/footer.
+    content='\n'.join(line for line in content.splitlines() if not re.fullmatch(r'\s*(?:海量资讯.{0,60}新浪财经APP|责任编辑\s*[:：].{0,20})\s*',line)).strip()
+    if not 6<=len(title)<=300 or len(content)<80:raise ValueError('web_source_article_text_too_short')
+    short_text=len(content)<160
     dates=[template_date] if template_date else []
-    for node in soup.select('meta[property="article:published_time"],meta[itemprop="datePublished"]')+article.select('time[itemprop="datePublished"][datetime]'):
+    for node in soup.select('meta[property="article:published_time"],meta[itemprop="datePublished"],meta[name="PubDate"],meta[name="pubdate"],meta[name="datePublished"]')+(article.select('time[itemprop="datePublished"][datetime]') if article else []):
         dates.append(node.get('content') or node.get('datetime'))
     # Only explicit article metadata, never URL dates or search snippets.
     for node in BeautifulSoup(html,'html.parser').select('script[type="application/ld+json"]'):
@@ -240,21 +264,27 @@ def parse_visible_article(html,url,now=None,hours=72):
                     dates.insert(0,entry.get('datePublished'))
     raw=next((str(value) for value in dates if value),None)
     if not raw:raise ValueError('web_source_time_missing')
-    date_only=bool(re.fullmatch(r'\d{4}-\d{2}-\d{2}',raw))
-    if date_only:
-        day=datetime.fromisoformat(raw)
+    normalized=raw.replace('/','-')
+    date_only=bool(re.fullmatch(r'\d{4}-\d{2}-\d{2}Z?',normalized))
+    try:value=datetime.fromisoformat(normalized.rstrip('Z') if date_only else normalized.replace('Z','+00:00'))
+    except ValueError:raise ValueError('web_source_time_invalid') from None
+    timezone_unknown=not date_only and value.tzinfo is None
+    if date_only or timezone_unknown:
+        # An explicitly labelled publication date is usable at day precision;
+        # a missing timezone never becomes an invented local publication clock.
+        day=datetime.combine(value.date(),datetime.min.time())
         stamp=day.replace(tzinfo=timezone(timedelta(hours=14))).astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None)
         end=min(now,(day+timedelta(days=1)).replace(tzinfo=timezone(timedelta(hours=-12))).astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None))
+        if stamp<now-timedelta(hours=hours)<=end:raise ValueError('web_source_day_window_boundary_requires_review')
+        date_only=True
     else:
-        value=datetime.fromisoformat(raw.replace('Z','+00:00'))
-        if value.tzinfo is None:raise ValueError('web_source_timezone_missing')
         stamp=value.astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None);end=stamp
     if stamp>now or end<now-timedelta(hours=hours):raise ValueError('web_source_time_outside_window')
     from ..models.news import News
     return News(id='web-'+hashlib.sha256((url+'\n'+content).encode()).hexdigest()[:24],
-        title=title,content=content,source='公开网页可见正文-'+urlsplit(url).hostname,
+        title=title,content=content,source=('公开网页快讯正文-' if short_text else '公开网页可见正文-')+urlsplit(url).hostname,
         source_url=url,published_at=stamp,category='公开网页，作者及原始来源仍需核对',
-        market_impact='原始来源时点：'+raw+'；精度：'+('day' if date_only else 'minute' if re.search(r'T\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$',raw) else 'second')+'；公开可见正文，不宣称完整稿或独立核验')
+        market_impact='原始来源时点：'+raw+('（来源未标时区，仅按日期，不用于盘前盘后或消息先后判断）' if timezone_unknown else '')+'；精度：'+('day' if date_only else 'minute' if re.search(r'T\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$',raw) else 'second')+'；'+('短讯文字，未取得扩展报道；' if short_text else '')+'公开可见正文，不宣称完整稿或独立核验'+extraction_note)
 
 
 def archived_public_body(url,now,hours=72,root=None):
@@ -279,7 +309,7 @@ def archived_public_body(url,now,hours=72,root=None):
         try:
             item=News.model_validate_json(payload)
             if (canonical(item.source_url)!=canonical(url) or len(item.content.strip())<100
-                or reading_scope(item) not in {'full_text','visible_body'} or excluded_reason(item)
+                or not (reading_scope(item) in {'full_text','visible_body'} or item.source.startswith('公开网页快讯正文-')) or excluded_reason(item)
                 or not within_window(item,now,hours)):continue
             return item,observed
         except (ValueError,TypeError):continue
@@ -310,7 +340,7 @@ def read_public(workspace,url,hours=72,deadline=None,characters=6000):
     reusable=[item for item in workspace.documents.values()
         if canonical(item.source_url)==url and hasattr(item,'content')
         and len(item.content.strip())>=100
-        and reading_scope(item) in {'full_text','visible_body'}
+        and (reading_scope(item) in {'full_text','visible_body'} or item.source.startswith('公开网页快讯正文-'))
         and within_window(item,workspace.now,hours)]
     if reusable:
         def latest(row):

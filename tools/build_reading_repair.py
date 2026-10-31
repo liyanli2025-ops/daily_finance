@@ -5,6 +5,7 @@ from build_model_led_release import build
 
 NAMES=('backend/app/services/web_research.py','backend/app/services/primary_discovery.py',
        'backend/app/services/search_objectives.py',
+       'backend/app/services/generic_extraction.py','backend/requirements-extraction.txt',
        'tools/run_primary_collection_once.py','tools/check_saved_search_bodies.py',
        'docs/reading_pipeline_repair_20261031.md')
 

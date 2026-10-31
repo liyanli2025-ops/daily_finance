@@ -1,0 +1,4 @@
+# Optional, separately reviewed runtime. Do not alter a live environment blindly.
+# Corpus replay used an isolated --target folder, never the production venv.
+trafilatura==2.3.1
+python-dateutil>=2.8.2,<3
