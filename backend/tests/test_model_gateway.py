@@ -157,12 +157,13 @@ class AppDatabaseTests(unittest.IsolatedAsyncioTestCase):
                             source="测试夹具", source_url="https://example.com/announcement/1",
                             published_at=datetime(2026, 10, 23, 5))
                 background = Material('fixture-financial','历史财务资料','测试夹具','https://example.com/filing/1',
-                                      'financial_baseline','HK:00700','带日期的历史财务证据',None,'2026-10-23T12:00:00')
+                                      'financial_baseline','HK:00700','带日期的历史财务证据。'*15,None,'2026-10-23T12:00:00')
                 body = "## 测试事实\n仅验证数据流[N:fixture-news]，历史资料[N:fixture-financial]。\n## 自选股\n腾讯控股00700，信息不足不新增判断。"
                 metadata = {"title": "集成测试报告", "summary": "仅验证数据流", "core_opinions": [],
                             "highlights": [], "cross_border_events": [], "market_analysis": {}}
+                from tests.test_episode_research import desk_reply
                 responses = iter([
-                    body + "\n```json\n" + json.dumps(metadata, ensure_ascii=False) + "\n```",
+                    desk_reply(report=body + "\n```json\n" + json.dumps(metadata, ensure_ascii=False) + "\n```",stocks=["HK:00700"]),
                     '{"overall_quality":8,"issues":[]}',
                     reply("本段只验证既有报告到口播的代码流程，保留事实边界与限制条件，不是真实财经内容。" * 7, body),
                     review_reply(body, '本段只验证既有报告到口播的代码流程，保留事实边界与限制条件，不是真实财经内容。' * 7),
@@ -181,13 +182,16 @@ class AppDatabaseTests(unittest.IsolatedAsyncioTestCase):
                 market = SimpleNamespace(get_market_overview=AsyncMock(
                     return_value=MarketOverview(date=china_today().isoformat())))
                 original_client = httpx.AsyncClient
+                def research_prompt(hub,*args,**kwargs):
+                    hub.prompt_ranges={background.id:[[0,len(background.body)]]}
+                    return background.prompt(),[background]
                 with patch.object(settings, "database_url", url), \
                         patch("app.services.ai_analyzer.china_now", return_value=datetime(2026, 10, 23, 13)), \
                         patch.object(gateway, "settings", config), \
                         patch.object(gateway.httpx, "AsyncClient", side_effect=lambda **kw:
                                      original_client(transport=httpx.MockTransport(handler), **kw)), \
                         patch("app.services.ai_analyzer.get_market_data_service", return_value=market), \
-                        patch("app.services.research_hub.ResearchHub.prompt", return_value=(background.prompt(),[background])), \
+                        patch("app.services.research_hub.ResearchHub.prompt", new=research_prompt), \
                         patch("app.services.ai_analyzer.AIAnalyzerService._fetch_watchlist_quotes", return_value={}), \
                         patch("app.services.signal_tracker.get_signal_tracker", return_value=SimpleNamespace(
                             get_signal_summary_text=AsyncMock(return_value=""))), \

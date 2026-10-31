@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .selection_check import inspect,candidates
 from .services.ai_analyzer import AIAnalyzerService
-from .services.episode_research import INSTRUCTIONS,questions
+from .services.episode_research import initial_prompt
 from .services.event_observations import EventObservations
 from .services.prompt_reading import input_characters,compact_market
 from .services.research_hub import ResearchHub
@@ -35,7 +35,7 @@ async def check(case_path,root=None):
     draft=analyzer._build_editorial_report_prompt(today=datetime.fromisoformat(snapshot['collected_at']).date(),
         report_type=ReportType.MORNING,is_trading_day=True,watchlist_text='',market_data_text=market,
         finance_summary=finance,cross_border_summary='')
-    draft+=INSTRUCTIONS+'\n研究问题：\n'+questions(stocks)
+    draft=initial_prompt(draft,stocks)
     review=analyzer._build_review_prompt(case['content']+'\n元数据：'+json.dumps(case.get('metadata',{}),ensure_ascii=False),
         market,finance,'',ReportType.MORNING)
     sizes={task:input_characters([dict(role='user',content=content)]) for task,content in [('analysis',draft),('review',review)]}

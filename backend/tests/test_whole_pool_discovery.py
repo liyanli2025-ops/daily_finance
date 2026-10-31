@@ -90,8 +90,10 @@ class DiscoveryLoopTests(unittest.IsolatedAsyncioTestCase):
                 async def _call_ai(self,prompt,max_tokens):
                     calls.append(prompt)
                     if len(calls)==1:
-                        return json.dumps(dict(action='request_evidence',requests=[dict(tool='read_material',id=ref,characters=80)]))
-                    return '完整报告'
+                        from tests.test_episode_research import desk_reply
+                        return desk_reply(requests=[dict(tool='read_material',id=ref,characters=80)])
+                    from tests.test_episode_research import desk_reply
+                    return desk_reply(report='完整报告')
             with patch('app.services.research_hub.ResearchHub.load',return_value=[]),patch('app.services.report_diagnostics.save_generation_stage'):
                 response,transcript=await complete_with_research(Analyzer(),directory['text']+'\n已经提供的原句。',300,ws,[])
             self.assertEqual(response,'完整报告')

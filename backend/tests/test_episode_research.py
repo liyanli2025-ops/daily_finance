@@ -15,6 +15,14 @@ from app.services.material_lifecycle import prune_material_caches
 NOW=datetime(2026,10,25,12)
 
 
+def desk_reply(report=None,requests=None,stocks=()):
+    from app.services.research_desk import AREAS
+    research=dict(coverage=[dict(area=area,status='catalogue_checked',evidence_ids=[],explanation='仅检查当前资料目录，不冒充正文或全网搜索。') for area in AREAS],
+                  watchlist_checks=[dict(key=key,status='catalogue_checked',evidence_ids=[],explanation='只检查当前测试名单。') for key in stocks],questions=[dict(id='transport',title='协议传递测试背景',selected=True,priority='normal',status='background',support_ids=[],counter_ids=[],what_changed='此夹具只验证协议传递。',why_it_matters='不作真实投资判断。',mechanism='不声称因果。',alternative='未验收分析质量。',what_to_watch='人工检查数据流。')],omissions=[])
+    return json.dumps(dict(action='complete_research' if report is not None else 'request_evidence',research=research,
+                           **(dict(report=report) if report is not None else dict(requests=requests))))
+
+
 def article(identifier='new'):
     return News(id=identifier,title='封装材料供需变化',content='公开报道说明行业供需变化，须区分行业与公司。'*100,
         source='证券时报原文',source_url='https://www.stcn.com/article/detail/123.html',published_at=NOW)
@@ -80,17 +88,17 @@ class RetrievalTests(unittest.IsolatedAsyncioTestCase):
         self.workspace=EpisodeWorkspace([article()],self.tmp.name,NOW)
 
     async def test_ready_response_has_no_extra_model_call(self):
-        analyzer=SimpleNamespace(_call_ai=AsyncMock(return_value='完整报告'))
+        analyzer=SimpleNamespace(_call_ai=AsyncMock(return_value=desk_reply(report='完整报告')))
         with patch('app.services.report_diagnostics.save_generation_stage') as save:
             result,transcript=await complete_with_research(analyzer,'初始材料',100,self.workspace,[])
         self.assertEqual(result,'完整报告');self.assertEqual(transcript,[])
         self.assertEqual(analyzer._call_ai.await_count,1);save.assert_called_once()
 
     async def test_search_then_read_unselected_body_and_finish(self):
-        request=lambda rows:json.dumps(dict(action='request_evidence',requests=rows))
+        request=lambda rows:desk_reply(requests=rows)
         analyzer=SimpleNamespace(_call_ai=AsyncMock(side_effect=[
             request([dict(tool='search_materials',query='封装材料')]),
-            request([dict(tool='read_material',id='new',offset=800,characters=100)]),'最终报告[N:new]']))
+            request([dict(tool='read_material',id='new',offset=800,characters=100)]),desk_reply(report='最终报告[N:new]')]))
         with patch('app.services.report_diagnostics.save_generation_stage'),patch.object(ResearchHub,'load',return_value=[]):
             result,transcript=await complete_with_research(analyzer,'初始只给标题',100,self.workspace,[])
         self.assertEqual(len(transcript),2);self.assertIn('new',self.workspace.accessed)
@@ -98,7 +106,7 @@ class RetrievalTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result,'最终报告[N:new]')
 
     async def test_tool_round_limit_cannot_be_published_as_report(self):
-        request=json.dumps(dict(action='request_evidence',requests=[dict(tool='search_materials',query='封装')]))
+        request=desk_reply(requests=[dict(tool='search_materials',query='封装')])
         analyzer=SimpleNamespace(_call_ai=AsyncMock(return_value=request))
         with patch('app.services.report_diagnostics.save_generation_stage'),patch.object(ResearchHub,'load',return_value=[]):
             with self.assertRaisesRegex(RuntimeError,'仍请求工具'):

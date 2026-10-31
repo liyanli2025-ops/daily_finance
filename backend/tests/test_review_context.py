@@ -52,7 +52,9 @@ class GenerationCheckpointTests(unittest.IsolatedAsyncioTestCase):
         service._prepare_cross_border_summary=Mock(return_value='')
         service._selected_evidence_news=[SimpleNamespace(id='real')]
         service._cross_border_evidence_news=[]
-        service._call_ai=AsyncMock(return_value='完整回复但元数据有误')
+        from tests.test_episode_research import desk_reply
+        response=desk_reply(report='完整回复但元数据有误')
+        service._call_ai=AsyncMock(return_value=response)
         order=[]
         def parse(*args):
             order.append('parse')
@@ -68,7 +70,7 @@ class GenerationCheckpointTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(RuntimeError,'parse fixture'):
                 await service.generate_daily_report([SimpleNamespace(id='real')])
         self.assertEqual(order,['saved','parse'])
-        save.assert_called_once_with('draft_response','完整回复但元数据有误')
+        save.assert_called_once_with('draft_response',response)
 
     async def test_repaired_response_survives_bad_metadata(self):
         service=AIAnalyzerService.__new__(AIAnalyzerService)

@@ -134,7 +134,8 @@ class ResponseTests(unittest.IsolatedAsyncioTestCase):
     async def test_search_result_only_confirmed_in_following_successful_reply(self):
         with tempfile.TemporaryDirectory() as folder:
             w=EpisodeWorkspace([article()],folder,NOW)
-            request=json.dumps(dict(action='request_evidence',requests=[dict(tool='search_materials',query='封装')]))
+            from tests.test_episode_research import desk_reply
+            request=desk_reply(requests=[dict(tool='search_materials',query='封装')])
             analyzer=SimpleNamespace(_call_ai=AsyncMock(side_effect=[request,RuntimeError('failed')]))
             with patch('app.services.report_diagnostics.save_generation_stage'),patch('app.services.research_hub.ResearchHub.load',return_value=[]):
                 with self.assertRaises(RuntimeError):await complete_with_research(analyzer,'input',100,w,[])

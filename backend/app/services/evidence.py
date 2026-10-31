@@ -33,6 +33,8 @@ def publication_label(item):
     if '；精度：day；' in impact and '原始来源时点：' in impact:
         raw=impact.split('原始来源时点：',1)[1].split('；精度：',1)[0]
         return raw+'（日精度；内部日期区间起点不是实际发布时分）'
+    if '；精度：minute；' in impact and '原始来源时点：' in impact:
+        return impact.split('原始来源时点：',1)[1].split('；精度：',1)[0]+'（分钟精度）'
     return item.published_at.isoformat() if item.published_at else '来源未提供，不能推断'
 
 

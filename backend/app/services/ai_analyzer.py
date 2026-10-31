@@ -177,6 +177,7 @@ class AIAnalyzerService:
         research_hub=ResearchHub()
         research_text, self._research_evidence = research_hub.prompt(get_watchlist_service().get_all_stocks(),max_characters=8000)
         workspace=current_workspace()
+        workspace.price_context_present=bool(market_data.indices)
         workspace.add(self._research_evidence)
         for identifier,ranges in getattr(research_hub,'prompt_ranges',{}).items():
             if identifier in workspace.documents:

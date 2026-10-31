@@ -3,7 +3,7 @@
 使用 pydantic-settings 进行配置验证和类型安全
 """
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, SecretStr
 from typing import Optional, List, Literal
 from pathlib import Path
 
@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     news_initial_prompt_characters: int = Field(default=34000, ge=12000, le=80000, description='全池目录、初读正文及新闻说明的字符预算；不是token或费用上限')
     model_http_retries: int = Field(default=0, ge=0, le=1, description='默认不自动重复付费HTTP请求；显式设置1才允许一次重试')
     report_auto_repair_enabled: bool = Field(default=False, description='默认保留审查失败稿待编辑，不自动整篇付费重写')
+    research_web_search_enabled: bool = Field(default=False, description='显式启用外部通用搜索；默认不产生搜索API请求')
+    research_web_search_api_key: Optional[SecretStr] = None
+    research_web_search_max_requests: int = Field(default=4, ge=1, le=12, description='每期搜索HTTP尝试上限，含失败；不是资料或节目篇数')
 
     # 备用 AI 服务（主服务挂了自动切换，强烈推荐配置！）
     # 例如：主用 DeepSeek，备用硅基流动

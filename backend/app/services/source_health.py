@@ -57,15 +57,20 @@ def permanent_reason(error):
         'overseas_full_body_unavailable','overseas_restricted_content','overseas_source_time_missing',
         'overseas_source_timezone_missing','minute_identity_missing','minute_quote_identity_missing',
         'minute_shape_invalid','minute_sequence_invalid','minute_values_invalid','minute_response_invalid',
-        'breadth_catalog_shape_invalid','breadth_catalog_identity_invalid','breadth_response_invalid'}:return str(error)
+        'breadth_catalog_shape_invalid','breadth_catalog_identity_invalid','breadth_response_invalid',
+        'web_research_failed_no_auto_retest'}:return str(error)
     return None
 
 
-def record_failure(root,key,error):
+def record_failure(root,key,error,detail_code=None):
     reason=permanent_reason(error)
     if reason is None:return False
     from .research_hub import save_json
-    save_json(state_path(root,key),dict(status='paused',at=china_now().isoformat(),reason=reason,
+    data=dict(status='paused',at=china_now().isoformat(),reason=reason,
         automatic_retest=False,scope='exact_adapter_or_article_key',
-        resume='Only explicitly revalidate after a URL/parser/config change; no expiry probe'))
+        resume='Only explicitly revalidate after a URL/parser/config change; no expiry probe')
+    if detail_code is not None:
+        import re
+        if re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,95}',detail_code):data['detail_code']=detail_code
+    save_json(state_path(root,key),data)
     return True
