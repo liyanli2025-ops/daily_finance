@@ -1,6 +1,6 @@
 """Preview a fresh progress-driven collection; --run --input-sha spends usage.
 
-Run from a separate upload directory against the reviewed v21 backend. No service,
+Run from a separate upload directory against the reviewed v21+v22 backend. No service,
 credential, scheduler, report, TTS or App database writes. Old trial markers and
 source-failure ledgers remain authoritative and are never removed by this tool.
 """
@@ -21,7 +21,7 @@ import zipfile
 
 TRIAL = 'progress-collection-v1'
 OWNER = 'finance-progress-collection-acceptance-v1'
-# Filled from the immutable, successfully installed v21 release. LF/CRLF only
+# Filled from installed v21 plus the reviewed v22 repair. LF/CRLF only
 # is normalized; unknown source changes are not silently accepted.
 REVIEWED_RUNTIME = {
     "app/collection_review.py": "0c2a56ebac790e768f7ffd1112b96c444eb464dfe488009953cfe95589f57a8d",
@@ -39,13 +39,13 @@ REVIEWED_RUNTIME = {
     "app/services/generic_extraction.py": "1b12efef7a6c1e748caf81733f7eb235e353244806a9e264415de5cf9f3365f8",
     "app/services/model_gateway.py": "af70135e8007cf2da9d52538a18bfd2b8b0dd0ed4e6ef42453e7e9fb952efbf2",
     "app/services/model_usage.py": "12e657d6652ad3c45d511c91b64756943062b99ebee261c1ba6da1c25c9bb502",
-    "app/services/primary_discovery.py": "ac37cad3e29059fae4cdc7db29c63af82a8af227914f7eb86b0da2cfaebfdadf",
+    "app/services/primary_discovery.py": "f799e347ad686f440832f6f4a3286fa3f6a291e3714c4bb3d2a0f2f4fbe0e269",
     "app/services/primary_material_quality.py": "d0d282b2f7bf1995792a8ae0909098bb9a25631b6f7f64f65add6dc481d28ff8",
     "app/services/primary_report.py": "0463c160a2ff3e258bb5f06c5c6bd37f13b9c91a18d61ce537651da2b9ab45e0",
     "app/services/reading_acceptance.py": "4c457fa15ef27c19841711352de5c0c80407e36df835d2e1ff6a8c4d8c76b193",
     "app/services/search_objectives.py": "6cff95ba005013ddd5ba4e836e43712372cb7483c6a646e9c935509e5d91ac5f",
     "app/services/search_primary_collection.py": "e71098d1d165e1ffb64a7cd51b2f686e0b843b4936122b99dad6f0d1f10fd63a",
-    "app/services/web_research.py": "6eb50cbacb1f25722cf0ccc6baed41056f850ec70fb85eadf00aedffdab7107b"
+    "app/services/web_research.py": "d5054b15254028721a1b6891eac5906dc40d9fd68cc35c1dbb3654cd4c10fbb3"
 }
 POLICY_FIELDS = ('research_max_model_calls', 'research_total_input_characters',
                  'research_total_output_tokens', 'research_web_search_max_requests',
@@ -69,7 +69,7 @@ def source_snapshot(backend):
         path = backend / relative
         if (not path.is_file() or path.is_symlink()
                 or hashlib.sha256(path.read_bytes().replace(b'\r\n', b'\n')).hexdigest() != expected):
-            raise CheckError('源码与已审阅v21不符，停止：' + relative)
+            raise CheckError('源码与已审阅v21+v22不符，停止：' + relative)
     # Also detect drift in imported support modules between preview and run.
     files = sorted((backend / 'app').rglob('*.py'))
     if any(p.is_symlink() for p in files):
@@ -179,6 +179,7 @@ async def preview(backend):
         model_requests_performed=0, search_requests_performed=0, public_fetch_attempts=0,
         tts_requests=0, production_pause_preserved=True,
         result_file=str(result_file),
+        continuation=value['environment'].get('continuation'),
         limitation='这只是本地预览，尚未联网。运行会使用模型及Tavily账户额度；'
             '字符与预留输出不是金额上限，也不保证达到上限才结束。'
             '模型请求数由累计输出上限推导，未新增固定取材轮次。'
@@ -282,13 +283,26 @@ def write_review(workspace, state):
             completed_request_characters=sum(end-start for start, end in ranges),
             limitation='区间表示请求完整返回，不证明模型认真阅读或独立核实；图片及附件未读。'))
     state['reading_review'] = rows
+    continuation = state.get('continuation')
+    if continuation:
+        prior = continuation['prior_usage']
+        state['combined_usage'] = dict(
+            model_http_attempts=prior['model_requests']+state['model_http_attempts'],
+            model_input_characters=prior['model_input_characters']+state['model_input_characters'],
+            reserved_output_tokens=prior['reserved_output_tokens']+state['reserved_output_tokens'],
+            search_http_attempts=prior['search_http_attempts']+state['search_http_attempts'])
     save_json(workspace.path / 'acceptance-review.json', state)
     lines = ['# 自主取材验收底稿', '', '状态：' + state['status'], '',
         '这是待人工核对的私人底稿，不代表覆盖充分或可直接发布。', '',
-        '## 实际用量', '',
+        '## 本段实际用量', '',
         json.dumps({key: state[key] for key in ('model_http_attempts', 'model_input_characters',
             'reserved_output_tokens', 'search_http_attempts', 'public_fetch_attempts')}, ensure_ascii=False),
         '', '## 实际正文与入模范围', '']
+    if continuation:
+        lines[lines.index('## 实际正文与入模范围'):lines.index('## 实际正文与入模范围')] = [
+            '## 含原失败与单次搜索诊断的累计用量', '',
+            json.dumps(state['combined_usage'], ensure_ascii=False), '',
+            '预留输出不是实际输出token或金额；旧明细保留在原结果中。', '']
     for row in rows:
         lines.extend([row['title'], row['url'],
             '保存文字：' + str(row['stored_characters']) + '；有完整响应的请求包含字符：'
@@ -339,6 +353,7 @@ async def execute(backend, input_sha):
             reserved_output_tokens=0, search_http_attempts=0, public_fetch_attempts=0,
             usage=[], model_exposures=[], research={}, report_generated=False, tts_requests=0,
             content_accepted=False, automation_resumed=False)
+        state['continuation'] = value['environment'].get('continuation')
         mutex = threading.RLock()
         def save():
             with mutex:

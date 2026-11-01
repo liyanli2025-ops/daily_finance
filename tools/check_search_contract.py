@@ -146,7 +146,17 @@ def main():
         data = response.json()
         if response.status_code != 200 or not isinstance(data, dict) or not isinstance(data.get('results'), list):
             raise ValueError('Search response shape invalid')
-        state.update(status='search_http_accepted_pending_review', metadata_results=len(data['results']))
+        # Retain usable directory entries so a later reviewed stage can inspect
+        # or reuse them; a count alone cannot recover the purchased search.
+        from app.services.evidence import article_url
+        results=[]
+        for row in data['results'][:10]:
+            if not isinstance(row,dict) or not article_url(row.get('url')):continue
+            results.append(dict(title=str(row.get('title') or '')[:300],url=row['url'],
+                snippet=str(row.get('content') or '')[:300],published_hint=row.get('published_date'),
+                reading_status='search_snippet_not_body'))
+        state.update(status='search_http_accepted_pending_review', metadata_results=len(data['results']),
+                     results=results, observed_at=china_now().isoformat())
     except Exception as error:
         state.update(status='failed_no_retry', error_type=type(error).__name__,
                      http_status=getattr(response, 'status_code', None))
