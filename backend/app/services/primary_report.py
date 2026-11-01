@@ -82,6 +82,8 @@ def export_discovery(workspace, state):
         news.append(item.model_dump(mode='json'))
         provenance.append(dict(id=identifier, text_sha256=body_hash(item),
                                discovery_provided_ranges=workspace.merged_ranges(ranges),
+                               discovery_completed_request_ranges=(state['context_delivery']['body_ranges'].get(identifier, [])
+                                   if 'context_delivery' in state else None),
                                observation_times=sorted(set(observations)),
                                observation_time_unknown=not observations,
                                available_at_cutoff_verified=False,

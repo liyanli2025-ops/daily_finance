@@ -1,6 +1,6 @@
 """Preview a fresh progress-driven collection; --run --input-sha spends usage.
 
-Run from a separate upload directory against the reviewed v21+v22 backend. No service,
+Run from a separate upload directory against the reviewed v21+v22+v23 backend. No service,
 credential, scheduler, report, TTS or App database writes. Old trial markers and
 source-failure ledgers remain authoritative and are never removed by this tool.
 """
@@ -21,9 +21,10 @@ import zipfile
 
 TRIAL = 'progress-collection-v1'
 OWNER = 'finance-progress-collection-acceptance-v1'
-# Filled from installed v21 plus the reviewed v22 repair. LF/CRLF only
+# Filled from installed v21 plus the reviewed v22/v23 repairs. LF/CRLF only
 # is normalized; unknown source changes are not silently accepted.
 REVIEWED_RUNTIME = {
+    "app/services/discovery_context.py": "8ee21b0d8fa064fcdfeba0a6ee078dd0ddbfc8546d22749e40259eb9b54fb2c8",
     "app/collection_review.py": "0c2a56ebac790e768f7ffd1112b96c444eb464dfe488009953cfe95589f57a8d",
     "app/config.py": "3c7aa5a7c9e679bad52a30fa70cdc9e67986a9b89548dc36c9941cca3cfbe104",
     "app/discovery_budget_check.py": "ce53a1f496170bf78c986086843060307debb82031a40ae667781758c265f8de",
@@ -39,9 +40,9 @@ REVIEWED_RUNTIME = {
     "app/services/generic_extraction.py": "1b12efef7a6c1e748caf81733f7eb235e353244806a9e264415de5cf9f3365f8",
     "app/services/model_gateway.py": "af70135e8007cf2da9d52538a18bfd2b8b0dd0ed4e6ef42453e7e9fb952efbf2",
     "app/services/model_usage.py": "12e657d6652ad3c45d511c91b64756943062b99ebee261c1ba6da1c25c9bb502",
-    "app/services/primary_discovery.py": "f799e347ad686f440832f6f4a3286fa3f6a291e3714c4bb3d2a0f2f4fbe0e269",
+    "app/services/primary_discovery.py": "d889d8de9703f7be31eb4daa4c7c5e91a0de7a9bbdc2970aeb58545c29119f93",
     "app/services/primary_material_quality.py": "d0d282b2f7bf1995792a8ae0909098bb9a25631b6f7f64f65add6dc481d28ff8",
-    "app/services/primary_report.py": "0463c160a2ff3e258bb5f06c5c6bd37f13b9c91a18d61ce537651da2b9ab45e0",
+    "app/services/primary_report.py": "55d6c5dbbfa74fb0ed28e47253689895cffda9428ed99c7cbe2186af316b7b8c",
     "app/services/reading_acceptance.py": "4c457fa15ef27c19841711352de5c0c80407e36df835d2e1ff6a8c4d8c76b193",
     "app/services/search_objectives.py": "6cff95ba005013ddd5ba4e836e43712372cb7483c6a646e9c935509e5d91ac5f",
     "app/services/search_primary_collection.py": "e71098d1d165e1ffb64a7cd51b2f686e0b843b4936122b99dad6f0d1f10fd63a",
@@ -69,7 +70,7 @@ def source_snapshot(backend):
         path = backend / relative
         if (not path.is_file() or path.is_symlink()
                 or hashlib.sha256(path.read_bytes().replace(b'\r\n', b'\n')).hexdigest() != expected):
-            raise CheckError('源码与已审阅v21+v22不符，停止：' + relative)
+            raise CheckError('源码与已审阅v21+v22+v23不符，停止：' + relative)
     # Also detect drift in imported support modules between preview and run.
     files = sorted((backend / 'app').rglob('*.py'))
     if any(p.is_symlink() for p in files):
@@ -201,6 +202,8 @@ def single_run(root):
 
 
 def body_exposure(workspace, research):
+    if research.get('request_context', {}).get('codec') == 'finance-discovery-context-v1':
+        return research['request_context']['body_ranges']
     from app.services.discovery_feedback import body_records
     return {key: row['ranges'] for key, row in
             body_records(workspace, research.get('receipts', [])).items() if row['eligible']}
