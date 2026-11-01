@@ -93,7 +93,9 @@ class DiscoveryTests(unittest.IsolatedAsyncioTestCase):
     async def test_search_account_failure_stops_provider_retests(self):
         self.query.return_value=dict(status='failed',reason='http_401',results=[])
         r=await self.run_decisions([tools(search()),tools(search('美国市场 收盘')),finish()])
-        self.query.assert_called_once();self.assertEqual(r['receipts'][1]['result']['reason'],'search_route_failed_no_retest')
+        self.query.assert_called_once();self.assertEqual(self.model.await_count,1)
+        self.assertEqual(r['status'],'search_unavailable_no_readable_candidates')
+        self.assertEqual(r['phase'],'search_preflight_required')
 
     async def test_exhausted_model_never_repairs_or_publishes(self):
         r=await self.run_decisions([tools(search())],limits=Limits(model_calls=1))

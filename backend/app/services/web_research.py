@@ -65,11 +65,50 @@ def search_availability():
     return dict(available=True,reason=None)
 
 
+def search_request(query,purpose,now,hours=72,topic='news'):
+    """Use one time-window representation; no account or network access."""
+    from .search_objectives import request_profile
+    if topic not in {'news','general'}:raise ValueError('search_topic_invalid')
+    effective_query,profile=request_profile(query,purpose,now,hours)
+    payload=dict(query=effective_query,topic=topic,search_depth='basic',max_results=10,
+        include_published_date=True,include_answer=False,include_raw_content=False,
+        auto_parameters=False,**profile)
+    if not any(key in profile for key in ('start_date','end_date')):
+        payload['time_range']='day' if hours<=24 else 'week'
+    return payload,profile
+
+
+def search_error_diagnostics(response,payload):
+    """Only known field names/signals and a hash, never arbitrary error bodies.
+
+    Providers can echo credentials and inputs in validation errors. Keep enough
+    information to distinguish common failures without exporting that content.
+    """
+    fields=('query','topic','search_depth','max_results','time_range','start_date','end_date',
+        'include_published_date','filter_by_published_date','exclude_domains','auto_parameters')
+    detail=''
+    if response is not None and getattr(response,'status_code',0)>=400:
+        try:detail=json.dumps(response.json(),ensure_ascii=False)[:16000]
+        except (ValueError,TypeError):pass
+    lowered=detail.lower()
+    patterns=dict(date_window_conflict=r'(cannot|conflict|exclusive|either|both).*(time_range|start_date|end_date)',
+        invalid_topic=r'(invalid|unsupported).{0,40}topic',
+        authentication=r'(unauthorized|invalid.api.key|missing.api.key)',
+        usage_limit=r'(usage.limit|credit|quota|balance)',
+        validation=r'(validation|invalid|must.be|not.allowed|unsupported)')
+    return dict(http_status=getattr(response,'status_code',None),
+        request_parameters=payload,
+        reported_fields=[key for key in fields if re.search(r'\b'+key+r'\b',lowered)],
+        error_signals=[key for key,pattern in patterns.items() if re.search(pattern,lowered)],
+        error_body_sha256=hashlib.sha256(detail.encode()).hexdigest() if detail else None,
+        raw_error_body_exported=False,
+        limitation='固定信号仅辅助诊断；未保留服务商原始错误文字，不能据此保证已确定根因。')
+
+
 def search(workspace,query,hours=72,deadline=None,topic='news',purpose='discovery'):
     from ..config import settings
-    from .search_objectives import request_profile
-    effective_query,profile=request_profile(query,purpose,workspace.now,hours)
-    if topic not in {'news','general'}:raise ValueError('search_topic_invalid')
+    payload,profile=search_request(query,purpose,workspace.now,hours,topic)
+    effective_query=payload['query']
     if not settings.research_web_search_enabled:return dict(status='disabled',scope='general_web',results=[])
     if not settings.research_web_search_api_key or not settings.research_web_search_api_key.get_secret_value().strip():return dict(status='unavailable',reason='search_account_not_configured',scope='general_web',results=[])
     cache=getattr(workspace,'web_search_cache',{})
@@ -82,12 +121,11 @@ def search(workspace,query,hours=72,deadline=None,topic='news',purpose='discover
     except RetiredSourceError:return dict(status='unavailable',reason='search_route_paused_no_auto_retest',scope='general_web',results=[])
     if deadline is not None and deadline<=time.monotonic():return dict(status='budget_exhausted',scope='general_web',results=[])
     workspace.web_search_attempts=attempts+1
+    response=None
     try:
         response=requests.post('https://api.tavily.com/search',
             headers={'Authorization':'Bearer '+settings.research_web_search_api_key.get_secret_value()},
-            json=dict(query=effective_query,topic=topic,search_depth='basic',max_results=10,
-                      time_range='day' if hours<=24 else 'week',include_published_date=True,
-                      include_answer=False,include_raw_content=False,auto_parameters=False,**profile),
+            json=payload,
             timeout=min(10,max(.1,deadline-time.monotonic())) if deadline else 10,allow_redirects=False)
         response.raise_for_status()
         if response.status_code!=200:raise ValueError('search_response_not_ok')
@@ -112,7 +150,8 @@ def search(workspace,query,hours=72,deadline=None,topic='news',purpose='discover
     except Exception as error:
         record_failure(root,pause_key,ValueError('web_research_failed_no_auto_retest'),detail_code=failure_reason(error))
         result=dict(status='failed',scope='general_web',error=type(error).__name__,results=[],
-                    reason=failure_reason(error),http_attempts=workspace.web_search_attempts,retries=0)
+                    reason=failure_reason(error),http_attempts=workspace.web_search_attempts,retries=0,
+                    diagnostics=search_error_diagnostics(response,payload))
     cache[key]=result;workspace.web_search_cache=cache
     return result
 

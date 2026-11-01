@@ -109,9 +109,28 @@ def prompt(stocks,now,limits):
 
 
 def decode(raw):
-    raw=raw.strip()
-    if raw.startswith('```json') and raw.endswith('```'):raw=raw[7:-3].strip()
-    data=json.loads(raw)
+    raw=raw.strip().lstrip('\ufeff')
+    fence=re.fullmatch(r'```(?:json)?\s*\n?(.*?)\n?```',raw,re.S)
+    if fence:raw=fence.group(1).strip()
+    def unique_object(pairs):
+        value={}
+        for key,item in pairs:
+            if key in value:raise ValueError('discovery_duplicate_json_key')
+            value[key]=item
+        return value
+    decoder=json.JSONDecoder(object_pairs_hook=unique_object)
+    try:
+        data=decoder.decode(raw)
+    except json.JSONDecodeError:
+        # Accept a short explanatory prefix followed by ONE intact object.
+        # Never repair a fragment, scan past a different object, or choose
+        # between multiple actions. Full tool validation still precedes I/O.
+        start=raw.find('{')
+        prefix=raw[:start] if start>=0 else ''
+        if start<0 or len(prefix)>400 or re.search(r'[{}\[\]`]',prefix):
+            raise ValueError('discovery_response_not_single_json') from None
+        data,end=decoder.raw_decode(raw,start)
+        if raw[end:].strip():raise ValueError('discovery_response_not_single_json')
     if not isinstance(data,dict) or data.get('action') not in {'tools','finish'}:
         raise ValueError('discovery_action_invalid')
     return data
@@ -282,6 +301,10 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
     try:
         while limits.model_calls is None or state['model_calls']<limits.model_calls:
             turn=state['model_calls']
+            if (state.get('search_route_failed') and not provided
+                    and not any(task['executable'] for task in state['collection_feedback']['tasks'])):
+                state.update(status='search_unavailable_no_readable_candidates',phase='search_preflight_required')
+                save();return state
             if time.monotonic()>=deadline:
                 state['status']='time_budget_exhausted';save();break
             request=request_text()
@@ -409,6 +432,7 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
                                     provider_returned_results=response.get('provider_returned_results'),
                                     metadata_results=response.get('metadata_results',len(rows)),
                                     reading_scope='search_directory_not_body')
+                        if response.get('diagnostics') is not None:result['diagnostics']=response['diagnostics']
                         if response.get('status') in {'failed','unavailable','disabled'}:state['search_route_failed']=True
                         searched[search_key]=result
                 elif r['tool']=='read_more':
