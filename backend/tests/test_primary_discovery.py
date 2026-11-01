@@ -47,7 +47,13 @@ class DiscoveryTests(unittest.IsolatedAsyncioTestCase):
     async def test_model_selects_second_result_instead_of_first(self):
         self.query.return_value['results'].insert(0,dict(title='台湾股市收盘',url='https://example.com/news/taiwan',snippet='台湾股票'))
         r=await self.run_decisions([tools(search()),tools(read('S2')),finish(['B1'],[
-            dict(title='美股收盘',why_it_matters='指数与行业分化',evidence_ids=['B1'],caveats='只读示例正文，未独立核实')])])
+            dict(title='美股收盘',why_it_matters='指数与行业分化',evidence_ids=['B1'],
+                caveats='只读示例正文，未独立核实',lane='us_market',
+                research_checks={facet:dict(
+                    status='supported' if facet=='primary_facts' else 'not_applicable',
+                    evidence_ids=['B1'] if facet=='primary_facts' else [],
+                    explanation='仅验证候选选择与示例正文协议；其余方面不作研究结论')
+                    for facet in ('primary_facts','background','disagreements','transmission')})])])
         self.assertEqual(self.reader.call_args.args[1],URL)
         self.assertEqual(r['status'],'partial_materials_for_human_review')
         self.assertIn('global_policy',r['coverage_gaps'])
