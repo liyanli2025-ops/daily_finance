@@ -36,6 +36,10 @@ def destination(root, name):
 
 
 def validate(root, manifest, archive):
+    for name, expected in manifest.get("prerequisites", {}).items():
+        target = destination(root, name)
+        if not target.is_file() or digest(target.read_bytes()) != expected:
+            raise RuntimeError("Reviewed server prerequisite changed: " + name)
     files = manifest["files"]
     if set(archive.namelist()) != set(files):
         raise RuntimeError("Bundle contents do not match manifest")
@@ -176,6 +180,8 @@ def main():
         if manifest['settings']:
             raise RuntimeError('Paused source releases cannot alter runtime settings')
         print("Source validation passed:", len(manifest["files"]), "files")
+        if manifest.get("source_revision"):
+            print("Source revision:", manifest["source_revision"])
         print("Runtime settings: preserved; no model or credential changes")
         if not args.apply:
             print("Validation only. No files or service state changed.")
