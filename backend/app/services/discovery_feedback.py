@@ -11,6 +11,7 @@ from .news_selection import within_window
 from .primary_material_quality import QUESTIONS, review_body
 from .search_primary_collection import LANES
 from .collection_time import receipt_windows,eligible as time_eligible,policy
+from .material_roles import assess_role,lane_allowed
 
 
 def cited_ids(dossier):
@@ -101,6 +102,7 @@ def body_records(workspace, receipts):
             gaps.append([cursor, len(item.content)])
         row.update(characters=len(item.content), text_sha256=digest, unread_ranges=gaps,
                    body_quality=review_body(item.content), lanes=[], direct_scopes=[],
+                   source_role=assess_role(item),
                    source_windows=receipt_windows(receipts,identifier,workspace.now))
         row['eligible'] = bool(not row['invalid_receipt'] and row['ranges']
             and len(item.content.strip()) >= 80
@@ -127,6 +129,10 @@ def build_feedback(workspace, state, stocks, limits):
         candidate_id = request.get('candidate_id')
         outcome = outcomes.setdefault(candidate_id, dict(terminal_failure=False, rejected_scopes=[], stored_body_id=None))
         reason = result.get('reason')
+        if receipt.get('origin')=='verified_snapshot_recovery' and result.get('status')=='ok':
+            outcome['terminal_failure']=False
+            if result.get('rejected_company_scope') and result['rejected_company_scope'] not in outcome['rejected_scopes']:
+                outcome['rejected_scopes'].append(result['rejected_company_scope'])
         if result.get('status') in {'failed', 'unavailable', 'unsupported', 'needs_local_review'} or (
                 result.get('status') == 'rejected' and reason not in
                 {'direct_company_not_in_candidate', 'direct_company_not_in_body','direct_company_not_primary_subject'}):
@@ -145,6 +151,7 @@ def build_feedback(workspace, state, stocks, limits):
         candidate = candidates.get(candidate_id, {})
         lanes = {r['lane'] for r in result.get('research_links', candidate.get('discovered_by', []))}
         source_item=workspace.documents[result['material']['id']]
+        lanes={lane for lane in lanes if lane_allowed(source_item,lane)}
         # A background window does not qualify as evidence of the latest
         # market session or an actual new policy release.
         market_hours=policy(workspace.now)['hours']['latest_close'] if row['source_windows'] else 72
@@ -163,7 +170,7 @@ def build_feedback(workspace, state, stocks, limits):
                 if company is not None and company_focus(source_item,SimpleNamespace(**company)):
                     row['direct_scopes'].append(request['scope'])
         elif request.get('relation') == 'industry':
-            lanes &= {'industry'}
+            lanes = {'industry'}  # explicit reading use, independent of discovery query
         row['lanes'] = sorted(set(row['lanes']) | lanes)
         row['direct_scopes'] = sorted(set(row['direct_scopes']))
     remaining = dict(model_calls=(max(0, limits.model_calls-state.get('model_calls', 0))

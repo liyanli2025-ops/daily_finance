@@ -1,6 +1,6 @@
 """Preview a fresh progress-driven collection; --run --input-sha spends usage.
 
-Run from a separate upload directory against the reviewed v21+v22+v23+v24+v25 backend. No service,
+Run from a separate upload directory against the reviewed v21 through v26 backend. No service,
 credential, scheduler, report, TTS or App database writes. Old trial markers and
 source-failure ledgers remain authoritative and are never removed by this tool.
 """
@@ -21,13 +21,15 @@ import zipfile
 
 TRIAL = 'progress-collection-v1'
 OWNER = 'finance-progress-collection-acceptance-v1'
-# Filled from installed v21 plus the reviewed v22/v23/v24/v25 repairs. LF/CRLF only
+# Filled from installed v21 plus the reviewed v22/v23/v24/v25/v26 repairs. LF/CRLF only
 # is normalized; unknown source changes are not silently accepted.
 REVIEWED_RUNTIME = {
+    "app/services/material_roles.py": "526b8e16a454c238edd69afe8ba2bf407ba752b62727dc49a6a4a386d0b49cc1",
+    "app/services/discovery_recovery.py": "bf3e5943deb684aeec4045a737846ba97a7255b1c20d9d058708baaf086a94a1",
     "app/services/article_metadata.py": "b9af84761c3a539f520a6941e8f8e5ccd9756a7adff4f80128c777d0c222eec6",
     "app/services/collection_time.py": "e70e83024900f5c6dc09e4d57daee593eb5a375997f3483d007e4d17f5250393",
     "app/services/news_quality.py": "cffb6117fb6503fa4f12da821a030052d72daff15a119e722be3ce2786353465",
-    "app/services/discovery_resume.py": "c510357f118b5c5ca9e388f4b42f4df74a12423fb994ad359dc200f912e7365d",
+    "app/services/discovery_resume.py": "72bdc8611efa2c4c7b54aa713783dc6ff13e7c62c5c3c586ad914ff1edd114c3",
     "app/services/discovery_context.py": "8ee21b0d8fa064fcdfeba0a6ee078dd0ddbfc8546d22749e40259eb9b54fb2c8",
     "app/collection_review.py": "0c2a56ebac790e768f7ffd1112b96c444eb464dfe488009953cfe95589f57a8d",
     "app/config.py": "3c7aa5a7c9e679bad52a30fa70cdc9e67986a9b89548dc36c9941cca3cfbe104",
@@ -38,15 +40,15 @@ REVIEWED_RUNTIME = {
     "app/services/ai_analyzer.py": "c1d5184f50b66bd00da16866707ca0a74eb0e96926bc31ee03d7ea98770c9d44",
     "app/services/discovery_budget.py": "89c425916b7facd481df44a73a59a18b7bc50ef5f919ed1db8afb2378af95542",
     "app/services/discovery_completion.py": "7846913b58e14193fcf1fca54a4900c8d803b7fd617e469e1a9fb70ee8ae63bc",
-    "app/services/discovery_feedback.py": "83ac26ae2440970a27b189c51c8afbd48ec1a12647dd1f7b79b3aa085642fa1b",
+    "app/services/discovery_feedback.py": "afec051ec0393fc84da484ebc31e609a8beff4afab6c5721b5575cc34a9f6162",
     "app/services/episode_research.py": "b810755244f6816e54de7fb170cd59b33bf05e164bfbeda2336bf2a0bdb1faae",
     "app/services/episode_workspace.py": "180530fd20d85514ca70717ac3ff0f17d765a77302d7ff656842f3bea284edf0",
     "app/services/generic_extraction.py": "1b12efef7a6c1e748caf81733f7eb235e353244806a9e264415de5cf9f3365f8",
     "app/services/model_gateway.py": "af70135e8007cf2da9d52538a18bfd2b8b0dd0ed4e6ef42453e7e9fb952efbf2",
     "app/services/model_usage.py": "12e657d6652ad3c45d511c91b64756943062b99ebee261c1ba6da1c25c9bb502",
-    "app/services/primary_discovery.py": "fc4025766557529cd76207848e9a73ada6f6898a59594c1d06c82cbfa3855342",
+    "app/services/primary_discovery.py": "80d13d417583830c5d4b7b801527cb31566f137e1edcff6dac262f9c1e8f4ccf",
     "app/services/primary_material_quality.py": "d0d282b2f7bf1995792a8ae0909098bb9a25631b6f7f64f65add6dc481d28ff8",
-    "app/services/primary_report.py": "4ff7cab51adf0d33bcb985fbd5e966c3db4a71e961b76656b3c2e89ec3462ca7",
+    "app/services/primary_report.py": "1bbb32302aa528dfa9f64a4aa89c4dcd0d43591926e9fb6338480f2cf35d3892",
     "app/services/reading_acceptance.py": "4c457fa15ef27c19841711352de5c0c80407e36df835d2e1ff6a8c4d8c76b193",
     "app/services/search_objectives.py": "ea2974422e9bce544fca5f0ad53741172146143f7a21aa153bbb04788259f0a9",
     "app/services/search_primary_collection.py": "e71098d1d165e1ffb64a7cd51b2f686e0b843b4936122b99dad6f0d1f10fd63a",
@@ -74,7 +76,7 @@ def source_snapshot(backend):
         path = backend / relative
         if (not path.is_file() or path.is_symlink()
                 or hashlib.sha256(path.read_bytes().replace(b'\r\n', b'\n')).hexdigest() != expected):
-            raise CheckError('源码与已审阅v21+v22+v23+v24不符，停止：' + relative)
+            raise CheckError('源码与已审阅v26不符，停止：' + relative)
     # Also detect drift in imported support modules between preview and run.
     files = sorted((backend / 'app').rglob('*.py'))
     if any(p.is_symlink() for p in files):

@@ -19,6 +19,7 @@ from .watchlist_repository import watchlist_signature
 from .time_context import china_now
 from .discovery_completion import CONTRACT, completion_review
 from .collection_time import policy as time_policy,validate_window,eligible as time_eligible
+from .material_roles import assess_role,lane_allowed
 
 OWNER = 'finance-primary-report-input-v1'
 FINISHED = {'materials_for_human_review', 'partial_materials_for_human_review'}
@@ -91,6 +92,7 @@ def export_discovery(workspace, state):
                                observation_time_unknown=not observations,
                                available_at_cutoff_verified=False,
                                source_windows=records.get(identifier,{}).get('source_windows',[]),
+                               source_role=assess_role(item),
                                reading_scope=reading_scope(item)))
     if any(not records.get(identifier, {}).get('eligible') for identifier in selected):
         raise ValueError('primary_report_selected_body_not_eligible')
@@ -169,6 +171,12 @@ def prepare(value, now=None):
             if body_hash(item) != hashes[item.id]:
                 raise ValueError('primary_report_body_hash_mismatch')
         # Recheck finish citations even when reading a saved, edited JSON export.
+        by_id={item.id:item for item in news}
+        for coverage in value['research'].get('coverage',[]):
+            if coverage.get('status')=='body_provided' and any(
+                    identifier in by_id and not lane_allowed(by_id[identifier],coverage.get('lane'))
+                    for identifier in coverage.get('evidence_ids',[])):
+                raise ValueError('primary_report_material_role_mismatch')
         from .primary_discovery import validate_finish
         validate_finish(dict(value['research'], omissions=[]), set(identifiers), stocks, {})
         if value.get('budget_contract') not in {None,CONTRACT}:

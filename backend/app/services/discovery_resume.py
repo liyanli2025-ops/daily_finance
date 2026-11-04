@@ -26,15 +26,22 @@ def tool_caches(state):
             # Company/landing/unsupported rejections never attempted a fetch.
             if result.get('status') in {'ok', 'failed', 'unavailable', 'needs_local_review'}:
                 url = state['candidates'][request['candidate_id']]['url']
-                reads.setdefault(url, deepcopy(result))
+                # An explicit local recovery may supersede only a captured
+                # parser failure. Access failures remain cached and paused.
+                if receipt.get('origin')=='verified_snapshot_recovery':reads[url]=deepcopy(result)
+                else:reads.setdefault(url, deepcopy(result))
     return searches, reads
 
 
 def restore_state(workspace, stocks, resume, settings):
-    """Only a proven input-size stop may resume; same envelope and cutoff."""
+    """Resume a proven size stop or verified recovery; same envelope/cutoff."""
     state = deepcopy(resume['research'])
+    recovered=state.get('status')=='recovered_saved_materials'
+    if recovered:
+        from .discovery_recovery import validate_prepared
+        validate_prepared(workspace,state,resume.get('recovery_state_sha256'))
     if (state.get('owner') != 'finance-model-led-discovery-v1'
-            or state.get('status') != 'input_budget_exhausted'
+            or state.get('status') != 'input_budget_exhausted' and not recovered
             or state.get('watchlist') != stocks
             or state.get('started_at') != workspace.now.isoformat()
             or state['budget_plan'].get('mode') != 'progress_driven_collection'):
@@ -96,7 +103,7 @@ def restore_state(workspace, stocks, resume, settings):
     state.pop('context_focus', None)
     state.pop('request_context', None)
     state.update(status='running', phase='resume_saved_context',
-                 resumed_from_status='input_budget_exhausted', prior_active_seconds=spent)
+                 resumed_from_status='recovered_saved_materials' if recovered else 'input_budget_exhausted', prior_active_seconds=spent)
     return state, limits, ceiling, plan, spent
 
 
