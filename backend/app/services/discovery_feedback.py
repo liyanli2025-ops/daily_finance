@@ -10,6 +10,7 @@ from .news_quality import excluded_reason, reading_scope
 from .news_selection import within_window
 from .primary_material_quality import QUESTIONS, review_body
 from .search_primary_collection import LANES
+from .collection_time import receipt_windows,eligible as time_eligible,policy
 
 
 def cited_ids(dossier):
@@ -99,12 +100,13 @@ def body_records(workspace, receipts):
         if cursor < len(item.content):
             gaps.append([cursor, len(item.content)])
         row.update(characters=len(item.content), text_sha256=digest, unread_ranges=gaps,
-                   body_quality=review_body(item.content), lanes=[], direct_scopes=[])
+                   body_quality=review_body(item.content), lanes=[], direct_scopes=[],
+                   source_windows=receipt_windows(receipts,identifier,workspace.now))
         row['eligible'] = bool(not row['invalid_receipt'] and row['ranges']
             and len(item.content.strip()) >= 80
             and digest == workspace.document_hashes.get(identifier)
             and reading_scope(item) in {'full_text', 'visible_body', 'wire_text'}
-            and not excluded_reason(item) and within_window(item, workspace.now, 72)
+            and not excluded_reason(item) and time_eligible(item, workspace.now, row['source_windows'])
             and not row['body_quality']['requires_editorial_review'])
     return records
 
@@ -125,12 +127,12 @@ def build_feedback(workspace, state, stocks, limits):
         candidate_id = request.get('candidate_id')
         outcome = outcomes.setdefault(candidate_id, dict(terminal_failure=False, rejected_scopes=[], stored_body_id=None))
         reason = result.get('reason')
-        if result.get('status') in {'failed', 'unavailable', 'unsupported'} or (
+        if result.get('status') in {'failed', 'unavailable', 'unsupported', 'needs_local_review'} or (
                 result.get('status') == 'rejected' and reason not in
-                {'direct_company_not_in_candidate', 'direct_company_not_in_body'}):
+                {'direct_company_not_in_candidate', 'direct_company_not_in_body','direct_company_not_primary_subject'}):
             outcome['terminal_failure'] = True
         if result.get('status') == 'rejected' and reason in {
-                'direct_company_not_in_candidate', 'direct_company_not_in_body'}:
+                'direct_company_not_in_candidate', 'direct_company_not_in_body','direct_company_not_primary_subject'}:
             if request.get('scope') not in outcome['rejected_scopes']:
                 outcome['rejected_scopes'].append(request.get('scope'))
         cached_id = (result.get('material', {}).get('id') if result.get('status') == 'ok'
@@ -142,12 +144,24 @@ def build_feedback(workspace, state, stocks, limits):
             continue
         candidate = candidates.get(candidate_id, {})
         lanes = {r['lane'] for r in result.get('research_links', candidate.get('discovered_by', []))}
+        source_item=workspace.documents[result['material']['id']]
+        # A background window does not qualify as evidence of the latest
+        # market session or an actual new policy release.
+        market_hours=policy(workspace.now)['hours']['latest_close'] if row['source_windows'] else 72
+        if not within_window(source_item,workspace.now,market_hours):
+            lanes-={'a_market','hk_market','us_market','global_policy'}
+        if result.get('source_window',{}).get('purpose')=='commentary':
+            lanes-={'a_market','hk_market','us_market','global_policy'}
         # Industry/direct relations are explicit research uses, not inferred
         # from body keywords. Even these links do NOT verify the subject.
         if request.get('relation') == 'direct':
             lanes &= {'company_event'}
             if request.get('scope'):
-                row['direct_scopes'].append(request['scope'])
+                from .news_quality import company_focus
+                from types import SimpleNamespace
+                company=next((stock for stock in stocks if stock['market']+':'+stock['code']==request['scope']),None)
+                if company is not None and company_focus(source_item,SimpleNamespace(**company)):
+                    row['direct_scopes'].append(request['scope'])
         elif request.get('relation') == 'industry':
             lanes &= {'industry'}
         row['lanes'] = sorted(set(row['lanes']) | lanes)
@@ -166,7 +180,8 @@ def build_feedback(workspace, state, stocks, limits):
         return bool(item is not None and hasattr(item, 'content') and len(item.content.strip()) >= 80
             and hashlib.sha256(item.content.encode()).hexdigest() == workspace.document_hashes.get(identifier)
             and reading_scope(item) in {'full_text', 'visible_body', 'wire_text'} and not excluded_reason(item)
-            and within_window(item, workspace.now, 72) and not review_body(item.content)['requires_editorial_review'])
+            and time_eligible(item, workspace.now, receipt_windows(receipts,identifier,workspace.now))
+            and not review_body(item.content)['requires_editorial_review'])
     tasks, lanes, watchlist = [], [], []
     for identifier, row in bodies.items():
         if not row['eligible']:

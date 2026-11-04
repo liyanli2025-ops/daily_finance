@@ -30,7 +30,8 @@ def failure_reason(error):
     if code in {'web_source_non_html','web_source_response_too_large','web_source_article_structure_missing',
                 'web_source_article_text_too_short','web_source_alias_identity_unverified','web_source_time_invalid',
                 'web_source_day_window_boundary_requires_review','web_source_specialized_reader_required',
-                'web_source_generic_extractor_unavailable'}:return code
+                'web_source_generic_extractor_unavailable','web_source_article_title_missing',
+                'web_source_disclosed_ai_generated_article'}:return code
     return type(error).__name__
 
 
@@ -304,10 +305,9 @@ def parse_visible_article(html,url,now=None,hours=72):
         if match:
             stamp=datetime.strptime(match.group(4)+' '+match.group(1)+' '+('AM' if match.group(2)=='a.m.' else 'PM'),'%B %d, %Y %I:%M %p')
             template_date=stamp.replace(tzinfo=timezone(timedelta(hours=-4 if match.group(3)=='EDT' else -5))).isoformat(timespec='minutes')
-    title=heading.get_text(' ',strip=True) if heading is not None else ''
-    if not title:
-        node=soup.select_one('meta[property="og:title"],meta[name="ArticleTitle"]')
-        title=node.get('content','').strip() if node else ''
+    from .article_metadata import article_title,visible_publication_fields,publication_value
+    title=article_title(soup,article,heading)
+    visible_dates=visible_publication_fields(soup)
     extraction_note=''
     if article is None:
         from .generic_extraction import extract_main_text
@@ -322,7 +322,8 @@ def parse_visible_article(html,url,now=None,hours=72):
     # A short, actually retrieved news item is not a missing article. Keep it
     # explicitly as short text instead of padding it with navigation/footer.
     content='\n'.join(line for line in content.splitlines() if not re.fullmatch(r'\s*(?:海量资讯.{0,60}新浪财经APP|责任编辑\s*[:：].{0,20})\s*',line)).strip()
-    if not 6<=len(title)<=300 or len(content)<80:raise ValueError('web_source_article_text_too_short')
+    if not 6<=len(title)<=300:raise ValueError('web_source_article_title_missing')
+    if len(content)<80:raise ValueError('web_source_article_text_too_short')
     short_text=len(content)<160
     dates=[template_date] if template_date else []
     for node in soup.select('meta[property="article:published_time"],meta[itemprop="datePublished"],meta[name="PubDate"],meta[name="pubdate"],meta[name="datePublished"]')+(article.select('time[itemprop="datePublished"][datetime]') if article else []):
@@ -340,11 +341,10 @@ def parse_visible_article(html,url,now=None,hours=72):
                 kind=entry.get('@type',[]);kind=kind if isinstance(kind,list) else [kind]
                 if any(value in {'Article','NewsArticle','BlogPosting'} for value in kind) and entry.get('headline')==title:
                     dates.insert(0,entry.get('datePublished'))
+    dates.extend(visible_dates)
     raw=next((str(value) for value in dates if value),None)
     if not raw:raise ValueError('web_source_time_missing')
-    normalized=raw.replace('/','-')
-    date_only=bool(re.fullmatch(r'\d{4}-\d{2}-\d{2}Z?',normalized))
-    try:value=datetime.fromisoformat(normalized.rstrip('Z') if date_only else normalized.replace('Z','+00:00'))
+    try:value,date_only=publication_value(raw)
     except ValueError:raise ValueError('web_source_time_invalid') from None
     timezone_unknown=not date_only and value.tzinfo is None
     if date_only or timezone_unknown:
@@ -362,7 +362,8 @@ def parse_visible_article(html,url,now=None,hours=72):
     return News(id='web-'+hashlib.sha256((url+'\n'+content).encode()).hexdigest()[:24],
         title=title,content=content,source=('公开网页快讯正文-' if short_text else '公开网页可见正文-')+urlsplit(url).hostname,
         source_url=url,published_at=stamp,category='公开网页，作者及原始来源仍需核对',
-        market_impact='原始来源时点：'+raw+('（来源未标时区，仅按日期，不用于盘前盘后或消息先后判断）' if timezone_unknown else '')+'；精度：'+('day' if date_only else 'minute' if re.search(r'T\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$',raw) else 'second')+'；'+('短讯文字，未取得扩展报道；' if short_text else '')+'公开可见正文，不宣称完整稿或独立核验'+extraction_note)
+        market_impact='原始来源时点：'+raw+('（来源未标时区，仅按日期，不用于盘前盘后或消息先后判断）' if timezone_unknown else '')+'；精度：'+('day' if date_only else 'minute' if re.search(r'T\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$',raw) else 'second')+'；'+('短讯文字，未取得扩展报道；' if short_text else '')+'公开可见正文，不宣称完整稿或独立核验'+extraction_note+
+            ('；其他显式时间字段（未确认为同一口径）：'+json.dumps(list(dict.fromkeys(str(value) for value in dates if value and str(value)!=raw)),ensure_ascii=False) if any(value and str(value)!=raw for value in dates) else ''))
 
 
 def archived_public_body(url,now,hours=72,root=None):
@@ -438,14 +439,16 @@ def read_public(workspace,url,hours=72,deadline=None,characters=6000):
                 reused_from='recent_same_url_archive',cache_observed_at=observed,http_requests_performed=0,
                 remote_version_checked=False,reading_status='stored_text_not_new_remote_verification',
                 limitation='复用过去24小时观察到、截止时点前同链接且发布窗口内的已存正文；不是新抓取，不证明远端未修订。')
+    cached=getattr(workspace,'web_article_cache',{})
+    if url in cached:
+        result=cached[url]
+        if result.get('status')!='ok':return dict(result,reused_within_episode=True)
+        return dict(result,material=workspace.read(result['material']['id'],characters=characters),reused_within_episode=True)
     root=ResearchHub().root;key='research-public-url:'+str(url).split('#',1)[0]
     try:
         if url in PAUSED_PUBLIC_ARTICLES:raise RetiredSourceError('public_article_paused')
         ensure_active(root,key)
     except RetiredSourceError:return dict(status='unavailable',reason='article_paused_no_auto_retest',url=url)
-    cached=getattr(workspace,'web_article_cache',{})
-    if url in cached:
-        return dict(cached[url],material=workspace.read(cached[url]['material']['id'],characters=characters),reused_within_episode=True)
     capture=None
     try:
         current=url
@@ -462,6 +465,8 @@ def read_public(workspace,url,hours=72,deadline=None,characters=6000):
             try:capture=capture_public_response(workspace,current,status,headers,raw)
             except OSError:capture=None  # Diagnostic disk failure is not publisher failure.
             item=parse_visible_article(raw,current,now=workspace.now,hours=hours)
+            from .news_quality import excluded_reason
+            if excluded_reason(item)=='disclosed_ai_generated_article':raise ValueError('web_source_disclosed_ai_generated_article')
             workspace.add([item])
             if item.id not in workspace.documents:raise ValueError('web_source_not_admitted')
             result=dict(status='ok',url=current,observed_at=china_now().isoformat(),response_capture=capture,reading_status='visible_article_body_not_certified_full_text',
@@ -470,8 +475,16 @@ def read_public(workspace,url,hours=72,deadline=None,characters=6000):
             return result
         raise ValueError('web_source_redirect_limit')
     except Exception as error:
+        reason=failure_reason(error)
+        local_review=bool(capture and reason in {'web_source_time_missing','web_source_time_invalid',
+            'web_source_time_outside_window','web_source_day_window_boundary_requires_review',
+            'web_source_article_title_missing','web_source_article_text_too_short',
+            'web_source_article_structure_missing','web_source_generic_extractor_unavailable',
+            'web_source_not_admitted','web_source_disclosed_ai_generated_article'})
         # Also pause an alias that redirects to an already retired target.
-        record_failure(root,key,ValueError('web_research_failed_no_auto_retest'),detail_code=failure_reason(error))
-        return dict(status='failed',url=url,error=type(error).__name__,retries=0,
-                    reason=failure_reason(error),response_capture=capture,
-                    limitation='未入正文证据，不把HTTP错误、目录或摘要当全文；失败路径暂停自动重试。')
+        if not local_review:record_failure(root,key,ValueError('web_research_failed_no_auto_retest'),detail_code=reason)
+        result=dict(status='needs_local_review' if local_review else 'failed',url=url,error=type(error).__name__,retries=0,
+                    reason=reason,response_capture=capture,
+                    limitation='未入正文证据；已有快照的结构/时间问题仅离线复核，不重新请求；访问失败仍暂停，不清除既有停用记录。')
+        cached[url]=result;workspace.web_article_cache=cached
+        return result

@@ -15,9 +15,14 @@ def review_events(dossier, feedback):
     stocks = {row['key'] for row in feedback['watchlist']}
     for index, event in enumerate(dossier['events']):
         checks = event.get('research_checks')
-        if (event.get('lane') not in LANES or event.get('scope') is not None and event['scope'] not in stocks
-                or not isinstance(checks, dict) or set(checks) != set(FACETS)):
-            problems.append(dict(code='event_research_checks_missing', event=index))
+        if event.get('lane') not in LANES:
+            problems.append(dict(code='event_lane_invalid', event=index, field='lane',
+                received=event.get('lane'), allowed=list(LANES)))
+        if event.get('scope') is not None and event['scope'] not in stocks:
+            problems.append(dict(code='event_scope_invalid', event=index, field='scope',allowed=sorted(stocks)))
+        if not isinstance(checks, dict) or set(checks) != set(FACETS):
+            problems.append(dict(code='event_research_checks_missing', event=index, field='research_checks',
+                required=list(FACETS)))
             continue
         for facet, question in FACETS.items():
             check = checks[facet]
@@ -29,7 +34,7 @@ def review_events(dossier, feedback):
                     or facet == 'primary_facts' and check['status'] == 'not_applicable'):
                 problems.append(dict(code='event_research_check_invalid', event=index, facet=facet))
                 continue
-            if check['status'] == 'unresolved':
+            if check['status'] == 'unresolved' and event.get('lane') in LANES:
                 tasks.append(dict(task_id='event:'+str(index)+':'+facet, kind='event_research',
                     lane=event['lane'], scope=event.get('scope'), candidate_ids=[],
                     evidence_ids=event['evidence_ids'], event_title=event['title'],

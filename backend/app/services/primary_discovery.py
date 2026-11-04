@@ -122,17 +122,37 @@ def prompt(stocks,now,limits):
         +'\n初始资源额度（动态当前额度与硬上限见后文；不是篇数配额或覆盖充分性承诺）：'+json.dumps(limits.__dict__))
 
 
-def decode(raw):
+def decode(raw, *, normalizations=None):
     raw=raw.strip().lstrip('\ufeff')
     fence=re.fullmatch(r'```(?:json)?\s*\n?(.*?)\n?```',raw,re.S)
     if fence:raw=fence.group(1).strip()
-    def unique_object(pairs):
-        value={}
-        for key,item in pairs:
-            if key in value:raise ValueError('discovery_duplicate_json_key')
-            value[key]=item
+    class ObjectPairs(list):
+        pass
+    def identical(a,b):
+        if type(a) is not type(b):return False
+        if isinstance(a,dict):return a.keys()==b.keys() and all(identical(a[k],b[k]) for k in a)
+        if isinstance(a,list):return len(a)==len(b) and all(identical(x,y) for x,y in zip(a,b))
+        return a==b
+    notes=[]
+    def normalize(value,path='$'):
+        if isinstance(value,ObjectPairs):
+            result={}
+            for key,item in value:
+                child=path+'['+json.dumps(key,ensure_ascii=False)+']'
+                item=normalize(item,child)
+                if key in result:
+                    if not identical(result[key],item):raise ValueError('discovery_duplicate_json_key')
+                    notes.append(dict(path=child,action='identical_duplicate_removed'))
+                result[key]=item
+            return result
+        if isinstance(value,list):return [normalize(item,path+'['+str(i)+']') for i,item in enumerate(value)]
+        if isinstance(value,float):
+            import math
+            if not math.isfinite(value):raise ValueError('discovery_nonfinite_json_number')
         return value
-    decoder=json.JSONDecoder(object_pairs_hook=unique_object)
+    def invalid_constant(value):
+        raise ValueError('discovery_nonfinite_json_number')
+    decoder=json.JSONDecoder(object_pairs_hook=ObjectPairs,parse_constant=invalid_constant)
     try:
         data=decoder.decode(raw)
     except json.JSONDecodeError:
@@ -145,8 +165,10 @@ def decode(raw):
             raise ValueError('discovery_response_not_single_json') from None
         data,end=decoder.raw_decode(raw,start)
         if raw[end:].strip():raise ValueError('discovery_response_not_single_json')
+    data=normalize(data)
     if not isinstance(data,dict) or data.get('action') not in {'tools','finish'}:
         raise ValueError('discovery_action_invalid')
+    if normalizations is not None:normalizations.extend(notes)
     return data
 
 
@@ -286,7 +308,9 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
     from .research_hub import save_json
     checkpoint=checkpoint or (lambda state:save_json(workspace.path/'primary-discovery.json',state))
     keys={s['market']+':'+s['code']:s for s in stocks}
+    from .collection_time import policy,window,read_purpose
     fresh=dict(owner='finance-model-led-discovery-v1',status='running',started_at=workspace.now.isoformat(),
+        time_policy=policy(workspace.now),
         watchlist=stocks,limits=limits.__dict__,budget_plan=budget_plan,budget_expansions=[],
         effective_search_limit=min(limits.search_calls,shared_search_remaining),
         model_calls=0,model_input_characters=0,reserved_output_tokens=0,search_tool_calls=0,body_url_calls=0,
@@ -305,6 +329,9 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
     started=time.monotonic()
     deadline=started+limits.seconds-spent_seconds
     base=prompt(stocks,workspace.now,Limits(**budget_plan['initial']))
+    if state.get('time_policy'):
+        base+='\n本期按用途采用的发布时间窗口：'+json.dumps(state['time_policy'],ensure_ascii=False)
+        base+='\nread可附purpose，与search同枚举；旧公告/评论明确作背景，不能证明最近收盘或新发布决定。'
     def save():
         state['provided_ids']=sorted(provided)
         state['executed_coverage']=executed_coverage(state['receipts'],stocks)
@@ -379,7 +406,9 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
             context_changed=previous_delivery!=encoded(state['context_delivery']['body_ranges'])
             state.pop('context_focus',None)
             state['decisions'].append(raw);save()
-            state['phase']='decode_model_response';save();data=decode(raw)
+            state['phase']='decode_model_response';save()
+            notes=[];data=decode(raw,normalizations=notes)
+            if notes:state.setdefault('response_normalizations',[]).append(dict(model_call=state['model_calls'],changes=notes))
             retain_observations(state,data,workspace)
             if data['action']=='finish':
                 state['phase']='validate_finish';state['proposed_dossier']=data;save()
@@ -450,6 +479,7 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
                 elif r.get('tool')=='read':
                     if r.get('candidate_id') not in candidates or r.get('relation') not in {'market','direct','industry','counter'}:
                         raise ValueError('discovery_read_invalid')
+                    if r.get('purpose','discovery') not in PURPOSES:raise ValueError('discovery_time_purpose_invalid')
                     if r['relation']=='direct' and r.get('scope') not in keys:raise ValueError('discovery_direct_scope_missing')
                 elif r.get('tool')=='inspect_context':
                     validate_inspection(r,state)
@@ -483,7 +513,8 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
                     elif state['search_tool_calls']>=state['effective_search_limit']:result=dict(status='budget_exhausted')
                     else:
                         state['search_tool_calls']+=1;save()
-                        response=await call_tool(search,workspace,query,hours=72,deadline=deadline,topic=topic,purpose=purpose)
+                        search_window=window(workspace.now,purpose) if state.get('time_policy') else None
+                        response=await call_tool(search,workspace,query,hours=search_window['hours'] if search_window else 72,deadline=deadline,topic=topic,purpose=purpose)
                         rows=[]
                         for item in response.get('results',[]):
                             url=canonical(item['url'])
@@ -495,6 +526,7 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
                             candidates[identifier].setdefault('retrieval_assessments',[]).append(assess(item,purpose,r['lane']))
                             rows.append(dict(candidate_id=identifier,**candidates[identifier]))
                         result=dict(status=response.get('status'),reason=response.get('reason'),results=rows,purpose=purpose,
+                                    source_window=search_window,
                                     purpose_inferred='purpose' not in r,effective_query=response.get('query',query),
                                     retrieval_profile=response.get('retrieval_profile',{}),
                                     provider_returned_results=response.get('provider_returned_results'),
@@ -511,6 +543,7 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
                     result=local_read(r['id'],r['offset'],r['characters'])
                 else:
                     item=candidates[r['candidate_id']];url=item['url']
+                    source_window=window(workspace.now,read_purpose(r,item)) if state.get('time_policy') else None
                     company=keys.get(r.get('scope'));hay=item.get('title','')+' '+item.get('snippet','')
                     scoped_candidate=any(link.get('scope')==r.get('scope') for link in item.get('discovered_by',[]))
                     if unsupported_page(url):result=dict(status='unsupported',reason=unsupported_page(url))
@@ -521,16 +554,21 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
                     elif state['body_url_calls']>=limits.body_urls:result=dict(status='budget_exhausted')
                     else:
                         state['body_url_calls']+=1;save()
-                        result=await call_tool(read,workspace,url,hours=72,deadline=min(deadline,time.monotonic()+15),characters=4000)
+                        result=await call_tool(read,workspace,url,hours=source_window['hours'] if source_window else 72,deadline=min(deadline,time.monotonic()+15),characters=4000)
                         read_results[url]=result
                     if result.get('status')=='ok':
                         material=result.get('material',{});identifier=material.get('id')
                         if identifier not in workspace.documents or not material.get('text'):raise ValueError('discovery_reader_missing_body')
-                        if r['relation']=='direct' and not company_mentioned(workspace.documents[identifier].content,company):
-                            result=dict(status='rejected',reason='direct_company_not_in_body',stored_body_id=identifier,
+                        from .news_quality import company_focus
+                        from types import SimpleNamespace
+                        if r['relation']=='direct' and not company_focus(workspace.documents[identifier],SimpleNamespace(**company)):
+                            reason=('direct_company_not_primary_subject' if company_mentioned(workspace.documents[identifier].content,company)
+                                    else 'direct_company_not_in_body')
+                            result=dict(status='rejected',reason=reason,stored_body_id=identifier,
                                 scope=r['scope'],reading_status='stored_body_rejected_for_requested_company')
                         else:
                             result=dict(result,research_links=[dict(link) for link in item.get('discovered_by',[])])
+                            if source_window:result['source_window']=source_window
                             provided.add(identifier)
                 receipt=dict(request=r,result=result);state['receipts'].append(receipt);save()
             complete_local_bodies()

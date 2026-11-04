@@ -24,7 +24,7 @@ def tool_caches(state):
             searches.setdefault((query, topic, purpose), deepcopy(result))
         if request.get('tool') == 'read' and request.get('candidate_id') in state.get('candidates', {}):
             # Company/landing/unsupported rejections never attempted a fetch.
-            if result.get('status') in {'ok', 'failed', 'unavailable'}:
+            if result.get('status') in {'ok', 'failed', 'unavailable', 'needs_local_review'}:
                 url = state['candidates'][request['candidate_id']]['url']
                 reads.setdefault(url, deepcopy(result))
     return searches, reads
@@ -111,7 +111,8 @@ def stored_news(row):
     impact = None
     if published.endswith('（日精度；内部日期区间起点不是实际发布时分）'):
         raw = published.split('（日精度；', 1)[0]
-        stamp = datetime.fromisoformat(raw[:10])
+        from .article_metadata import publication_value
+        stamp = publication_value(raw.split('（',1)[0])[0].replace(tzinfo=None,hour=0,minute=0,second=0,microsecond=0)
         impact = '原始来源时点：'+raw+'；精度：day；从已存正文恢复'
     elif published.endswith('（分钟精度）'):
         raw = published[:-len('（分钟精度）')]

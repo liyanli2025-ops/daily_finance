@@ -18,7 +18,7 @@ def infer_purpose(query,lane):
 
 def request_profile(query,purpose,now,hours=72):
     if purpose not in PURPOSES:raise ValueError('search_purpose_invalid')
-    if type(hours) is not int or not 1<=hours<=72:raise ValueError('search_window_invalid')
+    if type(hours) is not int or not 1<=hours<=168:raise ValueError('search_window_invalid')
     if purpose not in {'latest_close','released_policy'}:
         return query,{}
     # Date filtering is only an engine hint. Publication/update date does not

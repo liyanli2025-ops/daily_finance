@@ -20,7 +20,9 @@ def company_alias_headline(title,stock):
 def company_focus(item,stock):
     """A body mention alone does not earn a company-specific editorial slot."""
     short_headline=(company_alias_headline(item.title,stock) and stock.name in (item.content or '')[:600])
-    return bool(short_headline or (stock.name and stock.name in item.title)
+    lead=(item.content or '').lstrip()[:120]
+    lead_subject=bool(stock.name and re.match(re.escape(stock.name)+r'(?:[\s，,：:（(的于拟发公将宣披]|20\d{2})',lead))
+    return bool(short_headline or lead_subject or (stock.name and stock.name in item.title)
         or re.search(r'(?<!\d)'+re.escape(stock.code)+r'(?!\d)',item.title)
         or ((item.source or '').startswith('上市公司公告-') and stock.code in (item.related_stocks or [])))
 
@@ -52,7 +54,7 @@ def excluded_reason(item):
     if parts.hostname in {'wallstreetcn.com','www.wallstreetcn.com'} and re.match(r'^/(member|premium|vip)/',parts.path):
         return 'restricted_article'
     footer=(item.content or '')[-600:]
-    if re.search(r'(?m)^\s*(?:本文|本稿|本报道)\s*(?:由|系|为)?\s*(?:AI|人工智能)\s*(?:自动)?生成',footer,re.I):
+    if re.search(r'(?:本文|本稿|本报道)\s*(?:由|系|为|基于)?\s*(?:AI|人工智能)\s*(?:自动)?(?:生成|生产)',footer,re.I):
         return 'disclosed_ai_generated_article'
     if ('自动生成快讯' in (item.source or '') or '/aiassist/' in parts.path
             or AUTOMATED.search(item.title)):

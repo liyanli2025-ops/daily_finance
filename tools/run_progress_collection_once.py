@@ -1,6 +1,6 @@
 """Preview a fresh progress-driven collection; --run --input-sha spends usage.
 
-Run from a separate upload directory against the reviewed v21+v22+v23+v24 backend. No service,
+Run from a separate upload directory against the reviewed v21+v22+v23+v24+v25 backend. No service,
 credential, scheduler, report, TTS or App database writes. Old trial markers and
 source-failure ledgers remain authoritative and are never removed by this tool.
 """
@@ -21,10 +21,13 @@ import zipfile
 
 TRIAL = 'progress-collection-v1'
 OWNER = 'finance-progress-collection-acceptance-v1'
-# Filled from installed v21 plus the reviewed v22/v23/v24 repairs. LF/CRLF only
+# Filled from installed v21 plus the reviewed v22/v23/v24/v25 repairs. LF/CRLF only
 # is normalized; unknown source changes are not silently accepted.
 REVIEWED_RUNTIME = {
-    "app/services/discovery_resume.py": "f6e543624a07785f091f1394236a18f44d6546f34b7a6767877943d53207f7fa",
+    "app/services/article_metadata.py": "b9af84761c3a539f520a6941e8f8e5ccd9756a7adff4f80128c777d0c222eec6",
+    "app/services/collection_time.py": "e70e83024900f5c6dc09e4d57daee593eb5a375997f3483d007e4d17f5250393",
+    "app/services/news_quality.py": "cffb6117fb6503fa4f12da821a030052d72daff15a119e722be3ce2786353465",
+    "app/services/discovery_resume.py": "c510357f118b5c5ca9e388f4b42f4df74a12423fb994ad359dc200f912e7365d",
     "app/services/discovery_context.py": "8ee21b0d8fa064fcdfeba0a6ee078dd0ddbfc8546d22749e40259eb9b54fb2c8",
     "app/collection_review.py": "0c2a56ebac790e768f7ffd1112b96c444eb464dfe488009953cfe95589f57a8d",
     "app/config.py": "3c7aa5a7c9e679bad52a30fa70cdc9e67986a9b89548dc36c9941cca3cfbe104",
@@ -34,20 +37,20 @@ REVIEWED_RUNTIME = {
     "app/reading_acceptance.py": "99b22e0ced2d1ed5645c29d16972024dc4771da482a14bb9cad291b9655c4b6a",
     "app/services/ai_analyzer.py": "c1d5184f50b66bd00da16866707ca0a74eb0e96926bc31ee03d7ea98770c9d44",
     "app/services/discovery_budget.py": "89c425916b7facd481df44a73a59a18b7bc50ef5f919ed1db8afb2378af95542",
-    "app/services/discovery_completion.py": "bb462947db3ad3aaa9e0777f65b35e8cfd8aeaaad17fe620555a2d4d183570da",
-    "app/services/discovery_feedback.py": "3f6a104f0b2b60c2de6dd98eeb749a3805a8f1445e5dab67b5a89c14386fe0ac",
+    "app/services/discovery_completion.py": "7846913b58e14193fcf1fca54a4900c8d803b7fd617e469e1a9fb70ee8ae63bc",
+    "app/services/discovery_feedback.py": "83ac26ae2440970a27b189c51c8afbd48ec1a12647dd1f7b79b3aa085642fa1b",
     "app/services/episode_research.py": "b810755244f6816e54de7fb170cd59b33bf05e164bfbeda2336bf2a0bdb1faae",
     "app/services/episode_workspace.py": "180530fd20d85514ca70717ac3ff0f17d765a77302d7ff656842f3bea284edf0",
     "app/services/generic_extraction.py": "1b12efef7a6c1e748caf81733f7eb235e353244806a9e264415de5cf9f3365f8",
     "app/services/model_gateway.py": "af70135e8007cf2da9d52538a18bfd2b8b0dd0ed4e6ef42453e7e9fb952efbf2",
     "app/services/model_usage.py": "12e657d6652ad3c45d511c91b64756943062b99ebee261c1ba6da1c25c9bb502",
-    "app/services/primary_discovery.py": "ab54cdb857d4d29551b222f99c9e9949469f7a846e143ac3b921fbf82495e87c",
+    "app/services/primary_discovery.py": "fc4025766557529cd76207848e9a73ada6f6898a59594c1d06c82cbfa3855342",
     "app/services/primary_material_quality.py": "d0d282b2f7bf1995792a8ae0909098bb9a25631b6f7f64f65add6dc481d28ff8",
-    "app/services/primary_report.py": "55d6c5dbbfa74fb0ed28e47253689895cffda9428ed99c7cbe2186af316b7b8c",
+    "app/services/primary_report.py": "4ff7cab51adf0d33bcb985fbd5e966c3db4a71e961b76656b3c2e89ec3462ca7",
     "app/services/reading_acceptance.py": "4c457fa15ef27c19841711352de5c0c80407e36df835d2e1ff6a8c4d8c76b193",
-    "app/services/search_objectives.py": "6cff95ba005013ddd5ba4e836e43712372cb7483c6a646e9c935509e5d91ac5f",
+    "app/services/search_objectives.py": "ea2974422e9bce544fca5f0ad53741172146143f7a21aa153bbb04788259f0a9",
     "app/services/search_primary_collection.py": "e71098d1d165e1ffb64a7cd51b2f686e0b843b4936122b99dad6f0d1f10fd63a",
-    "app/services/web_research.py": "d5054b15254028721a1b6891eac5906dc40d9fd68cc35c1dbb3654cd4c10fbb3"
+    "app/services/web_research.py": "85c45c286548d0f69f84bae038c3bbc9e181cdc26ab92e846588cab52364f9e7"
 }
 POLICY_FIELDS = ('research_max_model_calls', 'research_total_input_characters',
                  'research_total_output_tokens', 'research_web_search_max_requests',

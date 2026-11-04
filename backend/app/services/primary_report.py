@@ -18,6 +18,7 @@ from .search_primary_collection import prepare as prepare_primary, watchlist_row
 from .watchlist_repository import watchlist_signature
 from .time_context import china_now
 from .discovery_completion import CONTRACT, completion_review
+from .collection_time import policy as time_policy,validate_window,eligible as time_eligible
 
 OWNER = 'finance-primary-report-input-v1'
 FINISHED = {'materials_for_human_review', 'partial_materials_for_human_review'}
@@ -45,6 +46,8 @@ def export_discovery(workspace, state):
     cutoff = local_time(state['started_at'])
     if cutoff != workspace.now:
         raise ValueError('primary_report_workspace_clock_changed')
+    if state.get('time_policy') is not None and state['time_policy']!=time_policy(cutoff):
+        raise ValueError('primary_report_time_policy_changed')
     provided = state.get('provided_ids')
     if not isinstance(provided, list) or not provided or len(set(provided)) != len(provided):
         raise ValueError('primary_report_provided_ids_invalid')
@@ -87,10 +90,12 @@ def export_discovery(workspace, state):
                                observation_times=sorted(set(observations)),
                                observation_time_unknown=not observations,
                                available_at_cutoff_verified=False,
+                               source_windows=records.get(identifier,{}).get('source_windows',[]),
                                reading_scope=reading_scope(item)))
     if any(not records.get(identifier, {}).get('eligible') for identifier in selected):
         raise ValueError('primary_report_selected_body_not_eligible')
     return dict(owner=OWNER, collected_at=cutoff.isoformat(), hours=72, watchlist=stocks,
+                time_policy=state.get('time_policy'),
                 news=news, provenance=provenance, research=state['dossier'],
                 budget_contract=state.get('budget_contract'),
                 collection_completion=(completion_review(state) if state.get('budget_contract')==CONTRACT else None),
@@ -137,6 +142,8 @@ def prepare(value, now=None):
         hours = value.get('hours')
         if type(hours) is not int or not 1 <= hours <= 72 or cutoff > now:
             raise ValueError('primary_report_clock_invalid')
+        policy=value.get('time_policy')
+        if policy is not None and policy!=time_policy(cutoff):raise ValueError('primary_report_time_policy_changed')
         if value.get('source_status') not in FINISHED:
             raise ValueError('primary_report_discovery_incomplete')
         stocks = watchlist_rows(value.get('watchlist'))
@@ -152,8 +159,12 @@ def prepare(value, now=None):
         if len(hashes) != len(provenance) or set(hashes) != set(identifiers):
             raise ValueError('primary_report_provenance_mismatch')
         for item in news:
+            windows=next(row for row in provenance if row['id']==item.id).get('source_windows',[])
+            if not isinstance(windows,list):raise ValueError('primary_report_source_window_invalid')
+            for window in windows:validate_window(window,cutoff)
+            if windows and policy is None:raise ValueError('primary_report_time_policy_missing')
             if (len(item.content.strip()) < 80 or reading_scope(item) not in {'full_text', 'visible_body', 'wire_text'}
-                    or excluded_reason(item) or not within_window(item, cutoff, hours)):
+                    or excluded_reason(item) or not (time_eligible(item,cutoff,windows) if policy else within_window(item, cutoff, hours))):
                 raise ValueError('primary_report_source_not_admitted')
             if body_hash(item) != hashes[item.id]:
                 raise ValueError('primary_report_body_hash_mismatch')
@@ -172,6 +183,7 @@ def prepare(value, now=None):
                 collection_feedback=value['collection_feedback'],watchlist=stocks,status=value['source_status'],
                 **(value.get('upstream_usage') or {})))
         source = dict(cutoff=cutoff.isoformat(), hours=hours, watchlist=stocks,
+                      time_policy=policy,
                       research=value['research'], executed_coverage=value.get('executed_coverage', {}),
                       provenance=provenance, search_receipts=value.get('search_receipts', []),
                       collection_feedback=value.get('collection_feedback'), open_tasks=value.get('open_tasks', []),
