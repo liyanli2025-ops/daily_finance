@@ -243,17 +243,17 @@ def assemble_request(base, state, limits, budget_plan):
     return prefix+encoded(view)+suffix, manifest(view)
 
 
-async def discover(workspace,stocks,*,limits=None,model=None,search=None,read=None,checkpoint=None):
+async def discover(workspace,stocks,*,limits=None,model=None,search=None,read=None,checkpoint=None,resume=None):
     if model is not None:
-        return await _discover(workspace,stocks,limits=limits,model=model,search=search,read=read,checkpoint=checkpoint)
+        return await _discover(workspace,stocks,limits=limits,model=model,search=search,read=read,checkpoint=checkpoint,resume=resume)
     from ..config import settings
     from .model_usage import collection_usage_scope
     # Scope only changes accounting/input guards; the gateway still enforces pause and retry policy.
     with collection_usage_scope(settings.research_input_max_characters):
-        return await _discover(workspace,stocks,limits=limits,model=model,search=search,read=read,checkpoint=checkpoint)
+        return await _discover(workspace,stocks,limits=limits,model=model,search=search,read=read,checkpoint=checkpoint,resume=resume)
 
 
-async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=None,checkpoint=None):
+async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=None,checkpoint=None,resume=None):
     """Collect with explicit adapters. Never enables search or unpauses models.
 
     checkpoint stores private receipts after every decision/tool, not a public
@@ -263,13 +263,22 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
     from .model_gateway import complete
     from .web_research import search as web_search,read_public,search_availability
     stocks=watchlist_rows(stocks)
+    resumed=None
+    if resume is not None:
+        if limits is not None:raise ValueError('discovery_resume_requires_original_dynamic_plan')
+        from .discovery_resume import restore_state
+        resumed=restore_state(workspace,stocks,resume,settings)
     if limits is None:
         limits, ceiling, budget_plan=plan_budget(len(stocks),len(LANES),settings)
     else:
         ceiling=None
         budget_plan=dict(mode='explicit_fixed_limits',initial=limits.__dict__,ceiling=limits.__dict__)
+    if resumed is not None:
+        state,limits,ceiling,budget_plan,spent_seconds=resumed
+    else:spent_seconds=0
     progress_driven=budget_plan['mode']=='progress_driven_collection'
     shared_search_remaining=max(0,settings.research_web_search_max_requests-getattr(workspace,'web_search_attempts',0))
+    if resumed is not None:shared_search_remaining+=state['search_tool_calls']
     if model is None and settings.model_http_retries!=0:raise RuntimeError('discovery_requires_zero_model_retries')
     if search is None and not search_availability()['available']:
         raise RuntimeError('discovery_search_unavailable_before_model')
@@ -277,7 +286,7 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
     from .research_hub import save_json
     checkpoint=checkpoint or (lambda state:save_json(workspace.path/'primary-discovery.json',state))
     keys={s['market']+':'+s['code']:s for s in stocks}
-    state=dict(owner='finance-model-led-discovery-v1',status='running',started_at=workspace.now.isoformat(),
+    fresh=dict(owner='finance-model-led-discovery-v1',status='running',started_at=workspace.now.isoformat(),
         watchlist=stocks,limits=limits.__dict__,budget_plan=budget_plan,budget_expansions=[],
         effective_search_limit=min(limits.search_calls,shared_search_remaining),
         model_calls=0,model_input_characters=0,reserved_output_tokens=0,search_tool_calls=0,body_url_calls=0,
@@ -286,11 +295,16 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
         context_delivery=dict(body_ranges={},candidate_ids=[]),observations=[],
         local_read_characters=0,no_progress_turns=0,finish_feedback_history=[],
         limitation='模型选择、范围标签与机械校验不是投资价值或事实准确性验收；不生成报告、口播或发布。')
-    candidates=state['candidates'];seen_urls={};searched={};read_results={};provided=set()
+    if resumed is None:state=fresh
+    from .discovery_resume import tool_caches
+    candidates=state['candidates'];seen_urls={row['url']:key for key,row in candidates.items()}
+    searched,read_results=tool_caches(state)
+    provided=set(state['provided_ids'])
+    state['effective_search_limit']=min(limits.search_calls,shared_search_remaining)
     last_rejected_finish=None
     started=time.monotonic()
-    deadline=started+limits.seconds
-    base=prompt(stocks,workspace.now,limits)
+    deadline=started+limits.seconds-spent_seconds
+    base=prompt(stocks,workspace.now,Limits(**budget_plan['initial']))
     def save():
         state['provided_ids']=sorted(provided)
         state['executed_coverage']=executed_coverage(state['receipts'],stocks)
@@ -442,14 +456,14 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
                 else:raise ValueError('discovery_unknown_tool')
             if data.get('budget_extension') is not None:
                 limits, expansion=expand_budget(limits,ceiling,state,data['budget_extension'],
-                    requests=requests,elapsed=time.monotonic()-started,
+                    requests=requests,elapsed=time.monotonic()-started+spent_seconds,
                     input_characters=message_characters([{'role':'user','content':request_text()[0]}]))
                 state['budget_expansions'].append(expansion)
                 if expansion['status']=='expanded':
                     state['last_budget_expansion_progress']=expansion['progress']
                     state['limits']=limits.__dict__
                     state['effective_search_limit']=min(limits.search_calls,shared_search_remaining)
-                    deadline=started+limits.seconds
+                    deadline=started+limits.seconds-spent_seconds
                 save()
             for r in requests:
                 if r['tool']=='search':

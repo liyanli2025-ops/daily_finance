@@ -1,6 +1,6 @@
 """Preview a fresh progress-driven collection; --run --input-sha spends usage.
 
-Run from a separate upload directory against the reviewed v21+v22+v23 backend. No service,
+Run from a separate upload directory against the reviewed v21+v22+v23+v24 backend. No service,
 credential, scheduler, report, TTS or App database writes. Old trial markers and
 source-failure ledgers remain authoritative and are never removed by this tool.
 """
@@ -21,9 +21,10 @@ import zipfile
 
 TRIAL = 'progress-collection-v1'
 OWNER = 'finance-progress-collection-acceptance-v1'
-# Filled from installed v21 plus the reviewed v22/v23 repairs. LF/CRLF only
+# Filled from installed v21 plus the reviewed v22/v23/v24 repairs. LF/CRLF only
 # is normalized; unknown source changes are not silently accepted.
 REVIEWED_RUNTIME = {
+    "app/services/discovery_resume.py": "f6e543624a07785f091f1394236a18f44d6546f34b7a6767877943d53207f7fa",
     "app/services/discovery_context.py": "8ee21b0d8fa064fcdfeba0a6ee078dd0ddbfc8546d22749e40259eb9b54fb2c8",
     "app/collection_review.py": "0c2a56ebac790e768f7ffd1112b96c444eb464dfe488009953cfe95589f57a8d",
     "app/config.py": "3c7aa5a7c9e679bad52a30fa70cdc9e67986a9b89548dc36c9941cca3cfbe104",
@@ -40,7 +41,7 @@ REVIEWED_RUNTIME = {
     "app/services/generic_extraction.py": "1b12efef7a6c1e748caf81733f7eb235e353244806a9e264415de5cf9f3365f8",
     "app/services/model_gateway.py": "af70135e8007cf2da9d52538a18bfd2b8b0dd0ed4e6ef42453e7e9fb952efbf2",
     "app/services/model_usage.py": "12e657d6652ad3c45d511c91b64756943062b99ebee261c1ba6da1c25c9bb502",
-    "app/services/primary_discovery.py": "d889d8de9703f7be31eb4daa4c7c5e91a0de7a9bbdc2970aeb58545c29119f93",
+    "app/services/primary_discovery.py": "ab54cdb857d4d29551b222f99c9e9949469f7a846e143ac3b921fbf82495e87c",
     "app/services/primary_material_quality.py": "d0d282b2f7bf1995792a8ae0909098bb9a25631b6f7f64f65add6dc481d28ff8",
     "app/services/primary_report.py": "55d6c5dbbfa74fb0ed28e47253689895cffda9428ed99c7cbe2186af316b7b8c",
     "app/services/reading_acceptance.py": "4c457fa15ef27c19841711352de5c0c80407e36df835d2e1ff6a8c4d8c76b193",
@@ -70,7 +71,7 @@ def source_snapshot(backend):
         path = backend / relative
         if (not path.is_file() or path.is_symlink()
                 or hashlib.sha256(path.read_bytes().replace(b'\r\n', b'\n')).hexdigest() != expected):
-            raise CheckError('源码与已审阅v21+v22+v23不符，停止：' + relative)
+            raise CheckError('源码与已审阅v21+v22+v23+v24不符，停止：' + relative)
     # Also detect drift in imported support modules between preview and run.
     files = sorted((backend / 'app').rglob('*.py'))
     if any(p.is_symlink() for p in files):
@@ -166,14 +167,19 @@ async def preview(backend):
     plan = value['budget_plan']
     max_by_output = plan['total_reserved_output_tokens'] // plan['initial']['output_tokens']
     configured_cap = plan['model_request_cap']
+    resume = value['environment'].get('resume')
+    if resume:
+        max_by_output = resume['remaining_reserved_output_tokens'] // plan['initial']['output_tokens']
+        if configured_cap is not None:configured_cap -= resume['prior_segment_model_calls']
     print(json.dumps(dict(mode='free_progress_collection_preview', trial=TRIAL,
         ready_to_run=not blockers, blockers=blockers, input_sha256=fingerprint(value),
         prepared_at=value['prepared_at'], expires_at=value['expires_at'],
         watchlist=value['watchlist'], route=value['environment']['route'], budget_plan=plan,
         max_model_requests_from_output_reservation=(min(max_by_output, configured_cap)
             if configured_cap is not None else max_by_output),
-        max_public_fetch_attempts_including_redirects=value['public_fetch_ceiling'],
-        max_search_http_requests=plan['ceiling']['search_calls'],
+        max_public_fetch_attempts_including_redirects=(value['public_fetch_ceiling']
+            - resume['prior_segment_public_fetch_attempts'] if resume else value['public_fetch_ceiling']),
+        max_search_http_requests=(resume['remaining_search_http_attempts'] if resume else plan['ceiling']['search_calls']),
         production_search_enabled=value['production_search_enabled'],
         trial_search_enabled_only_inside_this_process=True,
         extractor=value['environment']['extractor'], retries=0,
@@ -181,6 +187,7 @@ async def preview(backend):
         tts_requests=0, production_pause_preserved=True,
         result_file=str(result_file),
         continuation=value['environment'].get('continuation'),
+        resume=resume,
         limitation='这只是本地预览，尚未联网。运行会使用模型及Tavily账户额度；'
             '字符与预留输出不是金额上限，也不保证达到上限才结束。'
             '模型请求数由累计输出上限推导，未新增固定取材轮次。'

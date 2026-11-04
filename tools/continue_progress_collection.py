@@ -110,7 +110,7 @@ def verify_receipts(original, original_input, original_marker, diagnostic, diagn
         raise ValueError('Diagnostic does not cover the reviewed revised request')
 
 
-def evidence(backend, base):
+def evidence(backend, base, reviewed_source_changes=None):
     from app.config import settings
     from app.services.research_hub import ResearchHub
     from app.services.source_health import state_path
@@ -131,7 +131,9 @@ def evidence(backend, base):
     if probe_input['prior_result_sha256'] != frozen[str(paths[0])]:
         raise ValueError('Diagnostic result is not bound to this failed collection')
     for name, expected in probe_input['source_sha256'].items():
-        if Path(name).name != name or sha(backend / 'app/services' / name) != expected:
+        actual = sha(backend / 'app/services' / name)
+        reviewed = (reviewed_source_changes or {}).get(name)
+        if Path(name).name != name or (actual != expected and reviewed != (expected, actual)):
             raise ValueError('Runtime differs from the successfully revalidated source')
     if sha(backend / '.env') != probe_input['env_file_sha256']:
         raise ValueError('Configuration changed after successful search revalidation')
