@@ -5,8 +5,9 @@ identity or whether a source independently corroborates another source.
 """
 import hashlib
 from collections import deque
+from types import SimpleNamespace
 
-from .news_quality import excluded_reason, reading_scope
+from .news_quality import excluded_reason, reading_scope,company_focus
 from .news_selection import within_window
 from .primary_material_quality import QUESTIONS, review_body
 from .search_primary_collection import LANES
@@ -17,6 +18,16 @@ from .material_roles import assess_role,lane_allowed
 def cited_ids(dossier):
     return sorted({identifier for key in ('events', 'coverage', 'watchlist_checks')
                    for row in dossier.get(key, []) for identifier in row.get('evidence_ids', [])})
+
+
+def lane_usage_allowed(item,lane,windows,now):
+    if not lane_allowed(item,lane):return False
+    critical={'a_market','hk_market','us_market','commodities','global_policy'}
+    if lane not in critical:return True
+    if windows and all(row.get('purpose')=='commentary' for row in windows):return False
+    purpose='released_policy' if lane=='global_policy' else 'latest_close'
+    hours=policy(now)['hours'][purpose] if windows else 72
+    return within_window(item,now,hours)
 
 
 def complete_local_reads(workspace, state, limits, *, room_for_text, checkpoint, active=lambda: True):
@@ -151,21 +162,13 @@ def build_feedback(workspace, state, stocks, limits):
         candidate = candidates.get(candidate_id, {})
         lanes = {r['lane'] for r in result.get('research_links', candidate.get('discovered_by', []))}
         source_item=workspace.documents[result['material']['id']]
-        lanes={lane for lane in lanes if lane_allowed(source_item,lane)}
-        # A background window does not qualify as evidence of the latest
-        # market session or an actual new policy release.
-        market_hours=policy(workspace.now)['hours']['latest_close'] if row['source_windows'] else 72
-        if not within_window(source_item,workspace.now,market_hours):
-            lanes-={'a_market','hk_market','us_market','global_policy'}
-        if result.get('source_window',{}).get('purpose')=='commentary':
-            lanes-={'a_market','hk_market','us_market','global_policy'}
+        current_windows=[result['source_window']] if result.get('source_window') else []
+        lanes={lane for lane in lanes if lane_usage_allowed(source_item,lane,current_windows,workspace.now)}
         # Industry/direct relations are explicit research uses, not inferred
         # from body keywords. Even these links do NOT verify the subject.
         if request.get('relation') == 'direct':
             lanes &= {'company_event'}
             if request.get('scope'):
-                from .news_quality import company_focus
-                from types import SimpleNamespace
                 company=next((stock for stock in stocks if stock['market']+':'+stock['code']==request['scope']),None)
                 if company is not None and company_focus(source_item,SimpleNamespace(**company)):
                     row['direct_scopes'].append(request['scope'])
@@ -215,7 +218,14 @@ def build_feedback(workspace, state, stocks, limits):
             if any(r.get('scope') == scope if scope else r.get('lane') == lane for r in links):
                 cached_id = outcome.get('stored_body_id')
                 if cached_id:
-                    if cached_id not in ids and reusable(cached_id):
+                    item=workspace.documents.get(cached_id)
+                    windows=receipt_windows(receipts,cached_id,workspace.now)
+                    company=next((stock for stock in stocks if stock['market']+':'+stock['code']==scope),None)
+                    usable=False
+                    if item is not None:
+                        usable=bool(company and company_focus(item,SimpleNamespace(**company))) if scope else \
+                            lane_usage_allowed(item,lane,windows,workspace.now)
+                    if cached_id not in ids and reusable(cached_id) and usable:
                         cached.append(identifier)
                 else:
                     fresh.append(identifier)
@@ -275,7 +285,9 @@ def assess_finish(dossier, feedback, *, last_turn=False):
         for row in dossier[key]:
             record = actual[row[field]]
             if row['status'] == 'body_provided' and not set(row['evidence_ids']) <= set(record['body_ids']):
-                problems.append(dict(code='body_not_read_for_claimed_scope', scope=row[field]))
+                problems.append(dict(code='body_not_read_for_claimed_scope', scope=row[field],
+                    received_ids=row['evidence_ids'],allowed_body_ids=record['body_ids'],
+                    instruction='正文存在不代表适用于本范围；按实际账本保留缺口，选择其他来源或明确延期。'))
             if row['status'] == 'searched' and not record['successful_search']:
                 problems.append(dict(code='successful_search_receipt_missing', scope=row[field]))
     known = {task['task_id'] for task in feedback['tasks']}
