@@ -18,6 +18,14 @@ def review_body(content):
             findings.append(dict(code='merchandise_call_to_action', start=start, end=end))
     for match in re.finditer(r'扫码(?:购买|下单|领券)|点击(?:购买|下单)|立即(?:购买|下单|抢购)', content):
         findings.append(dict(code='purchase_call_to_action', start=match.start(), end=match.end()))
+    # Product names, ratings and risk disclaimers alone are normal reporting.
+    # Pair an explicit product invitation with a nearby identifiable product.
+    product=re.compile(r'ETF|基金|理财产品|信托产品',re.I)
+    for match in re.finditer(r'关注|布局|立即(?:认购|申购)|欢迎(?:认购|申购)|全市场领先|更高更纯|含[\u4e00-\u9fff]{1,4}量',content):
+        start,end=max(0,match.start()-70),min(len(content),match.end()+100)
+        window=content[start:end]
+        if (product.search(window) and re.search(r'\d{6}|[（(][A-Z0-9]{3,12}[）)]|更高更纯|全市场领先',window)):
+            findings.append(dict(code='financial_product_promotion',start=start,end=end))
     # Multiple lettered poll choices are an interaction block, not price data.
     choices = list(re.finditer(r'(?m)^\s*[A-D]\s*级\s*[｜|：:]', content))
     if len(choices) >= 3:

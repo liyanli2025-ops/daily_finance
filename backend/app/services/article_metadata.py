@@ -51,7 +51,9 @@ def article_title(soup, article, heading=None):
 def visible_publication_fields(soup):
     """Read bounded publication widgets, never recommendation timestamps."""
     values = []
-    for node in soup.select('.publication-header__details li, .artiHead .artiTime'):
+    for node in soup.select('.publication-header__details li, .artiHead .artiTime, '
+            '.artMain > .artDes > span, .article-cont > .details > i, '
+            '#content > h2 > .text-v2 > font'):
         text = node.get_text(' ', strip=True)
         try:
             publication_value(text)
@@ -65,3 +67,32 @@ def visible_publication_fields(soup):
         if re.fullmatch(r'\d{10}', raw) and 946684800 <= int(raw) < 4102444800:
             values.append(datetime.fromtimestamp(int(raw), timezone.utc).isoformat())
     return values
+
+
+def extracted_article_title(soup, content):
+    """Only after successful generic extraction: match a visible headline.
+
+    No hidden fields/scripts or search titles. A document title alone is not
+    sufficient; it must agree with a visible heading or the extracted opening.
+    The caller still checks publication, access and document type separately.
+    """
+    if soup.title is None:return ''
+    document=soup.title.get_text(' ',strip=True)
+    if not 6<=len(document)<=300:return ''
+    def normalized(text):return re.sub(r'[^\w]', '', text).lower()
+    doc=normalized(document)
+    for node in soup.select('h1, h2, h3, strong#title'):
+        if any(p.name in {'nav','aside','footer','form','script','template'} or p.has_attr('hidden')
+               or p.get('aria-hidden')=='true' or re.search(r'display\s*:\s*none|visibility\s*:\s*hidden',(p.get('style') or ''),re.I)
+               for p in (node,*node.parents)):
+            continue
+        heading=node.get_text(' ',strip=True);key=normalized(heading)
+        if 6<=len(heading)<=300 and len(key)>=6 and (doc==key or document.startswith(heading)
+                and re.match(r'\s*[-_|—｜]',document[len(heading):])):
+            return heading
+    # Some short news items use their opening as the document title. Require
+    # a substantial exact prefix in successfully extracted, visible text.
+    opening=normalized(content)
+    title=re.split(r'[_|｜]',document,maxsplit=1)[0].strip();key=normalized(title)
+    if len(key)>=24 and opening.startswith(key[:min(80,len(key))]):return title
+    return ''

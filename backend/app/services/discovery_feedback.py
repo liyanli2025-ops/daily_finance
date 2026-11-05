@@ -4,6 +4,7 @@ The controller checks acquisition and exposure, not truth, importance, issuer
 identity or whether a source independently corroborates another source.
 """
 import hashlib
+import re
 from collections import deque
 from types import SimpleNamespace
 
@@ -305,11 +306,22 @@ def assess_finish(dossier, feedback, *, last_turn=False):
             or not row['reason'].strip() for row in deferred)):
         problems.append(dict(code='deferred_tasks_invalid'))
         deferred = []
-    deferred_ids = {row['task_id'] for row in deferred}
+    from .discovery_budget import task_has_capacity
+    resources=feedback.get('resource_review')
+    tasks={task['task_id']:task for task in feedback['tasks']}
+    invalid=[]
+    for row in deferred:
+        if (not last_turn and re.search(r'预算|额度|budget|quota|token',row['reason'],re.I)
+                and task_has_capacity(tasks[row['task_id']],resources)):
+            problems.append(dict(code='budget_deferral_contradicts_resources',task_id=row['task_id'],
+                instruction='仍有可读候选或有进展的扩展空间；选择能解决缺口的工具，或给出具体编辑取舍，不得声称额度已耗尽。'))
+            invalid.append(row['task_id'])
+    deferred_ids = {row['task_id'] for row in deferred if row['task_id'] not in invalid}
     pending = [task['task_id'] for task in feedback['tasks'] if task['executable']
                and task['task_id'] not in deferred_ids
                and (task['kind'] != 'read_remaining' or set(task['evidence_ids']) & set(selected))]
     return dict(accepted=not problems and (not pending or last_turn), problems=problems,
         actionable_unresolved_tasks=pending, deferred_tasks=deferred,
         stopped_at_model_limit=bool(last_turn and pending), selected_ids=selected,
+        invalid_budget_deferrals=invalid,
         instruction='依据实际缺口继续选择工具；可显式说明暂不补查的编辑理由。不得自行增加模型轮次或越过硬上限、重试失败URL或把缺口改写成无消息。')

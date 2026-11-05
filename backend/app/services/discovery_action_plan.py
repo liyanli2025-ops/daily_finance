@@ -48,7 +48,10 @@ def action_plan(state,feedback,*,max_characters=6000):
                 reused_without_http=identifier in task.get('reusable_candidate_ids',[])))
         if options:row['candidate_options']=options
         remaining=feedback.get('remaining',{})
-        search_available=bool(remaining.get('searches') and remaining.get('body_urls') and not state.get('search_route_failed'))
+        measured=feedback.get('resource_review',{})
+        extended=measured.get('hard_remaining',{}) if measured.get('extension_progress_available') else {}
+        search_available=bool((remaining.get('searches') or extended.get('searches'))
+            and (remaining.get('body_urls') or extended.get('body_urls')) and not state.get('search_route_failed'))
         if task.get('lane') and search_available:
             row['search_option']=dict(tool='search',lane=task['lane'],scope=task.get('scope'),
                 query_required='由你根据问题编写适合来源语言的查询；不要重复已失败路径',

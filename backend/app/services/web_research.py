@@ -315,6 +315,9 @@ def parse_visible_article(html,url,now=None,hours=72):
         if candidate.get('status')=='unavailable':raise ValueError('web_source_generic_extractor_unavailable')
         if candidate.get('status')!='text_candidate':raise ValueError('web_source_article_structure_missing')
         content=candidate['text']
+        if not title:
+            from .article_metadata import extracted_article_title
+            title=extracted_article_title(soup,content)
         extraction_note='；正文算法：'+candidate['method']+' '+candidate['version']+'；未确认完整稿；'+','.join(candidate['warnings'])
     else:
         for node in article.select('script,style,nav,aside,footer,form'):node.decompose()

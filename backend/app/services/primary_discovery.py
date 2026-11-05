@@ -9,7 +9,7 @@ import re
 import time
 from urllib.parse import urlsplit
 
-from .discovery_budget import Limits, plan_budget, expand_budget
+from .discovery_budget import Limits, plan_budget, expand_budget, matching_proposal, resource_review, task_has_capacity
 from .discovery_completion import CONTRACT, review_events, completion_review
 from .prompt_reading import input_characters as message_characters
 from .event_observations import canonical
@@ -49,6 +49,8 @@ section可为candidates、receipts、observations或bodies；offset从0开始，
 正文元数据中的body_quality是非破坏式编辑提示；出现推广/投票信号时优先换独立来源，
 不得把促销口号写成新闻或忽略反证。启发式可能命中报道引用，未标记也不代表稿件合格。
 source_role中的限制同样必须遵守：银行评论不能证明央行原始发布，晨报/盘中稿不能代替收盘或结算资料。
+发布时间和行情交易日必须分开；72小时内的稿件不自动代表最新完成交易时段。reported_session_labels仅为正文原值，须继续核对最近交易日及合约。
+本文已有二手供需/反方讨论与尚缺原始数据必须分开描述；不能把未独立核实改写成文中没有。
 主资料候选菜单会标注用途：决议前瞻保留为背景，不能证明决议已公布；X等社交页面需独立讨论读取器，不用HTML正文工具读取。
 优先核对能直接解决缺口的已完成时段资料；滚动稿仍可能含后续更新，不因标题就断言无效。
 背景仍可用于解释与反证；若主资料仍缺，继续补查或明确保留缺口，不能靠改标签宣称覆盖完成。
@@ -343,6 +345,13 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
         state['provided_ids']=sorted(provided)
         state['executed_coverage']=executed_coverage(state['receipts'],stocks)
         state['collection_feedback']=build_feedback(workspace,state,stocks,limits)
+        resources=resource_review(limits,ceiling,state,elapsed=time.monotonic()-started+spent_seconds,
+            total_input=settings.research_total_input_characters,total_output=settings.research_total_output_tokens,
+            shared_search_limit=shared_search_remaining)
+        state['collection_feedback']['resource_review']=resources
+        for task in state['collection_feedback']['tasks']:
+            if not task.get('executable') and task_has_capacity(task,resources):
+                task.update(executable=True,requires_budget_extension=True)
         if progress_driven:state['collection_completion']=completion_review(state)
         checkpoint(state)
     def request_text():
@@ -495,11 +504,15 @@ async def _discover(workspace,stocks,*,limits=None,model=None,search=None,read=N
                 elif r.get('tool')=='inspect_context':
                     validate_inspection(r,state)
                 else:raise ValueError('discovery_unknown_tool')
-            if data.get('budget_extension') is not None:
-                limits, expansion=expand_budget(limits,ceiling,state,data['budget_extension'],
+            proposal=data.get('budget_extension')
+            automatic=proposal is None and progress_driven
+            if automatic:proposal=matching_proposal(state,requests,limits)
+            if proposal is not None:
+                limits, expansion=expand_budget(limits,ceiling,state,proposal,
                     requests=requests,elapsed=time.monotonic()-started+spent_seconds,
                     input_characters=message_characters([{'role':'user','content':request_text()[0]}]))
-                state['budget_expansions'].append(expansion)
+                expansion['origin']='selected_tools_local_review' if automatic else 'model_proposal'
+                if not automatic or expansion['status']=='expanded':state['budget_expansions'].append(expansion)
                 if expansion['status']=='expanded':
                     state['last_budget_expansion_progress']=expansion['progress']
                     state['limits']=limits.__dict__

@@ -57,6 +57,67 @@ def evidence_progress(state):
         sorted((key, row['ranges']) for key, row in feedback.get('bodies', {}).items() if row['eligible'])]
 
 
+def addresses_task(request, task):
+    if task['kind']=='read_remaining':
+        return request.get('tool')=='read_more' and request.get('id') in task['evidence_ids']
+    if request.get('tool')=='read':return request.get('candidate_id') in task.get('candidate_ids',[])
+    if request.get('tool')=='search':
+        return request.get('scope')==task['scope'] if task.get('scope') else request.get('lane')==task.get('lane')
+    return False
+
+
+def matching_proposal(state, requests, limits):
+    """A local capacity proposal for actual model-selected tools, no new tools."""
+    needs=set()
+    for tool,used,cap in [('search',state.get('search_tool_calls',0),state['effective_search_limit']),
+                         ('read',state.get('body_url_calls',0),limits.body_urls),
+                         ('read_more',state.get('local_read_characters',0),limits.local_read_characters)]:
+        amount=sum((r.get('characters',0) if tool=='read_more' else 1) for r in requests if r.get('tool')==tool)
+        if amount and (used>=cap*.75 or used+amount>cap):needs.add(tool)
+    ids=[t['task_id'] for t in state['collection_feedback']['tasks']
+         if any(request.get('tool') in needs and addresses_task(request,t) for request in requests)]
+    if not ids:return None
+    return dict(task_ids=list(dict.fromkeys(ids))[:12],reason='已选择解决实际缺口的工具，按真实进展核对同一期资源扩展')
+
+
+def resource_review(limits, ceiling, state, *, elapsed, total_input, total_output, shared_search_limit=None):
+    """Measured resources, not a monetary allowance or a coverage certificate."""
+    def room(cap,key,used):return max(0,getattr(cap,key)-state.get(used,0))
+    current=dict(searches=max(0,state['effective_search_limit']-state.get('search_tool_calls',0)),
+        body_urls=room(limits,'body_urls','body_url_calls'),
+        local_characters=room(limits,'local_read_characters','local_read_characters'))
+    maximum=ceiling or limits
+    progress=evidence_progress(state)
+    can_expand=bool(ceiling is not None and any(progress)
+        and progress!=state.get('last_budget_expansion_progress') and state.get('no_progress_turns',0)<2)
+    next_input=max(12000,state.get('request_context',{}).get('request_characters',12000))
+    turn_room=(limits.model_calls is None or state.get('model_calls',0)<limits.model_calls)
+    turn_room=bool(turn_room and total_input-state.get('model_input_characters',0)>=next_input
+        and total_output-state.get('reserved_output_tokens',0)>=limits.output_tokens and elapsed<limits.seconds)
+    hard=dict(searches=room(maximum,'search_calls','search_tool_calls'),
+        body_urls=room(maximum,'body_urls','body_url_calls'),
+        local_characters=room(maximum,'local_read_characters','local_read_characters'))
+    if shared_search_limit is not None:
+        hard['searches']=min(hard['searches'],max(0,shared_search_limit-state.get('search_tool_calls',0)))
+    return dict(owner='finance-measured-resource-review-v1',current=current,hard_remaining=hard,
+        next_turn_resources_available=turn_room,extension_progress_available=can_expand,
+        search_route_available=not state.get('search_route_failed',False),
+        remaining_seconds=max(0,limits.seconds-elapsed),
+        remaining_input_characters=max(0,total_input-state.get('model_input_characters',0)),
+        remaining_reserved_output_tokens=max(0,total_output-state.get('reserved_output_tokens',0)),
+        limitation='当前资源和扩展空间不是金额、新闻价值或完成度判定；工具仍由模型选择，失败台账和总上限不变。')
+
+
+def task_has_capacity(task, review):
+    if not review or not review['next_turn_resources_available']:return False
+    remaining=review['current'];maximum=review['hard_remaining']
+    def available(key):return remaining[key]>0 or review['extension_progress_available'] and maximum[key]>0
+    if task['kind']=='read_remaining':return available('local_characters')
+    if task.get('reusable_candidate_ids') and available('local_characters'):return True
+    if task.get('candidate_ids') and available('body_urls'):return True
+    return bool(review['search_route_available'] and available('searches') and available('body_urls'))
+
+
 def expand_budget(limits, ceiling, state, proposal, *, requests, elapsed, input_characters):
     """Validate an in-reply editorial choice against actual open tasks.
 
@@ -86,23 +147,16 @@ def expand_budget(limits, ceiling, state, proposal, *, requests, elapsed, input_
             or state.get('no_progress_turns', 0) >= 2):
         return denied('no_new_candidates_or_body_ranges')
     selected = [tasks[key] for key in record['task_ids']]
-    def addresses(request, task):
-        if task['kind'] == 'read_remaining':
-            return request.get('tool') == 'read_more' and request.get('id') in task['evidence_ids']
-        if request.get('tool') == 'read':
-            return request.get('candidate_id') in task.get('candidate_ids', [])
-        if request.get('tool') == 'search':
-            return (request.get('scope') == task['scope'] if task.get('scope')
-                    else request.get('lane') == task.get('lane'))
-        return False
-    if any(not any(addresses(request, task) for request in requests) for task in selected):
+    if any(not any(addresses_task(request, task) for request in requests) for task in selected):
         return denied('selected_gap_has_no_matching_tool_request')
     network = any(task['kind'] != 'read_remaining' for task in selected)
     local = any(task['kind'] == 'read_remaining' for task in selected)
     changes = {}
     def grow(key, used, step):
         current, maximum = getattr(limits, key), getattr(ceiling, key)
-        if used >= current*.75 and current < maximum:
+        demand=sum((r.get('characters',0) if key=='local_read_characters' else 1) for r in requests
+            if r.get('tool')=={'body_urls':'read','search_calls':'search','local_read_characters':'read_more'}.get(key))
+        if (used >= current*.75 or demand and used+demand>current) and current < maximum:
             changes[key] = min(maximum, current+step)
     if network:
         grow('body_urls', state['body_url_calls'], 8)
