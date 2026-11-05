@@ -14,6 +14,7 @@ TOOLS = Path(__file__).absolute().parents[2] / 'tools'
 sys.path.insert(0, str(TOOLS))
 import saved_editorial as sample
 import run_saved_editorial_once as runner
+import resume_saved_editorial_review as continuation
 
 
 def bundle():
@@ -30,7 +31,66 @@ def draft():
             source_quote='指数本日上涨百分之二，市场成交额扩大')])
 
 
+def completed_writer():
+    return dict(owner=sample.OWNER, status='failed_no_retry', reason='editorial_unchecked_citation',
+        completed_phases=['analysis'], phase='analysis', model_http_attempts=1,
+        model_input_characters=2000, reserved_output_tokens=6500, elapsed_seconds=20,
+        original_files_unchanged=True, production_pause_preserved=True,
+        completed_source_deliveries=[], usage=[dict(task='analysis', http_status=200,
+        transport_error=None, max_output_tokens=6500, request_characters=2000)])
+
+
 class EditorialInputTests(unittest.TestCase):
+    def test_missing_pair_is_reviewable_but_strict_validation_still_rejects(self):
+        value = draft()
+        value['evidence_checks'] = []
+        raw = json.dumps(value, ensure_ascii=False)
+        with self.assertRaisesRegex(ValueError, 'evidence_checks_missing'):
+            sample.validate_draft(raw, bundle())
+        accepted = sample.validate_draft(raw, bundle(), allow_unchecked=True)
+        self.assertEqual(sample.citation_audit(accepted)['unchecked_source_ids'], ['sample-source'])
+
+    def test_lenient_candidate_still_rejects_fabricated_source(self):
+        value = draft()
+        value['body'] += '[N:invented]'
+        with self.assertRaisesRegex(ValueError, 'unknown_or_missing_citation'):
+            sample.validate_draft(json.dumps(value), bundle(), allow_unchecked=True)
+
+    def test_lenient_candidate_still_rejects_fabricated_quote(self):
+        value = draft()
+        value['evidence_checks'][0]['source_quote'] = '不存在于来源的连续文字'
+        with self.assertRaisesRegex(ValueError, 'quote_not_in_provided_text'):
+            sample.validate_draft(json.dumps(value), bundle(), allow_unchecked=True)
+
+    def test_review_can_add_a_real_pair_without_changing_the_draft(self):
+        value = draft()
+        quote = value['evidence_checks'].pop()
+        review = dict(verdict='pass', issues=[], editorial_assessment='仍待人工判断', additional_evidence_checks=[quote])
+        checked = sample.validate_review(json.dumps(review), bundle(), value)
+        self.assertEqual(sample.citation_audit(value, checked)['unchecked_source_ids'], [])
+        self.assertEqual(value['evidence_checks'], [])
+
+    def test_review_cannot_close_missing_pair_using_invented_quote(self):
+        value = draft()
+        quote = value['evidence_checks'].pop()
+        quote['source_quote'] = '并不存在于正文中的支持性文字'
+        review = dict(verdict='pass', issues=[], editorial_assessment='判断', additional_evidence_checks=[quote])
+        with self.assertRaisesRegex(ValueError, 'quote_not_in_provided_text'):
+            sample.validate_review(json.dumps(review), bundle(), value)
+
+    def test_prior_usage_only_leaves_one_review_and_deducts_writer(self):
+        remaining = continuation.prior_usage(completed_writer())
+        self.assertEqual(remaining['model_requests'], 1)
+        self.assertEqual(remaining['total_input_characters'], 128000)
+        self.assertEqual(remaining['output_tokens'], 3500)
+        self.assertEqual(remaining['seconds'], 460)
+
+    def test_ambiguous_or_already_reviewed_result_cannot_start_a_continuation(self):
+        for change in (dict(completed_phases=[]), dict(model_http_attempts=2),
+                       dict(reason='editorial_quote_not_in_provided_text'), dict(elapsed_seconds=float('nan'))):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                continuation.prior_usage(dict(completed_writer(), **change))
+
     def test_quote_must_match_actual_delivered_text(self):
         value = draft()
         value['evidence_checks'][0]['source_quote'] = '不存在的政策原文：新增了贷款额度'
@@ -113,8 +173,73 @@ class EditorialInputTests(unittest.TestCase):
                 runner.assert_frozen(frozen)
 
 
+class SavedReviewIdentityTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.backend = Path(self.temporary.name) / 'backend'
+        self.source = self.backend / 'data/diagnostics/saved-editorial-v1'
+        self.source.mkdir(parents=True)
+        value = draft()
+        value['evidence_checks'] = []
+        self.text = json.dumps(value, ensure_ascii=False)
+        self.bundle = dict(bundle(), limits=sample.LIMITS, upstream_usage={})
+        self.env = dict(runtime='unchanged', routes={}, connection='private-hash',
+                        env_file='unchanged', editorial_policy='unchanged', tools={'new': 'tool'})
+        self.oldenv = dict(self.env, tools={'old': 'tool'})
+        messages = [dict(role='user', content='原始写稿输入')]
+        size = len(json.dumps(messages, ensure_ascii=False, separators=(',', ':')))
+        self.value = dict(owner=sample.OWNER, bundle=self.bundle, frozen={},
+                          writer_messages=messages, environment=self.oldenv)
+        self.result = completed_writer()
+        self.result.update(input_sha256=sample.fingerprint(self.value), model_input_characters=size,
+            source_cutoff=self.bundle['cutoff'], upstream_usage={}, completed_source_deliveries=[
+                dict(id=s['id'], text_sha256=sample.sha(s['text'].encode()), characters=len(s['text']))
+                for s in self.bundle['sources']])
+        self.result['usage'][0]['request_characters'] = size
+        data = {'result.json': self.result, 'input.json': self.value,
+                'started.json': dict(owner=sample.OWNER, input_sha256=self.result['input_sha256']),
+                'analysis-request.json': messages, 'analysis-visible-response.json': dict(text=self.text)}
+        for name, body in data.items():
+            runner.write(self.source / name, body)
+        self.case = dict(result_sha256=sample.sha((self.source / 'result.json').read_bytes()),
+            writer_input_sha256=self.result['input_sha256'],
+            writer_response_sha256=sample.sha((self.source / 'analysis-visible-response.json').read_bytes()),
+            bundle_sha256=sample.fingerprint(self.bundle), prior_tools=self.oldenv['tools'])
+
+    def load(self):
+        return continuation.load_saved(self.backend, self.source, self.case, self.env)
+
+    def test_load_keeps_old_files_unchanged_and_freezes_them(self):
+        before = {p.name: p.read_bytes() for p in self.source.iterdir()}
+        loaded = self.load()
+        self.assertEqual(loaded['resume']['writer_text'], self.text)
+        self.assertEqual(before, {p.name: p.read_bytes() for p in self.source.iterdir()})
+        self.assertIn(str(self.source / 'started.json'), loaded['frozen'])
+
+    def test_changed_private_input_is_rejected(self):
+        runner.write(self.source / 'input.json', dict(self.value, owner='different'))
+        with self.assertRaisesRegex(ValueError, 'saved_identity_changed'):
+            self.load()
+
+    def test_changed_route_or_backend_is_not_authorized_by_new_tool_hashes(self):
+        self.env['runtime'] = 'changed'
+        with self.assertRaisesRegex(ValueError, 'saved_environment_changed'):
+            self.load()
+
+    def test_changed_saved_response_is_rejected(self):
+        runner.write(self.source / 'analysis-visible-response.json', dict(text=self.text + ' '))
+        with self.assertRaisesRegex(ValueError, 'saved_response_changed'):
+            self.load()
+
+    def test_an_existing_review_attempt_is_not_restarted(self):
+        runner.write(self.source / 'review-request.json', [])
+        with self.assertRaisesRegex(ValueError, 'review_already_attempted'):
+            self.load()
+
+
 class EditorialExecutionTests(unittest.IsolatedAsyncioTestCase):
-    async def run_case(self, writer):
+    async def run_case(self, writer, *, resume=False):
         from app.services import model_gateway, model_usage, watchlist_repository
         import httpx
         review = dict(verdict='pass', issues=[], editorial_assessment='样稿形成完整主线，仍待人工验收。')
@@ -122,11 +247,13 @@ class EditorialExecutionTests(unittest.IsolatedAsyncioTestCase):
             message=dict(content=writer))])), SimpleNamespace(is_error=False,
             json=lambda: dict(choices=[dict(finish_reason='stop', message=dict(content=json.dumps(review, ensure_ascii=False)))]))]
         client = AsyncMock()
-        client.post.side_effect = responses
+        client.post.side_effect = responses[1:] if resume else responses
         manager = AsyncMock()
         manager.__aenter__.return_value = client
         b = bundle()
         value = dict(bundle=b, environment={}, frozen={}, writer_messages=[dict(role='user', content='写稿')])
+        if resume:
+            value['resume'] = dict(prior_result=completed_writer(), result_sha256='prior', writer_text=writer)
         base = SimpleNamespace(require_pause=lambda backend: None)
         with TemporaryDirectory() as temporary:
             backend = Path(temporary) / 'backend'
@@ -143,6 +270,9 @@ class EditorialExecutionTests(unittest.IsolatedAsyncioTestCase):
                     patch.object(model_usage, 'record_usage', return_value=dict(input_tokens=100, output_tokens=100)), \
                     patch.object(httpx, 'AsyncClient', return_value=manager):
                 result = await runner.execute(backend, value, root, base)
+                if resume:
+                    self.assertFalse((root / 'analysis-request.json').exists())
+                    self.assertTrue((root / 'review-request.json').exists())
             self.assertTrue((root / 'started.json').is_file())
             self.assertTrue((backend / 'data/.automation-paused').is_file())
             self.assertFalse(result['publication_allowed'])
@@ -161,3 +291,22 @@ class EditorialExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, 1)
         self.assertEqual(result['status'], 'failed_no_retry')
         self.assertFalse(saved)
+
+    async def test_missing_quote_mapping_does_not_lose_draft_or_skip_review(self):
+        value = draft()
+        value['evidence_checks'] = []
+        result, calls, saved = await self.run_case(json.dumps(value, ensure_ascii=False))
+        self.assertEqual(calls, 2)
+        self.assertTrue(saved)
+        self.assertEqual(result['status'], 'sample_needs_citation_review')
+
+    async def test_resume_only_posts_review_and_keeps_total_at_two(self):
+        value = draft()
+        value['evidence_checks'] = []
+        result, calls, saved = await self.run_case(json.dumps(value, ensure_ascii=False), resume=True)
+        self.assertEqual(calls, 1)
+        self.assertEqual(result['model_http_attempts'], 2)
+        self.assertEqual(result['new_model_http_attempts'], 1)
+        self.assertEqual(result['reserved_output_tokens'], 10000)
+        self.assertEqual(result['prior_editorial_usage'][0]['request_characters'], 2000)
+        self.assertTrue(saved)

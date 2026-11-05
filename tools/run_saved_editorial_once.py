@@ -16,7 +16,7 @@ import time
 import zipfile
 
 from saved_editorial import (OWNER, LIMITS, sha, fingerprint, prepare_bundle,
-                            writer_messages, review_messages, validate_draft, validate_review)
+                            writer_messages, review_messages, validate_draft, validate_review, citation_audit)
 
 
 def read(path, root, maximum=16 * 1024 * 1024):
@@ -106,10 +106,13 @@ def environment(backend, base):
         raise ValueError('editorial_requires_zero_retry_settings')
     if settings.model_max_calls_per_report is not None and settings.model_max_calls_per_report < 2:
         raise ValueError('editorial_report_budget_below_two_calls')
+    paths = [Path(__file__).absolute(), Path(__file__).with_name('saved_editorial.py').absolute(),
+             Path(__file__).with_name('run_progress_collection_once.py').absolute()]
+    continuation = Path(__file__).with_name('resume_saved_editorial_review.py').absolute()
+    if continuation.exists():
+        paths.append(continuation)
     return dict(runtime=fingerprint(base.source_snapshot(backend)),
-        tools={p.name: sha(read(p, p.parent)) for p in
-            (Path(__file__).absolute(), Path(__file__).with_name('saved_editorial.py').absolute(),
-             Path(__file__).with_name('run_progress_collection_once.py').absolute())},
+        tools={p.name: sha(read(p, p.parent)) for p in paths},
         routes={task: base.route_metadata(route) for task, route in routes.items()},
         connection=fingerprint([route.api_key for route in routes.values()]),
         env_file=sha(read(backend / '.env', backend)),
@@ -155,6 +158,11 @@ async def execute(backend, value, root, base):
     from app.config import settings
     import httpx
     bundle = value['bundle']
+    resume = value.get('resume')
+    if resume:
+        # The only continuation supported is the unspent review of one complete writer response.
+        from resume_saved_editorial_review import prior_usage
+        prior_usage(resume['prior_result'])
     signature = watchlist_signature(bundle['watchlist'])
     assert_frozen(value['frozen'])
     base.require_pause(backend)
@@ -167,6 +175,14 @@ async def execute(backend, value, root, base):
         upstream_usage=bundle['upstream_usage'], app_written=False, tts_requests=0, search_requests=0,
         public_fetch_attempts=0, production_pause_preserved=True, publication_allowed=False,
         content_accepted=False, collection_accepted=False)
+    if resume:
+        previous = resume['prior_result']
+        state.update(model_http_attempts=previous['model_http_attempts'],
+            model_input_characters=previous['model_input_characters'],
+            reserved_output_tokens=previous['reserved_output_tokens'],
+            completed_phases=list(previous['completed_phases']),
+            completed_source_deliveries=previous['completed_source_deliveries'],
+            prior_editorial_usage=previous['usage'], prior_editorial_result_sha256=resume['result_sha256'])
     started = time.monotonic()
     write(root / 'result.json', state)
 
@@ -177,7 +193,9 @@ async def execute(backend, value, root, base):
         if environment(backend, base) != value['environment']:
             raise ValueError('editorial_environment_changed')
         size = validate_input(messages, limit=LIMITS['input_characters_per_request'])
-        remaining = LIMITS['seconds'] - (time.monotonic() - started)
+        remaining = LIMITS['seconds'] - (resume['prior_result']['elapsed_seconds'] if resume else 0) - (time.monotonic() - started)
+        if resume and task != 'review':
+            raise ValueError('editorial_resume_review_only')
         if (state['model_http_attempts'] >= LIMITS['model_requests'] or remaining <= 0
                 or state['model_input_characters'] + size > LIMITS['total_input_characters']
                 or state['reserved_output_tokens'] + tokens > 10000):
@@ -221,8 +239,11 @@ async def execute(backend, value, root, base):
             write(root / 'result.json', state)
 
     try:
-        raw = await call('analysis', value['writer_messages'], LIMITS['writer_output_tokens'])
-        draft = validate_draft(raw, bundle)
+        raw = resume['writer_text'] if resume else await call('analysis', value['writer_messages'], LIMITS['writer_output_tokens'])
+        draft = validate_draft(raw, bundle, allow_unchecked=True)
+        state['citation_audit'] = citation_audit(draft)
+        if resume:
+            write(root / 'analysis-visible-response.json', dict(text=raw, reused_saved_response=True))
         write(root / 'draft.json', draft)
         markdown = '# 未发布的历史文字样稿\n\n资料截止：' + bundle['cutoff'] + '\n\n# ' + draft['title'] + '\n\n' + draft['body']
         markdown += '\n\n## 编辑备注\n\n' + '\n'.join('- ' + note for note in draft['editor_notes'])
@@ -238,6 +259,9 @@ async def execute(backend, value, root, base):
             raise ValueError('editorial_environment_changed')
         state.update(status='sample_reviewed_pending_human' if review['verdict'] == 'pass' else 'sample_needs_revision',
                      model_review_verdict=review['verdict'])
+        state['citation_audit'] = citation_audit(draft, review)
+        if state['citation_audit']['unchecked_source_ids'] and review['verdict'] == 'pass':
+            state['status'] = 'sample_needs_citation_review'
     except Exception as error:
         state.update(status='failed_no_retry', error_type=type(error).__name__)
         code = str(error)
@@ -246,6 +270,8 @@ async def execute(backend, value, root, base):
     finally:
         from app.services.time_context import china_now
         state.update(elapsed_seconds=round(time.monotonic() - started, 2), finished_at=china_now().isoformat())
+        state['new_model_http_attempts'] = state['model_http_attempts'] - (resume['prior_result']['model_http_attempts'] if resume else 0)
+        state['total_editorial_elapsed_seconds'] = round(state['elapsed_seconds'] + (resume['prior_result']['elapsed_seconds'] if resume else 0), 2)
         try:
             assert_frozen(value['frozen'])
             state['original_files_unchanged'] = True

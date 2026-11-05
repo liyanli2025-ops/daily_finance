@@ -157,7 +157,7 @@ def writer_messages(bundle, report_policy):
     return [dict(role='system', content=system), dict(role='user', content=json.dumps(bundle, ensure_ascii=False))]
 
 
-def validate_draft(raw, bundle):
+def validate_draft(raw, bundle, *, allow_unchecked=False):
     draft = decode(raw)
     if (not isinstance(draft.get('title'), str) or not 4 <= len(draft['title']) <= 200
             or not isinstance(draft.get('body'), str) or not 400 <= len(draft['body']) <= 12000
@@ -170,10 +170,12 @@ def validate_draft(raw, bundle):
     if not refs or set(refs) - set(by_id):
         raise ValueError('editorial_unknown_or_missing_citation')
     checks = draft.get('evidence_checks')
-    if not isinstance(checks, list) or not checks:
+    if not isinstance(checks, list) or (not checks and not allow_unchecked):
         raise ValueError('editorial_evidence_checks_missing')
     checked = set()
     for check in checks:
+        if not isinstance(check, dict):
+            raise ValueError('editorial_quote_not_in_provided_text')
         identifier = check.get('source_id')
         if (identifier not in by_id or not isinstance(check.get('draft_quote'), str)
                 or not check['draft_quote'].strip() or check['draft_quote'] not in subject
@@ -181,9 +183,17 @@ def validate_draft(raw, bundle):
                 or check['source_quote'] not in by_id[identifier]['text']):
             raise ValueError('editorial_quote_not_in_provided_text')
         checked.add(identifier)
-    if set(refs) - checked:
+    if set(refs) - checked and not allow_unchecked:
         raise ValueError('editorial_unchecked_citation')
     return draft
+
+
+def citation_audit(draft, review=None):
+    refs = set(re.findall(r'\[N:([^\]\s]+)\]', draft['title'] + '\n' + draft['body']))
+    checked = {x['source_id'] for x in draft['evidence_checks']}
+    checked.update(x['source_id'] for x in (review or {}).get('additional_evidence_checks', []))
+    return dict(unchecked_source_ids=sorted(refs - checked),
+                quote_presence_only=True, factual_support_certified=False)
 
 
 def review_messages(bundle, draft, review_policy):
@@ -191,12 +201,17 @@ def review_messages(bundle, draft, review_policy):
         + review_policy + '\n重点核对数字与合约、交易时段、事实归属、推广、同源转载和推理。'
         '必须指出具体原句及证据；选题收窄且明确遗漏不算事实错误。'
         '输入是历史样稿，不能认定全市场覆盖、当前新鲜度或生产已通过。'
+        'citation_audit列出缺少逐字对照的来源；这不是来源不存在，也不是引文已核实。'
+        '核对所有事实及算术、比例比较和推理跳跃，不因引用存在就认定论证成立。'
+        '可在additional_evidence_checks补齐缺项，每条含draft_quote、source_id、source_quote，'
+        '两段引文均须逐字连续。没有支持时在issues中指出，不编造对照。'
         '返回JSON：{"verdict":"pass或needs_revision",'
         '"issues":[{"severity":"high或medium或low","draft_quote":"稿件原句",'
         '"source_id":"对应来源ID，缺少支持时可为空字符串","source_quote":"来源原句，可为空字符串",'
         '"reason":"具体问题及依据"}],"editorial_assessment":"判断、理由与可听性是否形成完整主线"}。'
         'pass须没有high或medium问题。事实错误、旧行情冒充最新、媒体转述冒充原披露、无依据结论应判needs_revision。'),
-        dict(role='user', content=json.dumps(dict(input=bundle, draft=draft), ensure_ascii=False))]
+        dict(role='user', content=json.dumps(dict(input=bundle, draft=draft,
+             citation_audit=citation_audit(draft)), ensure_ascii=False))]
 
 
 def validate_review(raw, bundle, draft):
@@ -222,4 +237,10 @@ def validate_review(raw, bundle, draft):
         raise ValueError('editorial_review_verdict_conflicts')
     if review['verdict'] == 'needs_revision' and not review['issues']:
         raise ValueError('editorial_review_reason_missing')
+    additional = review.get('additional_evidence_checks', [])
+    if not isinstance(additional, list):
+        raise ValueError('editorial_review_evidence_invalid')
+    # Check new pairs with the same strict quote rules, without altering the writer's draft.
+    combined = dict(draft, evidence_checks=draft['evidence_checks'] + additional)
+    validate_draft(json.dumps(combined, ensure_ascii=False), bundle, allow_unchecked=True)
     return review

@@ -1,0 +1,11 @@
+{
+  "result_sha256": "23b8840767c45c126c3278201d811664baaf93af7ba03b72d6e23b94bd240cd6",
+  "writer_input_sha256": "1d00fff6e5dec9e7571be0c16006a400ba632d44e5665859572bd9fbf2ea30ef",
+  "writer_response_sha256": "29d6e0b5a58bbb31d647467b8959929a5bbd62ebfd48e752e8eafa8f41caf71a",
+  "bundle_sha256": "7a630137d0bf9cbac5f4f6fd93056d362638959b8570f3a9fc6a85057daa4823",
+  "prior_tools": {
+    "run_saved_editorial_once.py": "f9ec4a1ca9f96bc127db71069471a88fcf58e70347953f482f5f8430b4e7c1eb",
+    "saved_editorial.py": "b2423bdd2590f6a58022c140acca51323e698ace1cc66496ea7a70454a0c99f7",
+    "run_progress_collection_once.py": "5a57e361b2b660b6d2b3e81f4da1b658e0006c151328bb57d9e5211e100c7dcb"
+  }
+}
