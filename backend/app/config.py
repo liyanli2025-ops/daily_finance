@@ -51,6 +51,17 @@ class Settings(BaseSettings):
     research_web_search_api_key: Optional[SecretStr] = None
     research_web_search_max_requests: int = Field(default=24, ge=1, le=48, description='每期搜索HTTP尝试上限，含失败；不是资料或节目篇数')
 
+    # Unified production path: estimates must be explicitly configured/accepted.
+    # These defaults never authorize paid execution or change maintenance pause.
+    edition_estimate_accepted: bool = False
+    edition_estimated_limit_usd: Optional[float] = Field(default=None, gt=0)
+    edition_price_table: dict = Field(default_factory=dict, description='provider/model -> input/output/cache_read/cache_write 每百万token美元价格')
+    edition_search_price_usd: Optional[float] = Field(default=None, ge=0)
+    edition_audio_enabled: bool = True
+    edition_input_characters: int = Field(default=65000, ge=12000, le=100000)
+    edition_total_input_characters: int = Field(default=325000, ge=12000, le=500000)
+    edition_total_output_tokens: int = Field(default=30000, ge=4000, le=50000)
+
     research_report_model_reserve: Optional[int] = Field(default=None, ge=1, le=6, description='兼容旧.env，已停用；不参与新取材预算计算')
     research_max_model_calls: Optional[int] = Field(default=None, ge=1, le=128, description='主动取材可选紧急请求数上限；默认按进展、累计用量和时长停止，不从报告预算扣除')
     research_total_input_characters: int = Field(default=2000000, ge=12000, le=10000000, description='主动取材累计模型输入字符上限，发送前预留；不是token或金额')

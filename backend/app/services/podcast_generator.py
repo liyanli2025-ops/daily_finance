@@ -335,7 +335,8 @@ class PodcastGeneratorService:
         
         return random.choice(self.morning_openings)
     
-    async def generate_podcast(self, report: Report) -> tuple[str, int]:
+    async def generate_podcast(self, report: Report, *, require_verified_cache=False,
+                               allow_paid_fallback=True, before_tts_attempt=None) -> tuple[str, int]:
         """
         为报告生成播客音频
         
@@ -354,6 +355,8 @@ class PodcastGeneratorService:
         if podcast_text:
             print('[播客] 复用与本报告完全匹配的已核验脚本，跳过重复模型调用',flush=True)
         else:
+            if require_verified_cache:
+                raise RuntimeError('未找到与本报告匹配的已审口播，停止合成，不新增写稿或审稿模型调用')
             podcast_text = await self._prepare_podcast_text(report, weather_info)
             podcast_script_cache.save(report,self.user_nickname,podcast_text)
         print(f"[播客] 脚本生成完成，{len(podcast_text)} 字", flush=True)
@@ -366,7 +369,12 @@ class PodcastGeneratorService:
         temp_path = self.output_dir / f"{report.id}_voice.mp3"
         
         # 分段生成语音（在 [SECTION_BREAK] 处分段，并加入停顿）
-        await self._generate_segmented_tts(podcast_text, str(temp_path))
+        if require_verified_cache:
+            await self._generate_reviewed_tts_once(podcast_text, str(temp_path), before_tts_attempt)
+        elif allow_paid_fallback:
+            await self._generate_segmented_tts(podcast_text, str(temp_path))
+        else:
+            await self._generate_segmented_tts(podcast_text, str(temp_path), allow_paid_fallback=False)
         
         # 判断是否是晚报
         report_type = getattr(report, 'report_type', ReportType.MORNING)
@@ -408,12 +416,31 @@ class PodcastGeneratorService:
         
         return str(output_path), duration_seconds
 
+    async def _generate_reviewed_tts_once(self, text, output_path, before_attempt):
+        """One attempt per reviewed section; no paid fallback or hidden retries."""
+        import tempfile
+        from .audio_mixer import AudioSegment
+        from .spoken_editing import tts_segments
+        with tempfile.TemporaryDirectory(prefix='edition-tts-', dir=self.output_dir) as temporary:
+            combined = AudioSegment.empty()
+            for index, segment in enumerate(tts_segments(text)):
+                if before_attempt is not None:
+                    await before_attempt(len(segment))
+                target = Path(temporary) / (str(index) + '.mp3')
+                communicate = edge_tts.Communicate(text=segment, voice=self.voice, rate=self.rate, volume=self.volume)
+                await asyncio.wait_for(communicate.save(str(target)), timeout=60)
+                audio = AudioSegment.from_mp3(str(target))
+                if len(audio) <= 0:
+                    raise RuntimeError('edition_empty_tts_section')
+                combined += audio + AudioSegment.silent(duration=500)
+            combined.export(output_path, format='mp3')
+
     def _sanitize_for_tts(self, text: str) -> str:
         """Compatibility formatter. Actual synthesis accepts reviewed canonical text only."""
         from .spoken_editing import tts_text
         return tts_text(text)
 
-    async def _generate_segmented_tts(self, full_text: str, output_path: str):
+    async def _generate_segmented_tts(self, full_text: str, output_path: str, *, allow_paid_fallback=True):
         """
         分段生成 TTS，在模块之间加入停顿
         
@@ -437,6 +464,8 @@ class PodcastGeneratorService:
         
         if edge_success:
             return
+        if not allow_paid_fallback:
+            raise RuntimeError('本期Edge语音合成失败；保留已审口播，不自动切换收费TTS')
         
         # ============ 降级到硅基流动 TTS ============
         if settings.backup_ai_api_key and settings.backup_ai_base_url and "siliconflow" in settings.backup_ai_base_url.lower():

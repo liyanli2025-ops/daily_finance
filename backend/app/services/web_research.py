@@ -460,6 +460,7 @@ def read_public(workspace,url,hours=72,deadline=None,characters=6000):
             ensure_active(root,'research-public-url:'+current.split('#',1)[0])
             remaining=deadline-time.monotonic() if deadline else 8
             if remaining<=0:return dict(status='budget_exhausted',url=url)
+            workspace.public_fetch_attempts=getattr(workspace,'public_fetch_attempts',0)+1
             status,headers,raw=fetch_html_once(current,deadline)
             if status in {301,302,303,307,308}:
                 location=headers.get('Location') or headers.get('location')

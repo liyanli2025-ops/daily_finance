@@ -7,7 +7,7 @@ import sys
 import io
 from contextlib import asynccontextmanager
 from datetime import datetime
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -156,9 +156,15 @@ async def trigger_report_generation(request: Request):
         force = body.get('force') is True
     except Exception:
         pass
+    if report_type not in {'morning', 'evening'}:
+        raise HTTPException(400, 'type 必须为 morning 或 evening')
     
     if scheduler_service:
         print(f"[API] 创建{report_type}报告生成任务...")
+        from .services.edition_pipeline import preflight
+        preview = await preflight(report_type)
+        if not preview['ready_to_run']:
+            raise HTTPException(409, detail=preview)
         
         async def generate_with_error_handling():
             try:
@@ -179,6 +185,18 @@ async def trigger_report_generation(request: Request):
     return {"status": "error", "message": "调度器未运行"}
 
 
+@app.post('/api/editions/{identifier}/resume-review')
+async def resume_edition_review(identifier: str):
+    """Explicit same-edition continuation, never a new collection or budget."""
+    if scheduler_service is None:
+        raise HTTPException(409, '调度器未初始化')
+    try:
+        report = await scheduler_service.resume_edition_review(identifier)
+        return dict(status='reviewed', edition_id=report.id, podcast_status=report.podcast_status)
+    except (ValueError, RuntimeError, OSError):
+        raise HTTPException(409, '续审未完成或不满足条件；请查看同一期回执，不自动重试') from None
+
+
 @app.post("/api/trigger-evening-report")
 async def trigger_evening_report_generation():
     """
@@ -186,6 +204,10 @@ async def trigger_evening_report_generation():
     """
     print(f"\n[API] /api/trigger-evening-report 被调用！时间: {datetime.now()}")
     if scheduler_service:
+        from .services.edition_pipeline import preflight
+        preview = await preflight('evening')
+        if not preview['ready_to_run']:
+            raise HTTPException(409, detail=preview)
         print("[API] 创建晚报生成任务...")
         
         async def generate_evening_with_error_handling():
@@ -212,8 +234,10 @@ async def generate_report_sync():
     print(f"\n[API] /api/generate-report-sync 被调用！时间: {datetime.now()}")
     if scheduler_service:
         try:
-            await scheduler_service.generate_daily_report()
-            return {"status": "success", "message": "报告生成完成"}
+            report = await scheduler_service.generate_daily_report()
+            if report is None:
+                return {"status": "stopped_or_skipped", "message": "未新增报告，请查看本期事件与资料缺口记录"}
+            return {"status": "success", "message": "报告生成完成", "edition_id": report.id}
         except Exception as e:
             import traceback
             traceback.print_exc()

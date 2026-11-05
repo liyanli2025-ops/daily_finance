@@ -11,6 +11,8 @@ import uuid
 from .time_context import china_now
 
 _run=ContextVar('finance_model_run',default=None)
+_edition_sink=ContextVar('finance_edition_usage_sink',default=None)
+_edition_start=ContextVar('finance_edition_http_start',default=None)
 ROOT=Path(__file__).resolve().parents[2]/'data/diagnostics'
 
 
@@ -42,6 +44,23 @@ def reserve_call():
     if run['limit'] is not None and run['calls']>=run['limit']:
         raise RuntimeError('本期模型调用次数已达上限，停止额外扣费；保留诊断后人工检查')
     run['calls']+=1
+    callback=_edition_start.get()
+    if callback is not None:
+        callback()
+
+
+@contextmanager
+def edition_model_scope(identifier,stage,sink,before_attempt=None):
+    """One pre-reserved HTTP attempt, including unexpected retries or fallback."""
+    token=_run.set(dict(id=identifier,calls=0,limit=1,phase=stage))
+    callback=_edition_sink.set(sink)
+    start=_edition_start.set(before_attempt)
+    try:
+        yield
+    finally:
+        _edition_start.reset(start)
+        _edition_sink.reset(callback)
+        _run.reset(token)
 
 
 @contextmanager
@@ -90,6 +109,10 @@ def record_usage(task,route,max_tokens,response=None,error=None,elapsed=None,dir
              cache_write_tokens=count(usage.get('cache_creation_input_tokens')),
              elapsed_seconds=round(elapsed,3) if elapsed is not None else None,
              billing_note='Token用量不等于账单；服务商实际扣费另行核对，未知用量保留null')
+    sink=_edition_sink.get()
+    if sink is not None:
+        # Edition persistence errors stop the pipeline; do not silently lose its ledger.
+        sink(row)
     root=Path(directory) if directory is not None else ROOT
     try:
         root.mkdir(parents=True,exist_ok=True,mode=0o700)

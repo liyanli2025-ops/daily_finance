@@ -16,6 +16,51 @@ from ..models.database import ReportModel, get_session_maker
 router = APIRouter()
 
 
+@router.get('/generation/preflight')
+async def generation_preflight(report_type: str = 'morning'):
+    """Local inspection only; never starts searches/models/TTS."""
+    if report_type not in {'morning', 'evening'}:
+        raise HTTPException(400, 'report_type must be morning or evening')
+    from ..services.edition_pipeline import preflight
+    return await preflight(report_type)
+
+
+@router.get('/generation/runs')
+async def generation_runs():
+    from ..services.edition_pipeline import ROOT, load_state
+    if not ROOT.exists(): return []
+    result = []
+    for directory in sorted(ROOT.glob('edition-*'), key=lambda p: p.name):
+        if directory.is_symlink(): continue
+        try:
+            state = load_state(directory.name)
+        except (OSError, ValueError): continue
+        result.append({k: state.get(k) for k in ('id', 'status', 'cutoff', 'updated_at', 'missing', 'app_written')})
+    return sorted(result, key=lambda r: r.get('updated_at') or '', reverse=True)[:30]
+
+
+@router.get('/generation/runs/{identifier}')
+async def generation_run(identifier: str):
+    from ..services.edition_pipeline import load_state
+    try:
+        return load_state(identifier)
+    except (OSError, ValueError):
+        raise HTTPException(404, 'edition not found') from None
+
+
+@router.get('/generation/runs/{identifier}/receipt')
+async def generation_receipt(identifier: str):
+    from fastapi.responses import PlainTextResponse
+    from ..services.edition_pipeline import load_state, run_path
+    try:
+        load_state(identifier)
+        path = run_path(identifier) / 'receipt.txt'
+        if path.is_symlink(): raise ValueError('symlink')
+        return PlainTextResponse(path.read_text(), headers={'Cache-Control': 'no-store'})
+    except (OSError, ValueError):
+        raise HTTPException(404, 'edition receipt not found') from None
+
+
 async def get_db(request: Request) -> AsyncSession:
     """获取数据库会话"""
     async with request.app.state.session_maker() as session:

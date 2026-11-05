@@ -172,6 +172,15 @@ def main():
     root = args.project.resolve()
     bundle = Path(__file__).resolve().parent
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    if manifest.get('offline_acceptance_required'):
+        proof = json.loads((bundle / 'offline-acceptance.json').read_text())
+        expected = ('upgrade-manifest.json', 'manifest.json', 'payload.zip',
+                    'backend/tests/test_unified_edition.py', 'backend/tests/fixtures/unified_major_omission.json')
+        if (proof.get('owner') != 'finance-unified-offline-acceptance-v1' or proof.get('passed') is not True
+                or set(proof.get('file_sha256', {})) != set(expected)
+                or any(hashlib.sha256((bundle / name).read_bytes()).hexdigest() != proof['file_sha256'][name]
+                       for name in expected)):
+            raise RuntimeError('本版本尚无匹配的隔离验收回执，不能安装；不修改生产文件')
     with zipfile.ZipFile(bundle / "payload.zip") as archive:
         validate(root, manifest, archive)
         flag=root / 'backend/data/.automation-paused'

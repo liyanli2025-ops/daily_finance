@@ -259,178 +259,65 @@ class SchedulerService:
     
     @budgeted_generation
     async def generate_morning_report(self, force=False):
-        """
-        生成早报的完整流程
-        
-        交易日早报：
-        - 结合前一个交易日的市场情况
-        - 昨天收盘后的新闻、重要信息
-        - 国际市场情况（美股、港股夜盘等）
-        - 侧重当天操作建议
-        
-        非交易日早报（深度版）：
-        - 整周市场表现复盘
-        - 重要新闻深度梳理
-        - 重要概念科普
-        - 下周操作预测
-        """
-        import sys
+        return await self._generate_unified_edition('morning', force=force)
+
+    async def _generate_unified_edition(self, report_type, force=False):
+        """Manual and scheduled editions share one persistent run and fee ledger."""
+        from .edition_pipeline import generate_edition, ROOT, run_path
+        from .research_hub import save_json
+        import json
         today = china_today()
-        is_trading = self.is_trading_day(today)
-        report_type_str = "交易日早报" if is_trading else "非交易日深度早报"
-        if not force and await self._has_saved_edition(today,'morning'):
-            print('[SKIP] 数据库已有本日早报，不重复采集或扣费；确需重做请明确指定force=true',flush=True)
-            return
-        
-        # ===== 防重复生成：同一天只生成一次早报 =====
-        if not force and self._last_morning_date == today:
-            print(f"\n[SKIP] 今日早报已在本进程中生成过（{today}），跳过重复执行", flush=True)
-            return
-        
-        # 防并发：如果正在生成中，跳过
+        if report_type == 'evening' and not self.is_trading_day(today):
+            return None
+        if self._session_maker is None:
+            raise RuntimeError('数据库未初始化，停止取材与模型请求')
+        if await self._has_saved_edition(today, report_type):
+            print('[SKIP] 已有本期报告；force不清除已消费预算或重新收费', flush=True)
+            return None
         if self._generating_lock.locked():
-            print(f"\n[SKIP] 当前有报告正在生成中，跳过本次触发", flush=True)
-            return
-        
+            return None
         async with self._generating_lock:
-            # 二次检查（拿到锁后再确认一次）
-            if not force and self._last_morning_date == today:
-                print(f"\n[SKIP] 今日早报已生成（并发检查），跳过", flush=True)
-                return
-        
-            print("\n" + "="*50, flush=True)
-            print(f"[START] 开始生成{report_type_str} - {china_now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
-            print("="*50, flush=True)
-            sys.stdout.flush()
-        
-            try:
-                # Step 1: 采集新闻（带超时保护，防止某个数据源卡住导致进程假死）
-                NEWS_COLLECT_TIMEOUT = 300  # 5 分钟超时
-                print(f"\n[Step 1] 采集新闻（超时 {NEWS_COLLECT_TIMEOUT}s）...", flush=True)
-                collector = get_news_collector()
-                
-                # 非交易日采集更长时间的新闻（整周）
-                hours = 168 if not is_trading else 24  # 非交易日采集7天，交易日采集24小时
-                from .watchlist_repository import read_app_watchlist,watchlist_signature,assert_watchlist_current
-                collection_revision=watchlist_signature(await read_app_watchlist())
-                
-                try:
-                    all_news = await asyncio.wait_for(
-                        collector.collect_all(hours=hours),
-                        timeout=NEWS_COLLECT_TIMEOUT
-                    )
-                except asyncio.TimeoutError:
-                    print(f"[WARN] ⚠️ 新闻采集超时 ({NEWS_COLLECT_TIMEOUT}s)！本期停止生成", flush=True)
-                    all_news = []
-                
-                # 分离财经新闻和跨界新闻
-                news_by_type = collector.get_news_by_type(all_news)
-                finance_news = market_candidates(all_news)
-                
-                # 详细日志：各类型新闻数量
-                print(f"   [新闻分类] 总 {len(all_news)} 条 → "
-                      f"finance={len(news_by_type.get('finance', []))} | "
-                      f"tech={len(news_by_type.get('tech', []))} | "
-                      f"geopolitical={len(news_by_type.get('geopolitical', []))} | "
-                      f"social={len(news_by_type.get('social', []))} | "
-                      f"disaster={len(news_by_type.get('disaster', []))}")
-                
-                # 筛选中国相关财经新闻
-                china_news = collector.filter_china_related(finance_news)
-                print(f"   筛选出 {len(china_news)} 条中国及全球市场相关财经新闻（含大宗商品/外盘）")
-                
-                # 如果筛选后新闻太少，放宽使用全部财经新闻
-                if len(china_news) < 20 and len(finance_news) > len(china_news):
-                    print(f"   [INFO] 筛选后新闻不足20条（{len(china_news)}），补充使用全部 {len(finance_news)} 条财经新闻")
-                    china_news = finance_news
-                
-                # 筛选跨界新闻
-                cross_border_news = collector.filter_cross_border_news(all_news)
-                print(f"   筛选出 {len(cross_border_news)} 条跨界热点新闻")
-                if cross_border_news:
-                    for news in cross_border_news[:5]:
-                        print(f"      - [{news.news_type.value}] {news.title[:40]}...")
-                
-                if not all_news:
-                    print("[WARN] 未能从 RSS 源采集到新闻，停止生成报告")
-                    raise RuntimeError("新闻采集为空，本期停止生成；禁止用模拟新闻替代真实资料")
-                
-                # Step 2: AI 分析生成早报（带超时保护）
-                await assert_watchlist_current(collection_revision)
-                AI_REPORT_TIMEOUT = 900  # 15 分钟超时（含AI生成+审查修复，Claude长报告需要更久）
-                print(f"\n[Step 2] AI 分析生成{report_type_str}（超时 {AI_REPORT_TIMEOUT}s）...", flush=True)
-                analyzer = get_ai_analyzer(force_reinit=True)
-                
-                # News already has local rule sentiment; analysis must assess the evidence itself.
-                
-                # 生成早报（传入报告类型和是否交易日）
-                try:
-                    report = await asyncio.wait_for(
-                        analyzer.generate_daily_report(
-                            china_news if china_news else finance_news,
-                            cross_border_news,
-                            report_type=ReportType.MORNING,
-                            is_trading_day=is_trading,
-                            expected_watchlist=collection_revision
-                        ),
-                        timeout=AI_REPORT_TIMEOUT
-                    )
-                except asyncio.TimeoutError:
-                    print(f"\n[ERROR] ⚠️ AI 报告生成超时 ({AI_REPORT_TIMEOUT}s)！跳过本次生成", flush=True)
-                    raise RuntimeError('早报分析超时，任务失败，未生成完整报告') from None
-                
-                print(f"   报告生成完成: {report.title}")
-                print(f"   字数: {report.word_count}, 预计阅读时间: {report.reading_time} 分钟")
-                print(f"   核心观点: {len(report.core_opinions)} 条")
-                print(f"   跨界事件: {len(report.cross_border_events)} 条")
-                
-                # Step 3: 生成播客（带超时保护）
-                PODCAST_TIMEOUT = 900  # 15 分钟
-                print(f"\n[Step 3] 生成播客音频（超时 {PODCAST_TIMEOUT}s）...", flush=True)
-                podcast_gen = get_podcast_generator()
-                
-                try:
-                    audio_path, duration = await asyncio.wait_for(
-                        podcast_gen.generate_podcast(report),
-                        timeout=PODCAST_TIMEOUT
-                    )
-                    report.podcast_url = f"/podcasts/{report.id}.mp3"
-                    report.podcast_duration = duration
-                    report.podcast_status = "ready"
-                    print(f"   播客生成完成: 时长 {duration // 60} 分钟", flush=True)
-                except asyncio.TimeoutError:
-                    print(f"   [WARN] ⚠️ 播客生成超时 ({PODCAST_TIMEOUT}s)，跳过播客", flush=True)
-                    report.podcast_status = "failed"
-                except Exception as e:
-                    print(f"   [WARN] 播客生成失败: {e}", flush=True)
-                    report.podcast_status = "failed"
-                
-                # Step 4: 保存到数据库
-                print("\n[Step 4] 保存到数据库...")
-                await self._save_report(report)
-                print(f"   报告已保存，ID: {report.id}")
-                
-                # 标记今日早报已完成
+            prior = await self._get_today_morning_report() if report_type == 'evening' else None
+            report = await generate_edition(report_type, prior_report=prior)
+            if report is None:
+                print('[STOP] 重要资料仍缺；已保留全文与缺口清单，不生成或发布报告', flush=True)
+                return None
+            from .edition_pipeline import check_publication
+            await check_publication(report)
+            await self._save_report(report)
+            path = run_path(report.id, ROOT) / 'result.json'
+            state = json.loads(path.read_text())
+            state['app_written'] = True
+            save_json(path, state)
+            if report_type == 'morning':
                 self._last_morning_date = today
-                
-                # Step 5: 自动更新自选股 AI 预测（交易日才执行）
-                if is_trading:
-                    print("\n[Step 5] 自动更新自选股 AI 预测...")
-                    try:
-                        await self._update_watchlist_predictions()
-                    except Exception as pred_e:
-                        print(f"   [WARN] 自选股预测更新失败（不影响报告）: {pred_e}")
-                
-                print("\n" + "="*50)
-                print(f"[DONE] {report_type_str}生成完成！")
-                print("="*50 + "\n")
-                
-            except Exception as e:
-                print(f"\n[ERROR] 早报生成失败: {e}")
-                import traceback
-                traceback.print_exc()
-                raise
-    
+            else:
+                self._last_evening_date = today
+            return report
+
+    @budgeted_generation
+    async def resume_edition_review(self, identifier):
+        from .edition_pipeline import resume_review, regenerate_reviewed_audio, load_state, check_publication, run_path
+        from .research_hub import save_json
+        if self._session_maker is None:
+            raise RuntimeError('数据库未初始化')
+        async with self._generating_lock:
+            state = load_state(identifier)
+            if await self._has_saved_edition(datetime.fromisoformat(state['cutoff']).date(), state['report_type']):
+                raise RuntimeError('已有本期报告，不能重购审稿覆盖')
+            report = await resume_review(identifier)
+            if state['policy']['audio_enabled']:
+                try:
+                    await regenerate_reviewed_audio(report)
+                except Exception:
+                    report.podcast_status = 'failed'
+            await check_publication(report)
+            await self._save_report(report)
+            state = load_state(identifier)
+            state.update(app_written=True, report=report.model_dump(mode='json'))
+            save_json(run_path(identifier) / 'result.json', state)
+            return report
+
     async def midday_news_precollect(self):
         """
         盘中新闻预采集（交易日午间执行）
@@ -472,166 +359,13 @@ class SchedulerService:
     
     @budgeted_generation
     async def generate_evening_report(self, force=False):
-        """
-        生成晚报的完整流程（仅交易日）
-        
-        晚报内容：
-        - 当天交易情况梳理总结
-        - 回顾早报内容，评价预测准确性
-        - 结合市场技术面、新闻事件影响分析
-        - 对明日市场情况、投资建议作出预测
-        - 新颖/深刻的概念解释
-        """
-        import sys
-        today = china_today()
-        if not force and await self._has_saved_edition(today,'evening'):
-            print('[SKIP] 数据库已有本日晚报，不重复采集或扣费；确需重做请明确指定force=true',flush=True)
-            return
-        
-        # 非交易日不生成晚报
-        if not self.is_trading_day(today):
-            print(f"[SKIP] 今天 {today} 不是交易日，跳过晚报生成")
-            return
-        
-        print("\n" + "="*50, flush=True)
-        print(f"[START] 开始生成交易日晚报 - {china_now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
-        print("="*50, flush=True)
-        sys.stdout.flush()
-        
-        try:
-            # Step 1: 获取今日早报（用于对比评价）
-            print("\n[Step 1] 获取今日早报...")
-            morning_report = await self._get_today_morning_report()
-            if morning_report:
-                print(f"   找到今日早报: {morning_report.title}")
-            else:
-                print("   [WARN] 未找到今日早报，将独立生成晚报")
-            
-            # Step 2: 采集盘后新闻和当日市场数据（带超时保护）
-            NEWS_COLLECT_TIMEOUT = 300  # 5 分钟超时
-            print(f"\n[Step 2] 采集盘后数据（超时 {NEWS_COLLECT_TIMEOUT}s）...", flush=True)
-            collector = get_news_collector()
-            
-            # 采集今天下午到现在的新闻
-            from .watchlist_repository import read_app_watchlist,watchlist_signature,assert_watchlist_current
-            collection_revision=watchlist_signature(await read_app_watchlist())
-            try:
-                all_news = await asyncio.wait_for(
-                    collector.collect_all(hours=8),
-                    timeout=NEWS_COLLECT_TIMEOUT
-                )
-            except asyncio.TimeoutError:
-                print(f"[WARN] ⚠️ 晚报新闻采集超时 ({NEWS_COLLECT_TIMEOUT}s)！", flush=True)
-                all_news = []
-            
-            # 【核心改动】合并盘中预采集缓存，确保盘中新闻不丢失
-            midday_cache = collector.get_midday_cache()
-            midday_cache_count = len(midday_cache)
-            all_news = collector.merge_with_midday_cache(all_news)
-            
-            # 分离新闻
-            news_by_type = collector.get_news_by_type(all_news)
-            finance_news = market_candidates(all_news)
-            
-            # 详细日志：各类型新闻数量
-            print(f"   [新闻分类] 总 {len(all_news)} 条 → "
-                  f"finance={len(news_by_type.get('finance', []))} | "
-                  f"tech={len(news_by_type.get('tech', []))} | "
-                  f"geopolitical={len(news_by_type.get('geopolitical', []))} | "
-                  f"social={len(news_by_type.get('social', []))} | "
-                  f"disaster={len(news_by_type.get('disaster', []))}")
-            
-            china_news = collector.filter_china_related(finance_news)
-            cross_border_news = collector.filter_cross_border_news(all_news)
-            
-            print(f"   筛选出 {len(china_news)} 条中国及全球市场相关财经新闻（含大宗商品/外盘）")
-            print(f"   筛选出 {len(cross_border_news)} 条跨界热点新闻")
-            
-            # 如果筛选后新闻太少，放宽使用全部财经新闻
-            if len(china_news) < 20 and len(finance_news) > len(china_news):
-                print(f"   [INFO] 筛选后新闻不足20条（{len(china_news)}），补充使用全部 {len(finance_news)} 条财经新闻")
-                china_news = finance_news
-            
-            if not all_news:
-                print("[WARN] 未能采集到新闻，停止生成报告")
-                raise RuntimeError("新闻采集为空，本期停止生成；禁止用模拟新闻替代真实资料")
-            
-            # Step 3: AI 分析生成晚报（带超时保护）
-            AI_REPORT_TIMEOUT = 900  # 15 分钟超时（含AI生成+审查修复，Claude长报告需要更久）
-            print(f"\n[Step 3] AI 分析生成晚报（超时 {AI_REPORT_TIMEOUT}s）...", flush=True)
-            analyzer = get_ai_analyzer(force_reinit=True)
-            
-            # News already has local rule sentiment; analysis must assess the evidence itself.
-            
-            # 生成晚报（传入今日早报用于回顾对比）
-            try:
-                await assert_watchlist_current(collection_revision)
-                report = await asyncio.wait_for(
-                    analyzer.generate_daily_report(
-                        china_news if china_news else finance_news,
-                        cross_border_news,
-                        report_type=ReportType.EVENING,
-                        is_trading_day=True,
-                        morning_report=morning_report,
-                        expected_watchlist=collection_revision
-                    ),
-                    timeout=AI_REPORT_TIMEOUT
-                )
-            except asyncio.TimeoutError:
-                print(f"\n[ERROR] ⚠️ 晚报 AI 报告生成超时 ({AI_REPORT_TIMEOUT}s)！跳过本次生成", flush=True)
-                raise RuntimeError('晚报分析超时，任务失败，未生成完整报告') from None
-            
-            print(f"   报告生成完成: {report.title}")
-            print(f"   字数: {report.word_count}, 预计阅读时间: {report.reading_time} 分钟")
-            
-            # Step 4: 生成播客（晚报版，带超时保护）
-            PODCAST_TIMEOUT = 900  # 15 分钟
-            print(f"\n[Step 4] 生成播客音频（超时 {PODCAST_TIMEOUT}s）...", flush=True)
-            podcast_gen = get_podcast_generator()
-            
-            try:
-                audio_path, duration = await asyncio.wait_for(
-                    podcast_gen.generate_podcast(report),
-                    timeout=PODCAST_TIMEOUT
-                )
-                report.podcast_url = f"/podcasts/{report.id}.mp3"
-                report.podcast_duration = duration
-                report.podcast_status = "ready"
-                print(f"   播客生成完成: 时长 {duration // 60} 分钟", flush=True)
-            except asyncio.TimeoutError:
-                print(f"   [WARN] ⚠️ 播客生成超时 ({PODCAST_TIMEOUT}s)，跳过播客", flush=True)
-                report.podcast_status = "failed"
-            except Exception as e:
-                print(f"   [WARN] 播客生成失败: {e}", flush=True)
-                report.podcast_status = "failed"
-            
-            # Step 5: 保存到数据库
-            print("\n[Step 5] 保存到数据库...")
-            await self._save_report(report)
-            print(f"   报告已保存，ID: {report.id}")
-            
-            # Step 6: 自动更新自选股 AI 预测
-            print("\n[Step 6] 自动更新自选股 AI 预测...")
-            try:
-                await self._update_watchlist_predictions()
-            except Exception as pred_e:
-                print(f"   [WARN] 自选股预测更新失败（不影响报告）: {pred_e}")
-            
-            print("\n" + "="*50)
-            print(f"[DONE] 交易日晚报生成完成！")
-            print("="*50 + "\n")
-            
-        except Exception as e:
-            print(f"\n[ERROR] 晚报生成失败: {e}")
-            import traceback
-            traceback.print_exc()
-            raise
-    
+        return await self._generate_unified_edition('evening', force=force)
+
     async def generate_daily_report(self, force=False):
         """
         兼容旧接口：生成每日报告（默认生成早报）
         """
-        await self.generate_morning_report(force=force)
+        return await self.generate_morning_report(force=force)
 
     async def _has_saved_edition(self, report_date, report_type):
         """Persistent duplicate guard survives process restarts; database errors stop before paid calls."""
@@ -651,6 +385,7 @@ class SchedulerService:
         """
         import traceback
         print(f"[PODCAST] 重新生成播客: {report_id}", flush=True)
+        report = None
         
         try:
             # 从数据库获取报告
@@ -660,8 +395,8 @@ class SchedulerService:
                 return
             
             # 生成播客
-            podcast_gen = get_podcast_generator()
-            audio_path, duration = await podcast_gen.generate_podcast(report)
+            from .edition_pipeline import regenerate_reviewed_audio
+            audio_path, duration = await regenerate_reviewed_audio(report)
             
             print(f"[PODCAST] 生成完成，时长: {duration} 秒，路径: {audio_path}", flush=True)
             
@@ -679,7 +414,8 @@ class SchedulerService:
             print(f"[ERROR] 播客生成失败: {e}", flush=True)
             traceback.print_exc()
             try:
-                await self._update_report_podcast(report_id, None, None, "failed")
+                if report is not None and report.podcast_status != 'ready':
+                    await self._update_report_podcast(report_id, None, None, "failed")
             except Exception as e2:
                 print(f"[ERROR] 更新失败状态也失败: {e2}", flush=True)
     
@@ -974,6 +710,8 @@ class SchedulerService:
             existing_report = result.scalars().first()
             
             if existing_report:
+                if report.id.startswith('edition-') and existing_report.id != report.id:
+                    raise RuntimeError('已有同一期报告，停止覆盖；新费用及已审稿保留在本期记录')
                 # 覆盖更新已有报告
                 print(f"   [INFO] 发现同日{'早报' if report_type_str == 'morning' else '晚报'}，覆盖更新（旧ID: {existing_report.id}）")
                 existing_report.title = report.title

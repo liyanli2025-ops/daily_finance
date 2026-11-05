@@ -1,0 +1,39 @@
+{
+  "scope": "从真实附件摘录的遗漏场景；仅作新协议的离线结构回归，不是新模型输出或新闻核实",
+  "result_sha256": "413bd71898c35a17d1181e7b1b814b260c75478bda5a2a8a50e4c368cc4c2cae",
+  "bundle_sha256": "77aa9af96f80973b75877086b3df01fde28835d86e2353241be49e69c750505e",
+  "cutoff": "2026-11-05T08:32:25.702638",
+  "candidates": {
+    "S27": {
+      "title": "Trump is ducking blame for Republican losses. It’s a familiar pattern for him - AP News",
+      "url": "https://apnews.com/article/trump-midterms-blame-responsibility-republicans-losses-9593324649b5e8432fb34a95d4e4b2e1",
+      "read_receipts": []
+    },
+    "S29": {
+      "title": "美国中期选举：民主党获胜后投资者可期待什么 | The Straits Times",
+      "url": "https://www.straitstimes.com/zh-hans/business/us-midterms-what-investors-can-expect-after-democrats-shatter-republican-strongholds",
+      "read_receipts": [
+        "ConnectTimeoutError"
+      ]
+    },
+    "S32": {
+      "title": "What investors can expect after the US midterms - The Business Times",
+      "url": "https://www.businesstimes.com.sg/zh-hans/international/global/us-midterms-what-investors-can-expect-after-democrats-shatter-republican-strongholds",
+      "read_receipts": [
+        "ConnectTimeoutError"
+      ]
+    },
+    "S58": {
+      "title": "民主党有望横扫参众两院；长鑫回购引爆存储行情｜今日重要消息回顾｜长桥证券",
+      "url": "https://longbridge.com/zh-CN/dolphin/post/44760194",
+      "read_receipts": [
+        "ProtocolError"
+      ]
+    }
+  },
+  "other_macro_source": {
+    "id": "sample-b1038ede38b67f695141200b",
+    "title": "美国国债收益率小幅上升",
+    "text": "2026-11-03 10:42\n                    Joana Taborda\n                \n1 分鐘。讀\n            美国十年期国债收益率周二小幅升至百分之四点九四，此前一个交易日下跌三个基点。随着美国选民开始投票选举中期选举，投资者也在等待包括职位空缺与劳动力流动调查报告在内的关键经济数据。预计民主党将赢得众议院控制权，而参议院选举结果则更难预测。此次选举普遍被视为对特朗普总统第二任期的一次公投。 与此同时，有报道称美国袭击了伊朗格什姆岛，油价随之反弹，在前一个交易日暴跌近百分之七后收复部分失地。 财政方面，美国财政部表示，预计第四季度将借款六千一百八十亿美元，比八月份的估计少一百亿美元。此次调整反映期初现金余额高于预期，但部分被预计净现金流减少所抵消。不过，若剔除期初现金储备增加带来的利好，借款需求将比此前估计高出二百四十亿美元。\n        \n"
+  }
+}
