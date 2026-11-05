@@ -1,6 +1,7 @@
 """Conservative use restrictions, not fact or market-session certification."""
 import re
 from urllib.parse import urlsplit
+from .search_objectives import assess,social_platform
 
 
 def assess_role(item):
@@ -10,12 +11,17 @@ def assess_role(item):
     morning=bool(re.search(r'\bAM Report\b|\bmorning (?:report|brief|update)\b|盘前|早盘|晨报|早报',title,re.I))
     commentary=bool(re.search(r'\b(?:snapshot|outlook|preview|commentary)\b|观点|评论|解读|展望',title,re.I))
     bank_commentary=host=='mufgresearch.com' or host.endswith('.mufgresearch.com')
+    preview='forecast_or_commentary_not_release_confirmation' in assess(
+        dict(title=title,url=item.source_url),'released_policy','global_policy')['flags']
+    social=social_platform(item.source_url)
     if morning:flags.append('morning_or_intraday_not_settlement')
     if commentary or bank_commentary:flags.append('commentary_not_original_policy_release')
+    if preview:flags.append('forecast_not_released_policy')
+    if social:flags.append('social_statement_not_main_news_body')
     return dict(owner='finance-material-role-v1',flags=flags,
-        latest_close_allowed=not morning,
-        commodity_settlement_allowed=not morning,
-        original_policy_release_allowed=not (commentary or bank_commentary),
+        latest_close_allowed=not (morning or social),
+        commodity_settlement_allowed=not (morning or social),
+        original_policy_release_allowed=not (commentary or bank_commentary or preview or social),
         session_verified=False,source_identity_verified=False,
         limitation='仅限制明显不匹配用途；未被限制不表示收盘、政策发布或作者身份已核实。')
 

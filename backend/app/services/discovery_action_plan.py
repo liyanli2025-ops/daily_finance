@@ -3,6 +3,7 @@ import hashlib
 import json
 
 from .discovery_budget import evidence_progress
+from .search_objectives import primary_candidate
 
 
 def reject_finish(state):
@@ -43,6 +44,7 @@ def action_plan(state,feedback,*,max_characters=6000):
             if task.get('scope'):request['scope']=task['scope']
             options.append(dict(candidate_id=identifier,title=candidate.get('title',''),
                 url=candidate['url'],snippet=candidate.get('snippet',''),request_if_selected=request,
+                use_assessment=primary_candidate(candidate,task.get('lane')),
                 reused_without_http=identifier in task.get('reusable_candidate_ids',[])))
         if options:row['candidate_options']=options
         remaining=feedback.get('remaining',{})

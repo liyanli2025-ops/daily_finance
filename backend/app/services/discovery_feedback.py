@@ -13,6 +13,7 @@ from .primary_material_quality import QUESTIONS, review_body
 from .search_primary_collection import LANES
 from .collection_time import receipt_windows,eligible as time_eligible,policy
 from .material_roles import assess_role,lane_allowed
+from .search_objectives import primary_candidate
 
 
 def cited_ids(dossier):
@@ -208,7 +209,7 @@ def build_feedback(workspace, state, stocks, limits):
     def target(key, lane, scope=None):
         ids = sorted(identifier for identifier, row in bodies.items() if row['eligible']
                      and (scope in row['direct_scopes'] if scope else lane in row['lanes']))
-        fresh, cached = [], []
+        fresh, cached, background = [], [], []
         for identifier, candidate in candidates.items():
             outcome = outcomes.get(identifier, {})
             if (outcome.get('terminal_failure') or scope and scope in outcome.get('rejected_scopes', [])
@@ -216,6 +217,10 @@ def build_feedback(workspace, state, stocks, limits):
                 continue
             links = candidate.get('discovered_by', [])
             if any(r.get('scope') == scope if scope else r.get('lane') == lane for r in links):
+                suitability=primary_candidate(candidate,lane)
+                if not suitability['main_source_option']:
+                    background.append(dict(candidate_id=identifier,flags=suitability['flags']))
+                    continue
                 cached_id = outcome.get('stored_body_id')
                 if cached_id:
                     item=workspace.documents.get(cached_id)
@@ -229,18 +234,21 @@ def build_feedback(workspace, state, stocks, limits):
                         cached.append(identifier)
                 else:
                     fresh.append(identifier)
+        fresh.sort(key=lambda identifier:primary_candidate(candidates[identifier],lane)['priority'])
         unread = cached+fresh
         readable = bool(cached or fresh and remaining['body_urls'])
         successful_search = scope in searched_scopes if scope else lane in searched_lanes
         row = dict(key=key, lane=lane, scope=scope, body_ids=ids,
                    successful_search=successful_search, unread_candidate_ids=unread,
                    reusable_candidate_ids=cached, fresh_candidate_ids=fresh,
+                   background_candidate_hints=background,
                    subject_verified=False, coverage_sufficient=False)
         if not ids:
             kind = 'read_candidate' if readable else 'search_alternative'
             tasks.append(dict(task_id=key+':locate_body', kind=kind, lane=lane, scope=scope,
                 evidence_ids=[], candidate_ids=unread[:12],
                 reusable_candidate_ids=cached[:12], executable=bool(readable or search_available),
+                background_candidate_hints=background,
                 blocked_by=(None if readable or search_available else 'body_url_budget' if not remaining['body_urls']
                             else 'search_route_or_budget'),
                 question=('核对当前公司 '+scope+' 的主体及新增事实；同业材料不是公司直接消息。' if scope else QUESTIONS[lane])))

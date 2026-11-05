@@ -4,7 +4,13 @@ import re
 from urllib.parse import urlsplit
 
 PURPOSES={'discovery','latest_close','released_policy','company_event','commentary'}
-SOCIAL=('instagram.com','facebook.com','youtube.com','youtu.be','tiktok.com','pinterest.com')
+SOCIAL=('instagram.com','facebook.com','youtube.com','youtu.be','tiktok.com','pinterest.com',
+        'x.com','twitter.com','threads.net')
+
+
+def social_platform(url):
+    host=(urlsplit(url or '').hostname or '').lower()
+    return any(host==domain or host.endswith('.'+domain) for domain in SOCIAL)
 
 
 def infer_purpose(query,lane):
@@ -31,25 +37,47 @@ def request_profile(query,purpose,now,hours=72):
 
 def assess(row,purpose='discovery',lane=None):
     """Headline/URL checks only. A rolling article may contain later updates."""
-    title=str(row.get('title') or '');host=(urlsplit(row.get('url') or '').hostname or '').lower()
+    title=str(row.get('title') or '')
     flags=[]
-    social=any(host==domain or host.endswith('.'+domain) for domain in SOCIAL)
+    social=social_platform(row.get('url'))
     if social:flags.append('social_or_video_needs_platform_reader')
     if purpose=='latest_close':
-        if re.search(r'盘前|开盘前|午评|早盘|盘中|集体低开|pre.market|before.*open',title,re.I):
+        if re.search(r'盘前|开盘前|午评|早盘|盘中|晨报|早报|集体低开|pre.market|before.*open|\bAM Report\b|\bmorning (?:report|brief|update)\b',title,re.I):
             flags.append('session_or_rolling_update_needs_body_check')
         if (lane=='us_market' and re.search(r'台股|台湾股市|韓股|韩股|韩国股市|日股|日本股市',title)
             and not re.search(r'美股|华尔街|纳指|标普|道指|Wall Street|Nasdaq|S&P',title,re.I)):
             flags.append('different_market_primary_subject_hint')
         if re.search(r'单月|月内|月度|monthly',title,re.I):flags.append('monthly_period_not_daily_return_needs_body_check')
     if purpose=='released_policy':
-        forecast=re.search(r'预测|预期|将风平|只差官宣|盘前|决议前|preview|expected|forecast',title,re.I)
-        released=re.search(r'决议全文|声明全文|宣布|已公布|正式发布|发布声明|announces|issues.*statement',title,re.I)
+        forecast=re.search(r'预测|预期|将风平|只差官宣|盘前|决议前|前瞻|preview|expected|forecast|\bahead of\b|\bset to\b|\bpoised to\b|\blikely to\b|\bwhat to expect\b',title,re.I)
+        released=re.search(r'决议全文|声明全文|宣布|已公布|正式发布|发布声明|\bannounced?\b|\bannounces\b|\bissues?.*statement|\b(?:holds|held|keeps|kept|maintains|maintained|cuts|raises|raised|decided)\b',title,re.I)
         if forecast and not released:flags.append('forecast_or_commentary_not_release_confirmation')
+        elif forecast and released:flags.append('mixed_release_and_outlook_needs_body_check')
     return dict(purpose=purpose,flags=flags,
         role='lead_needs_body_check' if flags else 'candidate_needs_body_check',
         reading_scope='metadata_only',event_or_session_verified=False,
         limitation='标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。')
+
+
+def primary_candidate(row,lane):
+    """Suitability for a main-source menu, never news or source certification."""
+    purpose='released_policy' if lane=='global_policy' else 'latest_close' if lane in {
+        'a_market','hk_market','us_market','commodities'} else 'company_event' if lane=='company_event' else 'discovery'
+    review=assess(row,purpose,lane);flags=list(review['flags']);title=str(row.get('title') or '')
+    blockers=set(flags)&{'social_or_video_needs_platform_reader','forecast_or_commentary_not_release_confirmation',
+                        'different_market_primary_subject_hint'}
+    if lane in {'a_market','hk_market','us_market','commodities'} and re.search(
+            r'\bAM Report\b|\bmorning (?:report|brief|update)\b|晨报|早报',title,re.I):
+        blockers.add('morning_report_not_completed_session')
+    rolling=bool(re.search(r'live(?:coverage|[- ]updates)|live updates|滚动|直播',title+' '+str(row.get('url') or ''),re.I))
+    completed=bool(re.search(r'收盘|收评|\b(?:closed|closing|finished|ended)\b|how.*(?:indexes|indices).*fared',title,re.I))
+    if rolling:flags.append('rolling_article_may_contain_later_completed_session')
+    # Put explicit completed-session leads ahead of rolling pages without
+    # deleting those pages or pretending the headline verifies the session.
+    priority=2 if rolling else 0 if completed else 1
+    return dict(main_source_option=not blockers,priority=priority,flags=sorted(set(flags)|blockers),
+        background_only=bool(blockers),body_check_required=True,source_identity_verified=False,
+        limitation='只影响主资料建议，不删除原目录；预测可作背景，滚动稿仍需读正文核更新，未标记不表示事实已核实。')
 
 
 def executed_coverage(receipts,stocks):

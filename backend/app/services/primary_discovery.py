@@ -15,7 +15,7 @@ from .prompt_reading import input_characters as message_characters
 from .event_observations import canonical
 from .research_desk import INSTRUCTIONS
 from .search_primary_collection import LANES,watchlist_rows
-from .search_objectives import PURPOSES,assess,executed_coverage,infer_purpose
+from .search_objectives import PURPOSES,assess,executed_coverage,infer_purpose,social_platform
 from .discovery_feedback import build_feedback, assess_finish, cited_ids, complete_local_reads
 from .discovery_action_plan import action_plan,reject_finish
 from .discovery_context import (project, manifest, confirm, encoded, body_packets, subtract,
@@ -49,6 +49,8 @@ section可为candidates、receipts、observations或bodies；offset从0开始，
 正文元数据中的body_quality是非破坏式编辑提示；出现推广/投票信号时优先换独立来源，
 不得把促销口号写成新闻或忽略反证。启发式可能命中报道引用，未标记也不代表稿件合格。
 source_role中的限制同样必须遵守：银行评论不能证明央行原始发布，晨报/盘中稿不能代替收盘或结算资料。
+主资料候选菜单会标注用途：决议前瞻保留为背景，不能证明决议已公布；X等社交页面需独立讨论读取器，不用HTML正文工具读取。
+优先核对能直接解决缺口的已完成时段资料；滚动稿仍可能含后续更新，不因标题就断言无效。
 背景仍可用于解释与反证；若主资料仍缺，继续补查或明确保留缺口，不能靠改标签宣称覆盖完成。
 finish被拒绝后，依据finish_repair的任务与候选选择action=tools；仅修改标题、措辞、事件顺序不算取材进展。
 可明确deferred_tasks说明不补查的编辑理由；不能反复提交同一材料的结束稿来代替补查。
@@ -192,8 +194,7 @@ def unsupported_page(url):
     parts=urlsplit(url);host=(parts.hostname or '').lower()
     if parts.path.lower().endswith(('.pdf','.doc','.docx','.xls','.xlsx')):
         return 'document_requires_document_reader_not_html'
-    if host in {'instagram.com','www.instagram.com','facebook.com','www.facebook.com','tiktok.com','www.tiktok.com',
-                'youtube.com','www.youtube.com','m.youtube.com','youtu.be'}:
+    if social_platform(url):
         return 'social_page_requires_platform_reader'
     return None
 

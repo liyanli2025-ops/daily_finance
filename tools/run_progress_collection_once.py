@@ -1,6 +1,6 @@
 """Preview a fresh progress-driven collection; --run --input-sha spends usage.
 
-Run from a separate upload directory against the reviewed v21 through v27 backend. No service,
+Run from a separate upload directory against the reviewed v21 through v28 backend. No service,
 credential, scheduler, report, TTS or App database writes. Old trial markers and
 source-failure ledgers remain authoritative and are never removed by this tool.
 """
@@ -21,11 +21,11 @@ import zipfile
 
 TRIAL = 'progress-collection-v1'
 OWNER = 'finance-progress-collection-acceptance-v1'
-# Filled from installed v21 plus the reviewed v22/v23/v24/v25/v26/v27 repairs. LF/CRLF only
+# Filled from installed v21 plus the reviewed v22/v23/v24/v25/v26/v27/v28 repairs. LF/CRLF only
 # is normalized; unknown source changes are not silently accepted.
 REVIEWED_RUNTIME = {
-    "app/services/discovery_action_plan.py": "385c6ba4906ce3073135c48dc87a757be74a4d7659b6982813bb61f6ad1122ba",
-    "app/services/material_roles.py": "526b8e16a454c238edd69afe8ba2bf407ba752b62727dc49a6a4a386d0b49cc1",
+    "app/services/discovery_action_plan.py": "b754d49d84ab6627df4ee797ae353a9d4ece409af76e4c88c06bb1a56fc2e82e",
+    "app/services/material_roles.py": "a1360daeed8c969a32738361b160d33522fa5065212f4e1c05d8ccdac8964b31",
     "app/services/discovery_recovery.py": "bf3e5943deb684aeec4045a737846ba97a7255b1c20d9d058708baaf086a94a1",
     "app/services/article_metadata.py": "b9af84761c3a539f520a6941e8f8e5ccd9756a7adff4f80128c777d0c222eec6",
     "app/services/collection_time.py": "e70e83024900f5c6dc09e4d57daee593eb5a375997f3483d007e4d17f5250393",
@@ -41,17 +41,17 @@ REVIEWED_RUNTIME = {
     "app/services/ai_analyzer.py": "c1d5184f50b66bd00da16866707ca0a74eb0e96926bc31ee03d7ea98770c9d44",
     "app/services/discovery_budget.py": "89c425916b7facd481df44a73a59a18b7bc50ef5f919ed1db8afb2378af95542",
     "app/services/discovery_completion.py": "7846913b58e14193fcf1fca54a4900c8d803b7fd617e469e1a9fb70ee8ae63bc",
-    "app/services/discovery_feedback.py": "464dac55cf2837682a1ab4f801825d8e7bf31310677faa0011b5a2c4eadb641e",
+    "app/services/discovery_feedback.py": "8d2360e735d37084b6334c4d2d7ba67111f2d1f0a10f55999c6623c6835d010b",
     "app/services/episode_research.py": "b810755244f6816e54de7fb170cd59b33bf05e164bfbeda2336bf2a0bdb1faae",
     "app/services/episode_workspace.py": "180530fd20d85514ca70717ac3ff0f17d765a77302d7ff656842f3bea284edf0",
     "app/services/generic_extraction.py": "1b12efef7a6c1e748caf81733f7eb235e353244806a9e264415de5cf9f3365f8",
     "app/services/model_gateway.py": "af70135e8007cf2da9d52538a18bfd2b8b0dd0ed4e6ef42453e7e9fb952efbf2",
     "app/services/model_usage.py": "12e657d6652ad3c45d511c91b64756943062b99ebee261c1ba6da1c25c9bb502",
-    "app/services/primary_discovery.py": "a32e9d2e3c252448905e2b75fdaef55548fdc58373652c19351513dd61e33cc4",
+    "app/services/primary_discovery.py": "3bbd70c56c3ec2ca112f940fe4595c20bfa8e16279396448445a35106f5db421",
     "app/services/primary_material_quality.py": "d0d282b2f7bf1995792a8ae0909098bb9a25631b6f7f64f65add6dc481d28ff8",
     "app/services/primary_report.py": "1bbb32302aa528dfa9f64a4aa89c4dcd0d43591926e9fb6338480f2cf35d3892",
     "app/services/reading_acceptance.py": "4c457fa15ef27c19841711352de5c0c80407e36df835d2e1ff6a8c4d8c76b193",
-    "app/services/search_objectives.py": "ea2974422e9bce544fca5f0ad53741172146143f7a21aa153bbb04788259f0a9",
+    "app/services/search_objectives.py": "832f5d4e2cfbfd067b12765f050dd68f8f1b2fdc992f57bbad953158fceb4889",
     "app/services/search_primary_collection.py": "e71098d1d165e1ffb64a7cd51b2f686e0b843b4936122b99dad6f0d1f10fd63a",
     "app/services/web_research.py": "85c45c286548d0f69f84bae038c3bbc9e181cdc26ab92e846588cab52364f9e7"
 }
@@ -77,7 +77,7 @@ def source_snapshot(backend):
         path = backend / relative
         if (not path.is_file() or path.is_symlink()
                 or hashlib.sha256(path.read_bytes().replace(b'\r\n', b'\n')).hexdigest() != expected):
-            raise CheckError('源码与已审阅v27不符，停止：' + relative)
+            raise CheckError('源码与已审阅v28不符，停止：' + relative)
     # Also detect drift in imported support modules between preview and run.
     files = sorted((backend / 'app').rglob('*.py'))
     if any(p.is_symlink() for p in files):
@@ -177,7 +177,8 @@ async def preview(backend):
     if resume:
         max_by_output = resume['remaining_reserved_output_tokens'] // plan['initial']['output_tokens']
         if configured_cap is not None:configured_cap -= resume['prior_segment_model_calls']
-    print(json.dumps(dict(mode='free_progress_collection_preview', trial=TRIAL,
+    print(json.dumps(dict(mode=('free_fresh_collection_preview' if value['environment'].get('fresh_trial')
+                     else 'free_progress_collection_preview'), trial=TRIAL,
         ready_to_run=not blockers, blockers=blockers, input_sha256=fingerprint(value),
         prepared_at=value['prepared_at'], expires_at=value['expires_at'],
         watchlist=value['watchlist'], route=value['environment']['route'], budget_plan=plan,
@@ -194,6 +195,7 @@ async def preview(backend):
         result_file=str(result_file),
         continuation=value['environment'].get('continuation'),
         resume=resume,
+        fresh_trial=value['environment'].get('fresh_trial'),
         limitation='这只是本地预览，尚未联网。运行会使用模型及Tavily账户额度；'
             '字符与预留输出不是金额上限，也不保证达到上限才结束。'
             '模型请求数由累计输出上限推导，未新增固定取材轮次。'
