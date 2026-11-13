@@ -158,6 +158,8 @@ class EditionPipeline:
             (accounted(r) for r in self.state.get('reservations', [])), number(0))) + '；非账户账单，原预留记录保留')
         if self.state.get('budget_forecast'):
             lines.append('后续阶段费用规划：' + json.dumps(self.state['budget_forecast'], ensure_ascii=False))
+        if self.state.get('patch_progress'):
+            lines.append('补查进展：' + json.dumps(self.state['patch_progress'], ensure_ascii=False))
         for row in self.state.get('read_selection', []):
             selection = {k: v for k, v in row.items() if k not in {'ranked', 'skipped'}}
             selection['selected_articles'] = [dict(id=cid,
@@ -362,14 +364,23 @@ class EditionPipeline:
                     raise ValueError('edition_patch_read_invalid')
                 validate_increment(job)
             if jobs or reads or extra:
-                before = {i: digest(s['text']) for i, s in self.state['sources'].items()}
+                before = {i: dict(text=digest(s['text']), event_ids=set(s['event_ids']))
+                          for i, s in self.state['sources'].items()}
                 if not jobs:
                     await self.check()
                     self.budget.check_search_batch(0)
                 await self.searches(jobs)
                 selected, trace = patch_plan(self.state, events, assessment, extra)
                 await self.selected_reads(selected, events, trace)
-                if before == {i: digest(s['text']) for i, s in self.state['sources'].items()}:
+                changed = [i for i, source in self.state['sources'].items()
+                           if i not in before or digest(source['text']) != before[i]['text']]
+                links = [dict(source_id=i, event_id=eid)
+                         for i, source in self.state['sources'].items() for eid in source['event_ids']
+                         if i in before and eid in events and eid not in before[i]['event_ids']]
+                self.state['patch_progress'] = dict(new_or_changed_body_ids=changed,
+                    reused_body_event_links=links,
+                    limitation='新增关联不是新增事实或独立来源；仍须逐事件评估证据，不能直接判定已覆盖。')
+                if not changed and not links:
                     self.state.update(status='partial_materials', stop_reason='patch_no_new_body')
                     self.save(); return None
                 assessment = await self.call('patch_assessment', contract.ASSESS,

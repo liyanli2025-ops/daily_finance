@@ -604,5 +604,108 @@ class AllStageBudgetRegression(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('patch_assessment', [r['stage'] for r in edition_forecast(run, china_now())])
 
 
+class EmbeddedEventRegression(unittest.IsolatedAsyncioTestCase):
+    OTHER = '媒体报道另一项重大事项，结论仍有待进一步核实。'
+
+    def events(self):
+        return [copy.deepcopy(EVENT), dict(EVENT, id='E2', title='综述中的另一项重大事项')]
+
+    def test_one_candidate_can_belong_to_two_distinct_events(self):
+        value = dict(events=self.events(), excluded_candidates=[])
+        self.assertEqual(c.agenda(value, {'S1': {}}, set()), value)
+
+    def test_assigned_candidate_cannot_also_be_excluded(self):
+        with self.assertRaisesRegex(ValueError, 'unaccounted'):
+            c.agenda(dict(events=self.events(), excluded_candidates=[
+                dict(candidate_ids=['S1'], reason='不能一边使用一边排除')]), {'S1': {}}, set())
+
+    def test_duplicate_and_unknown_candidates_remain_rejected(self):
+        duplicate = copy.deepcopy(EVENT); duplicate['candidate_ids'] = ['S1', 'S1']
+        with self.assertRaisesRegex(ValueError, 'candidates_invalid'):
+            c.agenda(dict(events=[duplicate]), {'S1': {}}, set())
+        for excluded in ([dict(candidate_ids=['S2'], reason='不相关')] * 2,
+                         [dict(candidate_ids=['S3'], reason='未知候选')]):
+            with self.subTest(excluded=excluded), self.assertRaisesRegex(ValueError, 'unaccounted'):
+                c.agenda(dict(events=[copy.deepcopy(EVENT)], excluded_candidates=excluded), {'S1': {}, 'S2': {}}, set())
+
+    def test_real_saved_overview_has_separate_market_and_election_passages(self):
+        sample = json.loads((Path(__file__).parent / 'fixtures/edition_cost_sample.json').read_text())
+        source = next(s for s in sample['sources'] if s['id']=='sample-4a6547aff764077f2bb4f0a6')
+        text = source['text']
+        market = '科创50指数飙升近10%'
+        election = '美国媒体预测，民主党夺回美国国会参议院控制权。'
+        self.assertIn(market, text); self.assertIn(election, text)
+        events = self.events(); events[0].update(title='市场行情', lane='a_market')
+        events[1]['title'] = '媒体对中期选举作出的预测，待核实'
+        c.agenda(dict(events=events), {'S1': {}}, set())
+        sid=source['id']; material=dict(source, event_ids=['E1', 'E2'])
+        assessment=dict(events=[dict(id=eid,status='ready',reason='只核对这一段来源归属，非独立事实验证',
+            evidence=[dict(source_id=sid,quote=q)]) for eid,q in [('E1',market),('E2',election)]], watchlist_checks=[])
+        self.assertEqual(c.assess(assessment, {e['id']:e for e in events}, {sid:material}, set()), [])
+        self.assertEqual(len({sid:material}), 1)  # Two events never mean two independent sources.
+
+    async def shared_scenario(self, directory, *, discovered=False, remains_missing=False):
+        pipeline, _, _ = await PipelineRegression().scenario(directory)
+        source, written, assessment, reviewed = fixtures()
+        events=self.events(); source['text'] += self.OTHER
+        second=dict(id='E2',status='ready',reason='综述中另一段可核对的独立事项',
+                    evidence=[dict(source_id='body-1',quote=self.OTHER)])
+        first=copy.deepcopy(assessment)
+        if discovered:
+            first['missed_major_events']=[copy.deepcopy(events[1])]
+        else:
+            first['events'].append(copy.deepcopy(second))
+        patch_assessment=copy.deepcopy(assessment); patch_assessment['events'].append(second)
+        if remains_missing:
+            patch_assessment['events'][1]=dict(id='E2',status='missing',reason='只有媒体预测，关键依据仍未核实')
+        written['body'] += self.OTHER; written['script'] += self.OTHER
+        written['event_coverage'].append(dict(event_id='E2',quote=self.OTHER))
+        written['script_event_coverage'].append(dict(event_id='E2',quote=self.OTHER))
+        reviewed['agenda_checks'].append(dict(event_id='E2',status='covered',
+                                             report_quote=self.OTHER,script_quote=self.OTHER))
+        replies=[dict(events=events[:1] if discovered else events,excluded_candidates=[]),first]
+        if discovered:replies.append(patch_assessment)
+        replies.extend([written,reviewed])
+        phases=[]; reads=[]
+        async def model(task,messages,limit):
+            phases.append(pipeline.state['phase'])
+            return json.dumps(replies.pop(0),ensure_ascii=False)
+        def read(ws,url,**kwargs):
+            reads.append(url)
+            item=News(id='body-1',title=source['title'],content=source['text'],
+                source='公开网页可见正文-离线替身',source_url=url,published_at=pipeline.workspace.now-timedelta(hours=1))
+            ws.add([item]);return dict(status='ok',material=dict(id='body-1'))
+        pipeline.model,pipeline.read=model,read
+        return pipeline,phases,reads
+
+    async def test_initial_two_events_share_one_download_and_four_model_stages(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pipeline,phases,reads=await self.shared_scenario(Path(temporary))
+            self.assertIsNotNone(await pipeline.execute())
+            self.assertEqual(phases,['agenda','assessment','writing','review'])
+            self.assertEqual(len(reads),1)
+            self.assertEqual(set(pipeline.state['sources']['body-1']['event_ids']),{'E1','E2'})
+
+    async def test_new_event_in_cached_body_can_reach_conditional_assessment(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pipeline,phases,reads=await self.shared_scenario(Path(temporary),discovered=True)
+            self.assertIsNotNone(await pipeline.execute())
+            self.assertEqual(phases,['agenda','assessment','patch_assessment','writing','review'])
+            self.assertEqual(len(reads),1)
+            self.assertEqual(pipeline.state['patch_progress']['new_or_changed_body_ids'],[])
+            self.assertEqual(pipeline.state['patch_progress']['reused_body_event_links'],[
+                dict(source_id='body-1',event_id='E2')])
+            self.assertEqual(len(pipeline.state['sources']),1)
+
+    async def test_new_link_does_not_certify_coverage_or_bypass_missing_major(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pipeline,phases,reads=await self.shared_scenario(Path(temporary),discovered=True,remains_missing=True)
+            self.assertIsNone(await pipeline.execute())
+            self.assertEqual(phases,['agenda','assessment','patch_assessment'])
+            self.assertEqual(len(reads),1)
+            self.assertEqual(pipeline.state['missing'],['E2'])
+            self.assertNotIn('draft',pipeline.state)
+
+
 if __name__ == '__main__':
     unittest.main()
