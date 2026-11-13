@@ -53,6 +53,89 @@ def state():
 
 
 class StageContextRegression(unittest.TestCase):
+    def restore_candidates(self, encoded):
+        def decode(value):
+            if isinstance(value, dict):
+                if set(value) == {'$ref'}:
+                    return decode(encoded['candidate_shared'][value['$ref']])
+                return {k: decode(v) for k, v in value.items()}
+            if isinstance(value, list): return [decode(v) for v in value]
+            return value
+        if 'candidate_columns' not in encoded:
+            return copy.deepcopy(encoded['candidates'])
+        return {cid: dict(zip(encoded['candidate_columns'][:-1], row[:-1]), **decode(row[-1]))
+                for cid, row in encoded['candidates'].items()}
+
+    def test_real_large_candidate_catalogue_is_lossless_and_smaller(self):
+        from app.services.edition_context import candidate_packet
+        candidates = json.loads((Path(__file__).parent / 'fixtures/edition_cost_sample.json').read_text())['candidates']
+        before = copy.deepcopy(candidates)
+        encoded = candidate_packet(candidates)
+        restored = self.restore_candidates(encoded)
+        self.assertEqual(restored, before)
+        self.assertEqual(candidates, before)
+        compact = json.dumps(encoded, ensure_ascii=False, separators=(',', ':'))
+        self.assertLess(len(compact), len(json.dumps(dict(candidates=candidates), ensure_ascii=False)))
+        self.assertEqual(len(encoded['candidates']), 92)
+
+    def test_large_real_agenda_includes_system_brief_inside_request_limit(self):
+        from app.services.edition_context import packet
+        from app.services.edition_inputs import messages_for
+        sample = json.loads((Path(__file__).parent / 'fixtures/edition_cost_sample.json').read_text())
+        run = state(); run.update(candidates=sample['candidates'], watchlist=sample['watchlist'])
+        messages = messages_for('agenda', c.AGENDA, packet(run, 'agenda'), china_now(), 'morning')
+        self.assertLessEqual(sum(len(m['content']) for m in messages), run['policy']['max_input_characters'])
+        self.assertIn('candidate_columns', messages[0]['content'])
+
+    def test_shared_context_never_replaces_unique_warning_or_scope(self):
+        from app.services.edition_context import candidate_packet
+        candidates = {sid: dict(title='同一事件', url='https://example.com/' + sid,
+            snippet='各来源摘要', published_hint=None, reading_status='metadata_only',
+            discovered_by=[dict(scope=scope)], retrieval_assessments=[dict(flags=[flag])])
+            for sid, scope, flag in [('S1', 'A:600900', 'old_session'), ('S2', 'A:002714', 'commentary')]}
+        value = candidate_packet(candidates)
+        self.assertEqual(self.restore_candidates(value), candidates)
+
+    def test_reserved_codec_key_falls_back_without_overwriting_source(self):
+        from app.services.edition_context import candidate_packet
+        candidates = dict(S1=dict(title='来源原字段', url='https://example.com/1', snippet='摘要',
+                                 published_hint=None, extra={'$ref': 5}))
+        self.assertEqual(candidate_packet(candidates), dict(candidates=candidates))
+
+    def test_assessment_keeps_major_and_unread_snippets_and_all_candidate_titles(self):
+        from app.services.edition_context import assessment_candidates
+        value = self.context()
+        value['candidates'] = {cid: dict(title=cid, url='https://example.com/' + cid,
+            snippet='完整摘要' + cid) for cid in ('S1', 'S2', 'S3', 'S4', 'S5')}
+        value['agenda']['excluded_candidates'] = [dict(candidate_ids=['S2'], reason='无新增背景')]
+        value['sources']['body-1']['candidate_id'] = 'S4'
+        value['sources']['body-2'] = dict(value['sources']['body-1'], id='body-2', candidate_id='S1')
+        before = copy.deepcopy(value)
+        result = assessment_candidates(value)
+        self.assertEqual(set(result), set(value['candidates']))
+        self.assertEqual(result['S1']['snippet'], '完整摘要S1')
+        self.assertEqual(result['S3']['snippet'], '完整摘要S3')
+        self.assertEqual(result['S5']['snippet'], '完整摘要S5')
+        self.assertIsNone(result['S2']['snippet'])
+        self.assertIsNone(result['S4']['snippet'])
+        self.assertEqual(value, before)
+        for cid, row in result.items(): self.assertEqual(row['title'], value['candidates'][cid]['title'])
+
+    def test_forecast_replaces_draft_allowance_with_actual_saved_draft_and_keeps_all_known_bodies(self):
+        from app.services.edition_inputs import editorial_forecast
+        value = self.context()
+        draft = value.pop('draft')
+        value['sources']['contrary'] = dict(value['sources']['body-1'], id='contrary', event_ids=['E9'])
+        before = copy.deepcopy(value)
+        first = editorial_forecast(value, china_now())
+        self.assertEqual(first[1]['future_draft_allowance_bytes'], 40000)
+        self.assertEqual(set(first[1]['source_ids']), {'body-1', 'contrary'})
+        self.assertEqual(value, before)
+        value['draft'] = draft
+        second = editorial_forecast(value, china_now())
+        self.assertEqual(second[1]['future_draft_allowance_bytes'], 0)
+        self.assertGreater(second[1]['known_input_bytes'], first[1]['known_input_bytes'])
+
     def context(self):
         source, written, assessment, _ = fixtures()
         value = state()
@@ -177,6 +260,70 @@ class ContractRegression(unittest.TestCase):
 
 
 class BudgetRegression(unittest.TestCase):
+    def test_forecast_uses_known_stage_input_instead_of_maximum_character_cap(self):
+        from app.services.edition_budget import protection
+        run = state()
+        forecasts = [dict(stage=s, known_input_bytes=1000, future_draft_allowance_bytes=2000,
+            output_tokens=1000) for s in ('writing', 'review')]
+        amount, rows = protection(run['policy'], forecasts)
+        self.assertEqual(str(amount), '0.032')
+        run['policy'].update(editorial_forecast='known_payload_v1', estimated_limit_usd='.05')
+        Budget(run, lambda: None, lambda: forecasts).reserve('search')
+        self.assertEqual(len(run['reservations']), 1)
+        self.assertEqual(run['budget_forecast']['editorial'], rows)
+
+    def test_growing_material_forecast_stops_before_another_fee(self):
+        run = state()
+        run['policy'].update(editorial_forecast='known_payload_v1', estimated_limit_usd='.05')
+        forecast = [dict(stage=s, known_input_bytes=1000, future_draft_allowance_bytes=0,
+            output_tokens=1000) for s in ('writing', 'review')]
+        budget = Budget(run, lambda: None, lambda: forecast)
+        budget.reserve('search')
+        forecast[0]['known_input_bytes'] = 100000
+        with self.assertRaisesRegex(ValueError, 'estimated_budget_exhausted'):
+            budget.reserve('search')
+        self.assertEqual(len(run['reservations']), 1)
+
+    def test_missing_or_invalid_dynamic_forecast_is_not_free(self):
+        from app.services.edition_budget import protection
+        run = state(); run['policy']['editorial_forecast'] = 'known_payload_v1'
+        with self.assertRaisesRegex(ValueError, 'forecast_missing'):
+            Budget(run, lambda: None).reserve('search')
+        with self.assertRaisesRegex(ValueError, 'forecast_invalid'):
+            protection(run['policy'], [])
+
+    def test_complete_known_usage_updates_accounting_but_preserves_attempt_and_original_reserve(self):
+        from app.services.edition_budget import accounted
+        run = state(); budget = Budget(run, lambda: None)
+        reservation = budget.reserve('model', stage='writing', messages=[dict(content='资料')], output=1000)
+        original = reservation['estimated_usd']
+        budget.record_usage(reservation, dict(http_status=200, provider='ofox_anthropic',
+            input_tokens=100, output_tokens=20, cache_read_tokens=0, cache_write_tokens=0))
+        self.assertEqual(str(accounted(reservation)), '0.0004')
+        self.assertEqual(reservation['estimated_usd'], original)
+        self.assertEqual(len(run['reservations']), 1)
+
+    def test_unknown_cache_failure_or_compatible_usage_retains_full_reservation(self):
+        from app.services.edition_budget import accounted
+        for overrides in [dict(cache_write_tokens=None), dict(http_status=402), dict(provider='compatible'),
+                          dict(transport_error='timeout'), dict(input_tokens=True)]:
+            run = state(); budget = Budget(run, lambda: None)
+            reservation = budget.reserve('model', stage='writing', messages=[dict(content='资料')], output=1000)
+            usage = dict(http_status=200, provider='ofox_anthropic', input_tokens=100,
+                output_tokens=20, cache_read_tokens=0, cache_write_tokens=0)
+            usage.update(overrides); budget.record_usage(reservation, usage)
+            self.assertEqual(str(accounted(reservation)), reservation['estimated_usd'])
+
+    def test_receipt_cost_above_reservation_still_blocks_next_paid_action(self):
+        run = state(); run['policy']['estimated_limit_usd'] = '2'
+        budget = Budget(run, lambda: None)
+        reservation = budget.reserve('model', stage='writing', messages=[dict(content='资料')], output=1000)
+        budget.record_usage(reservation, dict(http_status=200, provider='ofox_anthropic',
+            input_tokens=2000000, output_tokens=20, cache_read_tokens=0, cache_write_tokens=0))
+        with self.assertRaisesRegex(ValueError, 'estimated_budget_exhausted'):
+            budget.reserve('search')
+        self.assertEqual(len(run['reservations']), 1)
+
     def test_unknown_or_nan_price_is_not_free(self):
         for value in (None, 'NaN', 'Infinity', '-1'):
             with self.subTest(value=value), self.assertRaises(ValueError): number(value)
@@ -252,6 +399,7 @@ class PipelineRegression(unittest.IsolatedAsyncioTestCase):
     async def test_normal_whole_path_four_calls_and_persistent_sources(self):
         with tempfile.TemporaryDirectory() as temporary:
             pipeline, stages, written = await self.scenario(Path(temporary))
+            pipeline.state['policy']['editorial_forecast'] = 'known_payload_v1'
             with patch('app.services.podcast_script_cache.save'), patch('app.services.podcast_script_cache.load', return_value=written['script']):
                 report = await pipeline.execute()
             self.assertEqual(stages, ['analysis', 'analysis', 'analysis', 'review'])

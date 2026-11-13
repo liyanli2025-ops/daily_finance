@@ -68,11 +68,16 @@ def main():
         os.chdir(package)
         print('生产源码、配置、数据库、暂停状态均未修改；临时源码副本将自动清理。')
         if not result.wasSuccessful(): raise SystemExit(1)
+        if result.testsRun != manifest['test_count']:
+            raise SystemExit('实际测试数量与交付清单不符，不生成验收回执')
+        proof_files = ('upgrade-manifest.json', 'manifest.json', 'payload.zip',
+                       'backend/tests/test_unified_edition.py', 'backend/tests/fixtures/unified_major_omission.json')
+        if manifest.get('edition_cost_sample_required'):
+            proof_files += ('backend/tests/fixtures/edition_cost_sample.json',)
         proof = dict(owner='finance-unified-offline-acceptance-v1', passed=True,
             test_count=result.testsRun,
             file_sha256={name: hashlib.sha256((package / name).read_bytes()).hexdigest() for name in
-                ('upgrade-manifest.json', 'manifest.json', 'payload.zip',
-                 'backend/tests/test_unified_edition.py', 'backend/tests/fixtures/unified_major_omission.json')})
+                proof_files})
         target = package / 'offline-acceptance.json'
         fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, 'w') as stream: json.dump(proof, stream, ensure_ascii=False, indent=2)

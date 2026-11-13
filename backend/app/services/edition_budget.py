@@ -39,10 +39,8 @@ def policy(config, routes):
     limit = number(config.edition_estimated_limit_usd)
     if limit <= 0:
         raise ValueError('edition_estimate_limit_missing')
-    editorial_reserve = sum((model_estimate(prices['review' if s == 'review' else 'analysis'],
-        config.edition_input_characters * 4, OUTPUTS[s]) for s in ('writing', 'review')), Decimal(0))
     return dict(model_prices=prices, search_price_usd=search_price, estimated_limit_usd=str(limit),
-        protected_editorial_estimate_usd=str(editorial_reserve),
+        editorial_forecast='known_payload_v1',
         max_model_reservations=MAX_CALLS, max_search_requests=config.research_web_search_max_requests,
         max_body_urls=config.research_body_max_urls, max_input_characters=config.edition_input_characters,
         total_input_characters=config.edition_total_input_characters,
@@ -51,10 +49,50 @@ def policy(config, routes):
         input_estimate='UTF8字节数按一字节一token规划；不是服务商token计数或账单保证')
 
 
+def protection(policy, forecasts, reserved_stages=()):
+    if (len(forecasts) != 2 or {r['stage'] for r in forecasts} != {'writing', 'review'}
+            or any(type(r[k]) is not int or r[k] < 0 for r in forecasts
+                   for k in ('known_input_bytes', 'future_draft_allowance_bytes', 'output_tokens'))):
+        raise ValueError('edition_editorial_forecast_invalid')
+    remaining, rows = Decimal(0), []
+    for row in forecasts:
+        if row['stage'] in reserved_stages:
+            continue
+        task = 'review' if row['stage'] == 'review' else 'analysis'
+        fee = model_estimate(policy['model_prices'][task],
+            row['known_input_bytes'] + row['future_draft_allowance_bytes'], row['output_tokens'])
+        rows.append(dict(row, estimated_usd=str(fee)))
+        remaining += fee
+    return remaining, rows
+
+
+def accounted(row):
+    # An unknown/failed response retains its original full reservation.
+    return number(row.get('usage_priced_usd', row['estimated_usd']))
+
+
 class Budget:
-    def __init__(self, state, save):
+    def __init__(self, state, save, forecast=None):
         self.state = state
         self.save = save
+        self.forecast = forecast
+
+    def record_usage(self, reservation, usage):
+        reservation['actual_usage'] = {k: usage.get(k) for k in
+            ('http_status', 'input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens')}
+        # Anthropic input counts exclude cache buckets. Compatible providers may
+        # count them inside input_tokens; do not assume their semantics here.
+        keys = ('input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens')
+        if (usage.get('http_status') != 200 or usage.get('transport_error')
+                or usage.get('provider') not in {'anthropic', 'ofox_anthropic'}
+                or any(type(usage.get(k)) is not int or usage[k] < 0 for k in keys)):
+            return
+        price = self.state['policy']['model_prices']['review' if reservation['stage'] == 'review' else 'analysis']
+        total = sum((number(price[rate]) * usage[key] for rate, key in
+            (('input', 'input_tokens'), ('output', 'output_tokens'),
+             ('cache_read', 'cache_read_tokens'), ('cache_write', 'cache_write_tokens'))), Decimal(0)) / 1000000
+        reservation['usage_priced_usd'] = str(total)
+        reservation['usage_price_basis'] = '已返回完整token用量×已接受价格，非账户账单；原预留及失败计数仍保留'
 
     def reserve(self, kind, *, stage=None, messages=None, output=0):
         state, p = self.state, self.state['policy']
@@ -78,12 +116,19 @@ class Budget:
             raise ValueError('edition_reservation_kind_invalid')
         # Always protect remaining writing/review, including before any search.
         stages = {r.get('stage') for r in model_rows} | ({stage} if stage else set())
-        remaining = Decimal(0)
-        for task in ('writing', 'review'):
-            if task not in stages:
-                remaining += model_estimate(p['model_prices']['review' if task == 'review' else 'analysis'],
-                    p['max_input_characters'] * 4, OUTPUTS[task])
-        if sum((number(r['estimated_usd']) for r in rows), Decimal(0)) + fee + remaining > number(p['estimated_limit_usd']):
+        if p.get('editorial_forecast') == 'known_payload_v1':
+            if self.forecast is None:
+                raise ValueError('edition_editorial_forecast_missing')
+            remaining, plan = protection(p, self.forecast(), stages)
+            state['budget_forecast'] = dict(editorial=plan, remaining_editorial_usd=str(remaining),
+                limitation='随正文和稿件更新；未知未来取材可能增加预留，预算不足则保留资料停止。')
+        else:
+            # Preserve the old policy for already-created ledgers and tests.
+            remaining = sum((model_estimate(p['model_prices']['review' if s == 'review' else 'analysis'],
+                p['max_input_characters'] * 4, OUTPUTS[s]) for s in ('writing', 'review') if s not in stages), Decimal(0))
+        if sum((accounted(r) for r in rows), Decimal(0)) + fee + remaining > number(p['estimated_limit_usd']):
+            state['budget_stop'] = 'edition_estimated_budget_exhausted'
+            self.save()
             raise ValueError('edition_estimated_budget_exhausted')
         row = dict(kind=kind, stage=stage, estimated_usd=str(fee), input_characters=chars,
                    input_bytes=byte_count, output_tokens=output, actual_usage='unknown_until_receipt')

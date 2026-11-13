@@ -13,7 +13,8 @@ import uuid
 from ..config import settings
 from . import edition_contract as contract
 from .edition_context import packet, editorial_source_ids
-from .edition_budget import Budget, OUTPUTS, digest, policy
+from .edition_budget import Budget, OUTPUTS, digest, policy, protection, accounted
+from .edition_inputs import messages_for, editorial_forecast
 from .episode_workspace import EpisodeWorkspace, body
 from .model_gateway import MODEL_PAUSE_FILE, complete, ensure_models_enabled, resolve_route
 from .research_hub import save_json
@@ -25,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2] / 'data/editions'
 
 
 def source_signature():
-    names = ('edition_pipeline.py', 'edition_context.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
+    names = ('edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
              'model_usage.py', 'web_research.py', 'material_roles.py', 'spoken_fidelity.py',
              'podcast_generator.py', 'podcast_script_cache.py', 'editorial_policy.py', 'research_desk.py')
     return digest({name: digest((Path(__file__).parent / name).read_text()) for name in names})
@@ -97,10 +98,15 @@ async def preflight(report_type='morning', config=settings):
     from .generic_extraction import runtime_status
     extractor = runtime_status()
     if not extractor['ready']: blockers.append('body_extractor_unavailable')
+    plan = None
     try:
         p, fingerprint, routes = environment(stocks, report_type, config)
         from .edition_budget import number
-        if number(p['estimated_limit_usd']) <= number(p['protected_editorial_estimate_usd']):
+        minimum, details = protection(p, editorial_forecast(dict(cutoff=now.isoformat(),
+            watchlist=stocks, report_type=report_type, sources={}), now))
+        plan = dict(editorial=details, remaining_editorial_usd=str(minimum),
+            limitation='无新正文的初始规划；不保证后续预算可容纳实际取材和成稿。')
+        if number(p['estimated_limit_usd']) <= minimum:
             blockers.append('estimated_limit_below_protected_editorial_reserve')
         if len(search_agenda(stocks, now)) + 2 > p['max_search_requests']:
             blockers.append('search_budget_cannot_cover_base_agenda')
@@ -109,6 +115,7 @@ async def preflight(report_type='morning', config=settings):
         blockers.append(str(error) if isinstance(error, ValueError) else 'model_route_or_price_unavailable')
     return dict(owner='finance-unified-edition-v1', mode='free_preflight', report_type=report_type,
         prepared_at=now.isoformat(), watchlist=stocks, policy=p, environment_sha256=fingerprint,
+        budget_forecast=plan,
         routes=routes, extractor=extractor, ready_to_run=not blockers, blockers=blockers,
         base_search_jobs=initial_searches(stocks, now),
         normal_model_requests=4, conditional_extra_requests=1, model_requests=0,
@@ -124,7 +131,7 @@ class EditionPipeline:
         self.search = search or public_search
         self.read = read or read_public
         self.check = check or self._check_environment
-        self.budget = Budget(state, self.save)
+        self.budget = Budget(state, self.save, lambda: editorial_forecast(self.state, self.workspace.now))
         self.started = time.monotonic()
         self.prior_seconds = state.get('active_seconds', 0)
         self.deadline = self.started + settings.research_max_seconds - self.prior_seconds
@@ -144,6 +151,10 @@ class EditionPipeline:
         from .edition_budget import number
         estimated = sum((number(r['estimated_usd']) for r in self.state.get('reservations', [])), number(0))
         lines.append('已预留估算美元：' + str(estimated) + '；不是实际账单，失败或未知用量不清零')
+        lines.append('按完整用量回执更新后的核算美元：' + str(sum(
+            (accounted(r) for r in self.state.get('reservations', [])), number(0))) + '；非账户账单，原预留记录保留')
+        if self.state.get('budget_forecast'):
+            lines.append('后续写审规划：' + json.dumps(self.state['budget_forecast'], ensure_ascii=False))
         for row in self.state.get('input_audit', []):
             lines.append('阶段输入：' + json.dumps(row, ensure_ascii=False))
         for row in self.state.get('usage', []):
@@ -177,19 +188,7 @@ class EditionPipeline:
     async def call(self, stage, prompt, value):
         await self.check()
         self.state.update(status=stage, phase=stage)
-        from .editorial_policy import REPORT_POLICY, REVIEW_POLICY, SPOKEN_POLICY, edition_brief, SPOKEN_EDITION_BRIEFS
-        edition = '周末回顾' if self.workspace.now.weekday() >= 5 else ('晚报' if self.state['report_type'] == 'evening' else '早报')
-        if stage == 'writing':
-            brief = REPORT_POLICY + '\n' + edition_brief(edition) + '\n' + SPOKEN_POLICY + '\n' + SPOKEN_EDITION_BRIEFS[edition]
-        elif stage == 'review':
-            brief = REVIEW_POLICY
-        else:
-            from .research_desk import INSTRUCTIONS
-            marker = '每轮回复用一个JSON对象'
-            if marker not in INSTRUCTIONS: raise RuntimeError('edition_shared_research_brief_changed')
-            brief = INSTRUCTIONS.split(marker, 1)[0]
-        messages = [dict(role='system', content=contract.SYSTEM + '\n' + brief + '\n' + prompt),
-                    dict(role='user', content=json.dumps(value, ensure_ascii=False))]
+        messages = messages_for(stage, prompt, value, self.workspace.now, self.state['report_type'])
         self.budget.reserve('model', stage=stage, messages=messages, output=OUTPUTS[stage])
         self.state.setdefault('input_audit', []).append(dict(stage=stage,
             data_characters=len(messages[1]['content']),
@@ -202,8 +201,7 @@ class EditionPipeline:
             self.state.setdefault('usage', []).append(row)
             reservation = next(r for r in reversed(self.state['reservations'])
                                if r['kind'] == 'model' and r['stage'] == stage)
-            reservation['actual_usage'] = {k: row.get(k) for k in
-                ('http_status', 'input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens')}
+            self.budget.record_usage(reservation, row)
             self.save()
         def before_attempt():
             self.state['model_http_attempts'] = self.state.get('model_http_attempts', 0) + 1

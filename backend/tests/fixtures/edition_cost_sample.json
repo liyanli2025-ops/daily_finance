@@ -1,0 +1,2719 @@
+{
+  "candidates": {
+    "S1": {
+      "title": "11/4/2026 收评：科创50暴涨9.92% 沪深两市成交额重上2万亿",
+      "url": "https://www.hutong9.net/forum.php?mod=viewthread&tid=574490",
+      "snippet": "11月4日消息，市场午后快速反弹，科创50指数大涨9.92%，创业板指涨超6%。沪深京三市午后大幅放量，成交额自9月22日以来再度突破2万亿元，市场活跃度显著提升。",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "A股收评 11月4日 沪指 成交额 板块",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "a_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S2": {
+      "title": "A股收评：创业板指涨近7%、科创50大涨近10%，两市成交额重回2万亿，全市场超4600个股上涨、超百股涨停_阳光照明_震荡_概念",
+      "url": "https://www.sohu.com/a/1097090825_114984?scm=10001.325_13-325_13.0.0-0-0-0-0.5_1334",
+      "snippet": "旅游\n\n教育\n\n时尚\n\n科技\n\n财经\n\n娱乐\n\n# A股收评：创业板指涨近7%、科创50大涨近10%，两市成交额重回2万亿，全市场超4600个股上涨、超百股涨停\n\n2026-11-04 15:05  来源: 金融界\n\n发布于：北京市\n\n11月4日，A股三大股指早盘低位震荡，午后股指强势拉升全线收涨，截止收盘，沪指涨2.16%报3686.17点，深成指涨4.22%报11335.69点，创业板指涨6.4%报2544.73点，科创50指数涨9.92%报1265.47点；沪深两市成交额突破2万亿，自2026年9月22日以来重返2万亿上方。半导体行业ETF集体爆发，半导体ETF博时（159582 ）、半",
+      "published_hint": "Wed, 04 Nov 2026 15:05:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "A股收评 11月4日 沪指 成交额 板块",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "a_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S3": {
+      "title": "A股收评：成交额重上2万亿！创业板指涨6.4%，科创50指数涨9.92%，全市超4600股上涨|a股|个股|沪指|涨停|上证指数_网易订阅",
+      "url": "https://www.163.com/dy/article/LATB12QK05198ETO.html",
+      "snippet": "### \n\n### 外资机构看好A股 三季度持仓市值增近八成\n\n证券时报 2026-11-05 06:17:02\n\n### A股一日反弹可否延续？12家基金公司拆解三大推手\n\n财联社 2026-11-04 21:23:37\n\n### 多家A股公司出手回购股份，五粮液累计回购18.01亿元\n\n每日经济新闻 2026-11-04 00:25:25\n\n### 半导体设备ETF国泰（159516）标的指数大涨15%！半导体设备板块强势反攻\n\n每日经济新闻 2026-11-04 20:32:17\n\n### A股限售股解禁一览：5.9亿元市值限售股今日解禁\n\n每日经济新闻 2026-11-05 07:40",
+      "published_hint": "Wed, 04 Nov 2026 07:16:12 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "A股收评 11月4日 沪指 成交额 板块",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "a_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S4": {
+      "title": "A股收评 | 沪指涨2.16% 科创50涨9.92% 半导体领涨_新浪财经_新浪网",
+      "url": "https://finance.sina.com.cn/stock/hkstock/hkstocknews/2026-11-04/doc-inixqaaz8129172.shtml",
+      "snippet": "热门板块方面\n\n1、【半导体设备与材料】 申万半导体指数涨11.41%，居申万二级行业首位，靶材概念涨13.29%，江丰电子、拓荆科技、京仪装备、芯源微、华峰测控均20CM涨停，北方华创、通富微电10%涨停，长鑫科技涨13.63%。催化上，长鑫科技11月4日早间公告董事长朱一明提议将回购金额区间由10亿元—20亿元上调至25亿元—50亿元，为目前科创板单笔金额最大的回购;上证报统计显示，截至11月4日，2026年已有42家科创板半导体公司披露回购方案、上限金额合计130亿元，其中24家为10月以来披露、上限合计106.5亿元。\n\n2、【算力硬件】 通信设备涨8.91%、元件涨9.14%，新易盛",
+      "published_hint": "Wed, 04 Nov 2026 07:26:46 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "A股收评 11月4日 沪指 成交额 板块",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "a_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S5": {
+      "title": "收评：沪指涨2.2%创指涨6.4% 贵金属板块强势_搜狐网",
+      "url": "https://m.sohu.com/a/1097093137_120702?scm=10001.198_14-198_14_exp.0.0-0-0-0-0.",
+      "snippet": "## 收评：沪指涨2.2%创指涨6.4% 贵金属板块强势\n\n中国经济网\n\n中国经济网\n\n中国经济网北京11月4日讯 A股三大指数午后走强。截至收盘，上证指数报3686.17点，上涨2.16%，成交额9532.65亿元；深证成指报11335.69点，上涨4.22%，成交额10844.27亿元；创业板指报2544.73点，上涨6.40%，成交额5470.99亿元。\n\n行业板块方面，半导体、贵金属、电子化学品等板块涨幅居前；白酒、饮料制造、保险等板块跌幅居前。\n\nA股市场板块涨跌幅排行",
+      "published_hint": "Wed, 04 Nov 2026 15:10:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "A股收评 11月4日 沪指 成交额 板块",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "a_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S6": {
+      "title": "南方财经网 - 南方财经全媒体集团",
+      "url": "https://m.sfccn.com/2026/11-4/1NMDE1MjBfMjI5Mjg1Ng.html",
+      "snippet": "异动速递丨创业板指涨逾3% 沪指涨近1%\n\n21综合    \n 2026-11-04 08:27:47\n\n创业板指涨逾3% 沪指涨近1%\n\n13:33\n\n创业板指涨逾2%\n\n指数走强，创业板指拉升涨逾2%，沪指涨0.75%，深成指涨1.74%。贵金属、光伏、锂电、半导体芯片、医药生物等方向涨幅居前，沪深京三市上涨个股近3400只。\n\n13:18\n\n储能概念震荡走高 首航新能20cm涨停\n\n午后储能概念震荡走高，首航新能20cm涨停，正泰电源触及涨停，海博思创、上能电气、阳光电源、固德威、林洋能源跟涨。\n\n12:01\n\n港股午间收盘，恒生指数涨0.01%，恒生科技指数跌1.02%。\n\n11:43",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "A股收评 11月4日 沪指 成交额 板块",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "a_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S7": {
+      "title": "ҵָ6% 뵼塢ǿ_ƾͷ_ƾͷÿվѡƾͷ_ֱƾ_ƾͷ",
+      "url": "http://www.caijingo.com/m/20261104153357.html",
+      "snippet": "114գйͨԺΪѶС׵20ҵλϷ巢չɹԼᵽ廥ʩɻĻʩչע뷢֡ͼת·ӡԴЭ뻥ϵȼ׼Ͻӳɱ֧廥Эͬ帳ǧаҵַʵ徭ãչż忪𹤾ߣзʵҵʵʼֵ壬ƶǶϵͳҵ̣ӦáϽӦóɱҵЧ\n\n2026Q3ȫ뵼۶5177Ԫ 24.1% [...] #\n\n|  |\n\n|  |\n\n|\n\n# ҵָ6% 뵼塢ǿ\n\n֤ȯ 2026-11-04 15:33:57\n\n|  |\n\n|  |\n\n| [...] 뵼ҵЭ (SIA) ʾ뵼óͳ֯WSTSƵݣȫ뵼۶2026ȴ5177Ԫ24.1%Ҫгİ뵼۶9³ǿʹΪƵձгҲ73.4%޵ͬﵽ˵191.7%\n\nйƷݡȨƷ30ϵ\n\n|  |\n\n|  |\n\n|\n\n## ΪƼ\n\n  |  |  |  | ",
+      "published_hint": "Wed, 04 Nov 2026 07:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "A股收评 11月4日 沪指 成交额 板块",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "a_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S8": {
+      "title": "上证指数K线图_指数行情走势K线形态分析_英为财情",
+      "url": "https://cn.investing.com/indices/shanghai-composite-candlestick",
+      "snippet": "| 型态 | | 时间范围 | 可靠性 | 以前的K线 | K线时间 |\n ---  ---  --- |\n| 显现型态 | | | | | |\n|  | Bullish Engulfing | 1D |  | 当前 | |\n|  | Three Outside Up | 5H |  | 当前 | |\n| 完整型态 | | | | | |\n|  | Bullish Engulfing | 5H |  | 1 | 2026年11月4日 09:00 |\n|  | Rising Three Methods | 5H |  | 1 | 2026年11月4日 09:00 |\n|  | Bullish d",
+      "published_hint": "Tue, 03 Nov 2026 21:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "A股收评 11月4日 沪指 成交额 板块",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "a_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S9": {
+      "title": "美股收盘：三大指数涨跌不一，纳指涨0.83%；半导体小爆发，存储芯片、光通信普涨，美光、海力士涨超2%；科技股多数上涨，苹果跌1.9%_腾讯新闻",
+      "url": "https://news.qq.com/rain/a/20261104A08IZ300",
+      "snippet": "# 美股收盘：三大指数涨跌不一，纳指涨0.83%；半导体小爆发，存储芯片、光通信普涨，美光、海力士涨超2%；科技股多数上涨，苹果跌1.9%\n\n头像\n\n2026-11-04 14:52发布于湖北九派财经官方账号\n\n问AI · 美光海力士领涨存储，芯片周期复苏在即吗？\n\n美东时间周二(11月3日)，美股三大指数涨跌不一。截至收盘，道指跌0.38%报51786.72点，纳指涨0.83%报25372.01点，标普500指数涨0.36%报7568.92点。\n\n盘面上，大型科技股多数上涨，微软涨2.74%，Meta涨2.36%，英伟达涨2.29%，亚马逊涨2.06%，谷歌A涨0.37%，特斯拉跌1.32%",
+      "published_hint": "Wed, 04 Nov 2026 14:52:13 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美股收盘 2026年11月4日 道指 标普 纳指",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "us_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S10": {
+      "title": "11月4日美股收盘：选举日道指跌200点 标普纳指结束三日连跌 芯片股反弹_新浪财经_新浪网",
+      "url": "https://finance.sina.com.cn/stock/usstock/c/2026-11-04/doc-inixpexm8289280.shtml",
+      "snippet": "新浪首页\n 新闻\n 体育\n 财经\n 娱乐\n 科技\n 博客\n 图片\n 专栏\n 更多\n\n 汽车 教育 时尚 女性 星座 健康\n 房产历史视频收藏育儿读书\n 佛学游戏旅游邮箱导航\n\n 新浪微博\n 新浪新闻\n 新浪财经\n 新浪体育\n 新浪众测\n 新浪博客\n 新浪视频\n 新浪游戏\n 天气通\n\n[](\n\n美股 > 正文\n\n# 11月4日美股收盘：选举日道指跌200点 标普纳指结束三日连跌 芯片股反弹\n\n11月4日美股收盘：选举日道指跌200点 标普纳指结束三日连跌 芯片股反弹\n\n2026年11月04日 05:19 环球市场播报\n\n新浪财经APP 缩小字体 放大字体 收藏 微博 分享 MD \n\n微信 腾讯Q",
+      "published_hint": "Tue, 03 Nov 2026 21:19:32 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美股收盘 2026年11月4日 道指 标普 纳指",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "us_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S11": {
+      "title": "美股收盘：三大指数涨跌不一，纳指涨0.83%，英伟达涨超2%，苹果跌1.9%；存储概念股普涨，美光、SK海力士涨超2%；油价、金价下跌 - 风口财经",
+      "url": "https://www.fengkouapp.com/news.html?id=1315272676922888192&type=news",
+      "snippet": "## 美股收盘：三大指数涨跌不一，纳指涨0.83%，英伟达涨超2%，苹果跌1.9%；存储概念股普涨，美光、SK海力士涨超2%；油价、金价下跌 中新经纬 2026-11-04\n\n半导体股全线上涨，超威半导体涨3.65%，博通涨3.07%，ARM涨2.9%，阿斯麦涨1.7%，台积电涨1.51%，高通涨1.45%，英特尔涨0.97%。\n\n存储概念股集体上涨，闪迪涨4.78%，西部数据涨2.59%，美光科技涨2.58%，希捷科技涨2.13%，SK海力士涨2.09%。\n\n光通信股大部分上涨，Ciena涨超5%，Coherent涨超3%，康宁涨超2%，迈威尔科技涨0.33%，Lumentum跌0.62%。",
+      "published_hint": "Wed, 04 Nov 2026 06:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美股收盘 2026年11月4日 道指 标普 纳指",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "us_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S12": {
+      "title": "纳指收涨0.8%，费城半导体指数涨2.6%；格陵兰岛自治政府议会批准与美国达成的安全协议丨每经整点 _ 东方财富网",
+      "url": "https://finance.eastmoney.com/a/202611043920687891.html",
+      "snippet": "财经\n 焦点\n 股票\n 新股\n 期指\n 期权\n 行情\n 数据\n 全球\n 美股\n 港股\n 期货\n 外汇\n 银行\n 基金\n 理财\n 债券\n 直播\n 股吧\n 基金吧\n 博客\n 财富号\n 搜索\n\n指数 期指 期权 个股 板块 排行 新股 基金 港股 美股 期货 外汇 黄金 自选股 自选基金\n\n资金流向 主力排名 板块资金 个股研报 新股申购 转债申购 北交所申购 AH股比价 年报大全 融资融券 龙虎榜 限售解禁 IPO审核 大宗交易 估值分析\n\n首页 > 财经频道 > 正文\n\n2026年11月04日 05:51\n\n来源： 每日经济新闻\n\n小 中 大\n\n东方财富APP\n\n方便，快捷\n\n手机查看财经快讯\n",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美股收盘 2026年11月4日 道指 标普 纳指",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "us_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S13": {
+      "title": "11月3日美股收盘：选举日道指跌200点标普纳指结束 ...",
+      "url": "https://www.hutong9.net/forum.php?mod=viewthread&tid=574475",
+      "snippet": "11月3日美股收盘:选举日道指跌200点标普纳指结束三日连跌芯片股反弹2026年11月04日05:19 环球市场播报纳斯达克(25372.0094, 207.65, 0.83%)综合",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美股收盘 2026年11月4日 道指 标普 纳指",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "us_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S14": {
+      "title": "美股三大指数集体上涨，道指日内涨幅达2.27% — TradingView新聞",
+      "url": "https://tw.tradingview.com/news/panews:741cc64efacdf:0",
+      "snippet": "PANewsPANews\n\n# 美股三大指数集体上涨，道指日内涨幅达2.27%\n\nPANews 11月4日消息，据币安行情，美股三大指数盘中集体上涨，道指日内涨幅达2.27%，纳指日内涨幅达0.07%，标普500指数日内涨幅达0.99%。\n\nPANews加密貨幣\n\n閱讀更多來自PANews\n\n## 來自 PANews 的更多新聞",
+      "published_hint": "Wed, 04 Nov 2026 14:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美股收盘 2026年11月4日 道指 标普 纳指",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "us_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S15": {
+      "title": "2026美股投資行事曆！美股休市時間、美股開盤時間（含美股期貨）、那斯達克23小時交易新制。台灣時間、美股夏令冬令時間交易對照表｜豐雲學堂 2026 年 11 月",
+      "url": "https://www.sinotrade.com.tw/richclub/calendar/2026%E7%BE%8E%E8%82%A1%E6%8A%95%E8%B3%87%E8%A1%8C%E4%BA%8B%E6%9B%86-%E7%BE%8E%E8%82%A1%E4%BC%91%E5%B8%82%E6%99%82%E9%96%93-%E7%BE%8E%E8%82%A1%E9%96%8B%E7%9B%A4%E6%99%82%E9%96%93-%E5%90%AB%E7%BE%8E%E8%82%A1%E6%9C%9F%E8%B2%A8--%E9%82%A3%E6%96%AF%E9%81%94%E5%85%8B23%E5%B0%8F%E6%99%82%E4%BA%A4%E6%98%93%E6%96%B0%E5%88%B6-%E5%8F%B0%E7%81%A3%E6%99%82%E9%96%93-%E7%BE%8E%E8%82%A1%E5%A4%8F%E4%BB%A4%E5%86%AC%E4%BB%A4%E6%99%82%E9%96%93%E4%BA%A4%E6%98%93%E5%B0%8D%E7%85%A7%E8%A1%A8-692d3cd05253d041f315711a",
+      "snippet": "本報告內容僅供參考，客戶應審慎考量本身之需求與投資風險，本公司恕不負任何法律責任，亦不作任何保證。本報告中之內容或有取材於本公司認可之來源，但並不保證其真實性或完整性；報告中所有資訊或預估，變更時本公司將不作預告，若資料內容有未盡完善之處，恕不負責。此外，非經本公司同意，不得將本報告加以複製或轉載。 投資不表示絕無風險，ETF等投資產品以往之績效，不保證該基金之最低投資收益；本文提及之數據及預測，不必然代表 投資之績效。文中所述之資料、建議或預測係本公司依可靠之消息來源而為合理預測，然本公司不保證其準確及完整性。以上資料、建議或預測可能因市場變化而隨時改變，本公司不負更新之責。本公司亦不保證本",
+      "published_hint": "Tue, 03 Nov 2026 16:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美股收盘 2026年11月4日 道指 标普 纳指",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "us_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S16": {
+      "title": "费城半导体指数 (.SOX)讨论区 - 股票评论 - 股吧交流社区",
+      "url": "https://www.moomoo.com/hans/index/.SOX-US/community",
+      "snippet": "18 \n\n4\n\n2\n\n       举报\n\n       Maniac Fool : 说得对 Image 35: 👍\n\n举报回复 取消回复 \n       T100 : 还好我没买\n\n举报回复 取消回复 \n       106419091 : ![Image 36: [敲打]]( 37: [敲打]]( 38: [敲打]](\n\n举报回复 取消回复 \n       AbbyL : Image 39\n\n举报回复 取消回复 \n\nImage 40: Able136998\n\nAble136998\n\n参与了话题·21小时前\n\n钱从半导体撤出来，老师放到了哪里2026 年 11 月 2 日 · 美股收盘 [.",
+      "published_hint": "Tue, 03 Nov 2026 14:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美股收盘 2026年11月4日 道指 标普 纳指",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "us_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S17": {
+      "title": "美股｜美股三大指數周三造好 道指急升逾3% 費城半導體指數逆市挫3.13%",
+      "url": "https://hk.finance.yahoo.com/news/%E7%BE%8E%E8%82%A1-%E7%BE%8E%E8%82%A1%E4%B8%89%E5%A4%A7%E6%8C%87%E6%95%B8%E5%91%A8%E4%B8%89%E9%80%A0%E5%A5%BD-%E9%81%93%E6%8C%87%E6%80%A5%E5%8D%87%E9%80%BE3-%E8%B2%BB%E5%9F%8E%E5%8D%8A%E5%B0%8E%E9%AB%94%E6%8C%87%E6%95%B8%E9%80%86%E5%B8%82%E6%8C%AB3-13-230018786.html",
+      "snippet": "跳至導覽  跳過主要內容  跳至右欄 [...] 1. 1. 追蹤清單\n   2. 投資組合\n2. 1. 最新新聞\n   2. Yahoo財經\n   3. Yahoo Money Talk\n   4. Tech\n3. 1. 外幣報價\n   2. 外幣兌換攻略\n   3. 日圓兌港元\n   4. 英鎊兌港元\n   5. 澳元兌港元\n   6. 美元兌港元\n   7. 港元兌人民幣\n   8. 港元兌台幣\n   9. 加元兌港元\n   10. 歐元兌港元\n   11. 貨幣轉換器\n4. 1. 港股首頁\n   2. 恒指\n   3. 恒生科技指數\n   4. 最活躍股票排行\n   5. 最大升幅股票",
+      "published_hint": "Wed, 04 Nov 2026 23:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美股收盘 2026年11月4日 道指 标普 纳指",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "us_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S18": {
+      "title": "Sources -- Miami's Toney (ankle) uncertain for Notre Dame game - ESPN",
+      "url": "https://www.espn.com/college-football/story/_/id/50381248/sources-miami-toney-ankle-uncertain-notre-dame-game",
+      "snippet": "# 天数智芯(HK:09903). 11-04 16:08:10 北京时间. | 最高：64.45 | 今开：56.80 | 成交量：1092.66万股 | 换手：1.40% |. | 最低：54.70 | 昨收：56.35 | 成交额：6.62亿 | 振幅：17.30% |. | 52周最高：295.83 | 量比：1.74 | 市盈率(动)：207.27 | 市盈率(TTM)：亏损 |. | 52周最低：49.63 | 委比：98.62% | 市盈率(静)：亏损 | 市净率：3.68 |. | 每股收益：-0.40 | 股息(TTM)：-- | 总股本：8.08亿 | 总市值：509.14",
+      "published_hint": "Wed, 04 Nov 2026 19:42:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "港股收评 11月4日 恒指 恒生科技",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S19": {
+      "title": "Active Inventory Grows as Sellers Keep Homes on the Market: Realtor.com® October Housing Report - www.marketscreener.com",
+      "url": "https://www.marketscreener.com/news/active-inventory-grows-as-sellers-keep-homes-on-the-market-realtor-com-october-housing-report-ce785fdfd88af125",
+      "snippet": "|  |  |  | | --- | --- | --- | | Market Closed - Nasdaq   04:00:00 2026-11-03 pm EST | 5-day change | 1st Jan Change | | 32.06 USD | -1.23% |  | -2.14% | +8.20% |   |  |  |  | | --- | --- | --- | | 09:31pm | Stock Spotlight | DJ | | Nov. 03 | EU Court Advisor Warns AI Chatbots Could Risk Infringing ",
+      "published_hint": "Wed, 04 Nov 2026 11:02:08 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "港股收评 11月4日 恒指 恒生科技",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S20": {
+      "title": "Canva To Cut Jobs, Reducing Workforce Amid Slowing Growth - RTTNews",
+      "url": "https://www.rttnews.com/amp/3709705/canva-to-cut-jobs-reducing-workforce-amid-slowing-growth.aspx",
+      "snippet": "# Canva To Cut Jobs, Reducing Workforce Amid Slowing Growth. 11/4/2026 3:17 PM ET. Canva plans to eliminate 1,271 jobs, representing 22 percent of its workforce, as the design software company responds to slowing growth and rising artificial intelligence costs. Co-founder and CEO Melanie Perkins tol",
+      "published_hint": "Wed, 04 Nov 2026 20:17:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "港股收评 11月4日 恒指 恒生科技",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S21": {
+      "title": "Nasdaq ends higher as AI heavyweights rebound ahead of midterm results - Kitco",
+      "url": "https://www.kitco.com/news/off-the-wire/2026-11-03/nasdaq-ends-higher-ai-heavyweights-rebound-ahead-midterm-results",
+      "snippet": "# Nasdaq ends higher as AI heavyweights rebound ahead of midterm results. Nov 3 (Reuters) - The Nasdaq ended higher on Tuesday as AI heavyweights rebounded ahead of US midterm election results, while ​Apple fell after the iPhone maker joined the list of Big Tech companies whose quarterly results ‌fa",
+      "published_hint": "Tue, 03 Nov 2026 21:12:39 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "港股收评 11月4日 恒指 恒生科技",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S22": {
+      "title": "S&P 500 ends down; Apple dips ahead of quarterly report - Kitco",
+      "url": "https://www.kitco.com/news/off-the-wire/2026-11-02/sp-500-ends-down-apple-dips-ahead-quarterly-report",
+      "snippet": "# S&P 500 ends down; Apple dips ahead of quarterly report. Nov 2 (Reuters) - The S&P 500 ended lower on Monday as oil prices tumbled ​on optimism about a potential US-Iran peace agreement, while Apple shares dipped ahead of the iPhone maker's quarterly report and investors awaited ‌Tuesday's US midt",
+      "published_hint": "Mon, 02 Nov 2026 22:29:13 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "港股收评 11月4日 恒指 恒生科技",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S23": {
+      "title": "Hecla Mining Q3 2026 Earnings Date and Estimates - MarketBeat",
+      "url": "https://www.marketbeat.com/earnings/reports/2026-11-5-hecla-mining-stock/",
+      "snippet": "AAPL   340.97   (+1.29%). GOOGL   352.72   (+0.30%). NVDA   226.32   (-1.29%). MU   989.04   (-3.88%). PLTR   209.00   (-0.02%).",
+      "published_hint": "Thu, 05 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "港股收评 11月4日 恒指 恒生科技",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S24": {
+      "title": "Jim Cramer's top 10 things to watch in the stock market Tuesday - CNBC",
+      "url": "https://www.cnbc.com/investingclub/2026/11/03/jim-cramers-top-10-things-to-watch-in-the-stock-market-tuesday.html",
+      "snippet": "1. It's Election Day. In the midterms, if Democrats were to take the House, the Senate, or both, the AI trade could come under pressure. Oil is down for a second day on hopes for a diplomatic solution to the Iran war. Bond yields are up a bit this morning, putting a lid on stocks. Apple shares are d",
+      "published_hint": "Tue, 03 Nov 2026 14:11:53 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "港股收评 11月4日 恒指 恒生科技",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S25": {
+      "title": "Eldorado Gold Corporation (EGO) stock price, news, quote and history - Yahoo Finance Australia",
+      "url": "https://au.finance.yahoo.com/quote/EGO/",
+      "snippet": "Regular market price: 32.24 1.64 (5.36%) as of 2026-11-02 21:00 UTC. Post market price: 32.27 0.03 (0.09%) as of 2026-11-03 00:33 UTC. | Five year avg dividend yield | 0.41 |. | Average volume10days | 4,276,800 |. | Average daily volume10 day | 4,276,800 |. | Fifty two week low | 24.60 |. | All time",
+      "published_hint": "Tue, 03 Nov 2026 08:56:34 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "港股收评 11月4日 恒指 恒生科技",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S26": {
+      "title": "Wall St futures mixed as Apple falls on margin warning, midterm results awaited - Kitco",
+      "url": "https://www.kitco.com/news/off-the-wire/2026-11-03/wall-st-futures-mixed-apple-falls-margin-warning-midterm-results",
+      "snippet": "Nov 3 (Reuters) - US stock index futures were mixed on Tuesday as crude oil prices ticked up and ​markets awaited the midterm election results, while Apple joined the list of Big Tech companies whose results failed ‌to impress investors. Apple (AAPL.O), fell 3.9% in premarket trading after the compa",
+      "published_hint": "Tue, 03 Nov 2026 13:34:43 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "港股收评 11月4日 恒指 恒生科技",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S27": {
+      "title": "Trump is ducking blame for Republican losses. It’s a familiar pattern for him - AP News",
+      "url": "https://apnews.com/article/trump-midterms-blame-responsibility-republicans-losses-9593324649b5e8432fb34a95d4e4b2e1",
+      "snippet": "Image 10: President Donald Trump signs a steel beam at the White House Ballroom construction site at the White House, Wednesday, Nov. 4, 2026, in Washington. President Donald Trump signs a steel beam at the White House Ballroom construction site at the White House, Wednesday, Nov. 4, 2026, in Washin",
+      "published_hint": "Wed, 04 Nov 2026 16:51:29 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "港股收评 11月4日 恒指 恒生科技",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S28": {
+      "title": "美国国债收益率小幅上升",
+      "url": "https://zh.tradingeconomics.com/united-states/government-bond-yield/news/597644",
+      "snippet": "备带来的好处，借款需求则高出二百四十亿美元。 2026-11-04. 避险需求推动美国十年期国债收益率下跌. 周三，美国十年期国债收益率跌至约百分之四点九，接近八周低点。随",
+      "published_hint": "Tue, 03 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美联储 关税 国债收益率 美元 11月4日 2026",
+          "topic": "news",
+          "purpose": "released_policy",
+          "lane": "global_policy",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "released_policy",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S29": {
+      "title": "美国中期选举：民主党获胜后投资者可期待什么 | The Straits Times",
+      "url": "https://www.straitstimes.com/zh-hans/business/us-midterms-what-investors-can-expect-after-democrats-shatter-republican-strongholds",
+      "snippet": "Straitstimes.com header logo\n\n# 美国中期选举：民主党粉碎共和党堡垒后，投资者可期待什么\n\nSign up now: Get ST's newsletters delivered to your inbox\n\n截至新加坡时间11月4日下午3点，美国民主党已赢得53个参议院席位和222个众议院席位。\n\n照片：AFP\n\nIsabelle Chong\n\nPublished Nov 04, 2026, 04:28 PM\n\nUpdated Nov 04, 2026, 06:13 PM\n\n 民主党赢得国会参众两院，这是对 Donald Trump 总统的重大谴责。他们赢得了5",
+      "published_hint": "Wed, 04 Nov 2026 08:28:05 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美联储 关税 国债收益率 美元 11月4日 2026",
+          "topic": "news",
+          "purpose": "released_policy",
+          "lane": "global_policy",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "released_policy",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S30": {
+      "title": "经济增长步入中期阶段 – Market Outlook",
+      "url": "https://www.sc.com/cn/market-outlook/global-market-outlook-sc-30-10-2026",
+      "snippet": "踏入2027年下半年，我们预期油价回落及关税对通胀的影响逐渐消退，为美联储考虑减息提供空间。然而，由于明年的财政赤字依然相当庞大，预计美国30年期国债收益率将保持在高位。\n\n我们预期欧洲央行在2026年12月前最后一次加息至2.75%，之后在2027年上半年暂停加息，而接下来则在2027年第三季减息25个基点。在日本，我们预期日本央行将会按季度加息，在2026年12月前加息一次，将政策利率升至1.50%，并在2027年上半年再加息两次至2.00%，然后于年中按兵不动\n\n##### 发达市场公司债 – 核心持仓\n\n我们维持发达市场投资级公司债及发达市场高收益公司债的中性配置，短线倾向是在市场阶段",
+      "published_hint": "Tue, 03 Nov 2026 16:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美联储 关税 国债收益率 美元 11月4日 2026",
+          "topic": "news",
+          "purpose": "released_policy",
+          "lane": "global_policy",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "released_policy",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S31": {
+      "title": "美国经济现状深度解读：2026年GDP、通胀、就业与利率全解析",
+      "url": "https://kuku.baidu.com/landing/tscp_doc/f19b03a19c403e76046fe85fc0bc3191",
+      "snippet": "2026年上半年，美联储连续4次维持利率不变（1 ... 美国财政部数据显示，2026财年联邦预算赤字为1.99万亿美元，联邦债务总额截至2026年10月15日已达约40.39万亿美元。",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美联储 关税 国债收益率 美元 11月4日 2026",
+          "topic": "news",
+          "purpose": "released_policy",
+          "lane": "global_policy",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "released_policy",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S32": {
+      "title": "What investors can expect after the US midterms - The Business Times",
+      "url": "https://www.businesstimes.com.sg/zh-hans/international/global/us-midterms-what-investors-can-expect-after-democrats-shatter-republican-strongholds",
+      "snippet": "The Business Times\n\nbusiness-time-50\n\nGlobal Enterprise logo\n\nBROUGHT TO YOU BYsc logo\n\n# 美国中期选举：民主党攻破共和党票仓后，投资者应关注什么\n\n#### Isabelle Chong\n\nPublished Wed, Nov 4, 2026 · 03:12 PM\n\n 民主党已赢得众议院和参议院的控制权。 照片来源：彭博社\n\n本文由 AI 翻译，关键事实请以原文为准。\n\n查看原文\n\n【新加坡】在美国中期选举中，民主党取得戏剧性胜利，掌控了国会参众两院。 这被视为对总统 Donald Trump 政策的否定",
+      "published_hint": "Wed, 04 Nov 2026 07:12:01 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美联储 关税 国债收益率 美元 11月4日 2026",
+          "topic": "news",
+          "purpose": "released_policy",
+          "lane": "global_policy",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "released_policy",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S33": {
+      "title": "民主党中选大胜 分析师盘点市场走向 | 大纪元",
+      "url": "https://www.epochtimes.com/gb/26/11/4/n14883106.htm/amp",
+      "snippet": "新闻\n 中国\n 评论\n 文化\n 生活\n 娱乐\n 健康\n 体育\n 社区\n 神韵\n\n# 民主党中选大胜 分析师盘点市场走向\n\n2026年11月4日，纽约市，纽约证券交易所（NYSE）开市钟响起，一名交易员在交易大厅工作。周三早盘，华尔街股市大幅上涨，市场消化了国会民主党人取得的压倒性选举胜利。(TIMOTHY A. CLARY/AFP)\n\n道琼斯指数一度飙升1000点；纳斯达克指数开盘涨幅超过1%。此前，随着选举结果陆续出炉，美股曾一度在盘后交易时段出现下滑，如今已实现回升。\n\n此次反弹出现在川普总统表态之后；他表示将接受选举结果，并期待与民主党人合作。\n\n当前，市场正疲于应对伊朗战争带来的影响以",
+      "published_hint": "Wed, 04 Nov 2026 18:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美联储 关税 国债收益率 美元 11月4日 2026",
+          "topic": "news",
+          "purpose": "released_policy",
+          "lane": "global_policy",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "released_policy",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S34": {
+      "title": "民主党横扫预期飙至99%：全球市场先行定价“蓝色浪潮”，特朗普要当“否决先生”_搜狐网",
+      "url": "https://m.sohu.com/a/1097073937_121157270?scm=10001.325_13-325_13.0.0-0-0-0-0.5_1334",
+      "snippet": "美元全线走软，美元指数日内跌幅超过0.5%。State Street银行金融市场部部长贝田和重表示：“市场认为财政扩张将受到一定遏制，美国利率可能下降，并容易引领美元抛售”。\n\n黄金获得双重支撑。现货黄金日内涨幅扩大至2%，现报4009.1美元/盎司。现货白银日内涨幅扩大至2%，报50.85美元/盎司。美元走软与美债收益率下行直接利好以美元计价的黄金；同时，民主党掌控国会带来的政策不确定性与特朗普政府行为可能更受制约的预期，增加了黄金作为政治风险对冲工具的吸引力。分析普遍认为，民主党掌控国会带来的政策不确定性，仍为黄金提供中期支撑。\n\n11月4日午后，A股黄金概念震荡反弹， 晓程科技（3001",
+      "published_hint": "Wed, 04 Nov 2026 14:30:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美联储 关税 国债收益率 美元 11月4日 2026",
+          "topic": "news",
+          "purpose": "released_policy",
+          "lane": "global_policy",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "released_policy",
+          "flags": [
+            "forecast_or_commentary_not_release_confirmation"
+          ],
+          "role": "lead_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S35": {
+      "title": "美國國債上漲，民主黨橫掃國會推動殖利率走低",
+      "url": "https://hk.investing.com/news/forex-news/article-1737970",
+      "snippet": "美國國債上漲，民主黨橫掃國會推動殖利率走低 ; 美元/日元-0.14% ; DX-0.35% ; US2YT-0.8% ; US5YT-1.24% ; US10YT-1.31%",
+      "published_hint": "Wed, 04 Nov 2026 14:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "美联储 关税 国债收益率 美元 11月4日 2026",
+          "topic": "news",
+          "purpose": "released_policy",
+          "lane": "global_policy",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "released_policy",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S36": {
+      "title": "最新上期所原油期货仓单变动-每日更新查询（2026年11月4日）-原油期货-金投期货-金投网",
+      "url": "https://futures.cngold.org/yuanyou/c10858672.html",
+      "snippet": "打开APP，查看更多高清行情>>\n\n截至北京时间2026年11月4日收盘，国内上期所原油期货价格报681.60元/桶，日内下跌-13.30元/桶(跌幅：-1.91%)，盘中最高触及693.80元/桶，最低下探至660.00元/桶，最新持仓量为22035手，前一日持仓为24114手，增减变化-2079.00手，当日总成交量为159854手。\n\n温馨提示：请远离场外配资，谨防上当受骗。\n\n原油期货 原油期货价格\n\n<上一篇 特朗普淡化了与伊朗冲突猜测 原油价格继续下行\n\n下一篇>已是最后一篇 \"已是最后一篇\")\n\n## 热评话题 [...] 沪铜行情 沪铝行情 沪锌行情 沪铅行情 沪镍行情 沪锡行",
+      "published_hint": "Wed, 04 Nov 2026 07:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "原油 黄金 铜 收盘 2026年11月4日",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "commodities",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S37": {
+      "title": "一张图看商品支撑阻力：金银油气+铂钯铜农产品期货(2026年11月4日)|原油|枢轴|现货黄金|现货白银|国际油价_网易订阅",
+      "url": "https://www.163.com/dy/article/LASNB2780519ALI0.html",
+      "snippet": "### 国内原油合约收跌2.32%\n\n每日经济新闻 2026-11-04 06:00:12\n\n### 布伦特原油期货涨幅扩大至1%，报104.73美元/桶\n\n每日经济新闻 2026-11-04 09:23:50\n\n### 国内商品期货开盘多数下跌 LU燃油跌超4%\n\n财联社 2026-11-04 09:28:08\n\n### 国内期货主力合约多数下跌 低硫燃料油跌近7%\n\n财联社 2026-11-04 12:02:01\n\n### 陈晔：上期所向LME授权热卷期货结算价\n\n财联社 2026-11-03 12:48:51\n\n### 国债期货午盘全线上涨，30年期主力合约涨0.26%\n\n每日经济新闻 ",
+      "published_hint": "Wed, 04 Nov 2026 01:32:08 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "原油 黄金 铜 收盘 2026年11月4日",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "commodities",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S38": {
+      "title": "国际金融要情 |（周三 2026.11.4）_搜狐网",
+      "url": "https://m.sohu.com/a/1096859314_632979?scm=10001.325_13-325_13.0.0-0-0-0-0.5_1334",
+      "snippet": "二、大宗商品行情\n\n贵金属\n\n 现货黄金：3930.21美元 / 盎司，-0.42%\n COMEX 黄金期货：3940.20美元 / 盎司，-0.74%\n 上金所：黄金 9999 846.99元 / 克，+0.83%\n 黄金 T+D：844.13元 / 克，+0.08%\n 上期所：沪金主连845.20 元 / 克，-0.11%\n\n能源类\n\n WTI 原油：96.09美元 / 桶，-0.38%\n 布伦特原油：104.40美元 / 桶，-0.34%\n 阿联酋穆尔班原油：102.20 美元 / 桶，-2.98%\n 上海油（INE）：原油主连678.80元 / 桶，-2.32%\n\n工业金属\n\n 伦铜：",
+      "published_hint": "Wed, 04 Nov 2026 07:04:27 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "原油 黄金 铜 收盘 2026年11月4日",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "commodities",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S39": {
+      "title": "🌍 國際財經晨報｜2026年11月4日｜繭居族咖啡廳 BY Ｍiss Luna",
+      "url": "https://vocus.cc/article/6aead55efd897800015c11af",
+      "snippet": "## 五、黃金與銅價格\n\n| 商品 | 最近可核實價格 | 單日漲跌 |\n --- \n| 現貨黃金 | US$3,953.37／金衡盎司 | 約+0.2% |\n| COMEX 12月黃金期貨 | US$3,963.50／金衡盎司 | 約-0.2% |\n| COMEX銅期貨 | 尚未取得11/3可靠結算價 | — |\n\n黃金為Reuters 11月3日美東時間上午9:07的市場報價快照，非當日正式收盤。銅價未取得可可靠核實的11月3日結算價，因此不沿用舊價格冒充當日行情。近一週金、銅漲跌亦未取得同一報價基準的完整資料。\n\nMarketScreener UK\n\n黃金： 油價下跌略為緩解通膨擔憂，為",
+      "published_hint": "Wed, 04 Nov 2026 06:50:52 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "原油 黄金 铜 收盘 2026年11月4日",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "commodities",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S40": {
+      "title": "一张图看商品支撑阻力：金银油气+铂钯铜农产品期货(2026年11月4日)_金市直播_黄金网_中金在线",
+      "url": "http://gold.cnfol.com/jinshizhibo/20261104/32415212.shtml",
+      "snippet": "如图数据显示，解读1：本文支撑阻力基于日图PP而来。  \n   \n 　　★ 现货黄金 XAU/USD的“日图PP”显示：其枢轴点位于3932.22，对应支撑阻力最大覆盖区间为3817.97-4044.77美元/盎司。  \n   \n 　　★ 现货白银 XAG/USD的“日图PP”显示：其枢轴点位于49.75，对应支撑阻力最大覆盖区间为46.39-53.14美元/盎司。  \n   \n 　　★ NYMEX铂金主力 PLAT的“日图PP”显示：其枢轴点位于1419.48，对应支撑阻力最大覆盖区间为1396.76-1442.06美元/盎司。  \n   \n 　　解读2：  \n   \n 　　★ WTI原油主",
+      "published_hint": "Wed, 04 Nov 2026 01:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "原油 黄金 铜 收盘 2026年11月4日",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "commodities",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S41": {
+      "title": "上海期货交易所期货行情 - 金属资讯网",
+      "url": "http://www.i001.com/showxjs_0_302020.shtml",
+      "snippet": "| 上海期货交易所期货成交情况 | 2026年11月04日(周三) |  |  |  |  |  |  |  |  |  |  |  |  |\n| 注： 1、成交手、成交额、年成交手、年成交额单边计算。 2、成交量、成交额包含期货自对冲量。 3、合约结算前，其成交量（额）不包含TAS成交量（额）；合约结算完成后，其成交量（额）包含TAS成交量（额）。 |\n| 商品名称 | 最高价 | 最低价 | 加权平均价 | 成交手 | 成交额(亿元) | 年成交手(万手) | 年成交额(亿元) |  |  |  |  |  |  |  |\n| 铜 | 108270 | 103620 | 105940 | ",
+      "published_hint": "Wed, 04 Nov 2026 07:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "原油 黄金 铜 收盘 2026年11月4日",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "commodities",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S42": {
+      "title": "午盘播报 11月4日 周三 _ 东方财富网",
+      "url": "https://finance.eastmoney.com/a/202611043921477546.html",
+      "snippet": "财经\n 焦点\n 股票\n 新股\n 期指\n 期权\n 行情\n 数据\n 全球\n 美股\n 港股\n 期货\n 外汇\n 银行\n 基金\n 理财\n 债券\n 直播\n 股吧\n 基金吧\n 博客\n 财富号\n 搜索\n\n指数 期指 期权 个股 板块 排行 新股 基金 港股 美股 期货 外汇 黄金 自选股 自选基金\n\n资金流向 主力排名 板块资金 个股研报 新股申购 转债申购 北交所申购 AH股比价 年报大全 融资融券 龙虎榜 限售解禁 IPO审核 大宗交易 估值分析\n\n首页 > 财经频道 > 正文\n\n午盘播报 11月4日 周三\n\n2026年11月04日 11:30\n\n来源： 东方财富研究中心\n\n小 中 大\n\n东方财富APP\n",
+      "published_hint": "Wed, 04 Nov 2026 03:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "原油 黄金 铜 收盘 2026年11月4日",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "commodities",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S43": {
+      "title": "2026年11月4日金十期货早餐：伊朗表示尚未与美国达成协议，谈判尚未取得新的进展；山西省能源局召开全省煤炭增产保供专题会议-市场参考-金十数据",
+      "url": "https://xnews.jin10.com/details/234249",
+      "snippet": "13. 据华尔街日报报道，美国官员称，美国周一袭击了伊朗格什姆岛。这是华盛顿近几周秘密对伊朗实施的一系列有限打击中的最新一次，与此同时特朗普仍在宣扬达成外交协议的可能性。\n\n14. 美国总统特朗普当地时间11月3日接受福克斯新闻采访，当被问及对以色列的援助问题时，他表示：“几个月前已与以色列达成协议，我们将停止提供40亿美元援助。”\n\n15. 克里姆林宫证实下周将在阿布扎比举行乌克兰问题三方会谈。\n\n## 全球期货市场异动\n\n1. 美油主力合约收涨0.31%，报96.76美元/桶；布油主力合约跌0.39%，报104.36美元/桶。\n\n2. 国际贵金属期货普遍收跌，COMEX黄金期货跌0.74%",
+      "published_hint": "Wed, 04 Nov 2026 11:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "原油 黄金 铜 收盘 2026年11月4日",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "commodities",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S44": {
+      "title": "国际油价在11月4日出现显著下挫，到当日交易收盘时，纽约商品交易所12月交割的轻质原油期货价格下探7.97美元，最终报收每桶88.12美元，跌幅达到8.29%；伦敦布伦特原油1月交割的期货合约价格下跌8.98美元，收于每桶94.62美元，跌幅为8.67%。 此次油价大幅回落主要受多重市场因素共同作用，一方面市场对全球经济增速放缓可能拖累原油需求的担忧持续升温，另一方面近期原油市场供应端的紧张预期有所缓解，多重利空因素集中发酵共同带动了本次油价的明显调整。_外汇动态报道_汇通财经www.fx678.com",
+      "url": "https://news.fx678.com/202611050532281124.shtml",
+      "snippet": "首 页\n 7x24快讯\n \n\n首页> 要闻中心> 正文\n\n点击查看多空信号\n\n2026-11-05 05:32\n\n本文共423字  |  预计阅读: 1分钟\n\n汇通财经APP讯——国际油价在11月4日出现显著下挫，到当日交易收盘时，纽约商品交易所12月交割的轻质原油期货价格下探7.97美元，最终报收每桶88.12美元，跌幅达到8.29%；伦敦布伦特原油1月交割的期货合约价格下跌8.98美元，收于每桶94.62美元，跌幅为8.67%。 此次油价大幅回落主要受多重市场因素共同作用，一方面市场对全球经济增速放缓可能拖累原油需求的担忧持续升温，另一方面近期原油市场供应端的紧张预期有所缓解，多重利空因素",
+      "published_hint": "Wed, 04 Nov 2026 21:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "原油 黄金 铜 收盘 2026年11月4日",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "commodities",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S45": {
+      "title": "伦铜价格小幅下跌 11月2日LME铜库存增加19775吨_新浪财经_新浪网",
+      "url": "https://finance.sina.com.cn/money/future/fmnews/2026-11-03/doc-inixmnqe2358492.shtml",
+      "snippet": "- 01/金融管理部门将召开会议 研究推动支持资本市场工具使用\n- 02/刘珺的道路\n- 03/华夏十二月令 | 十一月之美\n- 04/苏州银行“苏心家年华 同心乐运会”活动圆满举行\n- 05/中国农业银行成为2026年APEC会议战略合作伙伴\n- 06/卤片商品报价动态（2026-11-01）\n- 07/聚合硫酸铁颗粒商品报价动态（2026-11-01）\n- 08/精制工业盐（氯化钠）商品报价动态（2026-11-01）\n- 09/硅磷晶商品报价动态（2026-11-01）\n- 10/【邀请函】申万宏源王牌｜固收“申”音 周一论势第86期\n\n## 7X24小时\n\n徐小明 凯恩斯 占豪 花荣 ",
+      "published_hint": "Tue, 03 Nov 2026 03:08:38 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "原油 黄金 铜 收盘 2026年11月4日",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "commodities",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S46": {
+      "title": "宁德时代A股大涨，市值逼近1.2万亿 - 21经济网",
+      "url": "https://www.21jingji.com/article/20261103/herald/0bd4be62bf0a47af0eca6e4985755b74.html",
+      "snippet": "21世纪经济报道\n\n21财经APP 南财号 数字报 越声智投\n\n首页 宏观 公司 金融 证券 全球 观点 汽车 新健康 人文 智库 更多)\n\n大湾区 一带一路 文旅 理财 投资通 21视频 直播 品牌活动\n\n首页 证券 正文\n\n# 宁德时代A股大涨，市值逼近1.2万亿\n\n###### 2026年11月03日 11:05   南方财经综合\n\n11月3日上午，A股宁德时代大涨，截至10点26分涨逾5%，股价最新报252.22元，总市值11808亿元。港股宁德时代同步走强，涨幅超2.4%。\n\n11月2日晚，宁德时代公布回购进展：公告称，截至2026年10月31日，公司通过集中竞价交易方式累计回购A股",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "宁德时代 最新 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:300750"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S47": {
+      "title": "“与宁德时代签了”，统一股份最新公告！",
+      "url": "https://wap.eastmoney.com/a/202611043922282634.html",
+      "snippet": "统一股份（SH600506，股价18.18元，市值45.38亿元）11月4日晚间公告称，公司控股子公司统一石化与宁德时代签订《冷却液战略合作协议》，双方将围绕冷却液全生命周期",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "宁德时代 最新 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:300750"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S48": {
+      "title": "宁德时代(03750)11月2日斥资999.5万元回购4.12万股A股",
+      "url": "https://cn.investing.com/news/stock-market-news/article-3642976",
+      "snippet": "| 名称 | 最新价 | 涨跌幅 | 交易量 |  |\n ---  --- \n| 春晖智控 | 25.78 | +20.02% | 2,131.63万 |  |\n| Suzhou Betely Polymer Materials | 25.42 | +20.02% | 1,698.93万 |  |\n| 金冠电气 | 21.46 | +20.02% | 1,718.49万 |  |\n| 芯源微 | 211.37 | +20.00% | 754.73万 |  |\n| 拓荆科技 | 487.79 | +20.00% | 1,076.20万 |  |\n| 富创精密 | 121.20 | +20.00%",
+      "published_hint": "Mon, 02 Nov 2026 12:37:56 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "宁德时代 最新 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:300750"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S49": {
+      "title": "宁德时代(03750.HK)11月2日耗资999.5万元回购4.12万股A股 — TradingView News",
+      "url": "https://www.tradingview.com/news/gelonghui:9ab596c19e3f9:0",
+      "snippet": "Gelonghui\nGelonghui\n\n# 宁德时代(03750.HK)11月2日耗资999.5万元回购4.12万股A股\n\n格隆汇11月2日丨宁德时代3750公告，11月2日耗资999.5万元回购4.12万股A股，每股回购价格242.55-242.68元。\n\n## Compare charts\n\n## Latest news\n\n## More news from Gelonghui [...] Select market data provided by ICE Data Services. Select reference data provided by FactSet. Copyrig",
+      "published_hint": "Mon, 02 Nov 2026 12:38:05 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "宁德时代 最新 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:300750"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S50": {
+      "title": "新能源、消费双线发力！深市龙头释放多重积极信号_中国基金报_媒体广场_财经_证券之星",
+      "url": "https://wap.stockstar.com/detail/IG2026110300045119",
+      "snippet": "新能源龙头加快拓展市场空间\n\n新能源产业链近期迎来多项新进展。11月2日，宁德时代宣布，公司近日向全球能源基础设施投资机构Quinbrook Infrastructure Partners交付首批EnerQB长时储能系统。\n\n据了解，该产品单套设备容量5.64MWh，面向澳大利亚3GW/24GWh系列长时储能项目设计，推动8小时以上锂电长时储能系统向规模化应用迈进。\n\n海外合作也在持续推进。10月底，宁德时代在澳大利亚发布新一代储能系统TENER+，并与多家机构签署合作谅解备忘录，进一步拓展海外储能市场。\n\n今年前三季度，宁德时代实现营业收入4421.37亿元，同比增长56.19%；归母净利润",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "宁德时代 最新 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:300750"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S51": {
+      "title": "宁德时代A股大涨，市值逼近1.2万亿_新浪财经_新浪网",
+      "url": "https://finance.sina.com.cn/roll/2026-11-03/doc-inixmnqa6742321.shtml",
+      "snippet": "- 01/金融管理部门将召开会议 研究推动支持资本市场工具使用\n- 02/刘珺的道路\n- 03/华夏十二月令 | 十一月之美\n- 04/苏州银行“苏心家年华 同心乐运会”活动圆满举行\n- 05/中国农业银行成为2026年APEC会议战略合作伙伴\n- 06/卤片商品报价动态（2026-11-01）\n- 07/聚合硫酸铁颗粒商品报价动态（2026-11-01）\n- 08/精制工业盐（氯化钠）商品报价动态（2026-11-01）\n- 09/硅磷晶商品报价动态（2026-11-01）\n- 10/【邀请函】申万宏源王牌｜固收“申”音 周一论势第86期\n\n## 7X24小时\n\n徐小明 凯恩斯 占豪 花荣 ",
+      "published_hint": "Tue, 03 Nov 2026 14:23:35 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "宁德时代 最新 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:300750"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S52": {
+      "title": "章鱼能源、新能安与宁德时代签署合作备忘录；10月新能源乘用车零售销量预计为114.8万辆丨汽车早参 | 每日经济新闻",
+      "url": "https://www.mrjjxw.com/articles/2026-11-04/4638345.html",
+      "snippet": "## 要闻\n ## 公司\n ## 新经济\n ## 视频\n ## 房楼市\n ## 汽车\n ## 区域\n\n首页 > 要闻 > 正文\n\n# 章鱼能源、新能安与宁德时代签署合作备忘录；10月新能源乘用车零售销量预计为114.8万辆丨汽车早参\n\n来源：每日经济新闻综合\n\n 发布时间：2026年11月05日 07:00   更新时间：2026年11月05日 07:00\n\n每经记者 董天意    实习生 刘家怡    每经编辑 裴健如\n\n丨 2026年11月5日 星期四 丨\n\nNO.1 章鱼能源、新能安与宁德时代签署合作备忘录\n\n据宁德时代官微11月4日消息，近日，英国最大能源公司章鱼能源、新能安与宁德时代",
+      "published_hint": "Wed, 04 Nov 2026 22:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "宁德时代 最新 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:300750"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S53": {
+      "title": "宁德时代",
+      "url": "https://tavily.com/knowledge/company/DlV7kyGh1EXM",
+      "snippet": "# 台积电 腾讯控股 阿里巴巴 字节跳动 华为 宁德时代 美团 蚂蚁科技 比亚迪 中国平安保险 拼多多 京东集团 农夫山泉 迈瑞生物医疗电子 隆基股份 美的集团 海天调味食品 网易 鸿海精密工业 长城汽车\nID: DlV7kyGh1EXM\nWebsite: www.kdocs.cn\nHeadquarters: China [...] .com/company/%E5%8F%B0%E7%A7%AF%E7%94%B5-%E8%85%BE%E8%AE%AF%E6%8E%A7%E8%82%A1-%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4-%E5%AD%97%E8%8A%8",
+      "published_hint": null,
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "宁德时代 最新 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:300750"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S54": {
+      "title": "113յETFϷݶ1200ݣزֹʱԴǿ_ƱƵ_֤ȯ֮",
+      "url": "https://stock.stockstar.com/RB2026110400007778.shtml",
+      "snippet": "֤ȯ֮Ϣ112գETFϷ159147·ݶΪ21.4ڷݣǰһռ1050.0ݡ\n\n2026-11-03 06:33\n\n1030յETFϷݶ1500ݣزֹʱԴǿ\n\n֤ȯ֮Ϣ1030գETFϷ159147·ݶΪ21.5ڷݣǰһռ1500.0ݡ\n\n2026-10-31 06:33\n\nETF1030յETFϷ1.68%ݶ1500\n\n֤ȯ֮Ϣ1030գETFϷ1591471.68%ɽ3825.49Ԫ\n\n2026-10-31 06:31\n\nƼ\n\n 1\n\n  114֤ȯ֮Ϣܣ...\n 2 [...] Դ֤ȯվϷɷ޹˾վοͶʽ顣\n\n#ETFϷ#  #159147#  #Ϸ#\n\nAPP\n\n\n\nعƱ\n\nʱ\n\nʱ\n\nͶ",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "宁德时代 最新 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:300750"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S55": {
+      "title": "BTƱ˲ʱ8ͣƱת2027_ƱƵ_֤ȯ֮",
+      "url": "https://stock.stockstar.com/IG2026110400013391.shtml",
+      "snippet": "ҳ\n Ѷ\n Ʊ\n ƾ\n \n ר\n \n \n ר\n \n\n  Ʊ |  ض б ¹ ҵ ƴ Ȩ  ۹ иŹ ȫ\n\n   |   ƽ  ծȯ ڻ ָڻ\n\n  ƽ ȵ ר    ز ѧ ˾  · Ƽ\n\n  ǧǧ ڽ ʽ  ר ҵѶ\n\nҳ - Ʊ - ˾ - \n\nԴBTƾ\n\nBTƾ  >>\n\n 2026-11-04 09:34:58\n\nȨϢٱר\n\nԭ⣺BTƱ˲ʱ8ͣƱת2027꣩ [...] һ㣬Դھͷʵǰһ112գʱ¶µĻعչ档10µף˾ۼƺ5360Ԫ1961ɣռܹɱ04447Ͷ룬Ƕڻ̣ǰ200400Ԫעʽعһܹ֡ɱʵֱÿ档ѡڵǰڵܼ֣ײĲ߼ʮʱǰӯʽΪ1338Ϣʴﵽ342Ӧÿ1413ԪһһǧֵӦĹֵѴ",
+      "published_hint": "Wed, 04 Nov 2026 01:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "宁德时代 最新 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:300750"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S56": {
+      "title": "两大龙头出手！科创板芯片公司踊跃回购 - 21经济网",
+      "url": "https://www.21jingji.com/article/20261029/herald/92de5763a59a1d02e600a3ea890c7acd.html",
+      "snippet": "相关数据显示，截至10月28日，2026年以来已有35家科创板半导体公司公告回购方案，合计金额上限达到84亿元，占板块总额的四成。10月以来，17家科创板半导体公司公告回购方案，合计金额上限达到61亿元，占板块总额的近八成。\n\n在增持方面，2026年以来，科创板半导体公司股东及高管增持金额上限合计6.5亿元，占板块总额的四成。\n\n半导体是典型的高研发投入环节，为保障技术迭代和产能供给，长期发展存在较大资金需要。在本轮回购潮中，科创半导体各环节龙头接连抛出回购方案，并加速落地实施，背后既是对回报投资者的担当，也是对产业景气度和公司基本面的信心。\n\n10月以来，在存储领域，长鑫科技董事长提议回购1",
+      "published_hint": "Fri, 30 Oct 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "半导体 设备 材料 涨价 订单 长鑫科技 回购 科创板",
+          "topic": "news",
+          "purpose": "discovery",
+          "lane": "industry",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "discovery",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S57": {
+      "title": "海外AI支出持续性验证，长鑫科技大幅上调回购金额！科创芯片ETF华宝（589190）标的指数涨超2%！_新浪财经_新浪网",
+      "url": "https://finance.sina.com.cn/money/fund/etf/2026-11-04/doc-inixprpf8212302.shtml",
+      "snippet": "截至10月末，上证科创板芯片指数市盈率PE（TTM）为90.3倍，位于指数发布以来约30%分位点的相对低位水平。\n\n　　对投资者来说，芯片赛道细分选择难度大，不如通过覆盖芯片全产业链的指数一键布局。科创芯片ETF华宝（589190）被动跟踪上证科创板芯片指数，覆盖芯片全产业链，重仓AI芯片、存储、半导体设备材料等核心环节，能够较好地映射 AI 算力基础设施持续升级所带来的产业发展趋势，进攻性强，20CM高弹性。场外投资者可以关注联接基金021225。\n\n　　公开数据显示，科创芯片ETF华宝（589190）管理费0.3%，托管费率0.08%，综合费率0.38%，在同标的指数ETF中费率较低。\n\n",
+      "published_hint": "Wed, 04 Nov 2026 02:49:39 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "半导体 设备 材料 涨价 订单 长鑫科技 回购 科创板",
+          "topic": "news",
+          "purpose": "discovery",
+          "lane": "industry",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "discovery",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S58": {
+      "title": "民主党有望横扫参众两院；长鑫回购引爆存储行情｜今日重要消息回顾｜长桥证券",
+      "url": "https://longbridge.com/zh-CN/dolphin/post/44760194",
+      "snippet": "1、$长鑫科技(688825.SH)\n\n长鑫科技董事长提议上调回购上限至 50 亿元护盘，A 股存储链资金抢筹，午后科创 50 大涨超 9%，多只半导体 ETF 触及 20cm 涨停，中芯国际涨 8.87%。韩媒传出下游客户争抢三年后先进产能订单，存储周期回暖叠加国产替代共振，板块情绪迎来强修复。\n\n2、$SK海力士(SKHY.US)\n\n消息称 SK 海力士旗下 Solidigm 纽约存储工厂计划遇阻，核心症结是美国商务部尚未放行其大连工厂扩产所需美国设备出口许可，大连扩产是纽约项目资金来源的关键。美国管制外溢至本土芯片投资，凸显全球存储供应链的博弈风险。\n\n3、$甲骨文(ORCL.US)\n\n",
+      "published_hint": "Wed, 04 Nov 2026 08:33:14 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "半导体 设备 材料 涨价 订单 长鑫科技 回购 科创板",
+          "topic": "news",
+          "purpose": "discovery",
+          "lane": "industry",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "discovery",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S59": {
+      "title": "回购潮+封测年会+三季报多重共振 半导体设备高景气度有望延续_市场测评_市场_中金在线",
+      "url": "http://sc.stock.cnfol.com/shichangceping/20261104/32415531.shtml",
+      "snippet": "AI基础设施投资持续加速，推动全球半导体市场强劲增长，WSTS预计2026年全球半导体市场规模达1.655万亿美元，同比增长108%，存储器和逻辑芯片是主要增长动力；SEMI预计2026年全球半导体设备销售额将达1659亿美元，同比增长23.2%，并有望于2028年进一步提升至2295亿美元；同时，全球存储龙头加速扩产，三星、SK海力士规划2030年DRAM产能接近翻倍，国内长鑫科技DRAM全球市占率由2025年一季度的3%提升至2026年一季度的8%，国产创新空间巨大，国产半导体设备厂商有望充分受益。  \n   \n 　　天风证券：先进制程相关设备及关键零部件需求有望同步增长  \n   \n 　",
+      "published_hint": "Wed, 04 Nov 2026 07:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "半导体 设备 材料 涨价 订单 长鑫科技 回购 科创板",
+          "topic": "news",
+          "purpose": "discovery",
+          "lane": "industry",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "discovery",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S60": {
+      "title": "A股因何强势反弹？五重催化共振",
+      "url": "https://www.cls.cn/detail/2525278",
+      "snippet": "此外，产业资本则拿出了真金白银。长鑫科技回购上限由20亿元提升至50亿元，其DRAM全球市占率由3%升至8%；中际旭创澄清“砍单”传闻，确认2027年订单覆盖全年。\n\n亮点六：强结构性修复\n\n值得关注的是，成长科技、科创小盘大涨的同时，当天领跌的恰恰是前一交易日避险资金涌入的方向。\n\n白酒、乳业、生猪、银行、保险、电信、煤炭、石油石化、电力等红利低波板块逆市走低，贵州茅台跌2.27%；前期高位抱团的“羊”字辈概念股集体退潮。资金从防御板块大规模切换到前期深度超跌的科技赛道，被视为强结构性修复。\n\n修复还是反转，机构分歧仍在\n\n综合券商观点来看，更倾向于“认可修复机会，尚未确认全面反转”。 后续",
+      "published_hint": "Wed, 04 Nov 2026 02:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "半导体 设备 材料 涨价 订单 长鑫科技 回购 科创板",
+          "topic": "news",
+          "purpose": "discovery",
+          "lane": "industry",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "discovery",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S61": {
+      "title": "创业板指涨幅扩大至4% 科创50指数涨逾5% 贵金属、高带宽内存、半导体领涨_基金动态_基金_中金在线",
+      "url": "http://fund.cnfol.com/jijindongtai/20261104/32415420.shtml",
+      "snippet": "登录客服\n\n忘记密码？立即注册\n\n其它账号登录：新浪; \"新浪微博登录\")QQ; \"QQ登录\")微信; \"微信登录\")\n\n手机网\n\n退出 在线咨询 |客服帮助\n\n手机网\n\n欢迎您，\n\n首页 财经 股票 基金 黄金 外汇 期货 理财 原创 汽车 路演 博客 财经号\n\n，不超过人民币20亿元(含)”增加至“不低于人民币25亿元(含)，不超过人民币50亿元(含)”。\n\n　　玄学炒“羊”持续狂欢 风险“警报”已密集拉响\n\n　　A股昨日再度重挫，多个重要指数创下逾一年新低，而“羊”字辈个股依旧活跃，全市场涨停股中超过两成带“yang”，连七匹狼都走出两连板。一边是指数新低，一边是玄学狂欢，这场反差极大的",
+      "published_hint": "Wed, 04 Nov 2026 05:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "半导体 设备 材料 涨价 订单 长鑫科技 回购 科创板",
+          "topic": "news",
+          "purpose": "discovery",
+          "lane": "industry",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "discovery",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S62": {
+      "title": "创业板指大涨逾6% 科创50指数飙升近10% 成交额突破2万亿_证券要闻_财经_中金在线",
+      "url": "http://news.cnfol.com/zhengquanyaowen/20261104/32415483.shtml",
+      "snippet": "，不超过人民币20亿元(含)”增加至“不低于人民币25亿元(含)，不超过人民币50亿元(含)”。  \n   \n 　　科技巨头AI需求放缓？算力产业链企业回应：没有下调迹象 有订单价格上调  \n   \n 　　有传闻称大厂AI需求下调，市场对科技AI支出规模和增长速度担忧加剧。对此，多家算力产业链回应称，目前没有下调迹象，相关业务在手订单充足。  \n   \n 　　机构观点  \n   \n 　　西部证券：稳市政策组合拳持续加码，A股长期向好逻辑进一步明确 [...] 11月4日，野村证券报告指，近期科技股遭遇卖压，主要来自两项市场疑虑：一是AI业务可能侵蚀科技巨头既有的传统业务，二是大规模资本支出使自",
+      "published_hint": "Wed, 04 Nov 2026 06:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "半导体 设备 材料 涨价 订单 长鑫科技 回购 科创板",
+          "topic": "news",
+          "purpose": "discovery",
+          "lane": "industry",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "discovery",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S63": {
+      "title": "A股双创指数早盘震荡上涨，半导体反弹，医药股拉升，恒科指跌超1%，权重科网股陷入调整 - 华尔街见闻",
+      "url": "https://wallstreetcn.com/articles/3785133",
+      "snippet": "### 大家都在搜\n\n# A股双创指数早盘震荡上涨，半导体反弹，医药股拉升，恒科指跌超1%，权重科网股陷入调整\n\n11月4日，A股震荡分化，沪指早盘冲高之后翻绿，深成指、创业板小幅走高，半导体板块拉升，半导体设备、先进封装等概念股上涨，短剧游戏、文化传媒、生物科技、贵金属等板块活跃。电信、房地产、券商、白酒等板块调整。\n\n港股低开低走，恒指、恒科指盘初双双下跌，恒科指跌超1%，权重科网股多数回落。芯片、光模块等科技股有所反弹，生物科技板块拉升，恒生生物科技指数涨超1%。债市方面，国债期货普遍上涨。商品方面，国内商品期货多数下跌。核心市场走势：\n\nA股：截至发稿，沪指涨0.05%，深成指涨0.7",
+      "published_hint": "Wed, 04 Nov 2026 02:05:59 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "半导体 设备 材料 涨价 订单 长鑫科技 回购 科创板",
+          "topic": "news",
+          "purpose": "discovery",
+          "lane": "industry",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "discovery",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S64": {
+      "title": "뵼ɼ巴ƴ뵼ETFƴ뵼豸ETF뵼豸ETFǳ4%_Ƶ_֤ȯ֮",
+      "url": "https://fund.stockstar.com/IG2026110400020182.shtml",
+      "snippet": "ü۸\n\n֤ȯ֮ǹֵʾйͨҵھĻǺãӯãӪճɳһ㣬ۺϻάȿֵ >>\n\nͶ\n\nü۸\n\n֤ȯ֮ǹֵʾ΢˾ҵھĻǺ㣬ӯһ㣬Ӫճɳ㣬ۺϻάȿֵƫߡ >>\n\nͶ\n\nü۸\n\n֤ȯ֮ǹֵʾҵھĻǺ㣬ӯϲӪճɳãۺϻάȿֵƫߡ >>\n\nͶ\n\nü۸\n\n֤ȯ֮ǹֵʾԴܿƼҵھĻǺ㣬ӯһ㣬ӪճɳԽϲۺϻάȿֵƫߡ >>\n\nͶ\n\nü۸ [...] AMDӪ133.8Ԫͬ45%гԤڵ130.9ԪEPSΪ2.09ԪԤڵ1.95ԪҵͬȽӽ85ԪҪAIƶAMDԤƵļӪԼ170ԪгԤڵ162163ԪƱAMD̺ɼһǳ9%\n\nĦʿCEOδʮAIʱ֧ܴﵽ1015ԪһΪش󾭼ñĵλδ712꣬ģƷÿͶܴﵽ80001Ԫ [...] Aг",
+      "published_hint": "Wed, 04 Nov 2026 05:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "半导体 设备 材料 涨价 订单 长鑫科技 回购 科创板",
+          "topic": "news",
+          "purpose": "discovery",
+          "lane": "industry",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "discovery",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S65": {
+      "title": "恒指高收393点　连升4日　晶片和AI概念股急升 - RTHK",
+      "url": "https://gbcode.rthk.hk/TuniS/news.rthk.hk/rthk/ch/component/k2/1876541-20261104.htm?spTabChangeable=0",
+      "snippet": "+ facebook twitter\n\nA A A\n\n 繁\n 简\n Eng\n\n选单 \n\n 新闻主页\n 即时新闻\n\n  + 本地\n  + 大中华\n  + 国际\n  + 财经\n  + 体育\n 视像新闻\n 新闻专题\n\n  + 新闻专题\n 新闻节目\n\n  + 新闻节目\n  + 新闻节目\n 新闻图片\n 新闻简报\n 普通话新闻\n 新闻重温\n 报料快线\n 错误\n 新闻重温\n 视像新闻直播\n\n气温 湿度\n\n 主页\n\n## 恒指高收393点　连升4日　晶片和AI概念股急升\n\n2026-11-04 HKT 16:25\n\n分享工具  facebook   twitter\n\n  恒生指数在全日高位收市，报23919点",
+      "published_hint": "Wed, 04 Nov 2026 08:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "恒指 收市 2026年11月4日 恒生科技指数 成交",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S66": {
+      "title": "南方東英恒生指數每日槓桿(2X)產品(7200)",
+      "url": "https://www.hkex.com.hk/Market-Data/Securities-Prices/Exchange-Traded-Products/Exchange-Traded-Products-Quote?sym=7200&sc_lang=zh-HK",
+      "snippet": "交易所買賣產品資料 ; 基準, 恒生指數 ; 資產淨值, HK$4.87 (截至2026年11月3日) ; 股息率, - ; 股利政策, 每年(如有) ; 經常性開支每六個月更新一次。經常性開支, 1.05%.",
+      "published_hint": "Wed, 04 Nov 2026 08:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "恒指 收市 2026年11月4日 恒生科技指数 成交",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S67": {
+      "title": "香港股市行情怎么看？2026年恒指走势与主要指数全解析",
+      "url": "https://kuku.baidu.com/landing/tscp_doc/c59b5e38049394b23c85abbcd828306b",
+      "snippet": "香港股市行情，指的是以恒生指数系列为核心，反映在港上市股票整体价格走势、成交活跃度与板块轮动的一组市场指标。它既包括指数点位的涨跌，也涵盖成交额变化、资金",
+      "published_hint": "Wed, 04 Nov 2026 23:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "恒指 收市 2026年11月4日 恒生科技指数 成交",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S68": {
+      "title": "【H股A股造好】恒指連升4日 上證指數升2% 創指反彈6% | Now 新聞",
+      "url": "https://news.now.com/home/finance/player?newsId=668375",
+      "snippet": "now.com\n 新聞\n 財經\n 體育\n Viu\n MOOV\n Now TV\n MEDIA.NOW.COM\n\n前往我的賬戶 登出\n\nNow 新聞\n\n0\n\n0\n\n0\n\n【H股A股造好】恒指連升4日 上證指數升2% 創指反彈6%\n\n# 【H股A股造好】恒指連升4日 上證指數升2% 創指反彈6%\n\n\n\n抱歉，我們並不支援你正使用的瀏覽器。  \n為達至最佳瀏覽效果，請更新至最新的瀏覽器版本。  \n如有問題，歡迎電郵至 pccwmediaiapps@pccw.com 查詢。\n\n廣告\n\n|  |\n\n|  |\n\n 【H股A股造好】恒指連升4日 上證指數升2% 創指反彈6%\n\n【Now新聞台】港股連升4日，恒",
+      "published_hint": "Wed, 04 Nov 2026 11:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "恒指 收市 2026年11月4日 恒生科技指数 成交",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S69": {
+      "title": "每日市场慨况 - 软库中华金融集团",
+      "url": "https://sbichinacapital.com/chs/newscontent.asp?id=1624",
+      "snippet": "及中国证监会召开座谈会，加强政策支持维护资本市场稳定，市场情绪提振，港股造好。恒指高开76点，其后反复上扬，并以近全日高位收市。恒指全日升132.65点或0.57%，收报23,525.97点；恒生科技指数升28.32点或0.74%，收报3,867.73点；国指升36.99点或0.47%，收报7,943.10点。大市全日成交总额2,364.04亿元。     重点关注  ·比特币近期录得较大回调，比特币价格自近期約87,000美元下跌至77,000美元。价格下跌主要受美国国债收益率上升，导致市场流动性收紧、币安遭黑客盗走至少63亿美元资产，一度暂停充值和提现，及市场预期美国中期选举由民主党较高机",
+      "published_hint": "Wed, 04 Nov 2026 03:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "恒指 收市 2026年11月4日 恒生科技指数 成交",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S70": {
+      "title": "〈港股盤後〉強勢反彈 恒指收漲近400點 黄金、生物醫藥與光通信概念領漲",
+      "url": "https://hk.finance.yahoo.com/news/%E6%B8%AF%E8%82%A1%E7%9B%A4%E5%BE%8C-%E5%BC%B7%E5%8B%A2%E5%8F%8D%E5%BD%88-%E6%81%92%E6%8C%87%E6%94%B6%E6%BC%B2%E8%BF%91400%E9%BB%9E-%E9%BB%84%E9%87%91-%E7%94%9F%E7%89%A9%E9%86%AB%E8%97%A5%E8%88%87%E5%85%89%E9%80%9A%E4%BF%A1%E6%A6%82%E5%BF%B5%E9%A0%98%E6%BC%B2-084005851.html",
+      "snippet": "鉅亨網\n\n# 〈港股盤後〉強勢反彈 恒指收漲近400點 黄金、生物醫藥與光通信概念領漲\n\n鉅亨網新聞中心\n\n2 分鐘閱讀時間\n\n ^HSI\n\n  +1.67%\n GC=F\n\n  +2.88%\n 603259.SS\n\n  +10.00%\n 2259.HK\n\n  +14.58%\n\n港股主要指數周三(4日)集體強勢反彈。香港恒生指數早段低開74點後一度探底至23,385點，隨後上演「V型」反轉，午後升幅擴大，全日以最高位收市，大漲393點或1.67%，收報23,919.50點；恒生科技指數上揚1.77%，收報3,936.02點；國企指數漲1.44%，收報8,057.59點。大市成交額顯著放量至2,3",
+      "published_hint": "Wed, 04 Nov 2026 08:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "恒指 收市 2026年11月4日 恒生科技指数 成交",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S71": {
+      "title": "〈港股盤後〉強勢反彈 恒指收漲近400點 黄金、生物醫藥與光通信概念領漲 | 鉅亨網",
+      "url": "https://m.cnyes.com/news/id/6646515",
+      "snippet": "‌\n\n‌\n\n‌\n\n‌\n\nhome-icon\n\nA股港股港股\n\nA股港股\n\n# 〈港股盤後〉強勢反彈 恒指收漲近400點 黄金、生物醫藥與光通信概念領漲\n\n鉅亨網新聞中心\n\n港股主要指數周三(4日)集體強勢反彈。香港恒生指數早段低開74點後一度探底至23,385點，隨後上演「V型」反轉，午後升幅擴大，全日以最高位收市，大漲393點或1.67%，收報23,919.50點；恒生科技指數上揚1.77%，收報3,936.02點；國企指數漲1.44%，收報8,057.59點。大市成交額顯著放量至2,369億港元。\n\ncover image of news article\n\n強勢反彈 恒指收漲近400點 黄",
+      "published_hint": "Wed, 04 Nov 2026 08:40:05 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "恒指 收市 2026年11月4日 恒生科技指数 成交",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S72": {
+      "title": "大市分析 | EJFQ 信號 - 全方位股票分析系統",
+      "url": "https://www.ejfq.com/home/tc/research/php/articles.php?blog_blogs_id=6",
+      "snippet": "# 恒指及國指衍生工具統計圖表\n\n﻿夜市恒指期貨收報23535點，升171點，較上日恒指高水142點，成交16,636張，高於近月平均數。截至上日收市計，11月恒指期貨報23364點，低水29點，未合倉合約減少1,028張至126,051張。12月恒指期貨報23355點，低水38點，未平倉合約減少384張至16,877張。上日恒指高...全文\n\n# 滬深港日誌: 央行「活水」入市 優質科企起動\n\n美伊有望再次回到談判桌的消息，帶動國際油價回落，亞洲股市亦受到刺激而迎來反彈。滬深指數昨天分別上升1.08%及1.63%，科技類股份表現強勢，尤其AI應用概念漲勢最旺。另外，人民銀行昨天宣布，要開展逾",
+      "published_hint": "Wed, 04 Nov 2026 06:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "恒指 收市 2026年11月4日 恒生科技指数 成交",
+          "topic": "news",
+          "purpose": "latest_close",
+          "lane": "hk_market",
+          "scope": null
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "latest_close",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S73": {
+      "title": "华海诚科843万股限售股11月12日上市流通",
+      "url": "https://finance.eastmoney.com/a/202611043922084894.html",
+      "snippet": "11月4日，华海诚科（688535）发布公告，宣布本次股票上市流通的限售股总数为843万股，主要为公司通过发行股份、可转换公司债券及支付现金购买资产而募集配套资金的部分",
+      "published_hint": "Wed, 04 Nov 2026 10:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "华海诚科 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:688535"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S74": {
+      "title": "华海诚科：约843.45万股限售股将于11月12日上市流通 _ 东方财富网",
+      "url": "https://finance.eastmoney.com/a/202611043922302136.html",
+      "snippet": "财经\n 焦点\n 股票\n 新股\n 期指\n 期权\n 行情\n 数据\n 全球\n 美股\n 港股\n 期货\n 外汇\n 银行\n 基金\n 理财\n 债券\n 直播\n 股吧\n 基金吧\n 博客\n 财富号\n 搜索\n\n指数 期指 期权 个股 板块 排行 新股 基金 港股 美股 期货 外汇 黄金 自选股 自选基金\n\n资金流向 主力排名 板块资金 个股研报 新股申购 转债申购 北交所申购 AH股比价 年报大全 融资融券 龙虎榜 限售解禁 IPO审核 大宗交易 估值分析\n\n首页 > 财经频道 > 正文\n\n华海诚科：约843.45万股限售股将于11月12日上市流通\n\n2026年11月04日 22:34\n\n来源： 上海证券报·中国证",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "华海诚科 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:688535"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S75": {
+      "title": "海光信息、亨通光电等拟回购股份，江苏雷利实控人被立案丨公告精选 - 投资通 - 南方财经网",
+      "url": "https://www.sfccn.com/2026/11-4/1OMDE1MjBfMjI5Mzk1OA.html",
+      "snippet": "豪森智能：拟使用不超过6500.00万元部分闲置募集资金进行现金管理\n\n华海诚科：843.45万股限售股11月12日解禁，占总股本5.89%\n\n金融街：和谐健康持股比例已降至10%\n\n奥特维：为控股子公司无锡奥特维智能装备有限公司等提供1.95亿元担保\n\n#### 增、减持/回购\n\n#### 增持\n\n劲旅环境：多位股东拟增持公司股份\n\n依顿电子：九洲集团累计增持1.00%公司股份\n\n亨通光电：控股股东拟增持4亿至6亿元股份\n\n#### 减持\n\n中船特气：中船投资发展有限公司承诺6个月内不减持公司股份\n\n惠同新材：广东新力金属累计减持1.49%公司股份\n\n中纺标：中纺院（天津）科技发展有限公司累",
+      "published_hint": "Wed, 04 Nov 2026 13:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "华海诚科 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:688535"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S76": {
+      "title": "股票行情快报：华海诚科（688535）11月2日主力资金净买入4103.38万元_主力研究",
+      "url": "https://stock.stockstar.com/RB2026110200038153.shtml",
+      "snippet": "证券之星消息，截至2026年11月2日收盘，华海诚科(688535)报收于69.7元，上涨4.34%，换手率6.01%，成交量8.03万手，成交额5.5亿元。",
+      "published_hint": "Tue, 03 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "华海诚科 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:688535"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S77": {
+      "title": "华海诚科：第四届董事会第十八次会议决议公告 _ 东方财富网",
+      "url": "https://finance.eastmoney.com/a/202610293914630117.html",
+      "snippet": "证券交易\n\n 东方财富证券开户\n 东方财富在线交易\n 东方财富证券交易\n\n关注东方财富\n\n 东方财富网微博\n 东方财富网微信\n 意见与建议\n\n扫一扫下载APP\n\n 基金开户\n 基金交易\n 活期宝\n 基金产品\n 稳健理财\n\n 天天基金网微博\n 天天基金网微信\n\n扫一扫下载APP\n\n 期货手机开户\n 期货电脑开户\n 期货官方网站\n\n信息网络传播视听节目许可证：0908328号 经营证券期货业务许可证编号：913101046312860336 违法和不良信息举报:021-61278686 举报邮箱：jubao@eastmoney.com\n\n沪ICP证:沪B2-20070217 网站备案号:沪ICP备",
+      "published_hint": "Fri, 30 Oct 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "华海诚科 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:688535"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S78": {
+      "title": "大反攻！反弹行情节点开启！未来机会在哪里？——道达投资手记 | 每经网",
+      "url": "https://www.nbd.com.cn/articles/2026-11-04/4638239.html",
+      "snippet": "读者热线：4008890008\n\n特别提醒：如果我们使用了您的图片，请作者与本站联系索取稿酬。如您不希望作品出现在本站，可联系我们要求撤下您的作品。\n\n上一篇文章\n\n华海诚科：约843.45万股限售股11月12日解禁 返回每经网首页 下一篇文章\n\n现货钯金日内大涨6%，现报991.21美元/盎司\n\n相关文章\n\n  未来的机会在哪里？答案在这11个字里——道达对话牛博士\n  大盘跌破年线！未来还有一轮行情吗？——道达投资手记\n  大盘调整基本结束！反弹行情来临——道达投资手记\n  今天市场出现三大现象！行情反弹周期来临？——道达投资手记\n\n热文精选\n\n  “蓉漂人才荟”城市行招才引智系列活动（西",
+      "published_hint": "Wed, 04 Nov 2026 10:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "华海诚科 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:688535"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S79": {
+      "title": "华海诚科(688535):中信建投证券股份有限公司关于江苏华海诚科新材料股份有限公司发行股份、可转换公司债券及支付现金购买资产并募集配套资金之部分限售股上市流通的核查意见- CFi.CN 中财网",
+      "url": "https://www.cfi.net.cn/p20261104001926.html",
+      "snippet": "华海诚科(688535):中信建投证券股份有限公司关于江苏华海诚科新材料股份有限公司发行股份、可转换公司债券及支付现金购买资产并募集配套资金之部分限售股上市流通的",
+      "published_hint": "Wed, 04 Nov 2026 10:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "华海诚科 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:688535"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S80": {
+      "title": "Ͽƣ688535113ʽ1835.21Ԫ_ƱƵ_֤ȯ֮",
+      "url": "https://stock.stockstar.com/RB2026110400011128.shtml",
+      "snippet": "5ȯһ±\n\nùҪָ꼰ҵ£\n\nϿ2026ʾǰȹ˾Ӫ7.63Ԫͬ173.12%ĸ7829.79Ԫͬ290.5%۷Ǿ7315.39Ԫͬ290.04%2026ȣ˾Ӫ2.94Ԫͬ193.41%ȹĸ3861.34Ԫͬ515.27%ȿ۷Ǿ3646.15Ԫͬ502.07%ծ26.29%Ͷ565.62Ԫ1226.42Ԫë31.06%Ͽƣ688535Ӫҵ񣺰뵼װϻܷϺװϵӽзۡ [...] ù90ڹ2һ2ҡ\n\nʽʽָͣͨ۸仯ʽ򡣹ɼ۴״̬ʱγɵĳɽƶɼǵⲿֳɽΪʽ룬ɼ۴µ״̬ʱĵĳɽƶɼµⲿֳɽΪʽߵĲǵ֮ʣµƶɼľͨʽ׵ɽʽʽɢʽ\n\nעʽΪش󵥳ɽΪ󵥳ɽɢΪСɽ\n\nΪ֤ȯ֮ǾݹϢοͶʽ顣\n\n##  ETF\n\nα",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "华海诚科 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:688535"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S81": {
+      "title": "Ͽ: ջϿ²Ϲɷ޹˾йɷݡת˾ծȯֽ֧ʲļʽ֮۹ͨ_ƱƵ_֤ȯ֮",
+      "url": "https://stock.stockstar.com/notice/SN2026110500000923.shtml",
+      "snippet": "ҳ\n Ѷ\n Ʊ\n ƾ\n \n ר\n \n \n ר\n \n\n  Ʊ |  ض б ¹ ҵ ƴ Ȩ  ۹ иŹ ȫ\n\n   |   ƽ  ծȯ ڻ ָڻ\n\n  ƽ ȵ ר    ز ѧ ˾  · Ƽ\n\n  ǧǧ ڽ ʽ  ר ҵѶ\n\n  ΢Źں ΢Źں\n\n  ֤ȯ֮APP ֤ȯ֮APP\n\nҳ - Ʊ - ÿձض - ˾ - \n\n# Ͽ: ջϿ²Ϲɷ޹˾йɷݡת˾ծȯֽ֧ʲļʽ֮۹ͨ\n\nԴ֤ȯ֮ 2026-11-05 00:14:27\n\nȨϢٱר [...] ֤ȯ룺688535     ֤ȯƣϿ           ţ2026-043   \n         ջϿ²Ϲɷ޹˾   \nйɷݡת˾ծȯֽ֧ʲļ ",
+      "published_hint": "Wed, 04 Nov 2026 16:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "华海诚科 公告 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:688535"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S82": {
+      "title": "猪价逼近9元关口，养殖股集体走强！阳光乳业涨停，牧原股份、温氏股份涨超2%，养殖ETF汇添富(159172)指数涨超2%冲击两连阳|界面新闻",
+      "url": "https://www.jiemian.com/article/15286928.html",
+      "snippet": "消息面上，11月2日，卓创资讯监测的全国生猪出栏价格指数降至9.01元/公斤，生猪养殖即时盈利指数为-2745.56元/吨。对应2027年1月、3月和5月合约的预期盈利也全部为负，分别为-2613.43元/吨、-2796.29元/吨和-1377.98元/吨。\n\n近期生猪价格持续承压。据中国养猪网数据，截至11月1日，全国生猪价格近一个月累计下跌9.5%，较8月高点累计回落约19%。截至11月3日，生猪（外三元）价格进一步降至9.13元/公斤，创今年4月底以来新低。自2025年9月中旬转亏以来，生猪养殖利润持续承压，已连续约13个月处于亏损状态，且亏损程度进一步加深。\n\n【产能底逐渐显现、供给底",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "牧原股份 生猪 价格 11月 公告",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:002714"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S83": {
+      "title": "牧原前三季度亏损93亿元，多家猪企调减母猪存栏_资讯-蓝鲸财经",
+      "url": "https://www.lanjinger.com/d/1793336745035795232",
+      "snippet": "对于近期猪价，朱增勇认为，国庆后消费阶段性回落，叠加供给充裕、部分养殖户恐慌性出栏，进一步压低价格。他预计，11月出栏节奏逐步趋稳，腌腊和节日消费带来季节性支撑，猪价有望止跌并小幅回升、猪价中枢上移，但短期尚不具备趋势反转的基础。\n\n随着此前产能调减逐步传导，朱增勇预计，明年一季度生猪出栏同比增幅将逐步收窄，供给压力有所减轻；二季度供给收缩的影响有望更加明显，猪价重心或逐步上移。在他看来，猪价要持续走出低位，还需母猪产能有序调减并形成进一步实质性收缩，同时消费回暖、冻品库存不再集中冲击现货，压栏和二次育肥的扰动也需保持可控。\n\n\\特别声明：文章内容仅供参考，不构成投资建议。投资者据此操作风险自",
+      "published_hint": "Thu, 29 Oct 2026 08:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "牧原股份 生猪 价格 11月 公告",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:002714"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S84": {
+      "title": "【钛晨报】光模块三巨头“易中天”业绩出炉，前三季度净赚超350亿元；国家队最新调仓：国新进联通，诚通买黄金；联讯仪器、普冉股份，第三季度净利暴增超30倍 - 潮起网",
+      "url": "https://www.ichaoqi.com/guandian/2026/1030/89419.html",
+      "snippet": "10月29日，工业富联公告称，第三季度营业收入为3835.54亿元，同比增长57.73%；归属于上市公司股东的净利润为166.34亿元，同比增长60.35%。前三季度营业收入为9414.14亿元，同比增长55.88%；归属于上市公司股东的净利润为403.75亿元，同比增长79.55%。业绩增长主要受益于AI算力需求持续爆发，公司在主要客户的市场份额稳步提升，以及云服务商业务表现优异，推动整体营业收入增长；同时公司产品结构持续优化，主营业务经营效益实现稳步提升。\n\n牧原股份：第三季度净亏损32.41亿元，生猪价格下降\n\n10月29日，牧原股份公告称，第三季度营业收入为327.90亿元，同比下降7",
+      "published_hint": "Fri, 30 Oct 2026 09:30:14 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "牧原股份 生猪 价格 11月 公告",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:002714"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S85": {
+      "title": "变天！新易盛市值被养猪龙头牧原股份反超 较年内高点大跌72% 超6000亿市值蒸发-手机金融界",
+      "url": "https://m.jrj.com.cn/madapter/stock/2026/11/03151758992526.shtml",
+      "snippet": "变天！新易盛市值被养猪龙头牧原股份反超 较年内高点大跌72% 超6000亿市值蒸发\n\n  2026-11-03 15:17:43\n\n10秒看完全文要点\n\n11月3日，A股极致分化行情再添标志性案例。作为此前AI算力链领涨核心，新易盛盘中急剧下挫，跌幅一度超10%，股价创2025年8月以来新低，较年内高位累计回撤超77%；另一边，生猪养殖龙头牧原股份逆势放量拉升，大涨超4%。一跌一涨之间，新易盛总市值正式被牧原股份反超。\n\n一、冰火两重天：光模块龙头跌跌不休 养猪龙头逆势走强\n\n盘面数据显示，截至收盘，新易盛报173.36元/股，日内最低触及171.6元，总市值2418亿元。较创下历史高点618",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "牧原股份 生猪 价格 11月 公告",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:002714"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S86": {
+      "title": "16家样本猪企前三季度合计亏超280亿元：行业冲刺“5元成本”、布局肉食转型，有企业预判猪价春节前后或迎拐点 | 每经网",
+      "url": "https://www.nbd.com.cn/articles/2026-11-03/4637120.html",
+      "snippet": "眼下，牧原股份的成本位置相对领先。其在交流中表示，9月生猪养殖完全成本已降至略低于11.5元/公斤，现金成本约10元/公斤，凭借成本优势实现了正向的经营性现金流。\n\n牧原股份表示，下一步将在种猪育种、营养研发、数智化应用、组织管理与人员培养等方面持续投入，全方位深挖降本空间。“当下公司在生产与管理上的投入，未来将逐步体现在生产指标改善与成本下降中。”牧原股份方面在交流中如是表示。\n\n每经记者注意到，牧原股份今年5月还介绍，剔除饲料原材料价格的影响，公司此前提出降本空间已完成一半以上，未来还有每公斤两元左右的成本挖潜空间。当时，该公司介绍，最优秀场线的成本在10.5元/公斤以下，但仍有部分场线在",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "牧原股份 生猪 价格 11月 公告",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:002714"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S87": {
+      "title": "三峡电站单季发电量锐减29%，长江电力单季净利下滑23%，股价盘中却创年内新高_同比_公司_费用",
+      "url": "https://www.sohu.com/a/1095670396_121010226",
+      "snippet": "汽车\n\n房产\n\n旅游\n\n教育\n\n时尚\n\n科技\n\n财经\n\n娱乐\n\n# 三峡电站单季发电量锐减29%，长江电力单季净利下滑23%，股价盘中却创年内新高\n\n2026-11-01 12:18  来源: 深圳商报\n\n发布于：广东省\n\n10月31日，水电龙头长江电力（600900）发布三季报。报告显示，公司前三季度实现营业收入630.56亿元，同比下降4.08%；归母净利润263.44亿元，同比下降6.56%；基本每股收益1.0767元，同比下降6.56%。\n\n其中第三季度，公司实现营业收入251.27亿元，同比下降13.49%；归母净利润115.88亿元，同比下降23.44%，环比增长45%；扣非净利润",
+      "published_hint": "Sun, 01 Nov 2026 12:18:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "长江电力 公告 来水 发电量 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:600900"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S88": {
+      "title": "研报掘金｜东吴证券：维持长江电力“买入”评级，现金流表现良好财务费用持续优化 — TradingView News",
+      "url": "https://www.tradingview.com/news/gelonghui:103b07b82e3f9:0",
+      "snippet": "Gelonghui\nGelonghui\n\n# 研报掘金｜东吴证券：维持长江电力“买入”评级，现金流表现良好财务费用持续优化\n\n格隆汇11月3日｜东吴证券研报指出，长江电力来水偏枯影响三季度业绩，现金流表现良好财务费用持续优化。2026年前三季度归母净利润263.44亿元，同比-6.56%；三季度梯级电站发电量同比-14.89%，前三季度发电量同比-4.28%。2026年前三季度公司境内六座梯级电站发电量2250.58亿千瓦时，同比-4.28%；其中2026Q3发电量923.14亿千瓦时，同比-14.89%。公司自由现金流稳定，充沛现金流支撑高分红。该行维持2026-2028年公司归母净利润预测",
+      "published_hint": "Tue, 03 Nov 2026 08:05:22 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "长江电力 公告 来水 发电量 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:600900"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S89": {
+      "title": "研报掘金｜东吴证券：维持长江电力“买入”评级，现金流表现良好财务费用持续优化 — Actualités TradingView",
+      "url": "https://fr.tradingview.com/news/gelonghui:103b07b82e3f9:0",
+      "snippet": "GelonghuiGelonghui\n\nFlash\n\n# 研报掘金｜东吴证券：维持长江电力“买入”评级，现金流表现良好财务费用持续优化\n\n600900\n\n格隆汇11月3日｜东吴证券研报指出，长江电力来水偏枯影响三季度业绩，现金流表现良好财务费用持续优化。2026年前三季度归母净利润263.44亿元，同比-6.56%；三季度梯级电站发电量同比-14.89%，前三季度发电量同比-4.28%。2026年前三季度公司境内六座梯级电站发电量2250.58亿千瓦时，同比-4.28%；其中2026Q3发电量923.14亿千瓦时，同比-14.89%。公司自由现金流稳定，充沛现金流支撑高分红。该行维持2026-",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "长江电力 公告 来水 发电量 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:600900"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S90": {
+      "title": "研報掘金｜東吳證券：維持長江電力“買入”評級，現金流表現良好財務費用持續優化 — Noticias de TradingView",
+      "url": "https://es.tradingview.com/news/gelonghui:103b07b82acdf:0",
+      "snippet": "GelonghuiGelonghui\n\nFlash\n\n# 研報掘金｜東吳證券：維持長江電力“買入”評級，現金流表現良好財務費用持續優化\n\n600900\n\n格隆匯11月3日｜東吳證券研報指出，長江電力來水偏枯影響三季度業績，現金流表現良好財務費用持續優化。2026年前三季度歸母淨利潤263.44億元，同比-6.56%；三季度梯級電站發電量同比-14.89%，前三季度發電量同比-4.28%。2026年前三季度公司境內六座梯級電站發電量2250.58億千瓦時，同比-4.28%；其中2026Q3發電量923.14億千瓦時，同比-14.89%。公司自由現金流穩定，充沛現金流支撐高分紅。該行維持2026-",
+      "published_hint": "Wed, 04 Nov 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "长江电力 公告 来水 发电量 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:600900"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S91": {
+      "title": "单季赚116亿元！水电龙头长江电力，Q3净利同比下降23%、环比增长45%，股价创年内新高 | 每日经济新闻",
+      "url": "https://www.mrjjxw.com/articles/2026-10-30/4632255.html",
+      "snippet": "披露当日，公司股价盘中最高触及30.00元（前复权），为年内盘中最高价，收盘回落至29.74元，下跌0.83%。年初至10月30日，公司股价前复权累计上涨13.43%。\n\n## 收入端随电量回落，财务费用压降成缓冲\n\n三季报显示，公司前三季度发电量随长江来水及调度安排回落，收入端承压。公司前三季度营业成本为244.31亿元，同比下降1.00%；税金及附加24.15亿元，同比下降4.53%。费用端呈现“财务费用压降、研发投入加码”的反向组合：财务费用61.49亿元，同比下降14.13%，减少约10.12亿元；管理费用9.97亿元，与上年同期基本持平；研发费用5.40亿元，同比增长31.30%；销",
+      "published_hint": "Sat, 31 Oct 2026 00:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "长江电力 公告 来水 发电量 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:600900"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    },
+    "S92": {
+      "title": "Mysteel：50家电力上市公司前三季净利1312亿，9家实现利润正增-我的钢铁网",
+      "url": "https://news.mysteel.com/a/26110216/C5603D518A965290.html",
+      "snippet": "从净利润来看，48家公司实现盈利，其中长江电力净利润263.44亿元排名第一 ，中国广核以96.03亿元、华能国际以78.22亿元的净利润分列第二、三位。净利润前十的公司中，净利与营收双增的只中国广核、华能水电两家。此外电投水电是净利润增幅最大的公司，实现净利润14.38亿元，同比增长120.19%，业绩变动主要系水电来水好于同期，带动发电量同比增加，水电利润增长带动公司整体效益增长。\n\n从营业收入来看，华能国际（1658.49亿元）、国电电力（1243.55亿元）两家营收突破千亿元。营收同比增幅居前的公司多与“新机组投产放量”相关，如赣能股份营收同比增长23.28%，主要系子公司赣能上高发电",
+      "published_hint": "Mon, 02 Nov 2026 06:00:00 GMT",
+      "reading_status": "search_snippet_not_body",
+      "discovered_by": [
+        {
+          "query": "长江电力 公告 来水 发电量 11月",
+          "topic": "news",
+          "purpose": "company_event",
+          "lane": "company_event",
+          "scope": "A:600900"
+        }
+      ],
+      "retrieval_assessments": [
+        {
+          "purpose": "company_event",
+          "flags": [],
+          "role": "candidate_needs_body_check",
+          "reading_scope": "metadata_only",
+          "event_or_session_verified": false,
+          "limitation": "标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。"
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "sample-05389696a240b32f449fa49c",
+      "url": "https://finance.sina.com.cn/stock/hkstock/hkstocknews/2026-11-04/doc-inixqaaz8129172.shtml",
+      "title": "A股收评 | 沪指涨2.16% 科创50涨9.92% 半导体领涨",
+      "original_id": "web-954825ec65b5260b56f83929",
+      "text": "11月4日，A股开盘涨跌互现，早盘低位震荡，午后单边拉升，收盘五大指数集体大涨，沪指收于全天最高点。截至收盘，上证指数涨2.16%报3686.17点，深证成指涨4.22%报11335.69点，创业板指涨6.40%报2544.73点，科创50涨9.92%报1265.47点，北证50涨4.56%报894.08点。沪深两市成交额20376.92亿元，较上一交易日放量3342.55亿元。沪深两市4667只个股上涨、779只下跌、132只平盘，其中123只涨停、11只跌停，上涨个股占比约83%。板块方面，半导体、电子化学品、贵金属、元件、通信设备、医疗服务涨幅居前;白酒、饮料乳品、国有大型银行、调味发酵品、煤炭开采、保险跌幅居前。\n驱动因素\n11月2日，央行、金融监管总局、证监会先后召开证券基金保险公司互换便利座谈会和股票回购增持再贷款座谈会，证监会同日以答记者问方式披露三项安排：调整优化护盘式回购规则、引导首批18只主动ETF加快建仓、优化融资融券风控指标;11月3日，央行公告开展第三批互换便利操作1000亿元，31家证券公司、基金管理公司参与投标，中标费率10bp;11月4日，24家券商确认中标第三批互换便利，已披露金额合计超400亿元，其中\n中信证券\n、\n国泰海通\n各100亿元，多家机构表示资金将用于增持股票和股票ETF。盘面上，科创50涨9.92%、创业板指涨6.40%与沪指涨2.16%形成明显梯度，半导体涨11.41%、电子化学品Ⅱ涨10.55%、贵金属涨10.06%、元件涨9.14%、通信设备涨8.91%居前，白酒Ⅱ跌2.05%、饮料乳品跌1.98%、国有大型银行Ⅱ跌1.85%居后。沪深两市成交额重回2万亿元上方，沪深两市4667只个股上涨、123只涨停。消息面上，长鑫科技11月4日早间公告董事长朱一明提议将回购金额区间由10亿元—20亿元上调至25亿元—50亿元;\n中际旭创\n11月3日晚间披露投资者关系活动记录表，称绝大部分海外客户未下修需求或订单、2027年绝大部分订单已覆盖全年;现货黄金午后重回4000美元/盎司上方、日内涨幅超2%，美元指数下跌0.4%至101.50;SEMI预测2026年全球半导体设备销售额达1659亿美元、同比增长23.2%。\n热门板块方面\n1、【半导体设备与材料】 申万半导体指数涨11.41%，居申万二级行业首位，靶材概念涨13.29%，江丰电子、拓荆科技、京仪装备、芯源微、华峰测控均20CM涨停，北方华创、通富微电10%涨停，长鑫科技涨13.63%。催化上，长鑫科技11月4日早间公告董事长朱一明提议将回购金额区间由10亿元—20亿元上调至25亿元—50亿元，为目前科创板单笔金额最大的回购;上证报统计显示，截至11月4日，2026年已有42家科创板半导体公司披露回购方案、上限金额合计130亿元，其中24家为10月以来披露、上限合计106.5亿元。\n2、【算力硬件】 通信设备涨8.91%、元件涨9.14%，新易盛涨13.35%、中际旭创涨11.07%、天孚通信涨10.02%。催化上，中际旭创11月3日晚间披露投资者关系活动记录表，明确绝大部分海外客户未下修需求或订单、个别客户存在产品结构性调整、部分客户1.6T需求甚至有所增加，并称有关外资券商下调评级的传言系有人冒用该券商名义传播的虚假内容。\n3、【贵金属】 申万贵金属指数涨10.06%，晓程科技20CM涨停，山金国际、赤峰黄金、湖南黄金、招金黄金涨停。催化上，现货黄金午后重回4000美元/盎司上方、日内涨幅超2%，美元指数跌0.4%至101.50;世界黄金协会11月3日发布三季度《全球黄金需求趋势》报告，三季度全球央行及其他官方机构黄金储备净增321吨、同比增长42%，创2024年四季度以来单季新高。\n调整板块\n申万二级行业中，白酒Ⅱ跌2.05%、饮料乳品跌1.98%、国有大型银行Ⅱ跌1.85%、调味发酵品Ⅱ跌1.09%、煤炭开采跌1.08%、保险Ⅱ跌1.01%、食品加工跌1.00%，申万一级行业中银行跌0.84%。个股方面，阳光乳业、澳洋健康、阳光照明、百洋股份跌停，皇台酒业盘中最高触及涨停价18.88元后回落、收盘跌4.66%，山西汾酒跌3.07%、古井贡酒跌3.58%。白酒Ⅱ自10月29日至11月3日的4个交易日累计上涨11.13%、饮料乳品同期上涨7.98%，当日跌幅居前。",
+      "full_text_sha256": "dca30973d1ced3c4aabdfa9ae0722f275df13af0231b6b8d3b691b04f29962b5",
+      "retained_ranges": [
+        [
+          0,
+          1815
+        ]
+      ],
+      "excluded_ranges": [],
+      "boundary_notes": [],
+      "publication_note": "原始来源时点：2026-11-04T15:22+08:00；精度：minute；公开可见正文，不宣称完整稿或独立核验；其他显式时间字段（未确认为同一口径）：[\"2026-11-04T15:26:46+08:00\"]",
+      "reported_session_labels": [],
+      "source_role": {
+        "owner": "finance-material-role-v1",
+        "flags": [],
+        "latest_close_allowed": true,
+        "commodity_settlement_allowed": true,
+        "original_policy_release_allowed": true,
+        "reported_session_labels": [],
+        "session_verified": false,
+        "source_identity_verified": false,
+        "limitation": "仅限制明显不匹配用途；未被限制不表示收盘、政策发布或作者身份已核实。"
+      },
+      "observed_at": "2026-11-05T08:34:20.380882",
+      "available_at_cutoff_verified": false,
+      "origin": "previously_stored_body"
+    },
+    {
+      "id": "sample-05b566c21c785b20f3b62a59",
+      "url": "https://news.qq.com/rain/a/20261104A08IZ300",
+      "title": "美股收盘：三大指数涨跌不一，纳指涨0.83%；半导体小爆发，存储芯片、光通信普涨，美光、海力士涨超2%；科技股多数上涨，苹果跌1.9%",
+      "original_id": "web-b13e9a9946ee2e3b040d46f8",
+      "text": "美东时间周二(11月3日)，美股三大指数涨跌不一。截至收盘，道指跌0.38%报51786.72点，纳指涨0.83%报25372.01点，标普500指数涨0.36%报7568.92点。\n盘面上，大型科技股多数上涨，微软涨2.74%，Meta涨2.36%，英伟达涨2.29%，亚马逊涨2.06%，谷歌A涨0.37%，特斯拉跌1.32%，苹果跌1.9%。\n半导体股全线上涨，超威半导体涨3.65%，博通涨3.07%，ARM涨2.9%，阿斯麦涨1.7%，台积电涨1.51%，高通涨1.45%，英特尔涨0.97%。\n存储概念股集体上涨，闪迪涨4.78%，西部数据涨2.59%，美光科技涨2.58%，希捷科技涨2.13%，SK海力士涨2.09%。\n光通信股大部分上涨，Ciena涨超5%，Coherent涨超3%，康宁涨超2%，迈威尔科技涨0.33%，Lumentum跌0.62%。\n医药生物股多数下跌，默克跌超2%，强生跌超1%，安进跌0.9%，礼来跌0.12%，赛默飞世尔涨超2%，Moderna涨超3%。\n能源股全线下跌，康菲石油、埃克森美孚、雪佛龙跌超1%，西方石油跌0.48%，斯伦贝谢跌0.32%。\n黄金股普遍下跌，金罗斯黄金跌超3%，皇家黄金、巴里克黄金跌超2%，盎格鲁黄金跌超1%。\n中概股涨跌不一，纳斯达克中国金龙指数涨0.21%。个股方面，爱奇艺、京东集团、新东方涨超2%，腾讯音乐、小鹏汽车涨超1%，金山云跌超4%，哔哩哔哩、唯品会跌超2%，贝壳、老虎证券、阿里巴巴跌超1%。\n11月3日，欧洲三大股指全线下跌。英国伦敦股市《金融时报》100种股票平均价格指数报收于10638.43点，较前一交易日下跌122.90点，跌幅为1.14%；法国巴黎股市CAC40指数报收于8020.31点，较前一交易日下跌27.38点，跌幅为0.34%；德国法兰克福股市DAX指数报收于25864.62点，较前一交易日下跌116.47点，跌幅为0.45%。\n国际油价11月3日下跌。截至当天收盘，纽约商品交易所12月交货的轻质原油期货价格下跌37美分，收于每桶96.09美元，跌幅为0.38%；1月交货的伦敦布伦特原油期货价格下跌1.17美元，收于每桶103.6美元，跌幅为1.12%。\n11月3日，国际贵金属期货普遍收跌。COMEX黄金期货跌0.74%，报3940.2美元/盎司；COMEX白银期货跌2.12%，报49.81美元/盎司。\n美元指数11月3日上涨。衡量美元对六种主要货币的美元指数当天上涨0.15%，在汇市尾市收于101.867。\n来源 中新经纬\n【来源：宁波晚报】\n",
+      "full_text_sha256": "9fcdf1aafd83ec8fc9e664d21ceb29f110c1e29ba8a52c3902e53eee7f0f4ffc",
+      "retained_ranges": [
+        [
+          0,
+          1087
+        ]
+      ],
+      "excluded_ranges": [
+        [
+          1087,
+          1243
+        ]
+      ],
+      "boundary_notes": [
+        "explicit_end_matter"
+      ],
+      "publication_note": "原始来源时点：2026-11-04 14:52:13（来源未标时区，仅按日期，不用于盘前盘后或消息先后判断）；精度：day；公开可见正文，不宣称完整稿或独立核验；正文算法：trafilatura 2.3.1；未确认完整稿；",
+      "reported_session_labels": [
+        "美东时间周二(11月3日)"
+      ],
+      "source_role": {
+        "owner": "finance-material-role-v1",
+        "flags": [],
+        "latest_close_allowed": true,
+        "commodity_settlement_allowed": true,
+        "original_policy_release_allowed": true,
+        "reported_session_labels": [
+          "美东时间周二(11月3日)"
+        ],
+        "session_verified": false,
+        "source_identity_verified": false,
+        "limitation": "仅限制明显不匹配用途；未被限制不表示收盘、政策发布或作者身份已核实。"
+      },
+      "observed_at": "2026-11-05T08:34:56.007968",
+      "available_at_cutoff_verified": false,
+      "origin": "previously_stored_body"
+    },
+    {
+      "id": "sample-1b8d2fae8f2c6b895efac8ce",
+      "url": "https://www.21jingji.com/article/20261103/herald/0bd4be62bf0a47af0eca6e4985755b74.html",
+      "title": "宁德时代A股大涨，市值逼近1.2万亿",
+      "original_id": "web-ca7725951e520cfb192d1c48",
+      "text": "11月3日上午，A股宁德时代大涨，截至10点26分涨逾5%，股价最新报252.22元，总市值11808亿元。港股宁德时代同步走强，涨幅超2.4%。\n11月2日晚，宁德时代公布回购进展：公告称，截至2026年10月31日，公司通过集中竞价交易方式累计回购A股股份1960.59万股，占公司A股总股本的0.4447%，最高成交价331.61元/股，最低成交价218.79元/股，成交总金额53.6亿元。本次回购方案拟使用资金不低于200亿元且不超过400亿元，回购股份将用于注销并减少注册资本。\n此外，宁德时代还公告称，员工持股计划获股东大会通过。本次员工持股计划合计不超808.16万股，约占公司总股本的0.18%，资金总额不超过12.8亿元。\n今年以来，宁德时代股价累计跌超30%，据21世纪经济报道此前报道，多数机构认为，宁德时代单季度的盈利波动更多是受短期扰动因素影响，而非公司基本面发生趋势性变化；同时，公司在国内外的市场份额仍在提升，前三季度动力与储能销量增速跑赢行业，龙头地位依然稳固。\n站在当前时点，多家机构指出，市场已对上述扰动因素进行了较为充分甚至“过度”的定价，公司的业绩增长持续性与龙头竞争壁垒或被市场低估，中长期发展及配置价值更加凸显。\n一位长期跟踪宁德时代的大型公募基金基金经理向记者表示，当前宁德时代利空出尽，市场已基本消化了利空信息，“可以说是基本面见底”。此外，公司对于三季报情况已提出针对性的应对措施，对未来2至3个季度业绩可以偏乐观。同时，公司股息率可观，是适合中长期持有的优质投资标的。\n记者｜刘夏菲\n（声明：文章内容仅供参考，不构成投资建议。投资者据此操作，风险自担。）",
+      "full_text_sha256": "077154dd18e457fe29be01f3ee1901a431f147e8a5dbebc0f8e75189d7dcf455",
+      "retained_ranges": [
+        [
+          0,
+          704
+        ]
+      ],
+      "excluded_ranges": [],
+      "boundary_notes": [],
+      "publication_note": "原始来源时点：2026-11-03T11:05:16+08:00；精度：second；公开可见正文，不宣称完整稿或独立核验；正文算法：trafilatura 2.3.1；未确认完整稿；",
+      "reported_session_labels": [],
+      "source_role": {
+        "owner": "finance-material-role-v1",
+        "flags": [],
+        "latest_close_allowed": true,
+        "commodity_settlement_allowed": true,
+        "original_policy_release_allowed": true,
+        "reported_session_labels": [],
+        "session_verified": false,
+        "source_identity_verified": false,
+        "limitation": "仅限制明显不匹配用途；未被限制不表示收盘、政策发布或作者身份已核实。"
+      },
+      "observed_at": "2026-11-05T08:35:25.647726",
+      "available_at_cutoff_verified": false,
+      "origin": "previously_stored_body"
+    },
+    {
+      "id": "sample-4a6547aff764077f2bb4f0a6",
+      "url": "http://news.cnfol.com/zhengquanyaowen/20261104/32415483.shtml",
+      "title": "创业板指大涨逾6% 科创50指数飙升近10% 成交额突破2万亿",
+      "original_id": null,
+      "text": "创业板指大涨逾6% 科创50指数飙升近10% 成交额突破2万亿\n2026-11-04 15:04:30\n来源:东方财富Choice数据\n            　　A股主要指数今日展开大反攻，截止收盘，沪指涨2.16%，深证成指涨4.22%，创业板指涨6.40%，科创50指数涨9.92%。沪深京三市成交额超过2万亿，较昨日大幅放量逾3000亿。\n行业板块呈现普涨态势，半导体、贵金属、电子化学品、元件、通信设备、光伏设备、电源设备、机器人板块涨幅居前，白酒、食品饮料板块逆市走低。\n个股方面，上涨股票数量超过4600只，逾120只股涨停。\n今日要闻\n美国媒体预计民主党夺回参议院重掌国会\n美国媒体预测，民主党夺回美国国会参议院控制权。稍早前，美媒预测民主党夺回国会众议院控制权。这意味着本次中期选举后，民主党重新掌控国会。美国媒体预计民主党将夺回众议院多数席位\n中国人民银行加力实施股票回购增持再贷款政策\n为维护资本市场平稳运行，中国人民银行加力实施股票回购增持再贷款政策。自2026年11月4日起，下调股票回购增持再贷款利率0.25个百分点至1%。股票回购增持再贷款的支持对象为21家全国性银行和5家系统重要性城商行，支持比例为100%，期限1年，可根据银行需要展期。银行可在再贷款利率基础上适当加点，合理确定股票回购增持贷款期限和利率，加快贷款投放，增强上市公司、主要股东市值管理能力。\n国家发改委：预计到“十五五”末 我国社会消费品零售总额达到60万亿元左右\n11月4日，国家发展改革委召开奋进“十五五”系列新闻发布会，介绍夯实发展支撑有关情况。国家发展改革委经济贸易司副司长寇荣表示，预计到“十五五”末，我国流通业整体规模将持续扩大，社会消费品零售总额达到60万亿元左右，流通网络将更加健全。\n最高50亿元！长鑫科技大幅上调回购金额\n11月4日早上，长鑫科技发布《关于收到公司董事长提议增加回购股份金额的提示性公告》，公司董事长朱一明提议将回购股份金额由“不低于人民币10亿元(含)，不超过人民币20亿元(含)”增加至“不低于人民币25亿元(含)，不超过人民币50亿元(含)”。\n科技巨头AI需求放缓？算力产业链企业回应：没有下调迹象 有订单价格上调\n有传闻称大厂AI需求下调，市场对科技AI支出规模和增长速度担忧加剧。对此，多家算力产业链回应称，目前没有下调迹象，相关业务在手订单充足。\n机构观点\n西部证券：稳市政策组合拳持续加码，A股长期向好逻辑进一步明确\n西部证券研究所负责人孙寅表示，近期金融管理部门召开座谈会，提出一揽子稳市场稳预期相关政策，主要包括两项结构性货币政策工具的加力使用、“护盘式回购”的调整优化、18只主动ETF的加快建仓，以及对于融资风险指标的统筹研究。系列稳市政策出台表达了监管全力维护资本市场平稳运行的决心，资本市场的稳定性将逐步加强。监管打出稳市场稳预期政策组合拳，结构性货币政策工具加大使用力度，上市公司回购政策持续优化，未来融资业务风险控制指标加大研究、完善；随着资本市场基础制度和各项工具的不断完善，资本市场高质量发展的根基不断夯实，A股长期向好的运行逻辑进一步明确。\n野村证券：大型科技股卖压过度，自由现金流转负不等于获利能力恶化\n11月4日，野村证券报告指，近期科技股遭遇卖压，主要来自两项市场疑虑：一是AI业务可能侵蚀科技巨头既有的传统业务，二是大规模资本支出使自由现金流转为负值。该行认为，这两项担忧未必构成利空。大型科技公司无法削减AI投资，反而代表算力需求仍然强劲，对半导体产业而言并非坏事；至于自由现金流转负，则是资本支出与投资收益认列时间不同所造成的结果，不能直接视为企业获利能力恶化。\n华西证券：资金面与政策面共振，A股配置价值凸显\n华西证券策略首席分析师李立峰认为，市场已呈现明显的过度调整，正处于蓄势筑底阶段，触底反弹可期。他认为，宽基ETF持续逆势净流入，公募基金集中自购，增量资金持续进入；从政策面看，监管层近期密集释放“维稳资本市场”的信号。长期方向同样值得关注。李立峰表示，国产替代正进入加速落地期，持续释放多层次产业红利，本土创新企业打开成长空间，带动设备、材料、零部件等配套赛道扩容，催生一批优质龙头。\n东北证券：A股有望稳步兑现内涵式增长，科创板和创业板料实现估值修复\n东北证券宏观首席分析师廖博表示，近期市场波动主要表现为流动性再平衡，新旧动能比较视野下流动性或成为大类资产定价主线，中观产业趋势和宏观基本面暂未显现明显变化，预计股市表现有望向内涵价值收敛，前期调整较多的科创板和创业板有望实现估值修复，市场风险偏好也有望在美国中期选举靴子落地后得到一定提振，特别是计算机、电子、通信和机械等硬科技领域，比较明朗的是产业维度长期向好的发展势头没有显著变化。综合来看，全球市场将在流动性波动的环境中震荡运行，基本面和企业盈利的韧性共同决定了后续市场表现的斜率与可持续性。        \n",
+      "full_text_sha256": "229a66a5f0ba5b3cee152877d8a9afe42a2d28df683218644e090741c17cefdd",
+      "retained_ranges": [
+        [
+          0,
+          2036
+        ]
+      ],
+      "excluded_ranges": [
+        [
+          2036,
+          2045
+        ]
+      ],
+      "boundary_notes": [
+        "explicit_end_matter"
+      ],
+      "publication_note": "原始来源时点：2026-11-04 15:04:30（来源未标时区，仅按日期，不用于盘前盘后或消息先后判断）；精度：day；公开可见正文，不宣称完整稿或独立核验；正文算法：trafilatura 2.3.1；未确认完整稿；",
+      "reported_session_labels": [],
+      "source_role": {
+        "owner": "finance-material-role-v1",
+        "flags": [],
+        "latest_close_allowed": true,
+        "commodity_settlement_allowed": true,
+        "original_policy_release_allowed": true,
+        "reported_session_labels": [],
+        "session_verified": false,
+        "source_identity_verified": false,
+        "limitation": "仅限制明显不匹配用途；未被限制不表示收盘、政策发布或作者身份已核实。"
+      },
+      "observed_at": "2026-11-05T08:36:36.078260",
+      "available_at_cutoff_verified": false,
+      "origin": "offline_reparsed_body_not_previously_delivered"
+    },
+    {
+      "id": "sample-4b4207e4bac584dc010f4b98",
+      "url": "http://sc.stock.cnfol.com/shichangceping/20261104/32415531.shtml",
+      "title": "回购潮+封测年会+三季报多重共振 半导体设备高景气度有望延续",
+      "original_id": null,
+      "text": "A股主要指数今日展开大反攻，截止收盘，沪指涨2.16%，收报3686.17点；深证成指涨4.22%，收报11335.69点；创业板指涨6.40%，收报2544.73点；科创50指数涨9.92%，收报1265.47点。沪深京三市成交额达到2.05万亿，较昨日大幅放量3366亿。行业板块呈现普涨态势，半导体、贵金属、电子化学品、元件、通信设备、光伏设备、电源设备、机器人板块涨幅居前，白酒、食品饮料板块逆市走低。个股方面，上涨股票数量接近4700只，逾120只股涨停。\n　　11月4日早间，存储器制造龙头长鑫科技大幅提高回购计划上限至50亿元，上限金额较前次方案增加30亿元。这是科创板目前单笔金额最大的回购交易。据不完全统计，按方案上限口径，截至11月4日，年内已有42家科创板半导体公司披露回购方案，合计130亿元。其中，24家为10月以来新增方案，上限合计为106.5亿元，突破百亿元大关。增持方面，今年以来，科创板半导体公司股东及高管增持金额上限合计12.5亿元。\n　　而业绩方面，据市场数据统计，14家半导体设备公司前三季度营收合计759.38亿元、同比增长19.3%，归母净利润176.60亿元、同比增长59.5%。订单端同样饱满，盛美上海在手订单170.73亿元、同比增长88.2%，头部设备企业交付周期已排至2027年上半年。\n　　此外第二十四届中国半导体封装测试技术与市场年会于11月4日至6日在南京举行。本届大会以“AI启新程，封测铸‘芯’基”为主题，聚焦先进封装、AI芯片封装测试、玻璃基板及关键设备材料等领域，汇聚华天科技、长电科技、通富微电、台积电(南京)等产业链企业，围绕先进封装技术创新、关键设备国产化及产业链协同展开交流，为半导体装备产业升级提供新的交流合作平台。\n　　SEMI预测2026年全球半导体设备销售额达1659亿美元，同比增23.2%，设备需求增长为板块提供产业景气支撑。此外，2026年1-7月国内集成电路产量累计3341.6亿块，同比增长23.1%，出口2160亿美元，同比增长99.5%，国内产业链供需与全球贸易活跃度同步提升。\n　　东海证券认为，AI驱动的算力投资仍是四大厂商资本开支主线，存储业务全面放量且资本开支持续扩张，我国半导体在AI需求驱动下业绩表现良好。中信证券研报表示，展望2027年，AI资本开支将持续拉动全球科技硬件与能源基础设施建设，叠加关键材料自主可控需求与高端制造升级，有望推动新材料加速导入与规模化放量。　　\n　　东海证券：半导体国产化依然加速发展\n　　AI驱动的算力投资仍是四大厂商资本开支主线，存储业务全面放量且资本开支持续扩张，我国半导体在AI需求驱动下业绩表现良好；AI基建高景气或持续，半导体国产化依然加速发展。\n　　中信证券：重点关注半导体上游关键材料及设备环节\n　　展望2027年，AI资本开支将持续拉动全球科技硬件与能源基础设施建设，叠加关键材料自主可控需求与高端制造升级，有望推动新材料加速导入与规模化放量，建议把握下游扩产、材料升级、新技术迭代及国产替代带来的投资机会，重点关注半导体上游关键材料及设备环节。\n　　东吴证券：全球半导体靶材远期市场规模有望超70亿美元\n　　溅射靶材是薄膜沉积核心耗材，市场规模持续扩容。需求由晶圆产能扩张与单片用量提升双轮驱动，逻辑芯片向7-3nm迭代、3D-NAND与HBM工艺升级及Chiplet、CoWoS先进封装，共同推升单片晶圆靶材用量与单位价值。SEMI预测2026-2027年中国300mm晶圆厂设备支出维持双位数增长，资本开支向靶材采购传导，全球半导体靶材远期市场规模有望超70亿美元，较当前有翻倍空间。\n　　中原证券：AI基础设施投资持续加速\n　　AI基础设施投资持续加速，推动全球半导体市场强劲增长，WSTS预计2026年全球半导体市场规模达1.655万亿美元，同比增长108%，存储器和逻辑芯片是主要增长动力；SEMI预计2026年全球半导体设备销售额将达1659亿美元，同比增长23.2%，并有望于2028年进一步提升至2295亿美元；同时，全球存储龙头加速扩产，三星、SK海力士规划2030年DRAM产能接近翻倍，国内长鑫科技DRAM全球市占率由2025年一季度的3%提升至2026年一季度的8%，国产创新空间巨大，国产半导体设备厂商有望充分受益。\n　　天风证券：先进制程相关设备及关键零部件需求有望同步增长\n　　AI基础设施投资持续向晶圆制造环节传导，半导体设备需求景气度或延续至2027-2028年，先进制程相关设备及关键零部件需求有望同步增长。\n　　财通证券：行业景气度回升趋势明确\n　　全球半导体库存周期已触底反转，2026年第一季度全球半导体大厂库存周转天数降至121天，创近三年最低水平，补库周期一触即发，封测龙头企业平均产能利用率已超过80%，行业景气度回升趋势明确。\n　　(本文不构成任何投资建议，投资者据此操作，一切后果自负。市场有风险，投资需谨慎。)",
+      "full_text_sha256": "1b0b16f71af8aaf51bb2fd31234df732149090de61f2a84815ef001fb949f316",
+      "retained_ranges": [
+        [
+          0,
+          2062
+        ]
+      ],
+      "excluded_ranges": [],
+      "boundary_notes": [],
+      "publication_note": "原始来源时点：2026-11-04 15:36:26（来源未标时区，仅按日期，不用于盘前盘后或消息先后判断）；精度：day；公开可见正文，不宣称完整稿或独立核验；正文算法：trafilatura 2.3.1；未确认完整稿；",
+      "reported_session_labels": [],
+      "source_role": {
+        "owner": "finance-material-role-v1",
+        "flags": [],
+        "latest_close_allowed": true,
+        "commodity_settlement_allowed": true,
+        "original_policy_release_allowed": true,
+        "reported_session_labels": [],
+        "session_verified": false,
+        "source_identity_verified": false,
+        "limitation": "仅限制明显不匹配用途；未被限制不表示收盘、政策发布或作者身份已核实。"
+      },
+      "observed_at": "2026-11-05T08:35:50.739960",
+      "available_at_cutoff_verified": false,
+      "origin": "offline_reparsed_body_not_previously_delivered"
+    },
+    {
+      "id": "sample-b1038ede38b67f695141200b",
+      "url": "https://zh.tradingeconomics.com/united-states/government-bond-yield/news/597644",
+      "title": "美国国债收益率小幅上升",
+      "original_id": "web-c5e90069450513bd152a4b0e",
+      "text": "2026-11-03 10:42\n                    Joana Taborda\n                \n1 分鐘。讀\n            美国十年期国债收益率周二小幅升至百分之四点九四，此前一个交易日下跌三个基点。随着美国选民开始投票选举中期选举，投资者也在等待包括职位空缺与劳动力流动调查报告在内的关键经济数据。预计民主党将赢得众议院控制权，而参议院选举结果则更难预测。此次选举普遍被视为对特朗普总统第二任期的一次公投。 与此同时，有报道称美国袭击了伊朗格什姆岛，油价随之反弹，在前一个交易日暴跌近百分之七后收复部分失地。 财政方面，美国财政部表示，预计第四季度将借款六千一百八十亿美元，比八月份的估计少一百亿美元。此次调整反映期初现金余额高于预期，但部分被预计净现金流减少所抵消。不过，若剔除期初现金储备增加带来的利好，借款需求将比此前估计高出二百四十亿美元。\n        \n",
+      "full_text_sha256": "2c8f81d39cc5ed3107d28a201f960c9d9a61bb163037d3828aebcd8aa24c562b",
+      "retained_ranges": [
+        [
+          0,
+          410
+        ]
+      ],
+      "excluded_ranges": [
+        [
+          410,
+          1676
+        ]
+      ],
+      "boundary_notes": [
+        "dense_trailing_indicator_directory"
+      ],
+      "publication_note": "原始来源时点：2026-11-03T10:42:19Z；精度：second；公开可见正文，不宣称完整稿或独立核验；正文算法：trafilatura 2.3.1；未确认完整稿；",
+      "reported_session_labels": [],
+      "source_role": {
+        "owner": "finance-material-role-v1",
+        "flags": [
+          "market_quote_not_original_policy_release"
+        ],
+        "latest_close_allowed": true,
+        "commodity_settlement_allowed": true,
+        "original_policy_release_allowed": false,
+        "reported_session_labels": [],
+        "session_verified": false,
+        "source_identity_verified": false,
+        "limitation": "仅限制明显不匹配用途；未被限制不表示收盘、政策发布或作者身份已核实。"
+      },
+      "observed_at": "2026-11-05T08:35:05.700088",
+      "available_at_cutoff_verified": false,
+      "origin": "previously_stored_body"
+    },
+    {
+      "id": "sample-d3ad6f7f4150a7355b9264d6",
+      "url": "https://m.sohu.com/a/1096859314_632979?scm=10001.325_13-325_13.0.0-0-0-0-0.5_1334",
+      "title": "国际金融要情 |（周三 2026.11.4）",
+      "original_id": "web-cb35cf69936e032cf666d812",
+      "text": "核心主线：\n全球最大石油公司沙特石油巨头沙特阿美11月3日公布Q3财报，第三季度净利润大增34.6%，因中东战争持续推高原油价格，同时沙特能源基础设施正频繁遭受袭击。\n自与胡赛武装发生冲突至今，沙特油轮、管道、储存设施和炼油厂多次被袭击，导致原油出口数量锐减，为了缓解这一局面，沙特阿美已经计划开通两条陆上输油管线以维持原油出口稳定。\n国际油价方面\n，随着中东地缘局势愈发复杂，原油波动有所加剧。\nWTI原油价格报于96美元/桶；布伦特原油跌幅减少，报价目前为104美元/桶；阿联酋穆尔班原油单日跌幅依然超3%，目前报价102美元/桶。\nA股方面\n，\n11月3日，A股在昨日反弹之后迎来分化调整，三大指数悉数收跌，科创与创业板成长赛道回调幅度明显加大，市场资金从高位科技主线流出，转向防御属性板块避险，整体赚钱效应明显降温。\n指数收盘方面，上证指数报3608.10点，下跌0.82%；深证成指收于10876.99点，下跌1.21%；创业板指承压显著，收跌2.73%，成长板块抛压集中释放。两市全天合计成交额17034亿元，相比前一交易日有所缩量，增量进场节奏放缓。\n美股方面\n，\n美股市场迎来了11月份的开门拉锯战。在经历了一整月关于5.0%美债收益率、地缘局势以及科技巨头庞大资本开支（CAPEX）变现效率的剧烈洗盘后，盘面多空博弈依然极其激烈。\n至收盘，道琼斯工业平均指数报\n51786.72\n点，下跌0.38%；标普500指数收报7568.92\n点，上涨0.36%；纳斯达克指数收于\n25372.01\n点\n，涨幅为0.83%。\n一、全球股市行情\n美股（11 月 3 日收盘）\n道琼斯工业平均指数：51786.72 ，-0.38%\n标普 500 指数：7568.92，+0.36%\n纳斯达克综合指数：25372.01，+0.83%\n欧股（11 月 3 日收盘）\n德国 DAX30 指数：25864.62，-0.45%\n法国 CAC40 指数：8020.31，-0.34%\n英国富时 100 指数：\n10638.43，-1.14%\n欧洲斯托克 50 指数：\n6144.56，-0.51%\n亚太股市（11 月 3 日收盘）\n沪指：\n3608.10，-0.82%\n深成指：\n10876.99，-1.21%\n创业板指：\n2391.65，-2.73%\n港股板块\n恒生指数：23525.97，+0.57%\n国企指数：7943.10，+0.47%\n恒生科技指数：3867.73，+0.74%\n日韩板块\n日经225指数：\n63081.86，-0.33%\n韩国KOSPI指数：\n5648.79，-3.59%\n二、大宗商品行情\n贵金属\n现货黄金：3930.21\n美元 / 盎司，-0.42%\nCOMEX 黄金期货：3940.20\n美元 / 盎司，-0.74%\n上金所：黄金 9999 846.99\n元 / 克，+0.83%\n黄金 T+D：\n844.13元 / 克，+0.08\n%\n上期所：沪金主连\n845.20 元 / 克，-0.11%\n能源类\nWTI 原油：\n96.09美元 / 桶，-0.38\n%\n布伦特原油：\n104.40\n美元 / 桶，-0.34\n%\n阿联酋穆尔班原油：\n102.20 美元 / 桶，-2.98%\n上海油（INE）：\n原油主连678.80\n元 / 桶，-2.32\n%\n工业金属\n伦铜：14034.50\n美元 / 吨，-2.03%\n伦铝：3040.50\n美元 / 吨，-1.82%\n上海铜：沪铜主连\n106540\n元 / 吨，-0.64%\n长江现货 1# 铜： 110040 元 / 吨\n三、货币指数\n汇率类\nCFETS 人民币汇率指数\n（\n10月30日更新\n）\n：103.77，+0.36%\n人民币对美元汇率：11月3日中间价6.7146，下调4基点\n；在岸人民币6.6720，上调238基点\n；离岸人民币6.6745，上调218基点\nBIS货币篮子人民币汇率指数（10月30日更新）：111.57，+0.55%\n美元指数（11月4日）：101.8600，+0.10%\n货币市场利率\n（11 月 3 日收盘）\n货币\n（Shibor+DR007+R007）\n隔夜：1.2891%，+0.31BP\n7 天：1.3420%，-2.10BP\n14 天：1.3680%，-0.40BP\n1 年期：1.4390%，-0.08BP\nR007：\n加权平均利率1.3973%\nDR007：加权平均利率1.3472%\nDR001：1.2865%\n1年期中期借贷便利&人民币贷款市场报价利率\n1年期中期借贷便利（MLF）（10月26日更新）\n操作规模：7000 亿元（1 年期）\n利率：2.00%\n人民币贷款市场报价利率（LPR）（10月20日更新）\n1年期LPR：3.00%\n5年期以上LPR：3.50%\n国股银票转贴现收盘利率\n1M（1个月）：\n0.48%\n，+0BP\n3M（3个月）：\n0.50%\n，+0BP\n6M（6个月）：\n0.50%\n，+0BP\n四、债市收益率\n中国国债收益率\n（11月3日收盘）\n中国1年期国债：1.170%，-1.68%\n中国5年期国债：1.328%，-1.56%\n中国10年期国债：1.611%，-1.47%\n中国15年期国债：1.750%，-0.62%\n中国20年期国债：2.064%，-2.82%\n中国30年期国债：2.053%，-3.16%\n美国国债收益率（11月3日收盘）\n美国1个月期国债：3.940\n%，-0.66%\n美国6个月期国债：\n4.295%，+0.23%\n美国1年期国债：\n4.407%，+0.66%\n美国5年期国债：\n4.764%，+1.51%\n美国10年期国债：\n4.966%，+0.34%\n美国20年期国债：5.367%，+1.36%\n美国30年期国债：\n5.334%，+1.23%\n五、核心财经新闻\n环球风云\n知情人士称美伊预计36小时内回应卡塔尔斡旋方新提案\n沙特阿美拟扩建东西输油管道缓解出油出口困境\n美俄乌下周谈判，特朗普将再派心腹\n特朗普：将停止向以色列提供每年总额约40亿美元的军援\n中国经济\n京港两地签署备忘录深化商务领域合作\n三部委密集出手稳市场，互换便利单次1000亿元创操作新高\n以资本循环重塑港口发展价值，全国首单港口物流公募REITs获批\n加速释放发展潜能， “十五五”末新兴支柱产业产值有望突破十万亿元\n全球市场\n美国9月JOLTs职位空缺752.3万人，高于预期值\n美国总统特朗普：很快就会和加拿大达成一项伟大的协议\n国际电信联盟：2026年全球网民约63亿\n韩国10月CPI同比涨2.8%，石油类价格同比涨14.9%\n产业动态\n美国CVR能源公司42亿美元收购马拉松石油两家炼油厂及营销业务\n高盛大幅上调全球数据中心容量预测：2030年或达273GW\n迪士尼计划裁员数千人！后续可能将重点投入到影视内容等业务中\n法拉利第三季度营收增长7%至18.96亿欧元，上调2026年业绩指引\n六、今日重点关注\n中国：第九届进博会开幕在即，参展商期待“进博效应”\n美国：美国财政部拍卖六周期国债，得标利率3.940%\n国际：\n德国化工行业10月商业景气指数明显下降\n风险：厄尔尼诺将对我国今冬明春气候产生明显影响\n来源\n公开信息及市场数据\n编辑 王尊君\n",
+      "full_text_sha256": "74271a1b22273690c721dcbd40cb937f2739433cd534d0755558a3749726c311",
+      "retained_ranges": [
+        [
+          0,
+          3010
+        ]
+      ],
+      "excluded_ranges": [
+        [
+          3010,
+          3163
+        ]
+      ],
+      "boundary_notes": [
+        "explicit_end_matter"
+      ],
+      "publication_note": "原始来源时点：2026-11-04 07:04:27（来源未标时区，仅按日期，不用于盘前盘后或消息先后判断）；精度：day；公开可见正文，不宣称完整稿或独立核验",
+      "reported_session_labels": [
+        "11月3日收盘"
+      ],
+      "source_role": {
+        "owner": "finance-material-role-v1",
+        "flags": [],
+        "latest_close_allowed": true,
+        "commodity_settlement_allowed": true,
+        "original_policy_release_allowed": true,
+        "reported_session_labels": [
+          "11月3日收盘"
+        ],
+        "session_verified": false,
+        "source_identity_verified": false,
+        "limitation": "仅限制明显不匹配用途；未被限制不表示收盘、政策发布或作者身份已核实。"
+      },
+      "observed_at": "2026-11-05T08:35:50.400238",
+      "available_at_cutoff_verified": false,
+      "origin": "previously_stored_body"
+    },
+    {
+      "id": "sample-ed75d6fac6471d75bf9e4ad2",
+      "url": "https://finance.eastmoney.com/a/202611043922084894.html",
+      "title": "华海诚科843万股限售股11月12日上市流通",
+      "original_id": "web-e6b0dbe5ba744f00cc806ef4",
+      "text": "11月4日，\n华海诚科\n（688535）发布公告，宣布本次股票上市流通的限售股总数为843万股，主要为公司通过发行股份、可转换公司债券及支付现金购买资产而募集配套资金的部分限售股。占公司总股本的5.89%。此次限售股的上市流通日期定为2026年11月12日。\n2026年前三季度，\n华海诚科\n实现收入7.63亿元，归母净利润7830万元。\n（文章来源：财中社）",
+      "full_text_sha256": "0c244c95ea8d59fa457a366a70276d7148e022a4ba347038ca0727328a6a377d",
+      "retained_ranges": [
+        [
+          0,
+          180
+        ]
+      ],
+      "excluded_ranges": [],
+      "boundary_notes": [],
+      "publication_note": "原始来源时点：2026-11-04T18:50+08:00；精度：minute；公开可见正文，不宣称完整稿或独立核验",
+      "reported_session_labels": [],
+      "source_role": {
+        "owner": "finance-material-role-v1",
+        "flags": [],
+        "latest_close_allowed": true,
+        "commodity_settlement_allowed": true,
+        "original_policy_release_allowed": true,
+        "reported_session_labels": [],
+        "session_verified": false,
+        "source_identity_verified": false,
+        "limitation": "仅限制明显不匹配用途；未被限制不表示收盘、政策发布或作者身份已核实。"
+      },
+      "observed_at": "2026-11-05T08:36:36.564865",
+      "available_at_cutoff_verified": false,
+      "origin": "previously_stored_body"
+    }
+  ],
+  "watchlist": [
+    {
+      "code": "002714",
+      "name": "牧原股份",
+      "market": "A"
+    },
+    {
+      "code": "300750",
+      "name": "宁德时代",
+      "market": "A"
+    },
+    {
+      "code": "600900",
+      "name": "长江电力",
+      "market": "A"
+    },
+    {
+      "code": "688535",
+      "name": "华海诚科",
+      "market": "A"
+    }
+  ],
+  "cutoff": "2026-11-05T08:32:25.702638",
+  "report_type": "morning",
+  "limitation": "历史附件仅用于离线体积/去重核算，非本期已验收材料或模型判断。"
+}

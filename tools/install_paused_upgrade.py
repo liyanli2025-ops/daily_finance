@@ -176,6 +176,8 @@ def main():
         proof = json.loads((bundle / 'offline-acceptance.json').read_text())
         expected = ('upgrade-manifest.json', 'manifest.json', 'payload.zip',
                     'backend/tests/test_unified_edition.py', 'backend/tests/fixtures/unified_major_omission.json')
+        if manifest.get('edition_cost_sample_required'):
+            expected += ('backend/tests/fixtures/edition_cost_sample.json',)
         if (proof.get('owner') != 'finance-unified-offline-acceptance-v1' or proof.get('passed') is not True
                 or set(proof.get('file_sha256', {})) != set(expected)
                 or any(hashlib.sha256((bundle / name).read_bytes()).hexdigest() != proof['file_sha256'][name]
