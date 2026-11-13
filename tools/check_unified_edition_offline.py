@@ -24,7 +24,7 @@ def main():
     manifest = json.loads((package / 'upgrade-manifest.json').read_text())
     for name, expected in manifest.get('prerequisites', {}).items():
         target = args.project / name
-        if target.is_symlink() or not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest() != expected:
+        if target.is_symlink() or not target.is_file() or hashlib.sha256(target.read_bytes().replace(b'\r\n', b'\n')).hexdigest() != expected:
             raise SystemExit('服务器依赖源码与已知基线不符：' + name)
     with zipfile.ZipFile(package / 'payload.zip') as payload:
         if set(payload.namelist()) != {r['path'] for r in manifest['runtime_files']}:
@@ -38,7 +38,7 @@ def main():
         if source.is_symlink() or hashlib.sha256(source.read_bytes()).hexdigest() != row['sha256']:
             raise SystemExit('交付文件指纹不符：' + row['path'])
         if target.is_symlink(): raise SystemExit('服务器文件含软链：' + row['path'])
-        current = hashlib.sha256(target.read_bytes()).hexdigest() if target.is_file() else None
+        current = hashlib.sha256(target.read_bytes().replace(b'\r\n', b'\n')).hexdigest() if target.is_file() else None
         if current not in (row['base_sha256'], row['sha256']):
             raise SystemExit('服务器存在其他修改，停止覆盖及运行：' + row['path'])
     with tempfile.TemporaryDirectory(prefix='finance-unified-offline-', dir=package.parent) as temporary:
