@@ -5,6 +5,16 @@ from .edition_context import source_packet
 from .edition_budget import OUTPUTS
 
 
+RESEARCH_BRIEF = """为A/H股日内至数日投资者建立当期资料底稿，研究范围不受自选股或节目长度限制。
+全市场检查A股、港股、美股及重要外盘、宏观政策、行业经营、重大公司风险、自选股和价格结构；重大政治经济、突发及跨市场事件单独保留。热度、篇数和搜索排序不代表重要性，重大外盘即使与A/H关联待核仍可独立成项。
+围绕新增变化、旧背景、受影响对象、经营/估值/利率/汇率/风险偏好传导、竞争解释、价格反证及后续验证判断价值。区分事实、机制与有期限的假设，不编资金意图、预期差或“未定价”；收入同比增长不代替盈利质量、现金流与基数分析。
+标题和摘要仅作线索，未读不能当事实；正文存在不代表真实、完整或独立核验。按主体、事件、期间、指标和原始来源判断证据用途，同公司或同题不代表同一事实，同源转载不当独立佐证。
+对齐来源时区、交易日期、盘前盘中收盘盘后与截止时点，核最近已完成交易时段；政策区分拟议/通过/生效/执行，旧财报不当新催化，预测、评论、晨报不当原披露或收盘。
+保留更新、公司回应、独立调查、有力反方和正文深处的关键细节。具体未确认说法可作为待核线索，标明说话人、原始出处、时间、上下文、依据和回应；匿名身份不升级为已核身份，热度或多次复述不等于证实，广告和无增量刷屏不当证据。
+已有同页复用；补查说明原始依据、缺口及新增价值。工具失败、未搜、未读和缺重要证据如实区分，不解释成没有新闻；自选股不是持仓，缺关联不硬编。研究保留重要事实、不同解释和遗漏；节目取舍不抹掉底稿。
+本阶段只按末尾JSON协议完成任务；程序执行搜索和阅读，不输出旧工具名称、循环指令或完整报告。"""
+
+
 def messages_for(stage, prompt, value, now, report_type):
     import json
     from .editorial_policy import REPORT_POLICY, REVIEW_POLICY, SPOKEN_POLICY, edition_brief, SPOKEN_EDITION_BRIEFS
@@ -14,11 +24,7 @@ def messages_for(stage, prompt, value, now, report_type):
     elif stage == 'review':
         brief = REVIEW_POLICY
     else:
-        from .research_desk import INSTRUCTIONS
-        marker = '每轮回复用一个JSON对象'
-        if marker not in INSTRUCTIONS:
-            raise RuntimeError('edition_shared_research_brief_changed')
-        brief = INSTRUCTIONS.split(marker, 1)[0]
+        brief = RESEARCH_BRIEF
     if 'candidate_columns' in value:
         brief += '\n输入候选表按candidate_columns列顺序读取；attributes中单独的{"$ref":n}引用candidate_shared[n]，可嵌套。标题/链接/摘要/时点按原列解释，不能遗漏候选。'
     return [dict(role='system', content=contract.SYSTEM + '\n' + brief + '\n' + prompt),
