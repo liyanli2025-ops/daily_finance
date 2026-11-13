@@ -54,3 +54,44 @@ def editorial_forecast(state, now):
             source_ids=sorted(value['sources']),
             basis='已保存资料及完整系统提示词；待生成稿按写稿输出额度每token四字节另作预留。'))
     return result
+
+
+def edition_forecast(state, now):
+    """All four normal stages; future response context has explicit token units.
+
+    New search result/body sizes are unknown, so the plan is recomputed as they
+    arrive. It never certifies sufficient money for an unknown future episode.
+    """
+    from .edition_context import packet
+    result = editorial_forecast(state, now)
+    assessment = state.get('assessment') or {}
+    patch_pending = any(assessment.get(k) for k in
+        ('additional_searches', 'additional_reads', 'missed_major_events')) and not any(
+            r.get('stage') == 'patch_assessment' for r in state.get('reservations', []))
+    for row in result:
+        future = {}
+        if state.get('agenda') is None:
+            future['agenda'] = OUTPUTS['agenda']
+        if state.get('assessment') is None:
+            future['assessment'] = OUTPUTS['assessment']
+        if patch_pending:
+            future['patch_assessment'] = OUTPUTS['patch_assessment']
+        if row['stage'] == 'review' and state.get('draft') is None:
+            future['writing'] = OUTPUTS['writing']
+        row.update(future_draft_allowance_bytes=0,
+            future_input_tokens=(sum(future.values()) * 5 + 3) // 4,
+            future_context_output_allowances=future,
+            basis='已知系统/正文按UTF8字节保守规划；未来JSON结果按输出token额度加25%输入余量，非精确token计数。')
+    stages = [('agenda', contract.AGENDA), ('assessment', contract.ASSESS)]
+    if patch_pending:
+        stages.append(('patch_assessment', contract.ASSESS))
+    for stage, prompt in stages:
+        messages = messages_for(stage, prompt, packet(state, stage), now, state['report_type'])
+        future = {'agenda': OUTPUTS['agenda']} if stage == 'assessment' and state.get('agenda') is None else {}
+        result.append(dict(stage=stage,
+            known_input_bytes=sum(len(m['content'].encode()) for m in messages),
+            future_draft_allowance_bytes=0, future_input_tokens=(sum(future.values()) * 5 + 3) // 4,
+            future_context_output_allowances=future, output_tokens=OUTPUTS[stage],
+            source_ids=[] if stage == 'agenda' else sorted(state.get('sources', {})),
+            basis='当前实际请求提示词与资料；未来目录/正文未计入，取得后再次核算。'))
+    return result

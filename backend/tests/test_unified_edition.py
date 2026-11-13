@@ -542,5 +542,67 @@ class PipelineRegression(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError): run_path(identifier)
 
 
+class AllStageBudgetRegression(unittest.IsolatedAsyncioTestCase):
+    async def test_initial_batch_stops_before_first_search(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pipeline, _, _ = await PipelineRegression().scenario(Path(temporary))
+            from app.services.edition_budget import search_batch_plan
+            from app.services.edition_inputs import edition_forecast
+            p = pipeline.state['policy']
+            p.update(edition_forecast='remaining_stages_v1',
+                request_input_pricing=dict(analysis='uncached_request_v1', review='uncached_request_v1'))
+            self_rows = lambda: edition_forecast(pipeline.state, pipeline.workspace.now)
+            pipeline.budget.forecast = self_rows
+            one = search_batch_plan(p, self_rows(), 1)
+            p['estimated_limit_usd'] = one['required_estimated_usd']
+            search = unittest.mock.Mock(side_effect=AssertionError('must not connect'))
+            pipeline.search = search
+            with self.assertRaisesRegex(ValueError, 'estimated_budget_exhausted'):
+                await pipeline.searches([dict(lane='global_policy', query='policy news '+str(i)) for i in range(12)])
+            search.assert_not_called()
+            self.assertEqual(pipeline.state['reservations'], [])
+
+    async def test_normal_four_call_path_with_new_ledger(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pipeline, stages, _ = await PipelineRegression().scenario(Path(temporary))
+            pipeline.state['policy'].update(edition_forecast='remaining_stages_v1',
+                request_input_pricing=dict(analysis='uncached_request_v1', review='uncached_request_v1'))
+            self.assertIsNotNone(await pipeline.execute())
+            self.assertEqual(len(stages), 4)
+            self.assertTrue(pipeline.state['search_batch_checks'])
+
+    async def test_same_query_in_batch_is_not_bought_twice(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pipeline, _, _ = await PipelineRegression().scenario(Path(temporary))
+            pipeline.state['policy']['edition_forecast'] = 'remaining_stages_v1'
+            await pipeline.searches([dict(lane='global_policy', query='same policy')] * 2)
+            self.assertEqual(len(pipeline.state['search_receipts']), 1)
+            self.assertEqual(pipeline.state['search_batch_checks'][0]['search_batch_count'], 1)
+
+    async def test_future_context_replaced_by_actual_results_without_losing_sources(self):
+        from app.services.edition_inputs import edition_forecast
+        source, draft, assessment, _ = fixtures()
+        run = state(); run['sources'] = {'body-1': source, 'contrary': dict(source, text='相反观点')}
+        first = edition_forecast(run, china_now())
+        self.assertGreater(next(r for r in first if r['stage']=='review')['future_input_tokens'], 0)
+        run.update(agenda=dict(events=[EVENT]), assessment=assessment, draft=draft)
+        before = copy.deepcopy(run)
+        rows = edition_forecast(run, china_now())
+        for row in rows:
+            if row['stage'] in {'writing', 'review'}:
+                self.assertEqual(row['future_input_tokens'], 0)
+                self.assertEqual(set(row['source_ids']), {'body-1', 'contrary'})
+        self.assertEqual(run, before)
+
+    async def test_patch_forecast_only_when_research_requested(self):
+        from app.services.edition_inputs import edition_forecast
+        run = state(); run.update(agenda=dict(events=[EVENT]), assessment=fixtures()[2])
+        self.assertNotIn('patch_assessment', [r['stage'] for r in edition_forecast(run, china_now())])
+        run['assessment']['additional_searches'] = [dict(query='new policy')]
+        self.assertIn('patch_assessment', [r['stage'] for r in edition_forecast(run, china_now())])
+        run['reservations'].append(dict(kind='model', stage='patch_assessment'))
+        self.assertNotIn('patch_assessment', [r['stage'] for r in edition_forecast(run, china_now())])
+
+
 if __name__ == '__main__':
     unittest.main()

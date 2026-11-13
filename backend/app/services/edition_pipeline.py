@@ -14,10 +14,10 @@ from ..config import settings
 from . import edition_contract as contract
 from .edition_context import packet, editorial_source_ids
 from .edition_read_selection import primary_plan, patch_plan, fallback_plan, validate_increment
-from .edition_budget import Budget, OUTPUTS, digest, policy, protection, accounted
-from .edition_inputs import messages_for, editorial_forecast
+from .edition_budget import Budget, OUTPUTS, digest, policy, protection, accounted, request_input_pricing, search_batch_plan
+from .edition_inputs import messages_for, editorial_forecast, edition_forecast
 from .episode_workspace import EpisodeWorkspace, body
-from .model_gateway import MODEL_PAUSE_FILE, complete, ensure_models_enabled, resolve_route
+from .model_gateway import MODEL_PAUSE_FILE, complete, ensure_models_enabled, resolve_route, request_for
 from .research_hub import save_json
 from .search_primary_collection import search_agenda
 from .time_context import china_now
@@ -70,7 +70,9 @@ def run_path(identifier, root=ROOT):
 
 def environment(stocks, report_type, config=settings):
     routes = {task: resolve_route(task, config=config) for task in ('analysis', 'review')}
-    p = policy(config, routes)
+    pricing = {task: request_input_pricing(request_for(route,
+        [dict(role='user', content='pricing-shape')], 1)[2]) for task, route in routes.items()}
+    p = policy(config, routes, request_pricing=pricing)
     key = config.research_web_search_api_key
     private = dict(policy=p, stocks=stocks, report_type=report_type,
         source_signature=source_signature(),
@@ -102,14 +104,12 @@ async def preflight(report_type='morning', config=settings):
     plan = None
     try:
         p, fingerprint, routes = environment(stocks, report_type, config)
-        from .edition_budget import number
-        minimum, details = protection(p, editorial_forecast(dict(cutoff=now.isoformat(),
-            watchlist=stocks, report_type=report_type, sources={}), now))
-        plan = dict(editorial=details, remaining_editorial_usd=str(minimum),
-            limitation='无新正文的初始规划；不保证后续预算可容纳实际取材和成稿。')
-        if number(p['estimated_limit_usd']) <= minimum:
-            blockers.append('estimated_limit_below_protected_editorial_reserve')
-        if len(search_agenda(stocks, now)) + 2 > p['max_search_requests']:
+        plan = search_batch_plan(p, edition_forecast(dict(cutoff=now.isoformat(),
+            watchlist=stocks, report_type=report_type, sources={}), now),
+            len(initial_searches(stocks, now)))
+        if not plan['fits_money']:
+            blockers.append('estimated_limit_below_initial_batch_and_model_plan')
+        if not plan['fits_search_count']:
             blockers.append('search_budget_cannot_cover_base_agenda')
     except (ValueError, RuntimeError, KeyError, TypeError) as error:
         p, fingerprint, routes = None, None, None
@@ -132,7 +132,9 @@ class EditionPipeline:
         self.search = search or public_search
         self.read = read or read_public
         self.check = check or self._check_environment
-        self.budget = Budget(state, self.save, lambda: editorial_forecast(self.state, self.workspace.now))
+        self.budget = Budget(state, self.save, lambda: (edition_forecast(self.state, self.workspace.now)
+            if self.state['policy'].get('edition_forecast') == 'remaining_stages_v1'
+            else editorial_forecast(self.state, self.workspace.now)))
         self.started = time.monotonic()
         self.prior_seconds = state.get('active_seconds', 0)
         self.deadline = self.started + settings.research_max_seconds - self.prior_seconds
@@ -155,7 +157,7 @@ class EditionPipeline:
         lines.append('按完整用量回执更新后的核算美元：' + str(sum(
             (accounted(r) for r in self.state.get('reservations', [])), number(0))) + '；非账户账单，原预留记录保留')
         if self.state.get('budget_forecast'):
-            lines.append('后续写审规划：' + json.dumps(self.state['budget_forecast'], ensure_ascii=False))
+            lines.append('后续阶段费用规划：' + json.dumps(self.state['budget_forecast'], ensure_ascii=False))
         for row in self.state.get('read_selection', []):
             selection = {k: v for k, v in row.items() if k not in {'ranked', 'skipped'}}
             selection['selected_articles'] = [dict(id=cid,
@@ -196,6 +198,12 @@ class EditionPipeline:
         await self.check()
         self.state.update(status=stage, phase=stage)
         messages = messages_for(stage, prompt, value, self.workspace.now, self.state['report_type'])
+        task = 'review' if stage == 'review' else 'analysis'
+        expected = self.state['policy'].get('request_input_pricing', {}).get(task, 'unknown')
+        if self.model is complete and expected != 'unknown':
+            actual = request_input_pricing(request_for(resolve_route(task), messages, OUTPUTS[stage])[2])
+            if actual != expected:
+                raise ValueError('edition_request_pricing_changed')
         self.budget.reserve('model', stage=stage, messages=messages, output=OUTPUTS[stage])
         self.state.setdefault('input_audit', []).append(dict(stage=stage,
             data_characters=len(messages[1]['content']),
@@ -233,7 +241,16 @@ class EditionPipeline:
                     or not 2 <= len(job['query']) <= 120
                     or job.get('purpose', 'discovery') not in {'discovery', 'latest_close', 'released_policy', 'company_event', 'commentary'}):
                 raise ValueError('edition_search_packet_invalid')
+        seen = {r['query'] for r in self.state.get('search_receipts', [])}
+        pending = []
         for job in jobs:
+            if job['query'] not in seen:
+                pending.append(job); seen.add(job['query'])
+        if not pending:
+            return
+        await self.check()
+        self.budget.check_search_batch(len(pending))
+        for job in pending:
             await self.check()
             if any(r['query'] == job['query'] for r in self.state.get('search_receipts', [])):
                 continue
@@ -346,6 +363,9 @@ class EditionPipeline:
                 validate_increment(job)
             if jobs or reads or extra:
                 before = {i: digest(s['text']) for i, s in self.state['sources'].items()}
+                if not jobs:
+                    await self.check()
+                    self.budget.check_search_batch(0)
                 await self.searches(jobs)
                 selected, trace = patch_plan(self.state, events, assessment, extra)
                 await self.selected_reads(selected, events, trace)
