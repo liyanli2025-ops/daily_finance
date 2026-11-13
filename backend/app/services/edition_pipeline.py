@@ -12,6 +12,7 @@ import uuid
 
 from ..config import settings
 from . import edition_contract as contract
+from .edition_context import packet, editorial_source_ids
 from .edition_budget import Budget, OUTPUTS, digest, policy
 from .episode_workspace import EpisodeWorkspace, body
 from .model_gateway import MODEL_PAUSE_FILE, complete, ensure_models_enabled, resolve_route
@@ -24,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2] / 'data/editions'
 
 
 def source_signature():
-    names = ('edition_pipeline.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
+    names = ('edition_pipeline.py', 'edition_context.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
              'model_usage.py', 'web_research.py', 'material_roles.py', 'spoken_fidelity.py',
              'podcast_generator.py', 'podcast_script_cache.py', 'editorial_policy.py', 'research_desk.py')
     return digest({name: digest((Path(__file__).parent / name).read_text()) for name in names})
@@ -143,6 +144,8 @@ class EditionPipeline:
         from .edition_budget import number
         estimated = sum((number(r['estimated_usd']) for r in self.state.get('reservations', [])), number(0))
         lines.append('已预留估算美元：' + str(estimated) + '；不是实际账单，失败或未知用量不清零')
+        for row in self.state.get('input_audit', []):
+            lines.append('阶段输入：' + json.dumps(row, ensure_ascii=False))
         for row in self.state.get('usage', []):
             lines.append('调用回执：' + json.dumps({k: row.get(k) for k in
                 ('phase', 'provider', 'model', 'http_status', 'input_tokens', 'output_tokens',
@@ -188,6 +191,13 @@ class EditionPipeline:
         messages = [dict(role='system', content=contract.SYSTEM + '\n' + brief + '\n' + prompt),
                     dict(role='user', content=json.dumps(value, ensure_ascii=False))]
         self.budget.reserve('model', stage=stage, messages=messages, output=OUTPUTS[stage])
+        self.state.setdefault('input_audit', []).append(dict(stage=stage,
+            data_characters=len(messages[1]['content']),
+            total_message_characters=sum(len(m['content']) for m in messages),
+            fields=sorted(value), source_ids=sorted(value.get('sources', {})),
+            body_characters=sum(len(s['text']) for s in value.get('sources', {}).values()),
+            limitation='请求组装记录，不表示模型理解或事实核验；实际费用以服务商用量为准'))
+        self.save()
         def receipt(row):
             self.state.setdefault('usage', []).append(row)
             reservation = next(r for r in reversed(self.state['reservations'])
@@ -284,23 +294,22 @@ class EditionPipeline:
                         limitation='正文存在不代表独立核实、完整稿或最新交易时段；原文由后续证据评估和审稿核对。')
             self.save()
 
-    def packet(self):
-        return {k: self.state.get(k) for k in ('cutoff', 'watchlist', 'report_type', 'candidates',
-                    'agenda', 'sources', 'read_receipts', 'assessment', 'missing')}
+    def packet(self, stage):
+        return packet(self.state, stage)
 
     async def execute(self):
         stocks = {r['market'] + ':' + r['code'] for r in self.state['watchlist']}
         try:
             jobs = initial_searches(self.state['watchlist'], self.workspace.now)
             await self.searches(jobs)
-            a = await self.call('agenda', contract.AGENDA, self.packet())
+            a = await self.call('agenda', contract.AGENDA, self.packet('agenda'))
             self.state['agenda'] = contract.agenda(a, self.state['candidates'], stocks)
             events = {r['id']: r for r in a['events']}; self.save()
             await self.reads([dict(event_id=e['id'], candidate_id=c) for e in a['events'] for c in e['read_ids']], events)
             if not self.state['sources']:
                 self.state.update(status='partial_materials', missing=list(events), stop_reason='no_readable_body')
                 self.save(); return None
-            assessment = await self.call('assessment', contract.ASSESS, self.packet())
+            assessment = await self.call('assessment', contract.ASSESS, self.packet('assessment'))
             missing = contract.assess(assessment, events, self.state['sources'], stocks)
             extra = assessment.get('missed_major_events', [])
             for event in extra:
@@ -331,7 +340,7 @@ class EditionPipeline:
                     self.state.update(status='partial_materials', stop_reason='patch_no_new_body')
                     self.save(); return None
                 assessment = await self.call('patch_assessment', contract.ASSESS,
-                    dict(self.packet(), last_assessment=True))
+                    self.packet('patch_assessment'))
                 missing = contract.assess(assessment, events, self.state['sources'], stocks)
                 if (assessment.get('additional_searches') or assessment.get('additional_reads')
                         or assessment.get('missed_major_events')):
@@ -339,12 +348,8 @@ class EditionPipeline:
                 self.state.update(assessment=assessment, missing=missing); self.save()
             if missing or not self.state['sources']:
                 self.state['status'] = 'partial_materials'; self.save(); return None
-            eligible = {c['source_id'] for r in assessment['events'] if r['status'] == 'ready'
-                        for c in r.get('evidence', [])}
-            self.state['editorial_source_ids'] = sorted(eligible)
-            editorial = self.packet()
-            editorial['sources'] = {i: s for i, s in self.state['sources'].items() if i in eligible}
-            editorial['prior_report'] = self.state.get('prior_report')
+            self.state['editorial_source_ids'] = editorial_source_ids(self.state)
+            editorial = self.packet('writing')
             written = await self.call('writing', contract.WRITE, editorial)
             self.state['draft'] = written; self.save()
             contract.draft(written, events, editorial['sources']); self.save()
@@ -364,7 +369,7 @@ class EditionPipeline:
     async def review_and_finish(self, events):
         from .spoken_fidelity import CONTRACT
         value = await self.call('review', contract.REVIEW + CONTRACT,
-            dict(self.packet(), draft=self.state['draft'], prior_report=self.state.get('prior_report')))
+            self.packet('review'))
         self.state['review'] = value; self.save()
         contract.review(value, events, self.state['sources'], self.state['draft'])
         await self.check()

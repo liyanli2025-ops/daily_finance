@@ -52,6 +52,75 @@ def state():
             total_output_tokens=30000, audio_enabled=False))
 
 
+class StageContextRegression(unittest.TestCase):
+    def context(self):
+        source, written, assessment, _ = fixtures()
+        value = state()
+        value.update(candidates={'S1': dict(title='政策', snippet='仍有条件'),
+                                 'S2': dict(title='其他线索', snippet='不能静默漏掉')},
+            agenda=dict(events=[copy.deepcopy(EVENT)], excluded_candidates=[]),
+            sources={'body-1': source}, assessment=assessment, draft=written,
+            read_receipts=[dict(candidate_id='S1', event_id='E1', status='ok',
+                                response_capture='private-snapshot-path')])
+        return value
+
+    def test_agenda_keeps_every_candidate_without_body_or_process(self):
+        from app.services.edition_context import packet
+        value = packet(self.context(), 'agenda')
+        self.assertEqual(set(value['candidates']), {'S1', 'S2'})
+        self.assertNotIn('sources', value)
+        self.assertNotIn('assessment', value)
+
+    def test_writing_and_review_remove_directory_but_keep_major_and_original_body(self):
+        from app.services.edition_context import packet
+        state = self.context()
+        for stage in ('writing', 'review'):
+            value = packet(state, stage)
+            self.assertNotIn('candidates', value)
+            self.assertNotIn('read_receipts', value)
+            self.assertEqual(value['agenda'], state['agenda'])
+            self.assertEqual(value['sources']['body-1']['text'], state['sources']['body-1']['text'])
+        self.assertEqual(packet(state, 'review')['draft'], state['draft'])
+
+    def test_contrary_body_and_separate_watchlist_evidence_are_not_filtered_out(self):
+        from app.services.edition_context import packet
+        value = self.context()
+        value['sources']['contrary'] = dict(value['sources']['body-1'], id='contrary', text='存在相反解释')
+        value['sources']['company'] = dict(value['sources']['body-1'], id='company', event_ids=['E2'])
+        value['assessment']['watchlist_checks'] = [dict(key='A:600900', status='covered',
+            evidence=[dict(source_id='company', quote=FACT)])]
+        self.assertEqual(set(packet(value, 'writing')['sources']), {'body-1', 'contrary', 'company'})
+
+    def test_only_exact_duplicate_metadata_removed_and_state_is_unchanged(self):
+        from app.services.edition_context import packet
+        value = self.context()
+        value['sources']['body-1']['metadata'] = dict(id='body-1', title='其他口径标题',
+            published='2026-11-13', reading_scope='public_visible_body', body_quality={'warning': True})
+        before = copy.deepcopy(value)
+        source = packet(value, 'assessment')['sources']['body-1']
+        self.assertNotIn('id', source['metadata'])
+        self.assertEqual(source['metadata']['title'], '其他口径标题')
+        self.assertEqual(source['metadata']['body_quality'], {'warning': True})
+        self.assertEqual(source['metadata']['published'], '2026-11-13')
+        self.assertEqual(value, before)
+
+    def test_patch_keeps_all_candidates_failure_reasons_and_last_assessment(self):
+        from app.services.edition_context import packet
+        value = self.context()
+        value['read_receipts'].append(dict(candidate_id='S2', event_id='E1', status='failed', reason='timeout'))
+        result = packet(value, 'patch_assessment')
+        self.assertTrue(result['last_assessment'])
+        self.assertEqual(set(result['candidates']), {'S1', 'S2'})
+        self.assertEqual(result['read_receipts'][-1]['reason'], 'timeout')
+        self.assertNotIn('response_capture', result['read_receipts'][0])
+
+    def test_review_keeps_cited_body_on_resume(self):
+        from app.services.edition_context import packet
+        value = self.context()
+        value['assessment']['events'][0]['status'] = 'excluded'
+        self.assertIn('body-1', packet(value, 'review')['sources'])
+
+
 class ContractRegression(unittest.TestCase):
     def test_real_failed_election_sources_remain_a_major_gap(self):
         frozen = json.loads((Path(__file__).parent / 'fixtures/unified_major_omission.json').read_text())
