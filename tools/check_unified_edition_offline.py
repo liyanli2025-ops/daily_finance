@@ -39,7 +39,7 @@ def main():
             raise SystemExit('交付文件指纹不符：' + row['path'])
         if target.is_symlink(): raise SystemExit('服务器文件含软链：' + row['path'])
         current = hashlib.sha256(target.read_bytes().replace(b'\r\n', b'\n')).hexdigest() if target.is_file() else None
-        if current not in (row['base_sha256'], row['sha256']):
+        if current not in (row['base_sha256'], row['sha256'], *row.get('additional_old_sha256', [])):
             raise SystemExit('服务器存在其他修改，停止覆盖及运行：' + row['path'])
     with tempfile.TemporaryDirectory(prefix='finance-unified-offline-', dir=package.parent) as temporary:
         stage = Path(temporary) / 'backend'
@@ -64,6 +64,9 @@ def main():
         # provider cannot charge an account, even if credentials are exported.
         with patch('socket.socket.connect', no_network), patch('socket.socket.connect_ex', no_network):
             suite = unittest.defaultTestLoader.discover(str(package / 'backend/tests'), pattern='test_unified_edition.py')
+            if manifest.get('edition_read_selection_tests_required'):
+                suite.addTests(unittest.defaultTestLoader.discover(str(package / 'backend/tests'),
+                    pattern='test_edition_read_selection.py'))
             result = unittest.TextTestRunner(verbosity=2).run(suite)
         os.chdir(package)
         print('生产源码、配置、数据库、暂停状态均未修改；临时源码副本将自动清理。')
@@ -74,6 +77,8 @@ def main():
                        'backend/tests/test_unified_edition.py', 'backend/tests/fixtures/unified_major_omission.json')
         if manifest.get('edition_cost_sample_required'):
             proof_files += ('backend/tests/fixtures/edition_cost_sample.json',)
+        if manifest.get('edition_read_selection_tests_required'):
+            proof_files += ('backend/tests/test_edition_read_selection.py',)
         proof = dict(owner='finance-unified-offline-acceptance-v1', passed=True,
             test_count=result.testsRun,
             file_sha256={name: hashlib.sha256((package / name).read_bytes()).hexdigest() for name in

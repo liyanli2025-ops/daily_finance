@@ -178,6 +178,8 @@ def main():
                     'backend/tests/test_unified_edition.py', 'backend/tests/fixtures/unified_major_omission.json')
         if manifest.get('edition_cost_sample_required'):
             expected += ('backend/tests/fixtures/edition_cost_sample.json',)
+        if manifest.get('edition_read_selection_tests_required'):
+            expected += ('backend/tests/test_edition_read_selection.py',)
         if (proof.get('owner') != 'finance-unified-offline-acceptance-v1' or proof.get('passed') is not True
                 or set(proof.get('file_sha256', {})) != set(expected)
                 or any(hashlib.sha256((bundle / name).read_bytes()).hexdigest() != proof['file_sha256'][name]

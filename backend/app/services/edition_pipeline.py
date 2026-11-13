@@ -13,6 +13,7 @@ import uuid
 from ..config import settings
 from . import edition_contract as contract
 from .edition_context import packet, editorial_source_ids
+from .edition_read_selection import primary_plan, patch_plan, fallback_plan, validate_increment
 from .edition_budget import Budget, OUTPUTS, digest, policy, protection, accounted
 from .edition_inputs import messages_for, editorial_forecast
 from .episode_workspace import EpisodeWorkspace, body
@@ -26,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2] / 'data/editions'
 
 
 def source_signature():
-    names = ('edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
+    names = ('edition_read_selection.py', 'edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
              'model_usage.py', 'web_research.py', 'material_roles.py', 'spoken_fidelity.py',
              'podcast_generator.py', 'podcast_script_cache.py', 'editorial_policy.py', 'research_desk.py')
     return digest({name: digest((Path(__file__).parent / name).read_text()) for name in names})
@@ -155,6 +156,12 @@ class EditionPipeline:
             (accounted(r) for r in self.state.get('reservations', [])), number(0))) + '；非账户账单，原预留记录保留')
         if self.state.get('budget_forecast'):
             lines.append('后续写审规划：' + json.dumps(self.state['budget_forecast'], ensure_ascii=False))
+        for row in self.state.get('read_selection', []):
+            selection = {k: v for k, v in row.items() if k not in {'ranked', 'skipped'}}
+            selection['selected_articles'] = [dict(id=cid,
+                title=self.state['candidates'][cid]['title'], url=self.state['candidates'][cid]['url'])
+                for cid in row.get('selected_ids', [])]
+            lines.append('文章选择：' + json.dumps(selection, ensure_ascii=False))
         for row in self.state.get('input_audit', []):
             lines.append('阶段输入：' + json.dumps(row, ensure_ascii=False))
         for row in self.state.get('usage', []):
@@ -262,7 +269,8 @@ class EditionPipeline:
             if any(r['candidate_id'] == cid for r in self.state.get('read_receipts', [])): continue
             if len(self.state.get('read_receipts', [])) >= self.state['policy']['max_body_urls']:
                 raise RuntimeError('edition_body_budget_exhausted')
-            receipt = dict(candidate_id=cid, event_id=eid, status='started')
+            receipt = dict(candidate_id=cid, event_id=eid, status='started',
+                increment=job.get('increment'), selection_reason=job.get('reason'))
             self.state.setdefault('read_receipts', []).append(receipt); self.save()
             from .collection_time import window
             hours = window(self.workspace.now, event['purpose'])['hours']
@@ -292,6 +300,16 @@ class EditionPipeline:
                         limitation='正文存在不代表独立核实、完整稿或最新交易时段；原文由后续证据评估和审稿核对。')
             self.save()
 
+    async def selected_reads(self, jobs, events, trace):
+        self.state.setdefault('read_selection', []).extend(trace); self.save()
+        for job in jobs:
+            await self.reads([job], events)
+            alternate, record = fallback_plan(self.state, events, job)
+            if record:
+                self.state['read_selection'].append(record); self.save()
+            if alternate:
+                await self.reads([alternate], events)
+
     def packet(self, stage):
         return packet(self.state, stage)
 
@@ -303,7 +321,8 @@ class EditionPipeline:
             a = await self.call('agenda', contract.AGENDA, self.packet('agenda'))
             self.state['agenda'] = contract.agenda(a, self.state['candidates'], stocks)
             events = {r['id']: r for r in a['events']}; self.save()
-            await self.reads([dict(event_id=e['id'], candidate_id=c) for e in a['events'] for c in e['read_ids']], events)
+            selected, trace = primary_plan(a['events'])
+            await self.selected_reads(selected, events, trace)
             if not self.state['sources']:
                 self.state.update(status='partial_materials', missing=list(events), stop_reason='no_readable_body')
                 self.save(); return None
@@ -320,20 +339,16 @@ class EditionPipeline:
             for job in jobs:
                 if job.get('event_id') not in events or not isinstance(job.get('query'), str) or not 2 <= len(job['query']) <= 120:
                     raise ValueError('edition_patch_search_invalid')
+                validate_increment(job)
             for job in reads:
                 if job.get('event_id') not in events or job.get('candidate_id') not in self.state['candidates']:
                     raise ValueError('edition_patch_read_invalid')
+                validate_increment(job)
             if jobs or reads or extra:
                 before = {i: digest(s['text']) for i, s in self.state['sources'].items()}
                 await self.searches(jobs)
-                # A patch query is event-specific. Read its returned alternatives as
-                # one bounded batch, never mechanically accept its first result.
-                for cid, candidate in self.state['candidates'].items():
-                    for link in candidate.get('search_links', []):
-                        if link.get('event_id') in events:
-                            reads.append(dict(event_id=link['event_id'], candidate_id=cid))
-                reads += [dict(event_id=e['id'], candidate_id=c) for e in extra for c in e['read_ids']]
-                await self.reads(reads, events)
+                selected, trace = patch_plan(self.state, events, assessment, extra)
+                await self.selected_reads(selected, events, trace)
                 if before == {i: digest(s['text']) for i, s in self.state['sources'].items()}:
                     self.state.update(status='partial_materials', stop_reason='patch_no_new_body')
                     self.save(); return None

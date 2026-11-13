@@ -377,7 +377,8 @@ class PipelineRegression(unittest.IsolatedAsyncioTestCase):
         source, written, assessment, reviewed = fixtures()
         if missing: assessment['events'][0]['status'] = 'missing'
         if empty_patch:
-            assessment['additional_reads'] = [dict(event_id='E1', candidate_id='S1')]
+            assessment['additional_reads'] = [dict(event_id='E1', candidate_id='S1',
+                increment='missing_context', reason='检查这篇已读政策正文是否还有未核对的适用条件')]
         run = state(); now = china_now()
         workspace = EpisodeWorkspace(root=directory / 'evidence', now=now)
         def search(ws, query, **kwargs):
@@ -395,6 +396,71 @@ class PipelineRegression(unittest.IsolatedAsyncioTestCase):
             return json.dumps(replies[len(stages) - 1], ensure_ascii=False)
         pipeline = EditionPipeline(run, directory, workspace, model=model, search=search, read=read, check=AsyncMock())
         return pipeline, stages, written
+
+    async def selection_scenario(self, directory, *, patch_search=False, invalid=False, failed_first=False):
+        pipeline, _, _ = await self.scenario(directory)
+        candidates = {cid: dict(title='政策最新变化' + cid, url='https://example.com/' + cid,
+            snippet=FACT, search_links=[]) for cid in ('S1', 'S2', 'S3')}
+        agenda = dict(events=[dict(EVENT, candidate_ids=list(candidates), read_ids=['S2', 'S1'])], excluded_candidates=[])
+        assessment = fixtures()[2]
+        assessment['events'][0]['status'] = 'missing'
+        if patch_search:
+            assessment['additional_searches'] = [dict(event_id='E1', query='政策条件', purpose='discovery',
+                increment='missing_context', reason='核对这次公布政策的实施条件和适用范围')]
+            if invalid: assessment['additional_searches'][0].pop('reason')
+        calls, read_ids, searches = [], [], []
+        async def search(jobs):
+            searches.append(jobs)
+            pipeline.state['candidates'] = candidates
+            if len(searches) > 1:
+                for row in candidates.values():
+                    row['search_links'] = jobs
+        async def read(jobs, events):
+            for job in jobs:
+                cid = job['candidate_id']; read_ids.append(cid)
+                if failed_first and len(read_ids) == 1: continue
+                source = dict(fixtures()[0], id='B' + cid, candidate_id=cid, url=candidates[cid]['url'])
+                pipeline.state['sources'][source['id']] = source
+        async def call(stage, brief, payload):
+            calls.append(stage)
+            result = copy.deepcopy(agenda if stage == 'agenda' else assessment)
+            if stage == 'patch_assessment': result['additional_searches'] = []
+            return result
+        pipeline.searches, pipeline.reads, pipeline.call = search, read, call
+        return pipeline, calls, read_ids, searches
+
+    async def test_actual_execution_uses_one_model_selected_representative(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pipeline, calls, reads, _ = await self.selection_scenario(Path(temporary))
+            self.assertIsNone(await pipeline.execute())
+            self.assertEqual(reads, ['S2'])
+            self.assertEqual(calls, ['agenda', 'assessment'])
+            self.assertEqual(pipeline.state['read_selection'][0]['deferred_ids'], ['S1', 'S3'])
+
+    async def test_patch_search_results_are_screened_before_downloading(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pipeline, calls, reads, _ = await self.selection_scenario(Path(temporary), patch_search=True)
+            self.assertIsNone(await pipeline.execute())
+            self.assertEqual(len(reads), 2)
+            self.assertEqual(reads[0], 'S2')
+            self.assertEqual(len(set(reads)), 2)
+            self.assertEqual(calls, ['agenda', 'assessment', 'patch_assessment'])
+            self.assertEqual(len(pipeline.state['candidates']), 3)
+
+    async def test_invalid_increment_stops_before_patch_search(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pipeline, calls, reads, searches = await self.selection_scenario(Path(temporary), patch_search=True, invalid=True)
+            with self.assertRaisesRegex(ValueError, 'increment_required'): await pipeline.execute()
+            self.assertEqual(len(searches), 1)
+            self.assertEqual(calls, ['agenda', 'assessment'])
+
+    async def test_failed_representative_selects_one_alternate_without_model(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pipeline, calls, reads, _ = await self.selection_scenario(Path(temporary), failed_first=True)
+            self.assertIsNone(await pipeline.execute())
+            self.assertEqual(len(reads), 2)
+            self.assertNotEqual(reads[1], reads[0])
+            self.assertEqual(calls, ['agenda', 'assessment'])
 
     async def test_normal_whole_path_four_calls_and_persistent_sources(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -9,13 +9,13 @@ AGENDA = '''根据全部检索目录形成事件选题单。重大国内/国际�
 标题和摘要只作线索，不能认定其中事实成立。重要性按本期市场影响判断，不预设新闻篇数。
 每个候选必须分配给一个事件或说明排除原因，不能悄悄遗漏。返回：
 {"events":[{"id":"E1","title":"事件","importance":"major","reason":"重要性","lane":"global_policy","purpose":"discovery","candidate_ids":["S1","S2"],"read_ids":["S1"]}],"excluded_candidates":[{"candidate_ids":["S3"],"reason":"具体取舍理由"}]}
-importance仅major/context，purpose仅discovery/latest_close/released_policy/company_event/commentary。read_ids是批量读取计划，可选多个独立来源。read_ids必须属于本事件候选。公司事件可附scope=market:code。
+importance仅major/context，purpose仅discovery/latest_close/released_policy/company_event/commentary。read_ids只选一篇最适合本事件的代表稿；先按标题、摘要、来源、时间和用途判断，不因标题相似就认定内容完全一致。其他候选保留，读完代表稿再判断核实、更新、反方等具体缺口。read_ids必须属于本事件候选。公司事件可附scope=market:code。
 外盘核最近已完成交易时段；预测不当决定，行情不当公司专属消息。重要事件即使链接难读也须保留为major。'''
 ASSESS = '''核对事件单与实际全文，特别检查重要事件遗漏、事实依据、不同解释、条件、发布时间和交易时段。
 不要把一篇美债稿充作全部国际事件覆盖；失败来源不等于没有事件。评论不能当原披露，盘中/旧时段不能充最新收盘。
 返回：{"events":[{"id":"E1","status":"ready","reason":"证据及边界","evidence":[{"source_id":"正文ID","quote":"正文逐字依据，2至400字"}]}],"missed_major_events":[],"additional_searches":[],"additional_reads":[],"watchlist_checks":[{"key":"A:代码","status":"covered","reason":"实际查到或未查到什么"}]}
 events必须逐项包含原事件；status仅ready/missing/excluded。major缺正文或仍待核必须missing，不以改成excluded掩盖。ready至少一个实际正文逐字依据。
-missed_major_events可追加新发现的major事件，格式与选题单事件相同。补查搜索项为{event_id,query,purpose}，读取项为{event_id,candidate_id}；程序批量执行。
+missed_major_events可追加新发现的major事件，格式与选题单事件相同。补查搜索项为{event_id,query,purpose,increment,reason}，读取项为{event_id,candidate_id,increment,reason}。increment仅original_source/new_update/independent_verification/counterevidence/missing_context/access_failure；reason用12至400字说明要核对的具体事实或缺口，不能只说“补充资料”。每个事件同类缺口只选一篇；补搜结果程序按元数据筛一篇，不整批下载。不同网站转载同一稿不构成独立核实；新进展或反方来源可以另读。
 watchlist_checks逐项包含所有当前自选股，status为covered/missing/no_material_event；covered需附evidence=[{source_id,quote}]并引用主体匹配的正文。no_material_event说明已检查什么，不能凭搜索失败断言没有新闻。
 若提示last_assessment=true，不再提出补查；仍有重要缺口明确missing，交部分资料，禁止编事实。'''
 WRITE = '''仅依据给定全文、事件单和证据检查写一份可读财经报告，同时写适合听的口播，不能引入资料之外的新闻和数值。
