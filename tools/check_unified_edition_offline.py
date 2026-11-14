@@ -58,7 +58,9 @@ def main():
         os.environ['DATABASE_URL'] = 'sqlite:///' + str(stage / 'offline-unused.db')
         sys.path.insert(0, str(stage))
         os.chdir(stage)
+        blocked_connections = []
         def no_network(*args, **kwargs):
+            blocked_connections.append(True)
             raise AssertionError('离线验收禁止任何网络连接')
         # Blocking is outside the application. A test accidentally reaching a real
         # provider cannot charge an account, even if credentials are exported.
@@ -88,10 +90,14 @@ def main():
             if manifest.get('body_acquisition_tests_required'):
                 suite.addTests(unittest.defaultTestLoader.discover(str(package / 'backend/tests'),
                     pattern='test_body_acquisition.py'))
+            if manifest.get('critical_path_required'):
+                suite.addTests(unittest.defaultTestLoader.discover(str(package / 'backend/tests'),
+                    pattern='test_edition_critical_path.py'))
             result = unittest.TextTestRunner(verbosity=2).run(suite)
         os.chdir(package)
         print('生产源码、配置、数据库、暂停状态均未修改；临时源码副本将自动清理。')
-        if not result.wasSuccessful(): raise SystemExit(1)
+        if not result.wasSuccessful() or result.skipped: raise SystemExit(1)
+        if blocked_connections: raise SystemExit('测试试图联网，不生成发布准入回执')
         if result.testsRun != manifest['test_count']:
             raise SystemExit('实际测试数量与交付清单不符，不生成验收回执')
         proof_files = ('upgrade-manifest.json', 'manifest.json', 'payload.zip',
@@ -124,6 +130,18 @@ def main():
             proof_files += ('backend/tests/test_body_acquisition.py',
                 'backend/tests/fixtures/body_acquisition_sample.json',
                 'backend/tests/fixtures/sina_announcement_identity.body', 'tools/check_body_acquisition.py')
+        if manifest.get('critical_path_required'):
+            import test_edition_critical_path as critical
+            from app.services.edition_release_gate import validate_evidence
+            from app.services.edition_pipeline import source_signature
+            evidence = dict(validate_evidence(critical.EVIDENCE), source_signature=source_signature(),
+                test_count=result.testsRun,
+                model_responses='controlled_fixtures_not_editorial_accuracy',
+                source_responses='captured_supplier_chunks_and_explicit_failure_scenarios')
+            (package/'critical-path-acceptance.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2))
+            proof_files += ('backend/tests/test_edition_critical_path.py',
+                'backend/tests/fixtures/v45_trial_replay.zip','backend/tests/fixtures/v45_material_pool.json',
+                'critical-path-acceptance.json', 'tools/check_unified_edition_offline.py', 'install_upgrade.py')
         proof = dict(owner='finance-unified-offline-acceptance-v1', passed=True,
             test_count=result.testsRun,
             file_sha256={name: hashlib.sha256((package / name).read_bytes()).hexdigest() for name in

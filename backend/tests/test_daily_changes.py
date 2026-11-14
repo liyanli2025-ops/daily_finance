@@ -353,12 +353,12 @@ class AgendaRepair(unittest.TestCase):
         self.assertEqual(desk.request.call_count,1)
         radar.assert_not_called();self.assertEqual(result['breadth']['status'],'not_requested')
 
-    def test_real_saved_agenda_keeps_only_the_unaccounted_election_lead(self):
+    def test_real_saved_agenda_keeps_every_unaccounted_concrete_lead(self):
         import json
         fixture=json.loads((Path(__file__).parent/'fixtures/v45_agenda_failure.json').read_text())
         s=dict(fixture,change_protocol=changes.PROTOCOL)
         pending=changes.audit_agenda(s,fixture['agenda'])
-        self.assertEqual([(r['candidate_id'],r['topic']) for r in pending],[('S30','选举')])
+        self.assertEqual([(r['candidate_id'],r['topic']) for r in pending],[('S13','央行'),('S30','选举')])
         self.assertTrue({'S25','S39'} <= {r['candidate_id'] for r in s['change_signal_decisions']})
 
 
@@ -373,6 +373,9 @@ class SavedAgendaContinuation(unittest.IsolatedAsyncioTestCase):
             model_http_attempts=1,usage=[dict(http_status=200,provider='fake',model='test')],
             reservations=[dict(kind='model',stage='agenda',estimated_usd='0.17')],
             sources={},search_http_attempts=16,public_fetch_attempts=113,active_seconds=106.5)
+        pool=folder/'evidence/episode-saved';pool.mkdir(parents=True)
+        (pool/'materials.json').write_bytes((Path(__file__).parent/'fixtures/v45_material_pool.json').read_bytes())
+        (pool/'meta.json').write_text(json.dumps(dict(created_at=s['cutoff'])))
         (folder/'result.json').write_text(json.dumps(s,ensure_ascii=False))
         (folder/'response-1.json').write_text(json.dumps(dict(stage='agenda',text=json.dumps(s['agenda']))))
         return resume,folder,s
@@ -385,7 +388,7 @@ class SavedAgendaContinuation(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((folder/'result.json').read_bytes(),raw)
             for key in ['reservations','search_http_attempts','public_fetch_attempts','cutoff']:
                 self.assertEqual(state_after[key],s[key])
-            self.assertEqual(pending[0]['candidate_id'],'S30')
+            self.assertIn('S30',[r['candidate_id'] for r in pending])
 
     async def test_a_body_read_or_second_model_makes_original_ineligible(self):
         import json
@@ -457,6 +460,7 @@ class SavedAgendaContinuation(unittest.IsolatedAsyncioTestCase):
                     patch('app.edition_once.assert_watchlist_current',AsyncMock()), \
                     patch('app.edition_once.identity',return_value='identity'), \
                     patch('app.edition_once.manual_text_scope') as scope, \
+                    patch('app.services.edition_release_gate.require_acceptance',return_value={}), \
                     patch('app.edition_once.reviewed_search_permission',return_value=None), \
                     patch.object(resume,'preview',AsyncMock(return_value=(planned,s,proof,'identity'))), \
                     patch.object(resume.core,'EditionPipeline',Pipeline):

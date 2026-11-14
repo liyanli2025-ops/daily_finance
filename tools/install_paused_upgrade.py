@@ -204,7 +204,12 @@ def main():
             expected += ('backend/tests/test_body_acquisition.py',
                 'backend/tests/fixtures/body_acquisition_sample.json',
                 'backend/tests/fixtures/sina_announcement_identity.body', 'tools/check_body_acquisition.py')
+        if manifest.get('critical_path_required'):
+            expected += ('backend/tests/test_edition_critical_path.py',
+                'backend/tests/fixtures/v45_trial_replay.zip','backend/tests/fixtures/v45_material_pool.json',
+                'critical-path-acceptance.json', 'tools/check_unified_edition_offline.py', 'install_upgrade.py')
         if (proof.get('owner') != 'finance-unified-offline-acceptance-v1' or proof.get('passed') is not True
+                or proof.get('test_count') != json.loads((bundle/'upgrade-manifest.json').read_text())['test_count']
                 or set(proof.get('file_sha256', {})) != set(expected)
                 or any(hashlib.sha256((bundle / name).read_bytes()).hexdigest() != proof['file_sha256'][name]
                        for name in expected)):
@@ -257,6 +262,14 @@ def main():
                     time.sleep(1)
                 else:
                     raise RuntimeError("Upgraded service did not become healthy")
+            if manifest.get('critical_path_required'):
+                critical = json.loads((bundle/'critical-path-acceptance.json').read_text())
+                signature = critical.get('source_signature', '')
+                if not re.fullmatch(r'[0-9a-f]{64}', signature):
+                    raise ValueError('edition_release_acceptance_invalid')
+                target = destination(root, 'backend/data/diagnostics/release-acceptance/'+signature+'.json')
+                atomic_write(target, json.dumps(critical,ensure_ascii=False,indent=2).encode(), 0o600)
+                print('Critical path acceptance installed; matching application signature required before paid continuation')
             print("Source upgrade applied; maintenance pause preserved. Frontend static deployment and paid acceptance are separate.")
         except Exception:
             if stopped:

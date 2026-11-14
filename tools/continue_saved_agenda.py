@@ -15,7 +15,7 @@ def main():
     parser.add_argument('--input-sha')
     parser.add_argument('--save-preview', type=Path)
     parser.add_argument('--run-from-preview', type=Path)
-    parser.add_argument('--export', type=Path, default=Path('/tmp/daily-finance-v46-review.zip'))
+    parser.add_argument('--export', type=Path, default=Path('/tmp/daily-finance-v47-review.zip'))
     args = parser.parse_args()
     if any(p.is_symlink() for p in (args.project, *args.project.parents)):
         raise SystemExit('项目路径含软链，停止')

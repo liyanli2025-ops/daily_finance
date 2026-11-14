@@ -29,11 +29,13 @@ ROOT = Path(__file__).resolve().parents[2] / 'data/editions'
 
 
 def source_signature():
-    names = ('edition_agenda_resume.py', 'edition_manual.py', 'edition_continuation.py', 'edition_read_selection.py', 'edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
-             'model_usage.py', 'web_research.py', 'article_metadata.py', 'primary_material_quality.py', 'reading_acceptance.py', 'search_objectives.py', 'material_roles.py', 'spoken_fidelity.py',
-             'podcast_generator.py', 'podcast_script_cache.py', 'editorial_policy.py', 'research_desk.py',
-             'edition_issuer_desk.py', 'listener_research.py', 'body_acquisition.py', 'daily_changes.py', 'edition_market.py', 'market_breadth.py', 'timed_market.py', 'research_hub.py', 'research_schema.py', 'watchlist_sources.py')
-    return digest({name: digest((Path(__file__).parent / name).read_text()) for name in names})
+    # Bind acceptance to the whole application, including entry points and
+    # indirect readers, rather than a hand-maintained list that can omit changes.
+    root = Path(__file__).parent.parent
+    files = sorted(root.rglob('*.py'))
+    if any(p.is_symlink() for p in files):
+        raise ValueError('edition_source_symlink')
+    return digest({p.relative_to(root).as_posix(): digest(p.read_text()) for p in files})
 
 
 def initial_searches(stocks, now, *, direct_issuers=False, daily_changes=False, baselines=None):
@@ -229,6 +231,7 @@ class EditionPipeline:
     async def call(self, stage, prompt, value):
         await self.check()
         self.state.update(status=stage, phase=stage)
+        self.state.setdefault('flow_trace', []).append(stage)
         messages = messages_for(stage, prompt, value, self.workspace.now, self.state['report_type'])
         task = 'review' if stage == 'review' else 'analysis'
         expected = self.state['policy'].get('request_input_pricing', {}).get(task, 'unknown')
@@ -488,6 +491,7 @@ class EditionPipeline:
                 + validate_topics(self.state, accepted, events))
             validate_expectations(self.state, accepted, provided)
             validation['missing'].extend(self.state['change_missing'])
+        self.state.setdefault('flow_trace', []).append('assessment_validated')
         self.state.setdefault('assessment_validation', []).append(dict(stage=stage, **validation))
         self.save()
         return accepted, validation['missing']
@@ -536,6 +540,9 @@ class EditionPipeline:
 
     async def read_agenda(self):
         """Read a validated saved agenda; also used by same-budget repair continuation."""
+        self.state.update(status='reading', phase='reading')
+        self.state.setdefault('flow_trace', []).append('reading')
+        self.save()
         events = {r['id']: r for r in self.state['agenda']['events']}
         stocks = {r['market'] + ':' + r['code'] for r in self.state['watchlist']}
         selected, trace = primary_plan(self.state['agenda']['events'])
@@ -550,6 +557,7 @@ class EditionPipeline:
 
     async def finish_materials(self, assessment, events, stocks, *, research_tasks=None, recovered_ids=()):
         """One patch assessment, writing and review; reused by same-ledger continuation."""
+        self.state.setdefault('flow_trace', []).append('materials_decision')
         missing = contract.assess(assessment, events, self.state['sources'], stocks)
         missing.extend(self.state.get('change_missing', []))
         extra = assessment.get('missed_major_events', [])
@@ -615,6 +623,7 @@ class EditionPipeline:
         self.state['review'] = value; self.save()
         contract.review(value, events, self.state['sources'], self.state['draft'])
         validate_listener_review(self.state, value)
+        self.state.setdefault('flow_trace', []).append('review_validated')
         await self.check()
         from ..models.report import Report, ReportType
         written = self.state['draft']

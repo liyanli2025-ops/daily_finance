@@ -1,0 +1,98 @@
+[
+  {
+    "source_id": "d2f631e4157e25e84b50579b",
+    "scope_links": [
+      "A:002714"
+    ],
+    "id": "cc6a3743377f1e353d6f9ce6",
+    "title": "牧原股份财务指标 2026三季报及去年同期",
+    "source": "东方财富财务指标镜像",
+    "url": "https://datacenter.eastmoney.com/securities/api/data/v1/get?reportName=RPT_F10_FINANCE_MAINFINADATA&columns=ALL&filter=%28SECUCODE%3D%22002714.SZ%22%29&pageNumber=1&pageSize=8&sortColumns=REPORT_DATE&sortTypes=-1",
+    "published": "2026-10-30T00:00:00",
+    "reading_scope": "结构化字段；完整原始返回保存在缓存，非财报全文",
+    "kind": "financial_baseline",
+    "scope": "A:002714",
+    "period": "2026三季报；2025三季报",
+    "characters": 934,
+    "body_quality": {
+      "status": "no_obvious_promotion_signal",
+      "requires_editorial_review": false,
+      "findings": [],
+      "text_modified": false,
+      "limitation": "启发式提示可能命中报道引用；未命中不保证无推广，不裁决事实或重要性。位置为原始正文字符区间。"
+    },
+    "text": "牧原股份财务指标 2026三季报\n供应商结构化指标，尚未与原始财报逐项核对。保持原币种；累计口径不等于单季度，禁止自行混算。\n期间截止：2026-09-30 00:00:00；币种：CNY\n- 营业总收入（TOTALOPERATEREVE）：92199959692.76 元\n- 归母净利润（PARENTNETPROFIT）：-9318752305.25 元\n- 扣非归母净利润（KCFJCXSYJLR）：-9106670056.89 元\n- 营业总收入同比（TOTALOPERATEREVETZ）：-17.52396845068 %\n- 归母净利润同比（PARENTNETPROFITTZ）：-163.054416631724 %\n- 销售毛利率（XSMLL）：-2.2374643828 %\n- 资产负债率（ZCFZL）：55.8894897172 %\n- 每股经营现金流（MGJYXJJE）：0.516766683158 元/股\n- 加权净资产收益率（ROEJQ）：-11.6 %\n- 基本每股收益（EPSJB）：-1.67 元/股\n\n牧原股份财务指标 2025三季报\n供应商结构化指标，尚未与原始财报逐项核对。保持原币种；累计口径不等于单季度，禁止自行混算。\n期间截止：2025-09-30 00:00:00；币种：CNY\n- 营业总收入（TOTALOPERATEREVE）：111790004878.72 元\n- 归母净利润（PARENTNETPROFIT）：14778904957.09 元\n- 扣非归母净利润（KCFJCXSYJLR）：15473377552.36 元\n- 营业总收入同比（TOTALOPERATEREVETZ）：15.515225864648 %\n- 归母净利润同比（PARENTNETPROFITTZ）：41.00570971054 %\n- 销售毛利率（XSMLL）：20.2850740625 %\n- 资产负债率（ZCFZL）：55.4981008 %\n- 每股经营现金流（MGJYXJJE）：5.231693346792 元/股\n- 加权净资产收益率（ROEJQ）：19.26 %\n- 基本每股收益（EPSJB）：2.74 元/股"
+  },
+  {
+    "source_id": "4c170f614dbc185b95ce3fff",
+    "scope_links": [
+      "A:300750"
+    ],
+    "id": "3ffa155b9067dadd93cd6cac",
+    "title": "宁德时代财务指标 2026三季报及去年同期",
+    "source": "东方财富财务指标镜像",
+    "url": "https://datacenter.eastmoney.com/securities/api/data/v1/get?reportName=RPT_F10_FINANCE_MAINFINADATA&columns=ALL&filter=%28SECUCODE%3D%22300750.SZ%22%29&pageNumber=1&pageSize=8&sortColumns=REPORT_DATE&sortTypes=-1",
+    "published": "2026-10-21T00:00:00",
+    "reading_scope": "结构化字段；完整原始返回保存在缓存，非财报全文",
+    "kind": "financial_baseline",
+    "scope": "A:300750",
+    "period": "2026三季报；2025三季报",
+    "characters": 921,
+    "body_quality": {
+      "status": "no_obvious_promotion_signal",
+      "requires_editorial_review": false,
+      "findings": [],
+      "text_modified": false,
+      "limitation": "启发式提示可能命中报道引用；未命中不保证无推广，不裁决事实或重要性。位置为原始正文字符区间。"
+    },
+    "text": "宁德时代财务指标 2026三季报\n供应商结构化指标，尚未与原始财报逐项核对。保持原币种；累计口径不等于单季度，禁止自行混算。\n期间截止：2026-09-30 00:00:00；币种：CNY\n- 营业总收入（TOTALOPERATEREVE）：442137424000 元\n- 归母净利润（PARENTNETPROFIT）：64530063000 元\n- 扣非归母净利润（KCFJCXSYJLR）：57875782000 元\n- 营业总收入同比（TOTALOPERATEREVETZ）：56.192574435138 %\n- 归母净利润同比（PARENTNETPROFITTZ）：31.602397425025 %\n- 销售毛利率（XSMLL）：22.7174641973 %\n- 资产负债率（ZCFZL）：64.2303733954 %\n- 每股经营现金流（MGJYXJJE）：13.317950618618 元/股\n- 加权净资产收益率（ROEJQ）：17.64 %\n- 基本每股收益（EPSJB）：14.13 元/股\n\n宁德时代财务指标 2025三季报\n供应商结构化指标，尚未与原始财报逐项核对。保持原币种；累计口径不等于单季度，禁止自行混算。\n期间截止：2025-09-30 00:00:00；币种：CNY\n- 营业总收入（TOTALOPERATEREVE）：283071987000 元\n- 归母净利润（PARENTNETPROFIT）：49034109000 元\n- 扣非归母净利润（KCFJCXSYJLR）：43619225000 元\n- 营业总收入同比（TOTALOPERATEREVETZ）：9.275323314892 %\n- 归母净利润同比（PARENTNETPROFITTZ）：36.201794979783 %\n- 销售毛利率（XSMLL）：25.3097598103 %\n- 资产负债率（ZCFZL）：61.2745239532 %\n- 每股经营现金流（MGJYXJJE）：17.677626766055 元/股\n- 加权净资产收益率（ROEJQ）：17.76 %\n- 基本每股收益（EPSJB）：11.02 元/股"
+  },
+  {
+    "source_id": "7b0434ecef1f48e0a627c01a",
+    "scope_links": [
+      "A:600900"
+    ],
+    "id": "d7f396e4f215a8872d9602d8",
+    "title": "长江电力财务指标 2026三季报及去年同期",
+    "source": "东方财富财务指标镜像",
+    "url": "https://datacenter.eastmoney.com/securities/api/data/v1/get?reportName=RPT_F10_FINANCE_MAINFINADATA&columns=ALL&filter=%28SECUCODE%3D%22600900.SH%22%29&pageNumber=1&pageSize=8&sortColumns=REPORT_DATE&sortTypes=-1",
+    "published": "2026-10-31T00:00:00",
+    "reading_scope": "结构化字段；完整原始返回保存在缓存，非财报全文",
+    "kind": "financial_baseline",
+    "scope": "A:600900",
+    "period": "2026三季报；2025三季报",
+    "characters": 935,
+    "body_quality": {
+      "status": "no_obvious_promotion_signal",
+      "requires_editorial_review": false,
+      "findings": [],
+      "text_modified": false,
+      "limitation": "启发式提示可能命中报道引用；未命中不保证无推广，不裁决事实或重要性。位置为原始正文字符区间。"
+    },
+    "text": "长江电力财务指标 2026三季报\n供应商结构化指标，尚未与原始财报逐项核对。保持原币种；累计口径不等于单季度，禁止自行混算。\n期间截止：2026-09-30 00:00:00；币种：CNY\n- 营业总收入（TOTALOPERATEREVE）：63056214868.25 元\n- 归母净利润（PARENTNETPROFIT）：26343828523.43 元\n- 扣非归母净利润（KCFJCXSYJLR）：26363462872.22 元\n- 营业总收入同比（TOTALOPERATEREVETZ）：-4.084299212628 %\n- 归母净利润同比（PARENTNETPROFITTZ）：-6.558557808113 %\n- 销售毛利率（XSMLL）：61.2546818773 %\n- 资产负债率（ZCFZL）：57.014852076 %\n- 每股经营现金流（MGJYXJJE）：1.648795655254 元/股\n- 加权净资产收益率（ROEJQ）：11.66 %\n- 基本每股收益（EPSJB）：1.0767 元/股\n\n长江电力财务指标 2025三季报\n供应商结构化指标，尚未与原始财报逐项核对。保持原币种；累计口径不等于单季度，禁止自行混算。\n期间截止：2025-09-30 00:00:00；币种：CNY\n- 营业总收入（TOTALOPERATEREVE）：65741285681.72 元\n- 归母净利润（PARENTNETPROFIT）：28192874494.95 元\n- 扣非归母净利润（KCFJCXSYJLR）：28206547059.13 元\n- 营业总收入同比（TOTALOPERATEREVETZ）：-0.888570804951 %\n- 归母净利润同比（PARENTNETPROFITTZ）：0.599292568456 %\n- 销售毛利率（XSMLL）：62.477197058 %\n- 资产负债率（ZCFZL）：59.0357796035 %\n- 每股经营现金流（MGJYXJJE）：1.753099263286 元/股\n- 加权净资产收益率（ROEJQ）：13.01 %\n- 基本每股收益（EPSJB）：1.1522 元/股"
+  },
+  {
+    "source_id": "cd49a3bbce0395cdb1215c8a",
+    "scope_links": [
+      "A:688535"
+    ],
+    "id": "41bb0f28cb1f81c723839cf0",
+    "title": "华海诚科财务指标 2026三季报及去年同期",
+    "source": "东方财富财务指标镜像",
+    "url": "https://datacenter.eastmoney.com/securities/api/data/v1/get?reportName=RPT_F10_FINANCE_MAINFINADATA&columns=ALL&filter=%28SECUCODE%3D%22688535.SH%22%29&pageNumber=1&pageSize=8&sortColumns=REPORT_DATE&sortTypes=-1",
+    "published": "2026-10-30T00:00:00",
+    "reading_scope": "结构化字段；完整原始返回保存在缓存，非财报全文",
+    "kind": "financial_baseline",
+    "scope": "A:688535",
+    "period": "2026三季报；2025三季报",
+    "characters": 919,
+    "body_quality": {
+      "status": "no_obvious_promotion_signal",
+      "requires_editorial_review": false,
+      "findings": [],
+      "text_modified": false,
+      "limitation": "启发式提示可能命中报道引用；未命中不保证无推广，不裁决事实或重要性。位置为原始正文字符区间。"
+    },
+    "text": "华海诚科财务指标 2026三季报\n供应商结构化指标，尚未与原始财报逐项核对。保持原币种；累计口径不等于单季度，禁止自行混算。\n期间截止：2026-09-30 00:00:00；币种：CNY\n- 营业总收入（TOTALOPERATEREVE）：762683947.81 元\n- 归母净利润（PARENTNETPROFIT）：78297903.53 元\n- 扣非归母净利润（KCFJCXSYJLR）：73153898.74 元\n- 营业总收入同比（TOTALOPERATEREVETZ）：173.123269581652 %\n- 归母净利润同比（PARENTNETPROFITTZ）：290.505005327938 %\n- 销售毛利率（XSMLL）：31.0621501633 %\n- 资产负债率（ZCFZL）：26.291593179 %\n- 每股经营现金流（MGJYXJJE）：0.250173834201 元/股\n- 加权净资产收益率（ROEJQ）：3.51 %\n- 基本每股收益（EPSJB）：0.55 元/股\n\n华海诚科财务指标 2025三季报\n供应商结构化指标，尚未与原始财报逐项核对。保持原币种；累计口径不等于单季度，禁止自行混算。\n期间截止：2025-09-30 00:00:00；币种：CNY\n- 营业总收入（TOTALOPERATEREVE）：279245319.88 元\n- 归母净利润（PARENTNETPROFIT）：20050422.52 元\n- 扣非归母净利润（KCFJCXSYJLR）：18755378.68 元\n- 营业总收入同比（TOTALOPERATEREVETZ）：16.523240335163 %\n- 归母净利润同比（PARENTNETPROFITTZ）：-42.576410584765 %\n- 销售毛利率（XSMLL）：26.1680152532 %\n- 资产负债率（ZCFZL）：28.0666278958 %\n- 每股经营现金流（MGJYXJJE）：-0.019966367791 元/股\n- 加权净资产收益率（ROEJQ）：1.92 %\n- 基本每股收益（EPSJB）：0.16 元/股"
+  }
+]

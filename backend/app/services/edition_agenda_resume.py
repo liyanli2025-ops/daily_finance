@@ -55,8 +55,9 @@ def load_original(directory):
     state = deepcopy(state)
     pending = audit_agenda(state, agenda)
     capture_files(directory, state)
+    _, pool_proof = background_pool(directory, state)
     proof = dict(original_sha256=hashlib.sha256(raw).hexdigest(),
-        response_sha256=hashlib.sha256(response_raw).hexdigest())
+        response_sha256=hashlib.sha256(response_raw).hexdigest(), **pool_proof)
     return state, pending, proof, raw, response_raw
 
 
@@ -79,6 +80,37 @@ def capture_files(directory, state):
     return captures
 
 
+def background_pool(directory, state):
+    """Restore only saved financial background, with original IDs/text/periods."""
+    from .research_hub import Material
+    wanted = {c['baseline_document']:c for c in state.get('candidates', {}).values()
+              if c.get('baseline_document')}
+    if not wanted:
+        return [], {}
+    paths = list((directory/'evidence').glob('episode-*/materials.json'))
+    if len(paths) != 1:
+        raise ValueError('edition_agenda_resume_background_missing')
+    raw = regular(paths[0]).read_bytes()
+    rows = json.loads(raw)
+    meta_raw = regular(paths[0].parent/'meta.json').read_bytes()
+    observed = json.loads(meta_raw)['created_at']
+    items = []
+    for identifier, candidate in wanted.items():
+        matches = [r for r in rows if r.get('id') == identifier]
+        if len(matches) != 1:
+            raise ValueError('edition_agenda_resume_background_missing')
+        row = matches[0]
+        if (row.get('kind') != 'financial_baseline' or row.get('scope') != candidate.get('scope')
+                or not isinstance(row.get('text'), str)
+                or row.get('characters') != len(row['text']) or not row.get('published')
+                or datetime.fromisoformat(row['published']) > datetime.fromisoformat(state['cutoff'])):
+            raise ValueError('edition_agenda_resume_background_invalid')
+        items.append(Material(identifier,row['title'],row['source'],row['url'],row['kind'],row['scope'],
+            row['text'],datetime.fromisoformat(row['published']),observed,row.get('period',''),row.get('reading_scope','')))
+    return items, dict(background_pool_sha256=hashlib.sha256(raw).hexdigest(),
+        background_meta_sha256=hashlib.sha256(meta_raw).hexdigest())
+
+
 async def preview(config, identifier, *, root):
     from .. import edition_once as entry
     entry.require_pause()
@@ -99,6 +131,22 @@ async def preview(config, identifier, *, root):
     forecast = search_batch_plan(state['policy'], edition_forecast(state,
         datetime.fromisoformat(state['cutoff'])), 0, state['reservations'])
     blockers = []
+    minimum_stages = ('assessment','writing','review')
+    from .edition_budget import OUTPUTS
+    models = [r for r in state['reservations'] if r['kind']=='model']
+    if state['policy']['max_model_reservations']-len(models) < len(minimum_stages):
+        blockers.append('edition_model_reservations_insufficient_for_remaining_stages')
+    if state['policy']['total_output_tokens']-sum(r['output_tokens'] for r in models) < sum(OUTPUTS[k] for k in minimum_stages):
+        blockers.append('edition_output_budget_insufficient_for_remaining_stages')
+    from .edition_inputs import messages_for
+    from .edition_context import packet
+    assessment_messages = messages_for('assessment', contract.ASSESS, packet(state,'assessment'),
+        datetime.fromisoformat(state['cutoff']), state['report_type'])
+    known_assessment_characters = sum(len(m['content']) for m in assessment_messages)
+    remaining_input = state['policy']['total_input_characters']-sum(r.get('input_characters',0) for r in models)
+    if (known_assessment_characters > state['policy']['max_input_characters']
+            or known_assessment_characters >= remaining_input):
+        blockers.append('edition_input_budget_insufficient_for_known_assessment')
     if not runtime_status()['ready']: blockers.append('body_extractor_unavailable')
     if not search['available']: blockers.append(search['reason'])
     if not forecast['fits_money']: blockers.append('edition_estimated_budget_exhausted')
@@ -119,7 +167,8 @@ async def preview(config, identifier, *, root):
         prior_search_http_attempts=state.get('search_http_attempts',0),
         prior_public_fetch_attempts=state.get('public_fetch_attempts',0),
         remaining_public_http_attempts=state['policy']['max_body_urls']*3-state.get('public_fetch_attempts',0),
-        remaining_model_reservations=state['policy']['max_model_reservations']-1,
+        remaining_model_reservations=state['policy']['max_model_reservations']-len(models),
+        remaining_input_characters=remaining_input, known_assessment_characters=known_assessment_characters,
         selected_read_ids=[r for e in state['agenda']['events'] for r in e['read_ids']],
         pending_topic_leads=pending, budget_forecast=forecast,
         source_counts=entry.summary(state, directory)['source_counts'],
@@ -155,11 +204,14 @@ async def continue_once(config, identifier, *, root, run=False, input_sha=None):
         if child.exists(): raise ValueError('edition_agenda_resume_incomplete_directory')
         # Persist a child initial state BEFORE the one-attempt marker; old directory
         # content is only read. A crash before/after the marker never buys a new trial.
+        from .edition_release_gate import require_acceptance
+        release_receipt = require_acceptance()
         captures = capture_files(original_dir, state)
+        background, _ = background_pool(original_dir, state)
         child.mkdir(mode=0o700)
         state['agenda_continuation'] = dict(proof, input_sha256=input_sha,
             prior_usage=entry.summary(state, original_dir),
-            repair_source_signature=core.source_signature(), current_identity=fingerprint,
+            repair_source_signature=core.source_signature(), current_identity=fingerprint, release_acceptance=release_receipt,
             started_at=china_now().isoformat(), automatic_retry_allowed=False,
             original_result_preserved=True)
         state.update(status='reading_saved_agenda', resume_allowed=False, manual_run_finished=False)
@@ -176,6 +228,8 @@ async def continue_once(config, identifier, *, root, run=False, input_sha=None):
             for capture in captures:
                 shutil.copyfile(capture, folder/capture.name)
                 (folder/capture.name).chmod(0o600)
+        workspace.add(background)
+        state['agenda_continuation']['background_records_restored'] = len(background)
         workspace.watchlist_signature = entry.watchlist_signature(state['watchlist'])
         workspace.web_search_attempts = state.get('search_http_attempts',0)
         workspace.public_fetch_attempts = state.get('public_fetch_attempts',0)
