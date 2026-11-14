@@ -20,6 +20,7 @@ LIST_URL = 'https://np-anotice-stock.eastmoney.com/api/security/ann'
 BODY_URL = 'https://np-cnotice-stock.eastmoney.com/api/content/ann'
 PROFILE_URL = 'https://emweb.securities.eastmoney.com/PC_HSF10/CompanySurvey/CompanySurveyAjax'
 MAX_BYTES = 2 * 1024 * 1024
+MAX_DOCUMENT_PAGES = 32  # Supplier text chunks, not PDF physical pages.
 PROTOCOL = 'listener_research_v1'
 
 
@@ -270,21 +271,32 @@ class IssuerDesk:
         code, art = document.get('code'), document.get('art_code')
         if code not in self.stocks or not re.fullmatch(r'AN\d+', str(art or '')):
             raise ValueError('edition_issuer_document_invalid')
-        pages, total = [], 1
-        for page in (1, 2):
+        pages, total, size, page = [], 1, 0, 1
+        while page <= total:
             data = self.request(BODY_URL, dict(art_code=art, client_source='web', page_index=page))
             detail = data.get('data') or {}
+            if not isinstance(detail, dict):
+                raise ValueError('edition_issuer_page_structure_invalid')
             text = detail.get('notice_content')
             count = detail.get('page_size')
-            if (detail.get('art_code') != art or str(count) not in {'1', '2'}
-                    or not isinstance(text, str) or len(text.strip()) < 40):
-                raise ValueError('edition_issuer_full_document_unavailable')
+            if detail.get('art_code') != art:
+                raise ValueError('edition_issuer_page_identity_mismatch')
+            if (type(count) not in (int, str) or not re.fullmatch(r'[1-9]\d*', str(count))):
+                raise ValueError('edition_issuer_page_count_invalid')
+            if int(count) > MAX_DOCUMENT_PAGES:
+                raise ValueError('edition_issuer_document_page_limit')
+            if not isinstance(text, str) or len(text.strip()) < 40:
+                raise ValueError('edition_issuer_page_text_unavailable')
             if pages and int(count) != total:
                 raise ValueError('edition_issuer_page_count_changed')
             total = int(count)
+            size += len(text.encode('utf-8'))
+            if size > MAX_BYTES:
+                raise ValueError('edition_issuer_document_text_limit')
             pages.append(text.strip())
-            if page == total:
-                break
+            # request() shares the edition deadline/HTTP ledger and reuses
+            # hash-verified captures. No second request for a received page.
+            page += 1
         if len(pages) != total or len(set(pages)) != total:
             raise ValueError('edition_issuer_pages_incomplete')
         identifier = hashlib.sha256(('issuer:' + code + ':' + art).encode()).hexdigest()[:24]
@@ -295,4 +307,4 @@ class IssuerDesk:
         self.workspace.add([item])
         if identifier not in self.workspace.documents:
             raise ValueError('edition_issuer_body_not_admitted')
-        return dict(status='ok', material=dict(id=identifier))
+        return dict(status='ok', material=dict(id=identifier), supplier_text_pages=total)

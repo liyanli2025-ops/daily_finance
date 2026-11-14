@@ -112,6 +112,9 @@ def main():
             proof_files += ('backend/tests/test_listener_research.py',)
         if manifest.get('daily_changes_tests_required'):
             proof_files += ('backend/tests/test_daily_changes.py',)
+        if manifest.get('issuer_pagination_required'):
+            proof_files += ('backend/tests/fixtures/issuer_three_page_first.json',
+                'tools/complete_issuer_pagination.py')
         if manifest.get('body_acquisition_tests_required'):
             proof_files += ('backend/tests/test_body_acquisition.py',
                 'backend/tests/fixtures/body_acquisition_sample.json',

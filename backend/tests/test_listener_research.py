@@ -186,8 +186,8 @@ class DirectIssuerBoundaries(unittest.TestCase):
             issuer_document=dict(code='002714',art_code='AN1',published_at='2026-11-14T08:00:00'))
         with tempfile.TemporaryDirectory() as root:
             desk = self.desk(root)
-            desk.request = Mock(return_value=dict(data=dict(art_code='AN1',page_size=3,notice_content=FACT*10)))
-            with self.assertRaisesRegex(ValueError, 'full_document_unavailable'):desk.read(candidate)
+            desk.request = Mock(return_value=dict(data=dict(art_code='AN1',page_size=33,notice_content=FACT*10)))
+            with self.assertRaisesRegex(ValueError, 'document_page_limit'):desk.read(candidate)
             desk.request = Mock(return_value=dict(data=dict(art_code='AN1',page_size=2,notice_content=FACT*10)))
             with self.assertRaisesRegex(ValueError, 'pages_incomplete'):desk.read(candidate)
             self.assertFalse(desk.workspace.documents)
@@ -454,3 +454,202 @@ class EndpointEfficiency(unittest.TestCase):
                     desk.request(LIST_URL,{'stock_list':'300750'})
             self.assertEqual(getter.call_count,1)
             self.assertEqual(state['public_fetch_attempts'],1)
+
+
+class IssuerPaginationRegression(unittest.TestCase):
+    """The real three-chunk response must not be rejected as unavailable."""
+    def setup_desk(self, root):
+        from app.services.episode_workspace import EpisodeWorkspace
+        state = listener_state()
+        state['watchlist'] = [dict(market='A', code='300750', name='宁德时代')]
+        workspace = EpisodeWorkspace(root=Path(root), now=NOW)
+        desk = IssuerDesk(state, workspace, Mock(), time.monotonic() + 60)
+        first = json.loads((Path(__file__).parent / 'fixtures/issuer_three_page_first.json').read_text())
+        candidate = dict(title='宁德时代:H股公告(翌日披露报表)',
+            url='https://data.eastmoney.com/notices/detail/300750/AN202611121831664865.html',
+            issuer_document=dict(code='300750',art_code=first['data']['art_code'],published_at='2026-11-12T19:52:31'))
+        # Only page 1 is real. Later text is explicitly synthetic test data.
+        pages = [first] + [dict(data=dict(first['data'], notice_content=('模拟第%d页，不是真实公告。' % n)*12)) for n in (2,3)]
+        return desk, candidate, pages
+
+    def test_real_three_page_first_response_reads_all_chunks_before_admission(self):
+        with tempfile.TemporaryDirectory() as root:
+            desk, candidate, pages = self.setup_desk(root)
+            desk.request = Mock(side_effect=pages)
+            result = desk.read(candidate)
+            self.assertEqual(result['supplier_text_pages'], 3)
+            self.assertEqual([c.args[1]['page_index'] for c in desk.request.call_args_list], [1,2,3])
+            self.assertEqual(len(desk.workspace.documents), 1)
+            self.assertEqual(next(iter(desk.workspace.documents.values())).body,
+                '\n'.join(p['data']['notice_content'].strip() for p in pages))
+
+    def test_single_page_still_requires_one_request(self):
+        with tempfile.TemporaryDirectory() as root:
+            desk,candidate,pages=self.setup_desk(root)
+            pages[0]['data']['page_size']=1
+            desk.request=Mock(return_value=pages[0])
+            self.assertEqual(desk.read(candidate)['supplier_text_pages'],1)
+            desk.request.assert_called_once()
+
+    def test_count_change_does_not_store_partial_body(self):
+        with tempfile.TemporaryDirectory() as root:
+            desk,candidate,pages=self.setup_desk(root)
+            pages[1]['data']['page_size']=2
+            desk.request=Mock(side_effect=pages)
+            with self.assertRaisesRegex(ValueError,'page_count_changed'):desk.read(candidate)
+            self.assertFalse(desk.workspace.documents)
+            self.assertEqual(desk.request.call_count,2)
+
+    def test_identity_change_does_not_store_partial_body(self):
+        with tempfile.TemporaryDirectory() as root:
+            desk,candidate,pages=self.setup_desk(root)
+            pages[1]['data']['art_code']='AN999'
+            desk.request=Mock(side_effect=pages)
+            with self.assertRaisesRegex(ValueError,'page_identity_mismatch'):desk.read(candidate)
+            self.assertFalse(desk.workspace.documents)
+
+    def test_invalid_counts_and_excessive_count_stop_on_first_page(self):
+        for count in (0,-1,True,3.5,'03','x',None,33):
+            with self.subTest(count=count), tempfile.TemporaryDirectory() as root:
+                desk,candidate,pages=self.setup_desk(root)
+                pages[0]['data']['page_size']=count
+                desk.request=Mock(return_value=pages[0])
+                with self.assertRaisesRegex(ValueError,'page_count_invalid|document_page_limit'):desk.read(candidate)
+                desk.request.assert_called_once()
+                self.assertFalse(desk.workspace.documents)
+
+    def test_later_empty_page_does_not_store_partial_body(self):
+        with tempfile.TemporaryDirectory() as root:
+            desk,candidate,pages=self.setup_desk(root)
+            pages[2]['data']['notice_content']=''
+            desk.request=Mock(side_effect=pages)
+            with self.assertRaisesRegex(ValueError,'page_text_unavailable'):desk.read(candidate)
+            self.assertFalse(desk.workspace.documents)
+
+    def test_duplicate_pages_do_not_become_complete_body(self):
+        with tempfile.TemporaryDirectory() as root:
+            desk,candidate,pages=self.setup_desk(root)
+            pages[2]=copy.deepcopy(pages[1])
+            desk.request=Mock(side_effect=pages)
+            with self.assertRaisesRegex(ValueError,'pages_incomplete'):desk.read(candidate)
+            self.assertFalse(desk.workspace.documents)
+
+    def test_total_text_limit_does_not_store_partial_body(self):
+        with tempfile.TemporaryDirectory() as root:
+            desk,candidate,pages=self.setup_desk(root)
+            desk.request=Mock(side_effect=pages)
+            with patch('app.services.edition_issuer_desk.MAX_BYTES',500):
+                with self.assertRaisesRegex(ValueError,'document_text_limit'):desk.read(candidate)
+            self.assertFalse(desk.workspace.documents)
+
+    def test_received_first_page_is_reused_and_budget_counts_only_new_pages(self):
+        import hashlib
+        from app.services.research_hub import save_json
+        with tempfile.TemporaryDirectory() as root:
+            desk,candidate,pages=self.setup_desk(root)
+            params=dict(art_code=candidate['issuer_document']['art_code'],client_source='web',page_index=1)
+            key=hashlib.sha256(json.dumps([BODY_URL,params],sort_keys=True).encode()).hexdigest()
+            desk.folder.mkdir()
+            capture=desk.folder/(key+'.json');save_json(capture,pages[0])
+            desk.state['issuer_http_receipts']=[dict(key=key,status='received',capture=capture.name,
+                sha256=hashlib.sha256(capture.read_bytes()).hexdigest())]
+            desk.workspace.public_fetch_attempts=6
+            responses=[]
+            for page in pages[1:]:
+                response=Mock(status_code=200)
+                response.iter_content.return_value=[json.dumps(page).encode()]
+                responses.append(response)
+            desk.get=Mock(side_effect=responses)
+            with patch('app.services.source_health.ensure_active'):
+                desk.read(candidate)
+            self.assertEqual(desk.get.call_count,2)
+            self.assertEqual(desk.workspace.public_fetch_attempts,8)
+
+    def test_later_budget_failure_keeps_partial_body_out(self):
+        with tempfile.TemporaryDirectory() as root:
+            desk,candidate,pages=self.setup_desk(root)
+            desk.request=Mock(side_effect=[pages[0],ValueError('edition_public_http_budget_exhausted')])
+            with self.assertRaisesRegex(ValueError,'public_http_budget'):desk.read(candidate)
+            self.assertFalse(desk.workspace.documents)
+
+
+class IssuerPaginationCompletion(unittest.TestCase):
+    def setup_probe(self, root):
+        import importlib.util
+        import hashlib
+        from app.services.research_hub import save_json
+        tool = Path(__file__).parents[2] / 'tools/complete_issuer_pagination.py'
+        spec=importlib.util.spec_from_file_location('issuer_completion_under_test',tool)
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        project=Path(root)
+        folder=project/'backend/data/diagnostics/body-acquisition-v44'
+        captures=folder/'evidence/episode-saved/issuer-responses'
+        captures.mkdir(parents=True)
+        first=json.loads((Path(__file__).parent/'fixtures/issuer_three_page_first.json').read_text())
+        art=first['data']['art_code']
+        stock=dict(code='300750',name='宁德时代',market='A')
+        row=dict(stock=stock,selected_title=first['data']['notice_title'],
+            url=f'https://data.eastmoney.com/notices/detail/300750/{art}.html',
+            status='failed',reason='edition_issuer_full_document_unavailable')
+        catalogue=dict(data=dict(list=[dict(art_code=art,display_time='2026-11-12 19:52:31',
+            notice_date='2026-11-12',title=row['selected_title'],codes=[dict(stock_code='300750')])]))
+        receipts=[]
+        for url,params,data in [(LIST_URL,dict(sr=-1,page_size=20,page_index=1,ann_type='A',client_source='web',stock_list='300750'),catalogue),
+                (BODY_URL,dict(art_code=art,client_source='web',page_index=1),first)]:
+            key=hashlib.sha256(json.dumps([url,params],sort_keys=True).encode()).hexdigest()
+            path=captures/(key+'.json');save_json(path,data)
+            receipts.append(dict(key=key,url=url,parameters=params,status='received',capture=path.name,
+                sha256=hashlib.sha256(path.read_bytes()).hexdigest()))
+        state=dict(policy=dict(max_body_urls=4),watchlist=[stock],cutoff=NOW.isoformat(),rows=[row],
+            issuer_http_receipts=receipts,public_fetch_attempts=2)
+        save_json(folder/'transport.json',state)
+        save_json(folder/'result.json',dict(mode='public_issuer_body_probe'))
+        return module,project,folder,first
+
+    def test_preview_does_not_make_requests_or_create_completion_stage(self):
+        with tempfile.TemporaryDirectory() as root:
+            tool,project,folder,first=self.setup_probe(root)
+            with patch('requests.get') as get:
+                plan=tool.complete(project,False)
+            get.assert_not_called()
+            self.assertEqual(plan['max_new_public_http_requests'],2)
+            self.assertFalse((folder/'pagination-completion-v45').exists())
+
+    def test_completion_reuses_cache_preserves_original_and_does_not_repeat(self):
+        with tempfile.TemporaryDirectory() as root:
+            tool,project,folder,first=self.setup_probe(root)
+            before=(folder/'transport.json').read_bytes()
+            responses=[]
+            for n in (2,3):
+                response=Mock(status_code=200)
+                response.iter_content.return_value=[json.dumps(dict(data=dict(first['data'],
+                    notice_content=('模拟分页%d，非真实公告。'%n)*12))).encode()]
+                responses.append(response)
+            with patch('requests.get',side_effect=responses) as get, patch('app.services.source_health.ensure_active'):
+                result=tool.complete(project,True)
+                again=tool.complete(project,True)
+            self.assertEqual(get.call_count,2)
+            self.assertEqual(result['status'],'stored_pending_assessment')
+            self.assertEqual(result['new_public_http_requests'],2)
+            self.assertEqual(result['cumulative_public_http_requests'],4)
+            self.assertTrue(result['original_files_unchanged'])
+            self.assertEqual(before,(folder/'transport.json').read_bytes())
+            self.assertTrue(again['reused_saved_result'])
+            self.assertEqual(again['new_public_http_requests'],0)
+
+    def test_changed_capture_stops_before_request(self):
+        with tempfile.TemporaryDirectory() as root:
+            tool,project,folder,first=self.setup_probe(root)
+            path=next((folder/'evidence/episode-saved/issuer-responses').glob('*.json'))
+            path.write_text('{}')
+            with patch('requests.get') as get:
+                with self.assertRaisesRegex(ValueError,'capture_changed'):tool.complete(project,True)
+            get.assert_not_called()
+
+    def test_incomplete_prior_stage_stops_without_retry(self):
+        with tempfile.TemporaryDirectory() as root:
+            tool,project,folder,first=self.setup_probe(root)
+            (folder/'pagination-completion-v45').mkdir()
+            with patch('requests.get') as get:
+                with self.assertRaisesRegex(ValueError,'no_automatic_retry'):tool.complete(project,True)
+            get.assert_not_called()
