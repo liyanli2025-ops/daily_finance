@@ -50,7 +50,7 @@ def assessment_index(value):
     result.update(index)
     result['candidate_view_note']=('本阶段为已选题后的标题索引：全部候选ID、标题、站点、日期及特殊警示保留。'
         'source_origin仅为站点，不是文章地址；完整URL、旧摘要及执行查询已在选题阶段提供并保存在本地，'
-        '此处不重复发送。现有实际正文逐字保留；未读候选需按candidate_id提出补读，不得据标题确认事实。')
+        '此处不重复发送。正文按reading_limit与provided_original_ranges说明阅读范围，完整原文在本地保留；未读候选需按candidate_id提出补读，不得据标题确认事实。')
     tables={}
     for name in ('change_coverage','company_questions','read_receipts'):
         records=result.get(name)

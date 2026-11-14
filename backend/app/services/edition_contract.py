@@ -15,7 +15,7 @@ importance仅major/context，purpose仅discovery/latest_close/released_policy/co
 ASSESS = '''核对事件单与实际全文，特别检查重要事件遗漏、事实依据、不同解释、条件、发布时间和交易时段。
 不要把一篇美债稿充作全部国际事件覆盖；失败来源不等于没有事件。逐项检查综述正文里新增的其他重大事件，不能只按标题归类。已存正文可关联多个事件并复用，不增加来源数、不当独立核实；每个事件仍需匹配的逐字依据和时点，媒体预测不升级为确定结果。评论不能当原披露，盘中/旧时段不能充最新收盘。
 返回：{"events":[{"id":"E1","status":"ready","reason":"证据及边界","evidence":[{"source_id":"正文ID","quote":"正文逐字依据，2至400字"}]}],"missed_major_events":[],"additional_searches":[],"additional_reads":[],"watchlist_checks":[{"key":"A:代码","status":"covered","reason":"实际查到或未查到什么"}]}
-events必须逐项包含原事件；status仅ready/missing/excluded。major缺正文或仍待核必须missing，不以改成excluded掩盖。ready至少一个实际正文逐字依据，保留原文换行。validation_issues为程序发现的引用/用途问题，必须以实际正文补查或明确missing，不能通过改写解释掩盖。
+events必须逐项包含原事件；status仅ready/missing/excluded。evidence_view.use=pending_verification的资料不能支持ready，须另找原始依据；attributed_commentary只可支持purpose=commentary的署名观点，不能证明其中新闻或数字。不能把免责声明当佐证。major缺正文或仍待核必须missing，不以改成excluded掩盖。ready至少一个实际正文逐字依据，保留原文换行。validation_issues为程序发现的引用/用途问题，必须以实际正文补查或明确missing，不能通过改写解释掩盖。
 missed_major_events可追加新发现的major事件，格式与选题单事件相同。补查搜索项为{event_id,query,purpose,increment,reason}，读取项为{event_id,candidate_id,increment,reason}。increment仅original_source/new_update/independent_verification/counterevidence/missing_context/access_failure；reason用12至400字说明要核对的具体事实或缺口，不能只说“补充资料”。每个事件同类缺口只选一篇；补搜结果程序按元数据筛一篇，不整批下载。不同网站转载同一稿不构成独立核实；新进展或反方来源可以另读。
 watchlist_checks逐项包含所有当前自选股，status为covered/missing/no_material_event；covered需附evidence=[{source_id,quote}]并引用主体匹配的正文。no_material_event说明已检查什么，不能凭搜索失败断言没有新闻。
 若提示last_assessment=true，不再提出补查；仍有重要缺口明确missing，交部分资料，禁止编事实。'''
@@ -125,6 +125,8 @@ def assess(value, events, sources, stocks):
                         or purpose == 'latest_close' and role.get('latest_close_allowed') is False):
                     raise ValueError('edition_evidence_role_invalid')
                 quote(check.get('quote'), source['text'])
+                from .edition_evidence_view import assert_quote
+                assert_quote(source, check['quote'], purpose)
         if events[row['id']]['importance'] == 'major' and row['status'] != 'ready':
             missing.append(row['id'])
     checks = value.get('watchlist_checks')
@@ -146,6 +148,8 @@ def assess(value, events, sources, stocks):
                 if not source or check['key'] not in source.get('direct_scopes', []):
                     raise ValueError('edition_company_subject_mismatch')
                 quote(item.get('quote'), source['text'])
+                from .edition_evidence_view import assert_quote
+                assert_quote(source, item['quote'], 'company_event')
     return missing
 
 
@@ -170,7 +174,7 @@ def _source_quote(value, text):
     return original
 
 
-def prepare_assessment(value, events, sources, stocks, provided_ids):
+def prepare_assessment(value, events, sources, stocks, provided_ids, provided_ranges=None):
     """Admit explicit citations from delivered bodies, or preserve a material gap.
 
     Pure/transactional: original replies, bodies, roles and company scopes never
@@ -214,6 +218,9 @@ def prepare_assessment(value, events, sources, stocks, provided_ids):
                         elif key not in source.get('direct_scopes', []):
                             raise ValueError('edition_company_subject_mismatch')
                         original = _source_quote(item.get('quote'), source['text'])
+                        from .edition_evidence_view import assert_quote
+                        assert_quote(source, original, events[key]['purpose'] if kind == 'event' else 'company_event',
+                            (provided_ranges or {}).get(sid))
                         checked.append((sid, item, original))
                     except ValueError as error:
                         failures.append(dict(code=str(error), source_id=sid))
@@ -248,6 +255,8 @@ def anchors(rows, sources, body, *, reviewed=False):
         if sid not in sources or reviewed and row.get('status') != 'supported':
             raise ValueError('edition_source_check_invalid')
         quote(row.get('source_quote'), sources[sid]['text'])
+        from .edition_evidence_view import assert_quote
+        assert_quote(sources[sid], row['source_quote'])
         quote(row.get('report_quote'), body)
         checked.add(sid)
     cited = set(re.findall(r'\[N:([^\]\s]+)\]', body))

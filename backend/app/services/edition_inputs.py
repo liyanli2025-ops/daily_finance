@@ -36,16 +36,24 @@ def messages_for(stage, prompt, value, now, report_type):
 def assemble_request(stage, prompt, value, now, report_type, limit):
     messages=messages_for(stage,prompt,value,now,report_type)
     original=sum(len(m['content']) for m in messages)
-    selected=value
-    if original>limit and stage in {'assessment','patch_assessment'}:
+    from .edition_evidence_view import view
+    selected=deepcopy(value)
+    selected['sources']={sid:view(s) for sid,s in value.get('sources',{}).items()}
+    if not value.get('sources'): selected=value
+    messages=messages_for(stage,prompt,selected,now,report_type)
+    screened=sum(len(m['content']) for m in messages)
+    indexed=False
+    if screened>limit and stage in {'assessment','patch_assessment'}:
         from .edition_request_view import assessment_index
-        selected=assessment_index(value)
+        selected=assessment_index(selected)
+        indexed=True
         messages=messages_for(stage,prompt,selected,now,report_type)
     count=sum(len(m['content']) for m in messages)
     return selected,messages,dict(original_characters=original,request_characters=count,
         limit_characters=limit,fits_input=count<=limit,
-        candidate_index_used=selected is not value,
-        full_source_bodies_preserved=True)
+        candidate_index_used=indexed,
+        full_source_bodies_preserved=all(s['text']==value['sources'][sid]['text'] for sid,s in selected.get('sources',{}).items()),
+        original_sources_preserved_locally=True)
 
 
 def editorial_forecast(state, now):

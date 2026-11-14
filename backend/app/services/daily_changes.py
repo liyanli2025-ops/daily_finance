@@ -245,6 +245,8 @@ def validate_checks(state, value, provided):
                         or s.get('metadata', {}).get('kind') == 'financial_baseline'
                         or task.get('scope') and task['scope'] not in s.get('direct_scopes', [])):
                     raise ValueError('edition_change_evidence_invalid')
+                from .edition_evidence_view import assert_quote
+                assert_quote(s,e['quote'],'discovery',state.get('delivered_source_ranges',{}).get(state.get('phase'),{}).get(s['id']))
         if row['status'] == 'missing':
             missing.append('change:' + row['task_id'])
     return missing
@@ -269,6 +271,9 @@ def validate_expectations(state, value, provided):
                     or not isinstance(e.get('quote'), str) or not 2 <= len(e['quote']) <= 400
                     or e['quote'] not in s['text']):
                 raise ValueError('edition_expectation_evidence_invalid')
+            from .edition_evidence_view import assert_quote
+            assert_quote(s,e['quote'],'discovery' if key=='actual' else None,
+                state.get('delivered_source_ranges',{}).get(state.get('phase'),{}).get(s['id']))
         from datetime import datetime, timezone, timedelta
         try:
             actual, baseline = row['actual'], row['baseline']

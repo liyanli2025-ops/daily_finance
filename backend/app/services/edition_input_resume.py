@@ -80,17 +80,19 @@ async def preview(config,directory):
         blockers.append('edition_total_input_budget_exhausted')
     if state.get('active_seconds',0)>=config.research_max_seconds:blockers.append('edition_time_exhausted')
     identity=entry.identity(state['watchlist'],state['report_type'],config)
-    fingerprint=core.digest(dict(proof=proof,identity=identity,capacity=capacity))
+    from .edition_evidence_view import audit
+    screening=audit(state['sources'])
+    fingerprint=core.digest(dict(proof=proof,identity=identity,capacity=capacity,screening=screening))
     clock=china_now()
     return dict(mode='saved_bodies_input_capacity_preview',ready_to_run=not blockers,blockers=blockers,
         id=state['id'],prepared_at=clock.isoformat(),expires_at=(clock+timedelta(hours=2)).isoformat(),
-        input_sha256=fingerprint,capacity=capacity,budget_forecast=forecast,
+        input_sha256=fingerprint,capacity=capacity,budget_forecast=forecast,evidence_screening=screening,
         original_cutoff=state['cutoff'],estimated_limit_usd=policy['estimated_limit_usd'],
         retained_article_bodies=sum(bool(s.get('candidate_id')) for s in state['sources'].values()),
         prior_model_http_attempts=state['model_http_attempts'],prior_search_http_attempts=state['search_http_attempts'],
         prior_public_fetch_attempts=state['public_fetch_attempts'],
         model_requests=0,search_requests=0,public_fetch_attempts=0,tts_requests=0,
-        limitation='免费复核已存正文；全篇原文不裁剪。相同一期、截止与累计预算；真实内容质量仍待评估，未知补查和稿件可改变费用。'),state,proof,identity
+        limitation='免费复核已存正文；原文完整保留，明确页面杂项只从阅读视图移出；待核和评论按用途限制。相同一期、截止与累计预算；真实内容质量仍待评估，未知补查和稿件可改变费用。'),state,proof,identity
 
 
 async def continue_once(config,directory,*,run=False,input_sha=None):

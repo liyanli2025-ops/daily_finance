@@ -189,6 +189,12 @@ class EditionPipeline:
                 title=self.state['candidates'][cid]['title'], url=self.state['candidates'][cid]['url'])
                 for cid in row.get('selected_ids', [])]
             lines.append('文章选择：' + json.dumps(selection, ensure_ascii=False))
+        from .edition_evidence_view import audit,report
+        quality=audit(self.state.get('sources',{}))
+        save_json(self.path/'evidence-screening.json',quality)
+        fd=os.open(self.path/'evidence-screening.txt',os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
+        with os.fdopen(fd,'w') as stream:stream.write(report(self.state.get('sources',{})))
+        lines.append('正文筛选：' + json.dumps(quality,ensure_ascii=False))
         for row in self.state.get('input_audit', []):
             lines.append('阶段输入：' + json.dumps(row, ensure_ascii=False))
         for row in self.state.get('usage', []):
@@ -267,7 +273,10 @@ class EditionPipeline:
         number = sum(r['kind'] == 'model' for r in self.state['reservations'])
         save_json(self.path / ('response-' + str(number) + '.json'), dict(stage=stage, text=raw))
         self.state.setdefault('delivered_sources', {})[stage] = {
-            i: digest(s['text']) for i, s in value.get('sources', {}).items()}
+            i: digest(self.state['sources'][i]['text']) for i,s in value.get('sources', {}).items() if s['text']}
+        self.state.setdefault('delivered_source_ranges', {})[stage] = {
+            i: s.get('provided_original_ranges', [[0,len(self.state['sources'][i]['text'])]])
+            for i,s in value.get('sources', {}).items()}
         self.save()
         return contract.decode(raw)
 
@@ -485,7 +494,8 @@ class EditionPipeline:
             from .listener_research import restrict_baselines
             assessment = restrict_baselines(assessment, events, self.state['sources'])
         accepted, sources, validation = contract.prepare_assessment(
-            assessment, events, self.state['sources'], stocks, provided)
+            assessment, events, self.state['sources'], stocks, provided,
+            self.state.get('delivered_source_ranges',{}).get(stage))
         self.state['sources'] = sources
         from .daily_changes import enabled, validate_checks, validate_expectations, validate_topics
         if enabled(self.state):

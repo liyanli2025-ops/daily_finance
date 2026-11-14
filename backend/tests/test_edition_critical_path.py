@@ -336,9 +336,11 @@ class SavedInputCapacity(unittest.IsolatedAsyncioTestCase):
             directory,s=self.source(root);before=copy.deepcopy(s)
             now=datetime.fromisoformat(s['cutoff']);value=core.packet(s,'assessment')
             selected,messages,capacity=assemble_request('assessment',contract.ASSESS,value,now,'morning',65000)
-            self.assertEqual(capacity['original_characters'],85002)
+            self.assertGreater(capacity['original_characters'],85002)
             self.assertLessEqual(capacity['request_characters'],65000)
-            self.assertTrue(capacity['candidate_index_used']);self.assertEqual(selected['sources'],value['sources'])
+            self.assertTrue(capacity['candidate_index_used'])
+            from app.services.edition_evidence_view import view
+            self.assertEqual(selected['sources'],{sid:view(s) for sid,s in value['sources'].items()})
             original=candidates_from(value);indexed=candidates_from(selected)
             self.assertEqual(len(original),65);self.assertEqual(set(original),set(indexed))
             for cid,row in original.items():
@@ -366,7 +368,8 @@ class SavedInputCapacity(unittest.IsolatedAsyncioTestCase):
                 content=body['messages'][-1]['content']
                 if isinstance(content,list):content=next(r['text'] for r in content if r['type']=='text')
                 actual=json.loads(content)
-                for sid,source in old['sources'].items():self.assertEqual(actual['sources'][sid]['text'],source['text'])
+                from app.services.edition_evidence_view import view
+                for sid,source in old['sources'].items():self.assertEqual(actual['sources'][sid]['text'],view(source)['text'])
                 return original_post(url,body)
             with patch.object(h,'post',side_effect=child_post),patch.object(gate,'require_acceptance',return_value={'offline_test':True}):
                 result,path,reused=await stored.continue_once(h.config,directory,run=True,input_sha=plan['input_sha256'])
@@ -421,7 +424,7 @@ class SavedInputCapacity(unittest.IsolatedAsyncioTestCase):
         from app.services import edition_input_resume as stored
         with tempfile.TemporaryDirectory() as root,Harness(root) as h:
             directory,s=self.source(root);pool=next(directory.glob('evidence/episode-*/materials.json'))
-            rows=json.loads(pool.read_text());source=next(v for v in s['sources'].values() if v.get('candidate_id'))
+            rows=json.loads(pool.read_text());source=next(v for v in s['sources'].values() if v.get('metadata',{}).get('kind')=='primary_notice')
             source['text']+='\n不得静默截取的正文'*12000
             for row in rows:
                 if row['id']==source['id']:row.update(text=source['text'],characters=len(source['text']))
@@ -441,3 +444,126 @@ class SavedInputCapacity(unittest.IsolatedAsyncioTestCase):
             with entry.manual_text_scope(s['id'],h.config),self.assertRaisesRegex(ValueError,'edition_future_input_capacity_exhausted'):
                 await p.call('agenda',contract.AGENDA,p.packet('agenda'))
             self.assertEqual(s['budget_block']['stage'],'writing');self.assertEqual(h.model_calls,[])
+
+
+class EvidenceScreening(unittest.TestCase):
+    def source(self, text, **kw):
+        return dict(id='news',text=text,title='公司新闻',url='https://example.org/news',
+                    event_ids=['E1'],metadata={'kind':'news'},**kw)
+
+    def real(self):
+        with zipfile.ZipFile(FIX/'v47_input_failure.zip') as z:
+            return json.loads(z.read('result.json'))
+
+    def test_real_five_bodies_noise_roles_quotes_and_disclosures(self):
+        from app.services.edition_evidence_view import audit,view,assert_quote
+        s=self.real();before=copy.deepcopy(s);summary=audit(s['sources'])
+        self.assertEqual(summary['original_article_characters'],27760)
+        self.assertEqual(len(summary['pending_verification']),2)
+        self.assertEqual(len(summary['commentary']),1)
+        self.assertGreater(summary['removed_characters'],1500)
+        for sid in ('4dc80ed6482b30c70c799d3b','4acc823141b6262043010e36'):
+            self.assertEqual(view(s['sources'][sid]),s['sources'][sid])
+        kitco=s['sources']['web-13cc240830ffa2ac810b4bc9'];clean=view(kitco)
+        self.assertNotIn('Look first, then leap.',clean['text']);self.assertIn('Disclaimer:',clean['text'])
+        self.assertIn('Peter Schiff',clean['text']);self.assertIn('If',clean['text'])
+        for sid in summary['pending_verification']:
+            source=s['sources'][sid]
+            with self.assertRaisesRegex(ValueError,'requires_confirmation'):
+                assert_quote(source,source['text'][:50],'discovery')
+        with self.assertRaisesRegex(ValueError,'commentary_not_factual'):
+            assert_quote(kitco,'A Democratic majority in Congress','discovery')
+        assert_quote(kitco,'A Democratic majority in Congress','commentary')
+        self.assertEqual(s,before)
+        EVIDENCE['cases']['real_evidence_screening']=dict(outcome='cleaned_with_verification_gaps',assertions_passed=True,
+            article_bodies=5,removed_characters=summary['removed_characters'],pending_verification=2,commentary=1,
+            issuer_bodies_unchanged=True,unsafe_quotes_blocked=True)
+
+    def test_quoted_promotion_and_advertising_reporting_are_kept(self):
+        from app.services.edition_evidence_view import view
+        t='监管调查广告投放。\n“Advertisements”是页面中的广告标签。\n报道称：“It is time to seize this price opportunity and invest in gold.”\n公司否认宣传，客户要求退款。'
+        s=self.source(t);self.assertEqual(view(s),s)
+
+    def test_generic_english_news_and_ipo_reporting_are_not_blacklisted(self):
+        from app.services.edition_evidence_view import screen,view
+        s=self.source('The company filed an IPO prospectus on Friday. Revenue fell 5%.\nIts rival disputed the forecast. If demand falls, margins may decline.')
+        self.assertEqual(screen(s)['use'],'evidence_candidate');self.assertEqual(view(s),s)
+
+    def test_no_hardcoded_domains_ids_dates_or_company_names(self):
+        from app.services.edition_evidence_view import screen
+        s=self.source('A founder resignation was reported. An interim CEO is in place. An IPO may follow.')
+        self.assertEqual(screen(s)['use'],'pending_verification')
+        s['text']='法院裁定融资案不成立。管理层否认遭调查。'
+        self.assertEqual(screen(s)['use'],'evidence_candidate')
+
+    def test_unknown_layout_falls_back_to_whole_body_and_capacity_guard(self):
+        from app.services.edition_evidence_view import view
+        s=self.source('Read also\n:\nA contrary view of company pricing\nDisclaimer:\nNot investment advice.\nTradingView is named in the report.')
+        self.assertEqual(view(s),s)
+
+    def test_disclosure_table_units_negations_restrictions_and_footnotes_are_whole(self):
+        from app.services.edition_evidence_view import view
+        s=self.source('单周\n最近两日\n币种 CNY\nA股 290900 69964683\nAdvertisements\n注：未注销；拟于30日后行动，受监管许可条件限制。')
+        s['metadata']['kind']='primary_notice'
+        self.assertEqual(view(s),s)
+
+    def test_standalone_ad_label_never_deletes_following_news(self):
+        from app.services.edition_evidence_view import view,screen
+        s=self.source('事实一。\nAdvertisements\n反方：需求可能下降，不能据此推断订单改善。')
+        t=view(s)['text'];self.assertIn('事实一。',t);self.assertIn('反方：需求可能下降',t)
+        self.assertEqual(screen(s)['removed_characters'],15)
+
+    def test_cta_like_statement_in_denial_or_quotation_is_not_removed(self):
+        from app.services.edition_evidence_view import view
+        for prefix in ('The company denied saying: ','“','Analysts criticised the wording: '):
+            s=self.source(prefix+'It is time to seize this price opportunity and invest in gold.\n')
+            self.assertEqual(view(s),s)
+
+    def test_same_words_across_a_removed_interval_are_not_a_quote(self):
+        from app.services.edition_evidence_view import assert_quote
+        s=self.source('前段证据\nAdvertisements\n后段条件')
+        with self.assertRaisesRegex(ValueError,'outside_evidence_view'):
+            assert_quote(s,'前段证据\nAdvertisements\n后段条件')
+        with self.assertRaisesRegex(ValueError,'outside_evidence_view'):
+            assert_quote(s,'后段条件',delivered_ranges=[[0,4]])
+
+    def test_view_is_idempotent_and_cannot_be_quoted_as_full_raw_text(self):
+        from app.services.edition_evidence_view import view,assert_quote,SEPARATOR
+        s=self.source('前段证据\nAdvertisements\n后段条件');v=view(s)
+        self.assertEqual(view(v),v)
+        with self.assertRaisesRegex(ValueError,'crosses_omission'):assert_quote(v,'证据\n'+SEPARATOR.strip()+'\n后段')
+
+    def test_pending_source_cannot_pass_assessment_by_quoting_an_unrelated_sentence(self):
+        from app.services.edition_evidence_view import view
+        s=self.real();sid='web-398b81bfdf7f4b0afec3f21e';source=s['sources'][sid]
+        events={e['id']:e for e in s['agenda']['events']};eid=source['event_ids'][0]
+        rows=[dict(id=e,status='missing',reason='待核',evidence=[]) for e in events]
+        next(r for r in rows if r['id']==eid).update(status='ready',evidence=[dict(source_id=sid,quote='U.S. stocks finished mixed Friday')])
+        checks=[dict(key=r['market']+':'+r['code'],status='missing',reason='无直接证据') for r in s['watchlist']]
+        accepted,_,validation=contract.prepare_assessment(dict(events=rows,watchlist_checks=checks),events,s['sources'],
+            {r['key'] for r in checks},{sid})
+        self.assertEqual(next(r for r in accepted['events'] if r['id']==eid)['status'],'missing')
+        self.assertIn('edition_source_requires_confirmation',str(validation))
+
+    def test_clear_source_can_replace_quarantined_lead_without_deleting_event(self):
+        s=self.real();events={e['id']:e for e in s['agenda']['events']};eid='E2'
+        source=self.source('公司已发布正式声明，董事会批准人员变更。');source['event_ids']=[eid]
+        source['metadata']['kind']='primary_notice'
+        rows=[dict(id=e,status='missing',reason='待核',evidence=[]) for e in events]
+        next(r for r in rows if r['id']==eid).update(status='ready',evidence=[dict(source_id='news',quote='董事会批准人员变更')])
+        checks=[dict(key=r['market']+':'+r['code'],status='missing',reason='无直接证据') for r in s['watchlist']]
+        accepted,_,_=contract.prepare_assessment(dict(events=rows,watchlist_checks=checks),events,{'news':source},
+            {r['key'] for r in checks},{'news'})
+        self.assertEqual(next(r for r in accepted['events'] if r['id']==eid)['status'],'ready')
+
+    def test_multiline_quoted_page_labels_are_not_removed(self):
+        from app.services.edition_evidence_view import view
+        s=self.source('记者引用该页：“\nAdvertisements\n某某产品广告\n”\n报道指出该宣传存在误导风险。')
+        self.assertEqual(view(s),s)
+
+    def test_quarantined_body_is_local_only_not_sent_to_any_model_stage(self):
+        from app.services.edition_evidence_view import view,report
+        s=self.real();source=s['sources']['web-398b81bfdf7f4b0afec3f21e']
+        v=view(source);self.assertEqual(v['text'],'');self.assertEqual(v['provided_original_ranges'],[])
+        self.assertIn('Jensen Huang',report({'source':source}))
+        self.assertEqual(v['title'],source['title']);self.assertTrue(v['evidence_view']['reasons'])

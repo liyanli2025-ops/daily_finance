@@ -68,6 +68,9 @@ def editorial_source_packet(source, state):
     remain whole, so an inconvenient or contrary source cannot disappear.
     """
     result = source_packet(source)
+    from .edition_evidence_view import view
+    cleaned=view(result)
+    if cleaned != result: return cleaned
     if not state.get('continuation_catalogue_ids'):
         return result
     assessment = state.get('assessment') or {}
