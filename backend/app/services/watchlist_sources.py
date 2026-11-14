@@ -154,21 +154,27 @@ def fetch_sina_stock_news(stock, hours=24, now=None):
                        body_errors=errors)
 
 
-def fetch_company_announcements(stock, hours=24, now=None):
+def fetch_company_announcements(stock, hours=24, now=None, *, request_get=None,
+                                max_announcements=3, max_pages=5, deadline=None):
     """Search each A-share issuer, then read full announcement text for fresh hits.
 
     display_time is public availability; notice_date is a separate document date.
     Never substitute a retrieval time or the next-day document date for release time.
     """
+    if type(max_announcements) is not int or not 1 <= max_announcements <= 3:
+        raise ValueError('announcement_count_invalid')
+    if type(max_pages) is not int or not 1 <= max_pages <= 5:
+        raise ValueError('announcement_pages_invalid')
     now = now or china_now()
     if str(getattr(stock.market, 'value', stock.market)) != 'A':
         return [], {'status':'unsupported', 'reason':'此公告源仅支持A股'}
-    deadline = time.monotonic() + 35
+    deadline = min(deadline, time.monotonic() + 35) if deadline is not None else time.monotonic() + 35
+    transport = request_get or requests.get
     def get(url, **kwargs):
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise requests.Timeout('公告采集预算已耗尽')
-        return requests.get(url, timeout=min(10, remaining), **kwargs)
+        return transport(url, timeout=min(10, remaining), **kwargs)
     response = get('https://np-anotice-stock.eastmoney.com/api/security/ann',
                             params={'sr':-1, 'page_size':20, 'page_index':1, 'ann_type':'A',
                                     'client_source':'web', 'stock_list':stock.code})
@@ -189,14 +195,14 @@ def fetch_company_announcements(stock, hours=24, now=None):
         if now - timedelta(hours=hours) <= published:
             matches.append((published, row))
     result, errors = [], []
-    for published, row in sorted(matches, key=lambda pair: pair[0], reverse=True)[:3]:
+    for published, row in sorted(matches, key=lambda pair: pair[0], reverse=True)[:max_announcements]:
         art = str(row.get('art_code', ''))
         if not re.fullmatch(r'AN\d+', art):
             continue
         try:
             pages = []
             page_count = 1
-            for page in range(1, 6):
+            for page in range(1, max_pages + 1):
                 body = get('https://np-cnotice-stock.eastmoney.com/api/content/ann',
                            params={'art_code':art, 'client_source':'web', 'page_index':page})
                 body.raise_for_status()
@@ -205,8 +211,8 @@ def fetch_company_announcements(stock, hours=24, now=None):
                     raise ValueError('公告正文编号不匹配')
                 page_count = int(detail.get('page_size', 0))
                 content = detail.get('notice_content')
-                if not 1 <= page_count <= 5 or not isinstance(content, str) or not content.strip():
-                    raise ValueError('公告正文缺失或超出5页完整读取上限')
+                if not 1 <= page_count <= max_pages or not isinstance(content, str) or not content.strip():
+                    raise ValueError('公告正文缺失或超出完整读取页数上限')
                 pages.append(content.strip())
                 if page >= page_count:
                     break
@@ -225,7 +231,7 @@ def fetch_company_announcements(stock, hours=24, now=None):
                 is_china_related=True, category='自选股-公告', related_stocks=[stock.code]))
         except (requests.RequestException, ValueError, TypeError) as error:
             errors.append(type(error).__name__)
-    return result, dict(status='partial' if errors or len(matches)>3 else 'ok',
+    return result, dict(status='partial' if errors or len(matches)>max_announcements else 'ok',
                         retrieved=len(rows), in_window=len(matches), full_text=len(result),
                         latest_publication=latest.isoformat() if latest else None,
                         body_errors=errors)
