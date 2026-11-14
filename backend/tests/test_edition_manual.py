@@ -118,9 +118,37 @@ class ManualExecutionTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(reused)
             self.assertEqual(list(root.glob('*.started')),[])
 
-    async def run_fake(self, root, fail_review=False):
+    async def run_fake(self, root, fail_review=False, missing_change_checks=False):
         import test_unified_edition as reference
-        sample,stages,_=await reference.PipelineRegression().scenario(root/'fake',fail_review=fail_review)
+        sample,stages,written=await reference.PipelineRegression().scenario(root/'fake',fail_review=fail_review)
+        condition='若政策未按已披露条件实施就撤回传导判断。'
+        written['body'] += condition; written['script'] += condition
+        written['listener_cards'] = [dict(judgment='保留条件', source_id='body-1',
+            fact_quote=reference.FACT, report_quote=reference.FACT,
+            mechanism='政策可能影响经营，需要实际实施印证',
+            alternative='也可能只改变短期情绪，尚缺定价数据',
+            horizon='下一次正式实施披露', invalidation=condition)]
+        written['stock_followups'] = []
+        async def model(task,messages,limit):
+            raw=await sample.model(task,messages,limit)
+            reply=json.loads(raw)
+            if len(stages)==2 and not missing_change_checks:
+                # These are explicit fake editorial responses to the finite
+                # fake searches below. Production validators remain enabled.
+                from app.services.daily_changes import tasks
+                reply['change_checks'] = [dict(task_id=t['id'],
+                    status='supported' if t['id']=='politics' else 'screened_no_material_event',
+                    reason=('示例正文仅支持政策已公布及适用条件，不作独立核验'
+                        if t['id']=='politics' else '本次有限模拟检索只取得政策样例，未选出该类实质变化'),
+                    evidence=[dict(source_id='body-1',quote=reference.FACT)]
+                        if t['id']=='politics' else []) for t in tasks(sample.state)]
+                reply['expectation_checks'] = []
+            if task=='review':
+                reply['listener_checks'] = [dict(criterion=c,status='supported',
+                    reason='已核对模拟正文和口播中的条件边界',
+                    report_quote=reference.FACT,script_quote=reference.FACT) for c in
+                    ('evidence','causality','company_relevance','time_and_units','countercase_and_falsifier')]
+            return json.dumps(reply,ensure_ascii=False)
         prepared=dict(ready_to_run=True,watchlist=[],policy=copy.deepcopy(sample.state['policy']),
             environment_sha256='env',execution_sha256='frozen')
         prepared['policy'].update(estimated_limit_usd='1',audio_enabled=False,
@@ -129,14 +157,20 @@ class ManualExecutionTests(unittest.IsolatedAsyncioTestCase):
         real_class=entry.core.EditionPipeline
         def pipeline(state,directory,workspace,check):
             self.assertTrue(state['manual_text_only'])
-            return real_class(state,directory,workspace,model=sample.model,
+            self.assertEqual(state['research_protocol'],'listener_research_v1')
+            self.assertEqual(state['change_protocol'],'daily_changes_v1')
+            return real_class(state,directory,workspace,model=model,
                 search=sample.search,read=sample.read,check=check)
         with patch.object(entry,'require_pause'),patch.object(entry,'identity',return_value='frozen'),\
                 patch.object(entry,'preview',AsyncMock(return_value=prepared)),\
                 patch.object(entry,'assert_watchlist_current',AsyncMock()),\
-                patch.object(entry.core,'EditionPipeline',side_effect=pipeline):
+                patch.object(entry.core,'EditionPipeline',side_effect=pipeline),\
+                patch('app.services.edition_market.collect',return_value=dict(status='unavailable',
+                    indices=[],breadth={},gaps=['离线测试不提供行情，不作行情结论'])) as market:
             result,path,reused=await entry.run_once(config(),root=root/'editions')
             second,second_path,second_reused=await entry.run_once(config(),root=root/'editions')
+        market.assert_called_once()
+        self.assertFalse(result.get('issuer_http_receipts'))
         self.assertFalse(reused);self.assertTrue(second_reused)
         self.assertEqual(second['id'],result['id']);self.assertEqual(path,second_path)
         return result,path,stages
@@ -146,6 +180,9 @@ class ManualExecutionTests(unittest.IsolatedAsyncioTestCase):
             result,path,stages=await self.run_fake(Path(temporary))
             self.assertEqual(result['status'],'reviewed_text')
             self.assertEqual(len(stages),4)
+            self.assertEqual({r['task_id'] for r in result['assessment']['change_checks']},
+                {'politics','industry','operations','governance','market'})
+            self.assertEqual(len(result['review']['listener_checks']),5)
             self.assertEqual(len(result['sources']),1)
             self.assertFalse(result['app_written'])
             self.assertNotIn('tts_attempts',result)
@@ -157,6 +194,15 @@ class ManualExecutionTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn('draft',result)
             self.assertEqual(len(stages),4)
             self.assertEqual(len([r for r in result['reservations'] if r['kind']=='model']),4)
+
+    async def test_missing_change_checks_still_stops_before_writing(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            result,path,stages=await self.run_fake(Path(temporary),missing_change_checks=True)
+            self.assertEqual(result['status'],'failed')
+            self.assertEqual(result['error_code'],'edition_change_checks_missing')
+            self.assertNotIn('draft',result)
+            self.assertEqual(len(stages),2)
+            self.assertEqual(len([r for r in result['reservations'] if r['kind']=='model']),2)
 
     def test_export_is_offline_idempotent_and_contains_the_material(self):
         with tempfile.TemporaryDirectory() as temporary:

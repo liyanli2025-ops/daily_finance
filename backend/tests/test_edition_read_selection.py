@@ -250,11 +250,16 @@ class CandidateReplayFindingsTests(unittest.TestCase):
         cid,_=select_candidate(value,event(title='黄金和原油价格波动',lane='commodities'),['S1'],request())
         self.assertIsNone(cid)
 
-    def test_stale_search_hint_is_ranked_later_without_certifying_fresh_hint(self):
+    def test_stale_search_hint_is_skipped_without_certifying_fresh_hint(self):
         value=state();value['cutoff']='2026-11-14T09:00:00'
         value['candidates']['S1'].update(title='Oil and gold prices',published_hint='2026-11-01T08:00:00+08:00')
         value['candidates']['S2'].update(title='Oil and gold prices',published_hint='2026-11-13T08:00:00+08:00')
         cid,trace=select_candidate(value,event(title='黄金和原油价格波动',lane='commodities'),['S1','S2'],request())
         self.assertEqual(cid,'S2')
-        self.assertIn('S1',trace['deferred_ids'])
-        self.assertTrue(next(r for r in trace['ranked'] if r['candidate_id']=='S1')['published_hint_outside_window'])
+        self.assertNotIn('S1',trace['deferred_ids'])
+        self.assertEqual(next(r for r in trace['skipped'] if r['candidate_id']=='S1')['reason'],
+            'published_hint_outside_event_window')
+        self.assertFalse(next(r for r in trace['ranked'] if r['candidate_id']=='S2')['published_hint_outside_window'])
+        # Search timestamps remain hints: the original row is not relabeled as
+        # verified and a skipped title remains in the underlying candidate pool.
+        self.assertEqual(value['candidates']['S1']['published_hint'],'2026-11-01T08:00:00+08:00')
