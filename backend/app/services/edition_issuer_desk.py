@@ -12,7 +12,8 @@ from types import SimpleNamespace
 
 import requests
 
-from .research_hub import ResearchHub, Material, DATA_API
+from .research_hub import ResearchHub, Material, DATA_API, save_json
+from .time_context import china_now
 from .watchlist_sources import publication_time
 
 LIST_URL = 'https://np-anotice-stock.eastmoney.com/api/security/ann'
@@ -138,7 +139,71 @@ class IssuerDesk:
             recent_results=len(rows), complete_history=False,
             limitation='只核最近20条披露目录；空目录不等于公司没有事件。未读取公告正文，不是交易所原件核验。')
 
-    def baseline(self, stock):
+    def periodic_cache(self, key, fetch, disclosures=()):
+        """Reuse cross-edition baselines; new disclosures invalidate by identity.
+
+        Weekly financial checking is a fallback, not daily reanalysis. Business
+        classification is refreshed monthly or after a relevant business notice.
+        The original collection time survives reuse.
+        """
+        kind, scope = key.split(':', 1)
+        if kind not in {'profile', 'financial'} or scope not in {'A:' + code for code in self.stocks}:
+            raise ValueError('edition_baseline_cache_identity_invalid')
+        root = getattr(self, 'baseline_root', ResearchHub().root / 'edition-baselines-v1')
+        path = root / (hashlib.sha256(key.encode()).hexdigest() + '.json')
+        pattern = (r'季度报告|年度报告|半年度报告|财务报表|业绩快报|业绩预告|审计报告|财务.*更正|更正.*财务|报告.*修订'
+            if kind == 'financial' else r'主营业务.*变更|重大资产重组|重大资产[购出买卖]|收购|并购|吸收合并')
+        relevant = sorted({r['issuer_document']['art_code'] for r in disclosures
+            if r.get('issuer_document', {}).get('code') == scope.split(':')[1]
+            and re.search(pattern, r.get('title', ''))})
+        ttl = timedelta(days=7 if kind == 'financial' else 30)
+        def checksum(value):
+            return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        old, stamp = None, None
+        if path.is_symlink():
+            raise ValueError('edition_baseline_cache_symlink')
+        try:
+            if path.stat().st_size > MAX_BYTES * 3:
+                raise ValueError('edition_baseline_cache_too_large')
+            saved = json.loads(path.read_text())
+            stamp = datetime.fromisoformat(saved['collected_at'])
+            if (saved.get('owner') != 'edition-periodic-baseline-v1' or saved.get('key') != key
+                    or saved.get('value_sha256') != checksum(saved['value'])
+                    or stamp > self.workspace.now):
+                raise ValueError('edition_baseline_cache_invalid')
+            old = saved
+        except (OSError, ValueError, TypeError, KeyError):
+            pass
+        refresh = ('first_collection' if old is None else
+            'new_relevant_disclosure' if set(relevant) - set(old.get('disclosures', [])) else
+            'periodic_check_due' if self.workspace.now - stamp >= ttl else None)
+        if refresh is None:
+            value = old['value']; observed = old['collected_at']; status = 'reused'
+        else:
+            value = fetch()
+            # Invalid provider structures must not become a valid baseline.
+            if kind == 'financial' and (not isinstance(value, dict)
+                    or not isinstance(value.get('result'), dict)
+                    or not isinstance(value['result'].get('data'), list)):
+                raise ValueError('edition_baseline_financial_structure_invalid')
+            observed = china_now().isoformat()
+            status = 'checked_unchanged' if old and old['value_sha256'] == checksum(value) else 'refreshed'
+            save_json(path, dict(owner='edition-periodic-baseline-v1', key=key,
+                collected_at=observed, value_sha256=checksum(value), value=value, disclosures=relevant))
+        row = dict(key=key, status=status, refresh_reason=refresh,
+            collected_at=observed, value_sha256=checksum(value),
+            fallback_check_days=ttl.days, triggered_disclosures=relevant,
+            limitation='复用旧基线不代表今日重发业绩；检查后未变不等于公告或财报已经独立核实。')
+        self.state.setdefault('baseline_cache_receipts', []).append(row)
+        self._baseline_observed = getattr(self, '_baseline_observed', {})
+        self._baseline_observed[kind] = observed
+        # Include the exact cached supplier value in this edition's export too.
+        save_json(self.workspace.path / 'baseline-captures' / (hashlib.sha256(key.encode()).hexdigest() + '.json'),
+            dict(**row, value=value))
+        self.save()
+        return value
+
+    def baseline(self, stock, *, disclosures=()):
         """Reuse business/metric adapters through the same counted transport.
 
         The small structured baseline is separate from current news. Missing
@@ -146,12 +211,13 @@ class IssuerDesk:
         """
         obj = SimpleNamespace(**stock)
         hub = ResearchHub(self.workspace.path / 'issuer-baseline')
-        hub.cache = lambda key, ttl, fetch: fetch()
+        hub.cache = lambda key, ttl, fetch: self.periodic_cache(key, fetch, disclosures)
         hub.get_json = lambda url, params, deadline: self.request(url, params)
         result = dict(key='A:' + stock['code'], name=stock['name'], profile=None,
             gaps=[])
         try:
             profile = hub.profile(obj, self.deadline)
+            profile['collected_at'] = self._baseline_observed['profile']
             result['profile'] = {k: profile[k] for k in
                 ('company', 'industry', 'families', 'fields', 'topics', 'source', 'source_url', 'collected_at')}
             result['profile']['usage'] = '供应商业务归类，用于提出经营问题；不是最新事件或已核实上下游关系。'
@@ -161,6 +227,8 @@ class IssuerDesk:
         try:
             items = [item for item in hub.financial(obj, self.deadline)
                      if item.published_at is not None and item.published_at <= self.workspace.now]
+            for item in items:
+                item.collected_at = self._baseline_observed['financial']
             if not items:
                 result['gaps'].append(dict(kind='financial_baseline_or_publication_unavailable'))
             else:

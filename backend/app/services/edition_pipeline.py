@@ -127,7 +127,7 @@ async def preflight(report_type='morning', config=settings):
         routes=routes, extractor=extractor, ready_to_run=not blockers, blockers=blockers,
         base_search_jobs=initial_searches(stocks, now, direct_issuers=True),
         source_plan=dict(company_disclosures="A股先读公司披露列表，选题后读公告；空目录不代表没有事件",
-            company_baseline="每只A股最多另查1次业务归类、1次财务指标；原始报表仍待核",
+            company_baseline="首次建立基线；财务遇新披露或每7天核对，业务遇相关变动或每30天核对，平日复用；仅事件需要时比较",
             public_http_limit=config.research_body_max_urls * 3, paid_search_fallback="不自动回退；仅一次条件补查按缺口决定"),
         normal_model_requests=4, conditional_extra_requests=1, model_requests=0,
         search_requests=0, public_fetch_attempts=0, tts_requests=0,
@@ -289,7 +289,7 @@ class EditionPipeline:
                 self.state.setdefault('issuer_catalogue_checks', []).append(dict(
                     key=stock['market'] + ':' + stock['code'], status=result['status'],
                     results=len(result['results']), complete_history=False))
-                baseline, rows = await asyncio.to_thread(self.issuer_desk.baseline, stock)
+                baseline, rows = await asyncio.to_thread(self.issuer_desk.baseline, stock, disclosures=result['results'])
                 result['results'].extend(rows)
                 self.state.setdefault('company_baselines', {})[baseline['key']] = baseline
             else:
@@ -324,9 +324,17 @@ class EditionPipeline:
                 self.state.setdefault('read_metadata_rejections', []).append(
                     dict(candidate_id=cid, event_id=eid, flags=blocked, http_requests=0))
                 self.save(); continue
+            candidate = self.state['candidates'][cid]
+            question = event.get('baseline_question')
+            if (self.state.get('research_protocol') == PROTOCOL and candidate.get('baseline_document')
+                    and (not isinstance(question, str) or not 12 <= len(question.strip()) <= 200)):
+                self.state.setdefault('read_metadata_rejections', []).append(dict(
+                    candidate_id=cid, event_id=eid, flags=['baseline_requires_event_question'], http_requests=0))
+                self.save(); continue
             old = next((s for s in sources.values() if s['url'] == url), None)
             if old:
                 if eid not in old['event_ids']: old['event_ids'].append(eid)
+                self.attach_baselines(eid, old, event)
                 self.save(); continue
             if any(r['candidate_id'] == cid for r in self.state.get('read_receipts', [])): continue
             if len(self.state.get('read_receipts', [])) >= self.state['policy']['max_body_urls']:
@@ -378,11 +386,14 @@ class EditionPipeline:
                         direct_scopes=[s['market'] + ':' + s['code'] for s in self.state['watchlist']
                                        if company_focus(subject, SimpleNamespace(**s))],
                         limitation='正文存在不代表独立核实、完整稿或最新交易时段；原文由后续证据评估和审稿核对。')
-                    self.attach_baselines(eid, sources[identifier])
+                    self.attach_baselines(eid, sources[identifier], event)
             self.save()
 
-    def attach_baselines(self, event_id, current):
-        """Pair a company body with its period-labelled, already fetched baseline."""
+    def attach_baselines(self, event_id, current, event=None):
+        """Provide baseline numbers only for an explicit event research question."""
+        question = (event or {}).get("baseline_question")
+        if not isinstance(question, str) or not 12 <= len(question.strip()) <= 200:
+            return
         if self.state.get('research_protocol') != PROTOCOL or current.get('metadata', {}).get('kind') == 'financial_baseline':
             return
         scopes = set(current.get('direct_scopes', []))
@@ -408,7 +419,7 @@ class EditionPipeline:
                     original_policy_release_allowed=False, flags=['financial_baseline_not_current_event']),
                 limitation='带期间的经营比较背景；供应商结构化指标，未核原财报，不是本期新事件或独立佐证。')
             self.state.setdefault('baseline_links', []).append(dict(source_id=identifier,
-                event_id=event_id, scope=item.scope, new_http_requests=0))
+                event_id=event_id, scope=item.scope, question=question, new_http_requests=0))
 
     async def selected_reads(self, jobs, events, trace):
         self.state.setdefault('read_selection', []).extend(trace); self.save()

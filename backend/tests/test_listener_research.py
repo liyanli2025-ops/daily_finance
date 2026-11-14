@@ -1,6 +1,6 @@
 """Research usefulness and direct-source boundaries, with no provider requests."""
 import copy
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from pathlib import Path
 import tempfile
@@ -193,7 +193,145 @@ class DirectIssuerBoundaries(unittest.TestCase):
             self.assertFalse(desk.workspace.documents)
 
 
+class PeriodicBaselineCache(unittest.TestCase):
+    """New editions reuse dated background; announcements are the refresh signal."""
+    def desk(self, root, day=0):
+        workspace = SimpleNamespace(path=Path(root) / ('edition-' + str(day)),
+            now=NOW + timedelta(days=day), public_fetch_attempts=0, documents={})
+        value = IssuerDesk(listener_state(), workspace, Mock(), time.monotonic() + 60)
+        value.baseline_root = Path(root) / 'shared-baselines'
+        return value
+
+    def use(self, desk, key='financial:A:002714', fetch=None, disclosures=()):
+        fetch = fetch if fetch is not None else Mock(return_value={'result':{'data':[]}})
+        with patch('app.services.edition_issuer_desk.china_now', return_value=desk.workspace.now):
+            result = desk.periodic_cache(key, fetch, disclosures)
+        return result
+
+    def notice(self, title, identifier='AN1', code='002714'):
+        return dict(title=title, issuer_document=dict(code=code, art_code=identifier))
+
+    def test_next_daily_edition_reuses_financial_without_request_or_date_relabel(self):
+        with tempfile.TemporaryDirectory() as root:
+            fetch = Mock(return_value={'result':{'data':[]}})
+            first, second = self.desk(root), self.desk(root, 1)
+            self.use(first, fetch=fetch); self.use(second, fetch=fetch)
+            fetch.assert_called_once()
+            self.assertEqual(second.state['baseline_cache_receipts'][0]['status'], 'reused')
+            self.assertEqual(second.state['baseline_cache_receipts'][0]['collected_at'], NOW.isoformat())
+            self.assertEqual(second.workspace.public_fetch_attempts, 0)
+            self.assertTrue((second.workspace.path / 'baseline-captures').is_dir())
+
+    def test_new_report_updates_once_then_same_notice_reuses(self):
+        with tempfile.TemporaryDirectory() as root:
+            fetch = Mock(return_value={'result':{'data':[]}})
+            self.use(self.desk(root), fetch=fetch)
+            announcement = [self.notice('第三季度报告')]
+            second = self.desk(root, 1)
+            self.use(second, fetch=fetch, disclosures=announcement)
+            self.use(self.desk(root, 2), fetch=fetch, disclosures=announcement)
+            self.assertEqual(fetch.call_count, 2)
+            self.assertEqual(second.state['baseline_cache_receipts'][0]['refresh_reason'], 'new_relevant_disclosure')
+
+    def test_routine_or_other_company_notice_does_not_refresh_financial(self):
+        with tempfile.TemporaryDirectory() as root:
+            fetch = Mock(return_value={'result':{'data':[]}})
+            self.use(self.desk(root), fetch=fetch)
+            self.use(self.desk(root, 1), fetch=fetch, disclosures=[
+                self.notice('股东会召开通知'), self.notice('年度报告', code='600900')])
+            fetch.assert_called_once()
+
+    def test_financial_correction_is_a_refresh_signal(self):
+        with tempfile.TemporaryDirectory() as root:
+            fetch = Mock(return_value={'result':{'data':[]}})
+            self.use(self.desk(root), fetch=fetch)
+            self.use(self.desk(root, 1), fetch=fetch, disclosures=[self.notice('财务数据更正公告')])
+            self.assertEqual(fetch.call_count, 2)
+
+    def test_weekly_fallback_checks_without_claiming_new_numbers(self):
+        with tempfile.TemporaryDirectory() as root:
+            fetch = Mock(return_value={'result':{'data':[]}})
+            self.use(self.desk(root), fetch=fetch)
+            self.use(self.desk(root, 6), fetch=fetch)
+            last = self.desk(root, 7); self.use(last, fetch=fetch)
+            self.assertEqual(fetch.call_count, 2)
+            row = last.state['baseline_cache_receipts'][0]
+            self.assertEqual(row['status'], 'checked_unchanged')
+            self.assertEqual(row['refresh_reason'], 'periodic_check_due')
+
+    def test_business_profile_is_monthly_instead_of_daily_or_weekly(self):
+        with tempfile.TemporaryDirectory() as root:
+            fetch = Mock(return_value={'industry':'测试行业'})
+            self.use(self.desk(root), 'profile:A:002714', fetch)
+            self.use(self.desk(root, 29), 'profile:A:002714', fetch)
+            fetch.assert_called_once()
+            self.use(self.desk(root, 30), 'profile:A:002714', fetch)
+            self.assertEqual(fetch.call_count, 2)
+
+    def test_major_business_change_refreshes_profile_early(self):
+        with tempfile.TemporaryDirectory() as root:
+            fetch = Mock(return_value={'industry':'测试行业'})
+            self.use(self.desk(root), 'profile:A:002714', fetch)
+            self.use(self.desk(root, 1), 'profile:A:002714', fetch,
+                [self.notice('重大资产重组公告')])
+            self.assertEqual(fetch.call_count, 2)
+
+    def test_changed_cached_value_is_not_trusted(self):
+        with tempfile.TemporaryDirectory() as root:
+            fetch = Mock(return_value={'result':{'data':[]}})
+            first = self.desk(root); self.use(first, fetch=fetch)
+            path = next(first.baseline_root.glob('*.json'))
+            saved = json.loads(path.read_text()); saved['value']['result']['data'] = [{'tampered':True}]
+            path.write_text(json.dumps(saved))
+            self.use(self.desk(root, 1), fetch=fetch)
+            self.assertEqual(fetch.call_count, 2)
+
+    def test_future_cache_cannot_supply_earlier_edition(self):
+        with tempfile.TemporaryDirectory() as root:
+            fetch = Mock(return_value={'result':{'data':[]}})
+            self.use(self.desk(root, 2), fetch=fetch)
+            self.use(self.desk(root, 1), fetch=fetch)
+            self.assertEqual(fetch.call_count, 2)
+
+    def test_invalid_financial_structure_is_not_persisted(self):
+        with tempfile.TemporaryDirectory() as root:
+            desk = self.desk(root)
+            with self.assertRaisesRegex(ValueError, 'financial_structure_invalid'):
+                self.use(desk, fetch=Mock(return_value={'result':None}))
+            self.assertFalse(desk.baseline_root.exists())
+
+
 class SharedPipelineIntegration(unittest.IsolatedAsyncioTestCase):
+    async def test_daily_event_cannot_load_old_financial_without_comparison_question(self):
+        with tempfile.TemporaryDirectory() as root:
+            state = listener_state()
+            state['candidates'] = {'S1':dict(title='牧原股份财务基线', url='https://example.com/data',
+                baseline_document='F1', scope='A:002714', background_only=True)}
+            workspace = SimpleNamespace(now=NOW, path=Path(root), documents={})
+            pipeline = EditionPipeline(state, root, workspace, check=AsyncMock())
+            pipeline.save = Mock(); pipeline.issuer_desk.read = Mock()
+            await pipeline.reads([dict(event_id='E1', candidate_id='S1')],
+                {'E1':dict(purpose='company_event', scope='A:002714')})
+            pipeline.issuer_desk.read.assert_not_called()
+            self.assertFalse(state.get('sources'))
+            self.assertFalse(state.get('read_receipts'))
+            self.assertEqual(state['read_metadata_rejections'][0]['flags'], ['baseline_requires_event_question'])
+
+    async def test_reused_current_body_can_load_baseline_for_new_specific_question(self):
+        with tempfile.TemporaryDirectory() as root:
+            state = listener_state()
+            state['candidates'] = {'S1':dict(title='牧原股份经营数据公告', url='https://example.com/notice')}
+            current = dict(url='https://example.com/notice', event_ids=['E0'])
+            state['sources'] = {'B1':current}
+            workspace = SimpleNamespace(now=NOW, path=Path(root), documents={})
+            pipeline = EditionPipeline(state, root, workspace, check=AsyncMock())
+            pipeline.save = Mock(); pipeline.attach_baselines = Mock()
+            event = dict(purpose='company_event', baseline_question='核对本期成本变化与已披露毛利率的关系及比较期间')
+            await pipeline.reads([dict(event_id='E1', candidate_id='S1')], {'E1':event})
+            pipeline.attach_baselines.assert_called_once_with('E1', current, event)
+            self.assertEqual(current['event_ids'], ['E0', 'E1'])
+            self.assertFalse(state.get('read_receipts'))
+
     async def test_direct_company_request_creates_no_paid_search_reservation(self):
         with tempfile.TemporaryDirectory() as root:
             state = listener_state()
@@ -265,6 +403,9 @@ class IntegrationCoverage(unittest.IsolatedAsyncioTestCase):
                 metadata=lambda obj:dict(kind='financial_baseline',body_quality={'requires_editorial_review':False}))
             pipeline=EditionPipeline(state,root,workspace,check=AsyncMock())
             pipeline.attach_baselines('E1',dict(direct_scopes=['A:002714'],metadata={'kind':'primary_notice'}))
+            self.assertFalse(state['sources'])
+            pipeline.attach_baselines('E1',dict(direct_scopes=['A:002714'],metadata={'kind':'primary_notice'}),
+                dict(baseline_question='核对本期成本变化与已披露毛利及去年同期口径是否一致'))
             self.assertEqual(set(state['sources']),{'F1'})
             self.assertFalse(state['sources']['F1']['source_role']['latest_close_allowed'])
             self.assertEqual(state['baseline_links'][0]['new_http_requests'],0)

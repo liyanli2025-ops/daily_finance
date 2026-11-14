@@ -6,7 +6,7 @@ from .research_schema import research_fields
 
 QUESTIONS = (
     '发生了什么新增变化？原始来源、公布日、统计期与最近完成交易时段分别是什么？',
-    '与什么基线相比？收入、扣非利润、现金流、负债及业务经营指标能否相互印证？',
+    '本期变化需要经营比较吗？需要时才核收入、扣非利润、现金流等对应基线；不例行重复同比。',
     '经过哪条经营或估值渠道影响谁？传导是事实、推断还是有期限的情景？',
     '另一种合理解释是什么？什么可观察变化会使本期判断失效？',
     '对当前自选股哪些相关、哪些不相关？接下来观察哪个指标、哪个时间窗口？',
@@ -25,6 +25,7 @@ reason:"本期能下什么结论、不能下什么结论",report_quote:"body中�
 next_check:"下一次应核对的披露/数据及其日期或已知未知边界",source_ids:["直接公司证据ID"]}。
 insufficient允许source_ids为空，必须说明缺口；supported只能用scope或direct_scopes匹配的公司资料。
 每只自选股在报告中用简短一段交代结论边界与下一观察项；口播优先有实质变化者，不机械念完清单。
+日报只讲本期新增变化及其影响；没有新增业绩或相关催化时，不重复解读上次财报、不每天做同比分析。
 公司业务归类只用来选问题，不能充今日消息；财务基线标明期间和供应商镜像属性，不能当今日催化或已核原报。
 禁止以下跳步：利润增速高于收入就称盈利质量改善；回购计划完成比例就推导股价支撑；
 解禁额度就当实际卖出；只有涨跌就认定空头回补、资金意图或市场已定价。分别补现金流/扣非与基数、
@@ -70,7 +71,7 @@ def requirements(stage, value):
         return WRITE_REQUIREMENTS
     if stage == 'review':
         return REVIEW_REQUIREMENTS
-    return ('\n按listener_questions检查价值和缺口；company_questions仅给研究方向，不是事实。'
+    return ('\n日报不例行复述旧财报。只有本期新增事件确实需要经营比较时，在对应事件中附baseline_question（12至200字），说明具体要核对的指标和问题；否则不附此字段。缓存财务候选只作背景，不默认选读或单独列成新闻。\n按listener_questions检查价值和缺口；company_questions仅给研究方向，不是事实。'
             '财务基线是背景，不因过往报告日期旧而当今日催化，也不把它当最新公司消息的替代。'
             '公司披露目录只含最近20条，空目录不能声称无重大事件；披露镜像不冒充交易所原件。')
 
@@ -162,6 +163,14 @@ def listening_receipt(state):
         lines += ['- ' + source['title'], '  ' + source['url']]
     if not state.get('sources'):
         lines.append('- 目前没有可用正文。')
+    if state.get('baseline_cache_receipts'):
+        lines += ['', '背景基线更新（不是今日新闻）：']
+        for row in state['baseline_cache_receipts']:
+            status = {'reused':'复用旧基线，无新增请求', 'checked_unchanged':'已核对，数值未变',
+                'refreshed':'获取或更新基线'}.get(row['status'], row['status'])
+            reason = {'first_collection':'首次建立', 'new_relevant_disclosure':'出现相关新披露',
+                'periodic_check_due':'到期兜底核对'}.get(row.get('refresh_reason'), '尚未到期且无相关新披露')
+            lines.append('- ' + row['key'] + '：' + status + '；' + reason + '；原获取时间：' + row['collected_at'])
     lines += ['', '自选股核对：']
     checks = {c['key']: c for c in (state.get('assessment') or {}).get('watchlist_checks', [])}
     for stock in state.get('watchlist', []):
