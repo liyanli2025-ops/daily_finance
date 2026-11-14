@@ -167,9 +167,15 @@ class Budget:
         if kind == 'model':
             chars = sum(len(m['content']) for m in messages)
             byte_count = sum(len(m['content'].encode()) for m in messages)
-            if (len(model_rows) >= p['max_model_reservations'] or chars > p['max_input_characters']
-                    or chars + sum(r['input_characters'] for r in model_rows) > p['total_input_characters']
-                    or output + sum(r['output_tokens'] for r in model_rows) > p['total_output_tokens']):
+            dimensions = {
+                'model_reservations': (len(model_rows)+1,p['max_model_reservations']),
+                'request_input_characters': (chars,p['max_input_characters']),
+                'total_input_characters': (chars+sum(r['input_characters'] for r in model_rows),p['total_input_characters']),
+                'total_output_tokens': (output+sum(r['output_tokens'] for r in model_rows),p['total_output_tokens'])}
+            blocked = {k:dict(required=n,limit=limit) for k,(n,limit) in dimensions.items() if n>limit}
+            if blocked:
+                state['budget_block'] = dict(stage=stage,dimensions=blocked,model_http_started=False)
+                self.save()
                 raise ValueError('edition_model_budget_exhausted')
             task = 'review' if stage == 'review' else 'analysis'
             fee = model_estimate(p['model_prices'][task], byte_count, output,
@@ -187,6 +193,13 @@ class Budget:
             if self.forecast is None:
                 raise ValueError('edition_editorial_forecast_missing')
             remaining, plan = protection(p, self.forecast(), stages)
+            for future in plan:
+                if future.get('fits_known_input') is False:
+                    state['budget_block'] = dict(stage=future['stage'], dimensions={
+                        'request_input_characters': dict(required=future['known_input_characters'],limit=p['max_input_characters'])},
+                        model_http_started=False)
+                    self.save()
+                    raise ValueError('edition_future_input_capacity_exhausted')
             state['budget_forecast'] = dict(editorial=plan, remaining_model_estimate_usd=str(remaining),
                 limitation='随正文和稿件更新；未知未来取材可能增加预留，预算不足则保留资料停止。')
         else:

@@ -320,3 +320,124 @@ class CriticalPath(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError,'missing'):gate.require_acceptance(p)
             p.write_text(json.dumps(dict(source_signature='wrong')))
             with self.assertRaisesRegex(ValueError,'stale'):gate.require_acceptance(p)
+
+
+class SavedInputCapacity(unittest.IsolatedAsyncioTestCase):
+    def source(self, root):
+        directory=Path(root)/'v47';directory.mkdir()
+        with zipfile.ZipFile(FIX/'v47_input_failure.zip') as z:z.extractall(directory)
+        return directory,json.loads((directory/'result.json').read_text())
+
+    def test_real_multiple_whole_bodies_and_every_headline_fit_existing_limit(self):
+        from app.services.edition_inputs import assemble_request,messages_for,edition_forecast
+        from app.services.edition_request_view import candidates_from
+        from app.services.edition_budget import search_batch_plan
+        with tempfile.TemporaryDirectory() as root:
+            directory,s=self.source(root);before=copy.deepcopy(s)
+            now=datetime.fromisoformat(s['cutoff']);value=core.packet(s,'assessment')
+            selected,messages,capacity=assemble_request('assessment',contract.ASSESS,value,now,'morning',65000)
+            self.assertEqual(capacity['original_characters'],85002)
+            self.assertLessEqual(capacity['request_characters'],65000)
+            self.assertTrue(capacity['candidate_index_used']);self.assertEqual(selected['sources'],value['sources'])
+            original=candidates_from(value);indexed=candidates_from(selected)
+            self.assertEqual(len(original),65);self.assertEqual(set(original),set(indexed))
+            for cid,row in original.items():
+                for key in ('title','published','scope','issuer_document','baseline_document','warning'):
+                    if key in row:self.assertEqual(indexed[cid][key],row[key],(cid,key))
+                self.assertNotIn('snippet',indexed[cid]) if 'snippet' not in row else self.assertIsNone(indexed[cid]['snippet'])
+            for name,columns in selected.get('record_columns',{}).items():
+                unpacked=[dict(zip(columns[:-1],r[:-1]),**r[-1]) for r in selected[name]]
+                self.assertEqual(unpacked,value[name])
+            self.assertEqual(s,before)
+            plan=search_batch_plan(s['policy'],edition_forecast(s,now),0,s['reservations'])
+            self.assertTrue(plan['fits_money'],plan);self.assertEqual(plan['limit_usd'],'1')
+            self.assertTrue(all(r.get('fits_known_input',True) for r in plan['model_stages']))
+
+    async def test_real_saved_bodies_pass_gateway_without_rebuying_selection_or_pages(self):
+        from app.services import edition_input_resume as stored
+        with tempfile.TemporaryDirectory() as root,Harness(root) as h:
+            directory,old=self.source(root);before={str(p.relative_to(directory)):p.read_bytes() for p in directory.rglob('*') if p.is_file()}
+            plan,_,_,_=await stored.preview(h.config,directory)
+            self.assertTrue(plan['ready_to_run'],plan['blockers'])
+            self.assertEqual(plan['retained_article_bodies'],5)
+            original_post=h.post
+            def child_post(url,body):
+                h.s=json.loads((directory/stored.CHILD/'result.json').read_text())
+                content=body['messages'][-1]['content']
+                if isinstance(content,list):content=next(r['text'] for r in content if r['type']=='text')
+                actual=json.loads(content)
+                for sid,source in old['sources'].items():self.assertEqual(actual['sources'][sid]['text'],source['text'])
+                return original_post(url,body)
+            with patch.object(h,'post',side_effect=child_post),patch.object(gate,'require_acceptance',return_value={'offline_test':True}):
+                result,path,reused=await stored.continue_once(h.config,directory,run=True,input_sha=plan['input_sha256'])
+            self.assertFalse(reused);self.assertEqual(result['status'],'partial_materials',result.get('error_code'))
+            self.assertEqual(h.model_calls,['assessment']);self.assertEqual(h.get_calls,[])
+            self.assertEqual(result['model_http_attempts'],2);self.assertEqual(result['search_http_attempts'],16)
+            self.assertEqual(result['public_fetch_attempts'],127);self.assertEqual(result['cutoff'],old['cutoff'])
+            self.assertEqual(result['sources'],old['sources']);self.assertEqual(result['reservations'][:-1],old['reservations'])
+            self.assertEqual(result['policy'],old['policy']);self.assertIn('topic:S30:选举',result['missing'])
+            self.assertNotIn('draft',result);self.assertFalse(result.get('app_written'));self.assertFalse(result.get('tts_attempts'))
+            for name,data in before.items():self.assertEqual((directory/name).read_bytes(),data)
+            again,_,reused=await stored.continue_once(h.config,directory,run=True,input_sha='ignored')
+            self.assertTrue(reused);self.assertEqual(again,result);self.assertEqual(h.model_calls,['assessment']);self.assertEqual(h.get_calls,[])
+            h.export_case('real_v47_input',original_characters=plan['capacity']['original_characters'],
+                request_characters=result['request_capacity'][-1]['request_characters'],input_limit=65000,
+                article_bodies=5,candidate_titles=65,original_sources_unchanged=True,
+                new_model_requests=1,new_search_requests=0,new_public_requests=0,old_public_requests=127,
+                estimated_limit_usd='1',missing_election_preserved=True)
+
+    async def test_changed_body_or_capture_stops_before_marker_or_request(self):
+        from app.services import edition_input_resume as stored
+        with tempfile.TemporaryDirectory() as root,Harness(root) as h:
+            directory,s=self.source(root)
+            pool=next(directory.glob('evidence/episode-*/materials.json'));raw=pool.read_text();rows=json.loads(raw)
+            article=next(r for r in rows if r['id'] in s['sources']);article['text']+='改'
+            pool.write_text(json.dumps(rows,ensure_ascii=False))
+            with self.assertRaisesRegex(ValueError,'body_changed'):await stored.preview(h.config,directory)
+            pool.write_text(raw)
+            body=next(directory.glob('evidence/episode-*/public-responses/*.body'));body.write_bytes(body.read_bytes()+b'changed')
+            with self.assertRaisesRegex(ValueError,'capture_changed'):await stored.preview(h.config,directory)
+            self.assertFalse((directory/stored.CHILD).exists());self.assertEqual(h.model_calls,[]);self.assertEqual(h.get_calls,[])
+
+    async def test_free_preview_uses_actual_capacity_without_marking_or_modifying_history(self):
+        from app.services import edition_input_resume as stored
+        with tempfile.TemporaryDirectory() as root,Harness(root) as h:
+            directory,s=self.source(root);raw=(directory/'result.json').read_bytes()
+            plan,path,reused=await stored.continue_once(h.config,directory)
+            self.assertTrue(plan['ready_to_run']);self.assertIsNone(path)
+            self.assertEqual(plan['prior_public_fetch_attempts'],127)
+            self.assertEqual((directory/'result.json').read_bytes(),raw)
+            self.assertFalse((directory/stored.CHILD).exists());self.assertEqual(h.model_calls,[]);self.assertEqual(h.get_calls,[])
+
+    async def test_capacity_error_names_violated_dimension_before_http(self):
+        with tempfile.TemporaryDirectory() as root,Harness(root) as h:
+            s,p=h.fresh();s['policy']['max_input_characters']=10
+            with entry.manual_text_scope(s['id'],h.config),self.assertRaisesRegex(ValueError,'edition_model_budget_exhausted'):
+                await p.call('agenda',contract.AGENDA,p.packet('agenda'))
+            self.assertIn('request_input_characters',s['budget_block']['dimensions'])
+            self.assertFalse(s['budget_block']['model_http_started']);self.assertEqual(h.model_calls,[])
+
+    async def test_impossible_whole_body_is_blocked_in_free_preview(self):
+        from app.services import edition_input_resume as stored
+        with tempfile.TemporaryDirectory() as root,Harness(root) as h:
+            directory,s=self.source(root);pool=next(directory.glob('evidence/episode-*/materials.json'))
+            rows=json.loads(pool.read_text());source=next(v for v in s['sources'].values() if v.get('candidate_id'))
+            source['text']+='\n不得静默截取的正文'*12000
+            for row in rows:
+                if row['id']==source['id']:row.update(text=source['text'],characters=len(source['text']))
+            pool.write_text(json.dumps(rows,ensure_ascii=False));(directory/'result.json').write_text(json.dumps(s,ensure_ascii=False))
+            plan,path,_=await stored.continue_once(h.config,directory)
+            self.assertFalse(plan['ready_to_run']);self.assertIn('edition_input_capacity_exhausted',plan['blockers'])
+            self.assertIsNone(path);self.assertFalse((directory/stored.CHILD).exists())
+            self.assertEqual(h.model_calls,[]);self.assertEqual(h.get_calls,[])
+
+    async def test_known_future_input_stop_precedes_current_paid_request(self):
+        from app.services.edition_inputs import edition_forecast
+        with tempfile.TemporaryDirectory() as root,Harness(root) as h:
+            s,p=h.fresh();rows=edition_forecast(s,h.now)
+            writing=next(r for r in rows if r['stage']=='writing')
+            writing.update(known_input_characters=65001,fits_known_input=False)
+            p.budget.forecast=lambda:rows
+            with entry.manual_text_scope(s['id'],h.config),self.assertRaisesRegex(ValueError,'edition_future_input_capacity_exhausted'):
+                await p.call('agenda',contract.AGENDA,p.packet('agenda'))
+            self.assertEqual(s['budget_block']['stage'],'writing');self.assertEqual(h.model_calls,[])

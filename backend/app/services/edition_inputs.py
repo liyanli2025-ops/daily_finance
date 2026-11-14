@@ -33,6 +33,21 @@ def messages_for(stage, prompt, value, now, report_type):
             dict(role='user', content=json.dumps(value, ensure_ascii=False, separators=(',', ':')))]
 
 
+def assemble_request(stage, prompt, value, now, report_type, limit):
+    messages=messages_for(stage,prompt,value,now,report_type)
+    original=sum(len(m['content']) for m in messages)
+    selected=value
+    if original>limit and stage in {'assessment','patch_assessment'}:
+        from .edition_request_view import assessment_index
+        selected=assessment_index(value)
+        messages=messages_for(stage,prompt,selected,now,report_type)
+    count=sum(len(m['content']) for m in messages)
+    return selected,messages,dict(original_characters=original,request_characters=count,
+        limit_characters=limit,fits_input=count<=limit,
+        candidate_index_used=selected is not value,
+        full_source_bodies_preserved=True)
+
+
 def editorial_forecast(state, now):
     from .spoken_fidelity import CONTRACT
     value = {k: deepcopy(state.get(k)) for k in
@@ -58,9 +73,10 @@ def editorial_forecast(state, now):
                 # Explicit forecast for the not-yet-generated draft. Not a
                 # tokenizer or a promise about unknown future response size.
                 allowance = OUTPUTS['writing'] * 4
-        messages = messages_for(stage, prompt, payload, now, state['report_type'])
+        _, messages, capacity = assemble_request(stage, prompt, payload, now, state['report_type'], state['policy']['max_input_characters'])
         result.append(dict(stage=stage,
             known_input_bytes=sum(len(m['content'].encode()) for m in messages),
+            known_input_characters=capacity['request_characters'], fits_known_input=capacity['fits_input'],
             future_draft_allowance_bytes=allowance, output_tokens=OUTPUTS[stage],
             source_ids=sorted(value['sources']),
             basis='已保存资料及完整系统提示词；待生成稿按写稿输出额度每token四字节另作预留。'))
@@ -97,10 +113,11 @@ def edition_forecast(state, now):
     if patch_pending:
         stages.append(('patch_assessment', contract.ASSESS))
     for stage, prompt in stages:
-        messages = messages_for(stage, prompt, packet(state, stage), now, state['report_type'])
+        _, messages, capacity = assemble_request(stage, prompt, packet(state, stage), now, state['report_type'], state['policy']['max_input_characters'])
         future = {'agenda': OUTPUTS['agenda']} if stage == 'assessment' and state.get('agenda') is None else {}
         result.append(dict(stage=stage,
             known_input_bytes=sum(len(m['content'].encode()) for m in messages),
+            known_input_characters=capacity['request_characters'], fits_known_input=capacity['fits_input'],
             future_draft_allowance_bytes=0, future_input_tokens=(sum(future.values()) * 5 + 3) // 4,
             future_context_output_allowances=future, output_tokens=OUTPUTS[stage],
             source_ids=[] if stage == 'agenda' else sorted(state.get('sources', {})),

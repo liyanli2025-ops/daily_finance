@@ -78,6 +78,7 @@ def summary(state, directory):
     reservations = state.get('reservations', [])
     return dict(mode='manual_text_edition_result', id=state['id'], status=state['status'],
         cutoff=state['cutoff'], estimated_limit_usd=state['policy']['estimated_limit_usd'],
+        request_capacity=state.get('request_capacity',[]),budget_block=state.get('budget_block'),
         model_reservations=sum(r['kind'] == 'model' for r in reservations),
         model_http_attempts=state.get('model_http_attempts', 0),
         search_http_attempts=state.get('search_http_attempts', 0),

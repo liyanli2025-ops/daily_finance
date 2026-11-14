@@ -130,6 +130,8 @@ def main():
             proof_files += ('backend/tests/test_body_acquisition.py',
                 'backend/tests/fixtures/body_acquisition_sample.json',
                 'backend/tests/fixtures/sina_announcement_identity.body', 'tools/check_body_acquisition.py')
+        if manifest.get('input_capacity_required'):
+            proof_files += ('backend/tests/fixtures/v47_input_failure.zip', 'tools/continue_saved_bodies.py')
         if manifest.get('critical_path_required'):
             import test_edition_critical_path as critical
             from app.services.edition_release_gate import validate_evidence

@@ -204,6 +204,8 @@ def main():
             expected += ('backend/tests/test_body_acquisition.py',
                 'backend/tests/fixtures/body_acquisition_sample.json',
                 'backend/tests/fixtures/sina_announcement_identity.body', 'tools/check_body_acquisition.py')
+        if manifest.get('input_capacity_required'):
+            expected += ('backend/tests/fixtures/v47_input_failure.zip', 'tools/continue_saved_bodies.py')
         if manifest.get('critical_path_required'):
             expected += ('backend/tests/test_edition_critical_path.py',
                 'backend/tests/fixtures/v45_trial_replay.zip','backend/tests/fixtures/v45_material_pool.json',

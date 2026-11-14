@@ -17,7 +17,7 @@ from .edition_issuer_desk import IssuerDesk, PROTOCOL, company_job
 from .listener_research import validate_draft as validate_listener_draft, validate_review as validate_listener_review
 from .edition_read_selection import primary_plan, patch_plan, fallback_plan, validate_increment
 from .edition_budget import Budget, OUTPUTS, digest, policy, protection, accounted, request_input_pricing, search_batch_plan
-from .edition_inputs import messages_for, editorial_forecast, edition_forecast
+from .edition_inputs import messages_for, assemble_request, editorial_forecast, edition_forecast
 from .episode_workspace import EpisodeWorkspace, body
 from .model_gateway import MODEL_PAUSE_FILE, complete, ensure_models_enabled, resolve_route, request_for
 from .research_hub import save_json
@@ -232,7 +232,9 @@ class EditionPipeline:
         await self.check()
         self.state.update(status=stage, phase=stage)
         self.state.setdefault('flow_trace', []).append(stage)
-        messages = messages_for(stage, prompt, value, self.workspace.now, self.state['report_type'])
+        value, messages, capacity = assemble_request(stage, prompt, value, self.workspace.now, self.state['report_type'], self.state['policy']['max_input_characters'])
+        self.state.setdefault('request_capacity', []).append(dict(stage=stage, **capacity))
+        self.save()
         task = 'review' if stage == 'review' else 'analysis'
         expected = self.state['policy'].get('request_input_pricing', {}).get(task, 'unknown')
         if self.model is complete and expected != 'unknown':

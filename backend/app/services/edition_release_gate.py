@@ -7,6 +7,7 @@ OWNER = 'finance-critical-path-acceptance-v1'
 CASES = {
     'issuer_full_path': 'reviewed_text',
     'real_v45_partial': 'partial_materials',
+    'real_v47_input': 'partial_materials',
     'no_body': 'partial_materials',
     'model_402': 'failed',
     'invalid_quote': 'partial_materials',
@@ -38,6 +39,14 @@ def validate_evidence(value):
             or not flow.get('original_text_sha256') or flow.get('app_written') is not False
             or flow.get('tts_requests') != 0):
         raise ValueError('edition_release_full_path_not_exercised')
+    real = cases['real_v47_input']
+    if (real.get('original_characters') != 85002 or not 0 < real.get('request_characters',0) <= 65000
+            or real.get('input_limit') != 65000 or real.get('article_bodies') != 5
+            or real.get('candidate_titles') != 65 or real.get('original_sources_unchanged') is not True
+            or real.get('new_model_requests') != 1 or real.get('new_search_requests') != 0
+            or real.get('new_public_requests') != 0 or real.get('old_public_requests') != 127
+            or real.get('estimated_limit_usd') != '1' or real.get('missing_election_preserved') is not True):
+        raise ValueError('edition_release_real_multiple_bodies_not_exercised')
     return value
 
 
