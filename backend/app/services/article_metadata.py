@@ -66,7 +66,8 @@ def visible_publication_fields(soup):
         raw = node.get('data-article-publish-time', '')
         if re.fullmatch(r'\d{10}', raw) and 946684800 <= int(raw) < 4102444800:
             values.append(datetime.fromtimestamp(int(raw), timezone.utc).isoformat())
-    return values
+    values.extend(headline_publication_fields(soup))
+    return list(dict.fromkeys(values))
 
 
 def extracted_article_title(soup, content):
@@ -96,3 +97,79 @@ def extracted_article_title(soup, content):
     title=re.split(r'[_|｜]',document,maxsplit=1)[0].strip();key=normalized(title)
     if len(key)>=24 and opening.startswith(key[:min(80,len(key))]):return title
     return ''
+
+
+def headline_publication_fields(soup):
+    """Publication widgets attached to a visible, document-matching headline.
+
+    Never scan the whole page for dates or infer a date from a URL/title. A
+    compact heading/header or its immediate metadata siblings is the boundary.
+    """
+    def visible(node):
+        for parent in (node, *node.parents):
+            classes = parent.get('class', [])
+            if ('hidden' in classes and not any(re.fullmatch(
+                    r'[a-z]+:(?:block|flex|inline|inline-block|inline-flex|grid)', name) for name in classes)):
+                return False
+            if (parent.name in {'nav', 'aside', 'footer', 'script', 'style', 'template', 'noscript'}
+                    or parent.has_attr('hidden') or parent.get('aria-hidden') == 'true'
+                    or parent.get('itemprop') == 'dateModified'
+                    or re.search(r'display\s*:\s*none|visibility\s*:\s*hidden', parent.get('style', ''), re.I)
+                    or re.search(r'(?:^|[ _-])(?:recommend|related|comments?|modified|updated)(?:$|[ _-])',
+                                 ' '.join(parent.get('class', [])), re.I)):
+                return False
+        return True
+    def matching(node):
+        text = node.get_text(' ', strip=True)
+        document = soup.title.get_text(' ', strip=True) if soup.title else ''
+        return (6 <= len(text) <= 300 and (document == text or document.startswith(text)
+                and re.match(r'\s*[-_|—｜]', document[len(text):])))
+    headings = [n for n in soup.select('h1, h2, h3') if visible(n) and matching(n)]
+    if not headings or len({n.get_text(' ', strip=True) for n in headings}) != 1:
+        return []
+    found = []
+    for heading in headings:
+        regions = []
+        parent = heading.parent
+        # Do not ascend into a large article/recommendation region.
+        if (parent.name in {'header', 'div'} and len(parent.get_text(' ', strip=True)) <= 600
+                and len(parent.select('h1, h2, h3')) == 1):
+            regions.append(parent)
+        # Responsive templates often repeat the same publication widget.
+        for node in list(heading.next_siblings)[:8]:
+            if not getattr(node, 'name', None):
+                if str(node).strip():
+                    break
+                continue
+            if (node.name in {'p', 'section', 'article', 'h1', 'h2', 'h3'}
+                    or node.select_one('p, h1, h2, h3, article, section')
+                    or len(node.get_text(' ', strip=True)) > 180):
+                break
+            if visible(node):
+                regions.append(node)
+        values = []
+        for region in regions:
+            for node in [region, *region.select('time, span, i, font')]:
+                if (not visible(node) or node is heading or heading in node.parents
+                        or node.select_one('h1, h2, h3') is not None):
+                    continue
+                if node.get('itemprop') == 'dateModified':
+                    continue
+                raw = node.get('datetime') if node.name == 'time' else node.get_text(' ', strip=True)
+                if not raw:
+                    continue
+                raw = re.sub(r'^(?:发布时间|发布日期|发布于|Published(?: on)?)\s*[:：]?\s*', '', raw, flags=re.I)
+                # Bare clocks, years, paragraph dates and update labels are not
+                # publication dates. Unknown timezones remain unknown downstream.
+                if not re.fullmatch(r'\d{4}[-/]\d{2}[-/]\d{2}[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?', raw):
+                    continue
+                try:
+                    publication_value(raw)
+                except ValueError:
+                    continue
+                values.append(raw)
+        found.extend(values)
+    # Multiple conflicting clocks near the headline require review; never
+    # choose the newest clock (which could be an update rather than publication).
+    unique = {publication_value(raw)[0].isoformat(): raw for raw in found}
+    return list(unique.values()) if len(unique) == 1 else []

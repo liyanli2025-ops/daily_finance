@@ -26,6 +26,12 @@ def review_body(content):
         window=content[start:end]
         if (product.search(window) and re.search(r'\d{6}|[（(][A-Z0-9]{3,12}[）)]|更高更纯|全市场领先',window)):
             findings.append(dict(code='financial_product_promotion',start=start,end=end))
+    # Training promotions can appear before an otherwise useful news body.
+    # Retain the original text and require editorial review, never erase it.
+    for match in re.finditer(r'立即报名|点击.{0,12}报名|报名.{0,12}限额', content):
+        start, end = max(0, match.start()-100), min(len(content), match.end()+100)
+        if re.search(r'课程|培训|训练营|实操课', content[start:end]):
+            findings.append(dict(code='training_course_promotion', start=start, end=end))
     # Multiple lettered poll choices are an interaction block, not price data.
     choices = list(re.finditer(r'(?m)^\s*[A-D]\s*级\s*[｜|：:]', content))
     if len(choices) >= 3:
