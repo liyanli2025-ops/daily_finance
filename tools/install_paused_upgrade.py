@@ -182,6 +182,8 @@ def main():
             expected += ('backend/tests/test_edition_read_selection.py',)
         if manifest.get('edition_batch_budget_tests_required'):
             expected += ('backend/tests/test_edition_batch_budget.py',)
+        if manifest.get('edition_manual_tests_required'):
+            expected += ('backend/tests/test_edition_manual.py',)
         if (proof.get('owner') != 'finance-unified-offline-acceptance-v1' or proof.get('passed') is not True
                 or set(proof.get('file_sha256', {})) != set(expected)
                 or any(hashlib.sha256((bundle / name).read_bytes()).hexdigest() != proof['file_sha256'][name]

@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2] / 'data/editions'
 
 
 def source_signature():
-    names = ('edition_read_selection.py', 'edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
+    names = ('edition_manual.py', 'edition_read_selection.py', 'edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
              'model_usage.py', 'web_research.py', 'material_roles.py', 'spoken_fidelity.py',
              'podcast_generator.py', 'podcast_script_cache.py', 'editorial_policy.py', 'research_desk.py')
     return digest({name: digest((Path(__file__).parent / name).read_text()) for name in names})

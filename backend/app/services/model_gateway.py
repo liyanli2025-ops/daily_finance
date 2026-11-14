@@ -20,6 +20,11 @@ MODEL_PAUSE_FILE=Path(__file__).resolve().parents[2]/'data'/'.automation-paused'
 
 
 def ensure_models_enabled():
+    from .edition_manual import active, models_allowed
+    if active():
+        if not MODEL_PAUSE_FILE.is_file() or MODEL_PAUSE_FILE.is_symlink() or not models_allowed():
+            raise RuntimeError('手动文字验收仅允许暂停期间本期已预留的一次模型请求')
+        return
     if MODEL_PAUSE_FILE.exists():
         raise RuntimeError('维护暂停：全部模型请求已阻止，等待用户明确恢复')
 
@@ -70,7 +75,8 @@ class Route:
 
 
 def resolve_route(task, config=None):
-    config = config or settings
+    from .edition_manual import current_config
+    config = config or current_config(settings)
     if task not in TASKS:
         raise ValueError(f"Unknown model task: {task}")
     provider = getattr(config, f"{task}_provider") or config.ai_provider
@@ -156,6 +162,8 @@ def completed_text(route, data):
 
 async def complete(task, messages, max_tokens=4000):
     ensure_models_enabled()
+    from .edition_manual import current_config
+    config = current_config(settings)
     from .model_usage import reserve_call, record_usage, current_input_limit
     from .prompt_reading import validate_input
     request_characters=validate_input(messages,limit=current_input_limit())
@@ -163,8 +171,8 @@ async def complete(task, messages, max_tokens=4000):
     url, headers, body = request_for(route, messages, max_tokens)
     # Report only metadata, never prompts, keys, raw errors, or reasoning content.
     log.info("model_task=%s provider=%s model=%s effort=%s", task, route.provider, route.model, route.effort)
-    async with httpx.AsyncClient(timeout=settings.ai_timeout_seconds) as client:
-        retries=settings.model_http_retries
+    async with httpx.AsyncClient(timeout=config.ai_timeout_seconds) as client:
+        retries=config.model_http_retries
         for attempt in range(retries+1):
             ensure_models_enabled()
             from .episode_workspace import current_workspace

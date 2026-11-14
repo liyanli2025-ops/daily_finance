@@ -51,16 +51,19 @@ def capabilities():
         limitation='配置状态不是联网验收；搜索目录不是正文，聊天工具不能自动供服务器调用。')
 
 
-def search_availability():
+def search_availability(config=None, manual_proof=None):
     """Local route preflight before buying a collection-model decision."""
     from ..config import settings
+    from .edition_manual import current_config
+    settings = config or current_config(settings)
     if not settings.research_web_search_enabled:
         return dict(available=False,reason='search_disabled')
     key=settings.research_web_search_api_key
     if not key or not key.get_secret_value().strip():
         return dict(available=False,reason='search_account_not_configured')
     pause_key='research-web-search:tavily:v1:'+hashlib.sha256(key.get_secret_value().encode()).hexdigest()[:12]
-    try:ensure_active(ResearchHub().root,pause_key)
+    from .edition_manual import ensure_search_active
+    try:ensure_search_active(ResearchHub().root,pause_key,proof=manual_proof,check=ensure_active)
     except RetiredSourceError:
         return dict(available=False,reason='search_route_paused_no_auto_retest')
     return dict(available=True,reason=None)
@@ -108,6 +111,8 @@ def search_error_diagnostics(response,payload):
 
 def search(workspace,query,hours=72,deadline=None,topic='news',purpose='discovery'):
     from ..config import settings
+    from .edition_manual import current_config
+    settings = current_config(settings)
     payload,profile=search_request(query,purpose,workspace.now,hours,topic)
     effective_query=payload['query']
     if not settings.research_web_search_enabled:return dict(status='disabled',scope='general_web',results=[])
@@ -118,7 +123,8 @@ def search(workspace,query,hours=72,deadline=None,topic='news',purpose='discover
     attempts=getattr(workspace,'web_search_attempts',0)
     if attempts>=settings.research_web_search_max_requests:return dict(status='budget_exhausted',scope='general_web',results=[])
     root=ResearchHub().root;pause_key='research-web-search:tavily:v1:'+hashlib.sha256(settings.research_web_search_api_key.get_secret_value().encode()).hexdigest()[:12]
-    try:ensure_active(root,pause_key)
+    from .edition_manual import ensure_search_active
+    try:ensure_search_active(root,pause_key,check=ensure_active)
     except RetiredSourceError:return dict(status='unavailable',reason='search_route_paused_no_auto_retest',scope='general_web',results=[])
     if deadline is not None and deadline<=time.monotonic():return dict(status='budget_exhausted',scope='general_web',results=[])
     workspace.web_search_attempts=attempts+1
