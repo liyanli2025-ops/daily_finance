@@ -99,7 +99,9 @@ def summarize_breadth(catalog,quotes,observed,rejections=None):
 
 
 class BreadthRadar:
-    def __init__(self,root=None):self.hub=ResearchHub(root if root is not None else ROOT)
+    def __init__(self,root=None,mapper=None):
+        self.hub=ResearchHub(root if root is not None else ROOT)
+        self.mapper=mapper or bounded_map
 
     def get(self,url,params,deadline):
         remaining=deadline-time.monotonic()
@@ -119,7 +121,7 @@ class BreadthRadar:
                     lambda:parse_catalog_page(self.get(CATALOG,params,deadline).json()))
             # Verify first page before scheduling any other pages.
             rows=page(1)
-            for result in bounded_map(range(2,math.ceil(count/80)+1),page):rows.extend(result)
+            for result in self.mapper(range(2,math.ceil(count/80)+1),page):rows.extend(result)
             by_symbol={row['symbol']:row for row in rows}
             after=int(self.get(COUNT,{'node':'hs_a'},deadline).json())
             if len(rows)!=len(by_symbol) or len(by_symbol)!=count or after!=count:raise ValueError('breadth_catalog_incomplete_or_changed')
@@ -132,16 +134,17 @@ class BreadthRadar:
             return dict(text=r.text,symbols=symbols,observed_at=china_now().isoformat())
         return cached(self.hub,'breadth:quotes:v1:'+hashlib.sha256(','.join(symbols).encode()).hexdigest(),90,request)
 
-    def collect(self,budget=90):
+    def collect(self,budget=90,cutoff=None):
         start=china_now();deadline=time.monotonic()+budget
         try:
             catalog=self.catalog(deadline);symbols=sorted(row['symbol'] for row in catalog['members'])
             chunks=[symbols[i:i+200] for i in range(0,len(symbols),200)]
             quotes={};rejections=Counter()
-            for saved in bounded_map(chunks,lambda chunk:self.quote_batch(chunk,deadline)):
-                parsed,bad=parse_dated_quotes(saved['text'],set(saved['symbols']),datetime.fromisoformat(saved['observed_at']))
+            for saved in self.mapper(chunks,lambda chunk:self.quote_batch(chunk,deadline)):
+                observed=datetime.fromisoformat(saved['observed_at'])
+                parsed,bad=parse_dated_quotes(saved['text'],set(saved['symbols']),min(observed,cutoff) if cutoff else observed)
                 quotes.update(parsed);rejections.update(bad)
-            result=summarize_breadth(catalog,quotes,china_now(),dict(rejections))
+            result=summarize_breadth(catalog,quotes,cutoff or china_now(),dict(rejections))
             result['collection_started_at']=start.isoformat()
             return result
         except Exception as error:

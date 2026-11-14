@@ -181,7 +181,7 @@ def packet(state, stage):
         # provider directories and executed tool plans are no longer useful here.
         assessment = state.get('assessment') or {}
         result['assessment'] = {k: deepcopy(assessment[k]) for k in
-            ('events', 'watchlist_checks', 'missed_major_events') if k in assessment}
+            ('events', 'watchlist_checks', 'missed_major_events', 'change_checks', 'expectation_checks') if k in assessment}
         ids = editorial_source_ids(state)
         result['prior_report'] = deepcopy(state.get('prior_report'))
         if stage == 'review':

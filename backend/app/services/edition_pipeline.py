@@ -32,11 +32,11 @@ def source_signature():
     names = ('edition_manual.py', 'edition_continuation.py', 'edition_read_selection.py', 'edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
              'model_usage.py', 'web_research.py', 'article_metadata.py', 'primary_material_quality.py', 'reading_acceptance.py', 'search_objectives.py', 'material_roles.py', 'spoken_fidelity.py',
              'podcast_generator.py', 'podcast_script_cache.py', 'editorial_policy.py', 'research_desk.py',
-             'edition_issuer_desk.py', 'listener_research.py', 'research_hub.py', 'research_schema.py', 'watchlist_sources.py')
+             'edition_issuer_desk.py', 'listener_research.py', 'daily_changes.py', 'edition_market.py', 'market_breadth.py', 'timed_market.py', 'research_hub.py', 'research_schema.py', 'watchlist_sources.py')
     return digest({name: digest((Path(__file__).parent / name).read_text()) for name in names})
 
 
-def initial_searches(stocks, now, *, direct_issuers=False):
+def initial_searches(stocks, now, *, direct_issuers=False, daily_changes=False, baselines=None):
     jobs = search_agenda(stocks, now)
     jobs += [dict(lane='global_policy', purpose='discovery',
                   query=now.strftime('%Y-%m-%d') + ' major world political economic breaking developments financial markets'),
@@ -49,6 +49,9 @@ def initial_searches(stocks, now, *, direct_issuers=False):
         for job in jobs:
             if company_job(job, stocks):
                 job['retrieval'] = 'issuer_catalogue'
+    if daily_changes:
+        from .daily_changes import decorate_jobs, targeted_jobs
+        jobs = decorate_jobs(jobs, now, baselines) + targeted_jobs(stocks, now, baselines)
     return jobs
 
 
@@ -112,8 +115,8 @@ async def preflight(report_type='morning', config=settings):
     try:
         p, fingerprint, routes = environment(stocks, report_type, config)
         plan = search_batch_plan(p, edition_forecast(dict(cutoff=now.isoformat(),
-            watchlist=stocks, report_type=report_type, sources={}, research_protocol=PROTOCOL), now),
-            sum(j.get('retrieval') != 'issuer_catalogue' for j in initial_searches(stocks, now, direct_issuers=True)))
+            watchlist=stocks, report_type=report_type, sources={}, research_protocol=PROTOCOL, change_protocol='daily_changes_v1'), now),
+            sum(j.get('retrieval') != 'issuer_catalogue' for j in initial_searches(stocks, now, direct_issuers=True, daily_changes=True)))
         if not plan['fits_money']:
             blockers.append('estimated_limit_below_initial_batch_and_model_plan')
         if not plan['fits_search_count']:
@@ -125,9 +128,12 @@ async def preflight(report_type='morning', config=settings):
         prepared_at=now.isoformat(), watchlist=stocks, policy=p, environment_sha256=fingerprint,
         budget_forecast=plan,
         routes=routes, extractor=extractor, ready_to_run=not blockers, blockers=blockers,
-        base_search_jobs=initial_searches(stocks, now, direct_issuers=True),
+        base_search_jobs=initial_searches(stocks, now, direct_issuers=True, daily_changes=True),
         source_plan=dict(company_disclosures="A股先读公司披露列表，选题后读公告；空目录不代表没有事件",
             company_baseline="首次建立基线；财务遇新披露或每7天核对，业务遇相关变动或每30天核对，平日复用；仅事件需要时比较",
+            daily_changes="五类逐项核对；每只自选股另查经营和治理风险，非只查业绩；标题后选一篇读",
+            market_structure="日期校验的指数与A股样本涨跌分布；共用请求上限、最多90秒/128次，至少保留24次正文请求；缺数据不推断资金意图",
+            expectation="有事前可比基线及实际值原文才允许预期差判断；无一致预期接口则留缺口",
             public_http_limit=config.research_body_max_urls * 3, paid_search_fallback="不自动回退；仅一次条件补查按缺口决定"),
         normal_model_requests=4, conditional_extra_requests=1, model_requests=0,
         search_requests=0, public_fetch_attempts=0, tts_requests=0,
@@ -294,9 +300,10 @@ class EditionPipeline:
                 self.state.setdefault('company_baselines', {})[baseline['key']] = baseline
             else:
                 self.budget.reserve('search')
+                options = dict(max_results=5) if self.state.get('change_protocol') == 'daily_changes_v1' else {}
                 result = await asyncio.to_thread(self.search, self.workspace, job['query'],
                     deadline=self.deadline, hours=168 if self.workspace.now.weekday() >= 5 else 72,
-                    topic='news', purpose=job.get('purpose', 'discovery'))
+                    topic='news', purpose=job.get('purpose', 'discovery'), **options)
             self.state.setdefault('search_receipts', []).append(dict(query=job['query'], job=job, result=result))
             self.state['search_http_attempts'] = getattr(self.workspace, 'web_search_attempts', 0)
             for row in result.get('results', []):
@@ -445,6 +452,11 @@ class EditionPipeline:
         accepted, sources, validation = contract.prepare_assessment(
             assessment, events, self.state['sources'], stocks, provided)
         self.state['sources'] = sources
+        from .daily_changes import enabled, validate_checks, validate_expectations
+        if enabled(self.state):
+            self.state['change_missing'] = validate_checks(self.state, accepted, provided)
+            validate_expectations(self.state, accepted, provided)
+            validation['missing'].extend(self.state['change_missing'])
         self.state.setdefault('assessment_validation', []).append(dict(stage=stage, **validation))
         self.save()
         return accepted, validation['missing']
@@ -453,15 +465,30 @@ class EditionPipeline:
         stocks = {r['market'] + ':' + r['code'] for r in self.state['watchlist']}
         try:
             jobs = initial_searches(self.state['watchlist'], self.workspace.now,
-                direct_issuers=self.state.get('research_protocol') == PROTOCOL)
+                direct_issuers=self.state.get('research_protocol') == PROTOCOL,
+                daily_changes=self.state.get('change_protocol') == 'daily_changes_v1')
             if self.state.get('research_protocol') == PROTOCOL:
                 # Obtain free issuer context before reserving the paid batch.
                 await self.searches([j for j in jobs if j.get('retrieval') == 'issuer_catalogue'])
+                if self.state.get('change_protocol') == 'daily_changes_v1':
+                    jobs = initial_searches(self.state['watchlist'], self.workspace.now,
+                        direct_issuers=True, daily_changes=True, baselines=self.state.get('company_baselines'))
+                # Reserve the COMPLETE paid batch before spending on any search.
                 await self.searches([j for j in jobs if j.get('retrieval') != 'issuer_catalogue'])
+                if self.state.get('change_protocol') == 'daily_changes_v1':
+                    from .edition_market import collect, evidence
+                    await self.check()
+                    self.state['market_observations'] = await asyncio.to_thread(collect, self.state, self.issuer_desk)
+                    source = evidence(self.state['market_observations'])
+                    if source:
+                        self.state['sources'][source['id']] = source
+                    self.save()
             else:
                 await self.searches(jobs)
             a = await self.call('agenda', contract.AGENDA, self.packet('agenda'))
             self.state['agenda'] = contract.agenda(a, self.state['candidates'], stocks)
+            from .daily_changes import audit_agenda
+            audit_agenda(self.state, self.state['agenda'])
             events = {r['id']: r for r in a['events']}; self.save()
             selected, trace = primary_plan(a['events'])
             await self.selected_reads(selected, events, trace)
@@ -486,6 +513,7 @@ class EditionPipeline:
     async def finish_materials(self, assessment, events, stocks, *, research_tasks=None, recovered_ids=()):
         """One patch assessment, writing and review; reused by same-ledger continuation."""
         missing = contract.assess(assessment, events, self.state['sources'], stocks)
+        missing.extend(self.state.get('change_missing', []))
         extra = assessment.get('missed_major_events', [])
         for event in extra:
             contract.event(event, self.state['candidates'], stocks)
@@ -537,7 +565,9 @@ class EditionPipeline:
         written = await self.call('writing', contract.WRITE, editorial)
         self.state['draft'] = written; self.save()
         contract.draft(written, events, editorial['sources'])
-        validate_listener_draft(self.state, written, editorial['sources']); self.save()
+        validate_listener_draft(self.state, written, editorial['sources'])
+        from .daily_changes import validate_language
+        validate_language(self.state, written); self.save()
         return await self.review_and_finish(events)
 
     async def review_and_finish(self, events):
@@ -583,7 +613,7 @@ async def generate_edition(report_type='morning', root=ROOT, prior_report=None):
         state = dict(id=identifier, owner='finance-unified-edition-v1', status='prepared',
             cutoff=now.isoformat(), report_type=report_type, watchlist=preview['watchlist'],
             policy=preview['policy'], environment_sha256=preview['environment_sha256'],
-            reservations=[], usage=[], candidates={}, sources={}, app_written=False, research_protocol=PROTOCOL)
+            reservations=[], usage=[], candidates={}, sources={}, app_written=False, research_protocol=PROTOCOL, change_protocol='daily_changes_v1')
         if prior_report is not None:
             state['prior_report'] = dict(id=prior_report.id, title=prior_report.title,
                 report_date=prior_report.report_date.isoformat(), content=prior_report.content,

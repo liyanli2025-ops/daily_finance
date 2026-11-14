@@ -69,12 +69,13 @@ def search_availability(config=None, manual_proof=None):
     return dict(available=True,reason=None)
 
 
-def search_request(query,purpose,now,hours=72,topic='news'):
+def search_request(query,purpose,now,hours=72,topic='news',max_results=10):
     """Use one time-window representation; no account or network access."""
     from .search_objectives import request_profile
     if topic not in {'news','general'}:raise ValueError('search_topic_invalid')
+    if type(max_results) is not int or max_results not in {5,10}:raise ValueError('search_result_limit_invalid')
     effective_query,profile=request_profile(query,purpose,now,hours)
-    payload=dict(query=effective_query,topic=topic,search_depth='basic',max_results=10,
+    payload=dict(query=effective_query,topic=topic,search_depth='basic',max_results=max_results,
         include_published_date=True,include_answer=False,include_raw_content=False,
         auto_parameters=False,**profile)
     if not any(key in profile for key in ('start_date','end_date')):
@@ -109,16 +110,16 @@ def search_error_diagnostics(response,payload):
         limitation='固定信号仅辅助诊断；未保留服务商原始错误文字，不能据此保证已确定根因。')
 
 
-def search(workspace,query,hours=72,deadline=None,topic='news',purpose='discovery'):
+def search(workspace,query,hours=72,deadline=None,topic='news',purpose='discovery',max_results=10):
     from ..config import settings
     from .edition_manual import current_config
     settings = current_config(settings)
-    payload,profile=search_request(query,purpose,workspace.now,hours,topic)
+    payload,profile=search_request(query,purpose,workspace.now,hours,topic,max_results)
     effective_query=payload['query']
     if not settings.research_web_search_enabled:return dict(status='disabled',scope='general_web',results=[])
     if not settings.research_web_search_api_key or not settings.research_web_search_api_key.get_secret_value().strip():return dict(status='unavailable',reason='search_account_not_configured',scope='general_web',results=[])
     cache=getattr(workspace,'web_search_cache',{})
-    key=(effective_query,hours,topic,purpose,tuple(sorted((k,str(v)) for k,v in profile.items())))
+    key=(effective_query,hours,topic,purpose,max_results,tuple(sorted((k,str(v)) for k,v in profile.items())))
     if key in cache:return dict(cache[key],reused_within_episode=True)
     attempts=getattr(workspace,'web_search_attempts',0)
     if attempts>=settings.research_web_search_max_requests:return dict(status='budget_exhausted',scope='general_web',results=[])
@@ -139,7 +140,7 @@ def search(workspace,query,hours=72,deadline=None,topic='news',purpose='discover
         data=response.json()
         if not isinstance(data,dict) or not isinstance(data.get('results'),list):raise ValueError('search_result_shape')
         results=[]
-        for row in data['results'][:10]:
+        for row in data['results'][:max_results]:
             if not isinstance(row,dict):continue
             url=row.get('url')
             from .evidence import article_url
@@ -149,8 +150,8 @@ def search(workspace,query,hours=72,deadline=None,topic='news',purpose='discover
                 reading_status='search_snippet_not_body'))
         result=dict(status='ok',scope='general_web_search_results_not_exhaustive',query=effective_query,
             requested_query=query,topic=topic,purpose=purpose,retrieval_profile=profile,
-            requested_max_results=10,provider_returned_results=len(data['results']),
-            processed_results=min(10,len(data['results'])),metadata_results=len(results),
+            requested_max_results=max_results,provider_returned_results=len(data['results']),
+            processed_results=min(max_results,len(data['results'])),metadata_results=len(results),
             requested_hours=hours,window='engine_day_or_week_hint_not_verified_article_window',
             results=results,http_attempts=workspace.web_search_attempts,
             limitation='搜索引擎可能漏收、排序失真或返回旧转载；须读取正文核对时间，未入证据池。')

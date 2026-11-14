@@ -190,6 +190,8 @@ def main():
             expected += ('backend/tests/test_article_publication.py',)
         if manifest.get('listener_research_tests_required'):
             expected += ('backend/tests/test_listener_research.py',)
+        if manifest.get('daily_changes_tests_required'):
+            expected += ('backend/tests/test_daily_changes.py',)
         if (proof.get('owner') != 'finance-unified-offline-acceptance-v1' or proof.get('passed') is not True
                 or set(proof.get('file_sha256', {})) != set(expected)
                 or any(hashlib.sha256((bundle / name).read_bytes()).hexdigest() != proof['file_sha256'][name]

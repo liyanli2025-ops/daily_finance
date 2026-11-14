@@ -25,7 +25,7 @@ reason:"本期能下什么结论、不能下什么结论",report_quote:"body中�
 next_check:"下一次应核对的披露/数据及其日期或已知未知边界",source_ids:["直接公司证据ID"]}。
 insufficient允许source_ids为空，必须说明缺口；supported只能用scope或direct_scopes匹配的公司资料。
 每只自选股在报告中用简短一段交代结论边界与下一观察项；口播优先有实质变化者，不机械念完清单。
-日报只讲本期新增变化及其影响；没有新增业绩或相关催化时，不重复解读上次财报、不每天做同比分析。
+日报覆盖政治、行业技术竞争、公司经营与上下游、治理风险、市场结构等所有重要新增变化，不限业绩；旧事件的新进展也应核对。财报基线仅在本期问题需要时比较，不每天重复同比。
 公司业务归类只用来选问题，不能充今日消息；财务基线标明期间和供应商镜像属性，不能当今日催化或已核原报。
 禁止以下跳步：利润增速高于收入就称盈利质量改善；回购计划完成比例就推导股价支撑；
 解禁额度就当实际卖出；只有涨跌就认定空头回补、资金意图或市场已定价。分别补现金流/扣非与基数、
@@ -60,20 +60,23 @@ def brief(state):
             source_url=profile.get('source_url'), observed_at=profile.get('collected_at'),
             gaps=deepcopy(record.get('gaps', [])),
             usage='研究问题，不是已验证事实；缺业务归类时使用通用问题，不猜行业。'))
+    from .daily_changes import brief as change_brief
     return dict(research_protocol=PROTOCOL, listener_questions=list(QUESTIONS), company_questions=companies,
-        issuer_catalogue_checks=deepcopy(state.get('issuer_catalogue_checks', [])))
+        issuer_catalogue_checks=deepcopy(state.get('issuer_catalogue_checks', [])), **change_brief(state))
 
 
 def requirements(stage, value):
     if value.get('research_protocol') != PROTOCOL:
         return ''
+    from .daily_changes import requirements as change_requirements
+    changes = change_requirements(stage) if value.get('change_protocol') == 'daily_changes_v1' else ''
     if stage == 'writing':
-        return WRITE_REQUIREMENTS
+        return WRITE_REQUIREMENTS + changes
     if stage == 'review':
-        return REVIEW_REQUIREMENTS
+        return REVIEW_REQUIREMENTS + changes
     return ('\n日报不例行复述旧财报。只有本期新增事件确实需要经营比较时，在对应事件中附baseline_question（12至200字），说明具体要核对的指标和问题；否则不附此字段。缓存财务候选只作背景，不默认选读或单独列成新闻。\n按listener_questions检查价值和缺口；company_questions仅给研究方向，不是事实。'
             '财务基线是背景，不因过往报告日期旧而当今日催化，也不把它当最新公司消息的替代。'
-            '公司披露目录只含最近20条，空目录不能声称无重大事件；披露镜像不冒充交易所原件。')
+            '公司披露目录只含最近20条，空目录不能声称无重大事件；披露镜像不冒充交易所原件。') + changes
 
 
 def _text(value):
@@ -196,4 +199,23 @@ def listening_receipt(state):
         if state.get('status') in {'reviewed_text','audio_ready'} else '尚未取得本期通过回执'),
         '音频：' + ('本期已生成' if state.get('status') == 'audio_ready' else '本期尚未生成'),
         '未取得、未读、未核实均不能解释成没有事件。']
+    from .daily_changes import enabled, coverage
+    if enabled(state):
+        lines += ['', '五类变化的实际查漏（已查不等于充分覆盖）：']
+        labels = dict(checked='已执行有限检索', unavailable='通道未成功', not_checked='尚未检索',
+            supported='有正文依据待内容验收', screened_no_material_event='有限检索内未选出实质变化',
+            missing='证据仍缺', not_assessed='尚未评估')
+        conclusions = {r['task_id']:r for r in (state.get('assessment') or {}).get('change_checks', [])}
+        for row in coverage(state):
+            lines.append('- ' + row['name'] + '：' + labels.get(row['discovery'],row['discovery'])
+                + '；候选=' + str(len(row['candidate_ids'])) + '；已存正文=' + str(len(row['stored_source_ids']))
+                + '；' + labels.get(row['conclusion'],row['conclusion']))
+            if conclusions.get(row['id'], {}).get('reason'):
+                lines.append('  ' + conclusions[row['id']]['reason'])
+        for row in state.get('change_signal_decisions', []):
+            lines.append('具体政治线索：' + row['topic'] + '；候选' + row['candidate_id'])
+            lines.extend('  ' + (r.get('event_id') or '已排除') + '：' + r['reason'] for r in row['decisions'])
+        market = state.get('market_observations') or {}
+        lines.append('行情/结构数据：' + str(market.get('status', '未执行')) + '；新增公开请求=' + str(market.get('public_fetch_attempts', 0)))
+        lines.extend('数据缺口：' + gap for gap in market.get('gaps', []))
     return '\n'.join(lines) + '\n'

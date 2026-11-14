@@ -36,10 +36,18 @@ class IssuerDesk:
         self.folder = workspace.path / 'issuer-responses'
         self.stocks = {s['code']: s for s in state['watchlist'] if s['market'] == 'A'}
 
-    def request(self, url, params):
-        if url not in {LIST_URL, BODY_URL, PROFILE_URL, DATA_API}:
+    def request(self, url, params, *, response_kind='json', deadline=None, request_tag=None):
+        from .edition_market import allowed_endpoint, COUNT
+        market = allowed_endpoint(url)
+        if (url not in {LIST_URL, BODY_URL, PROFILE_URL, DATA_API} and not market
+                or response_kind not in {'json', 'gbk'} or response_kind == 'gbk' and not market
+                or request_tag is not None and (url != COUNT or request_tag != 'breadth-final-count')):
             raise ValueError('edition_issuer_endpoint_invalid')
         key = hashlib.sha256(json.dumps([url, params], sort_keys=True).encode()).hexdigest()
+        if response_kind != 'json':
+            key = hashlib.sha256((key + ':' + response_kind).encode()).hexdigest()
+        if request_tag:
+            key = hashlib.sha256((key + ':' + request_tag).encode()).hexdigest()
         receipts = self.state.setdefault('issuer_http_receipts', [])
         previous = next((r for r in receipts if r['key'] == key), None)
         if previous:
@@ -51,10 +59,11 @@ class IssuerDesk:
             raw = capture.read_bytes()
             if hashlib.sha256(raw).hexdigest() != previous['sha256']:
                 raise ValueError('edition_issuer_capture_changed')
-            return json.loads(raw)
+            return raw.decode('gbk') if response_kind == 'gbk' else json.loads(raw)
         if url in self.state.get('issuer_endpoint_gaps', {}):
             raise ValueError('edition_issuer_endpoint_unavailable_this_run')
-        remaining = self.deadline - time.monotonic()
+        deadline = min(self.deadline, deadline) if deadline is not None else self.deadline
+        remaining = deadline - time.monotonic()
         if remaining <= 0 or getattr(self.workspace, 'public_fetch_attempts', 0) >= self.state['policy']['max_body_urls'] * 3:
             raise ValueError('edition_public_http_budget_exhausted')
         from .source_health import ensure_active, record_failure
@@ -77,12 +86,12 @@ class IssuerDesk:
             chunks, size = [], 0
             for chunk in response.iter_content(65536):
                 size += len(chunk)
-                if size > MAX_BYTES or time.monotonic() >= self.deadline:
+                if size > MAX_BYTES or time.monotonic() >= deadline:
                     raise ValueError('edition_issuer_response_limit')
                 chunks.append(chunk)
             raw = b''.join(chunks)
-            data = json.loads(raw)
-            if not isinstance(data, dict):
+            data = raw.decode('gbk') if response_kind == 'gbk' else json.loads(raw)
+            if not isinstance(data, dict) and not market:
                 raise ValueError('edition_issuer_structure_invalid')
             self.folder.mkdir(parents=True, exist_ok=True, mode=0o700)
             name = key + '.json'
