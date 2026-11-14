@@ -73,6 +73,9 @@ def main():
             if manifest.get('edition_manual_tests_required'):
                 suite.addTests(unittest.defaultTestLoader.discover(str(package / 'backend/tests'),
                     pattern='test_edition_manual.py'))
+            if manifest.get('edition_continuation_tests_required'):
+                suite.addTests(unittest.defaultTestLoader.discover(str(package / 'backend/tests'),
+                    pattern='test_edition_continuation.py'))
             if manifest.get('article_publication_tests_required'):
                 suite.addTests(unittest.defaultTestLoader.discover(str(package / 'backend/tests'),
                     pattern='test_article_publication.py'))
@@ -92,6 +95,8 @@ def main():
             proof_files += ('backend/tests/test_edition_batch_budget.py',)
         if manifest.get('edition_manual_tests_required'):
             proof_files += ('backend/tests/test_edition_manual.py',)
+        if manifest.get('edition_continuation_tests_required'):
+            proof_files += ('backend/tests/test_edition_continuation.py',)
         if manifest.get('article_publication_tests_required'):
             proof_files += ('backend/tests/test_article_publication.py',)
         proof = dict(owner='finance-unified-offline-acceptance-v1', passed=True,

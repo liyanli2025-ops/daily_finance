@@ -184,6 +184,8 @@ def main():
             expected += ('backend/tests/test_edition_batch_budget.py',)
         if manifest.get('edition_manual_tests_required'):
             expected += ('backend/tests/test_edition_manual.py',)
+        if manifest.get('edition_continuation_tests_required'):
+            expected += ('backend/tests/test_edition_continuation.py',)
         if manifest.get('article_publication_tests_required'):
             expected += ('backend/tests/test_article_publication.py',)
         if (proof.get('owner') != 'finance-unified-offline-acceptance-v1' or proof.get('passed') is not True

@@ -61,6 +61,52 @@ def source_packet(source):
     return result
 
 
+def editorial_source_packet(source, state):
+    """Keep verbatim evidence with surrounding paragraphs; raw pool stays intact.
+
+    Only the explicit same-edition continuation uses this view. Uncited bodies
+    remain whole, so an inconvenient or contrary source cannot disappear.
+    """
+    result = source_packet(source)
+    if not state.get('continuation_catalogue_ids'):
+        return result
+    assessment = state.get('assessment') or {}
+    quotes = [item.get('quote') for row in assessment.get('events', [])
+              + assessment.get('watchlist_checks', []) for item in row.get('evidence', [])
+              if item.get('source_id') == source['id']]
+    # The reviewer also receives the complete context of every written anchor.
+    quotes += [row.get('source_quote') for row in (state.get('draft') or {}).get('source_checks', [])
+               if row.get('source_id') == source['id']]
+    text = source['text']
+    if not quotes or any(not isinstance(q, str) or q not in text for q in quotes):
+        return result
+    spans = []
+    for quote in quotes:
+        start = 0
+        while True:
+            offset = text.find(quote, start)
+            if offset < 0: break
+            left, right = max(0, offset - 300), min(len(text), offset + len(quote) + 300)
+            # Extend to whole nearby paragraphs, never reconstruct wording.
+            boundary = text.rfind('\n', max(0, left - 300), left)
+            if boundary >= 0: left = boundary + 1
+            boundary = text.find('\n', right, min(len(text), right + 300))
+            if boundary >= 0: right = boundary
+            spans.append((left, right)); start = offset + len(quote)
+    merged = []
+    for left, right in sorted(spans):
+        if merged and left <= merged[-1][1]: merged[-1][1] = max(right, merged[-1][1])
+        else: merged.append([left, right])
+    if sum(right-left for left,right in merged) >= len(text): return result
+    from .edition_budget import digest
+    result['text'] = '\n[中间原文未提供]\n'.join(text[left:right] for left,right in merged)
+    result['provided_original_ranges'] = merged
+    result['original_text_sha256'] = digest(text)
+    result['original_characters'] = len(text)
+    result['reading_limit'] = '仅提供逐字证据及其周边段落，非全文；省略标记不是原文，不能引用。未引文来源保留全文。若事实/条件无法核对，须指出缺口，不能声称读过省略部分。'
+    return result
+
+
 def assessment_candidates(state):
     rows = deepcopy(state.get('candidates', {}))
     agenda = state.get('agenda') or {}
@@ -104,7 +150,18 @@ def packet(state, stage):
     result['agenda'] = deepcopy(state.get('agenda'))
     result['missing'] = deepcopy(state.get('missing', []))
     if stage in {'assessment', 'patch_assessment'}:
-        result.update(candidate_packet(assessment_candidates(state)))
+        candidates = assessment_candidates(state)
+        if stage == 'patch_assessment' and state.get('continuation_catalogue_ids'):
+            # These exact candidates were already delivered to BOTH paid stages.
+            # Retain every title/URL/time/warning and the explicit decisions; only
+            # avoid replaying their old snippets in the single final assessment.
+            # Newly searched candidates retain full snippets.
+            for cid in state['continuation_catalogue_ids']:
+                if cid in candidates and candidates[cid].get('snippet') is not None:
+                    candidates[cid]['snippet'] = None
+                    candidates[cid]['snippet_note'] = '已在前两次模型输入提供；本次保留标题/来源/时点及已有评估，旧完整摘要仍在本地。'
+            result['previous_catalogue_note'] = '本次是原期最后一次补查评估；旧摘要不重发，新搜摘要和全部现有正文仍提供。逐项核对原事件及公司缺口，不得据旧标题认定事实。'
+        result.update(candidate_packet(candidates))
         result['read_receipts'] = [{k: deepcopy(row[k]) for k in
             ('candidate_id', 'event_id', 'status', 'reason') if k in row}
             for row in state.get('read_receipts', [])]
@@ -112,6 +169,11 @@ def packet(state, stage):
         if stage == 'patch_assessment':
             result['assessment'] = deepcopy(state.get('assessment'))
             result['last_assessment'] = True
+            if state.get('research_tasks'):
+                result['company_research_tasks'] = deepcopy(state['research_tasks'])
+                result['company_task_note'] = '这些是自选股补查任务，不是新增新闻事件；events仍逐项对应agenda，watchlist_checks单独核对公司直接资料。'
+            if state.get('recovered_source_ids'):
+                result['recovered_background_ids'] = list(state['recovered_source_ids'])
     else:
         # Assessment results and ALL major/excluded event reasons remain visible;
         # provider directories and executed tool plans are no longer useful here.
@@ -124,5 +186,6 @@ def packet(state, stage):
             result['draft'] = deepcopy(state['draft'])
             # Legacy/resumed drafts must never lose an explicitly cited body.
             ids = set(ids) | {r['source_id'] for r in state['draft'].get('source_checks', [])}
-    result['sources'] = {sid: source_packet(state['sources'][sid]) for sid in sorted(ids)}
+    result['sources'] = {sid: (editorial_source_packet(state['sources'][sid], state)
+        if stage in {'writing', 'review'} else source_packet(state['sources'][sid])) for sid in sorted(ids)}
     return result

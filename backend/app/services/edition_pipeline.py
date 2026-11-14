@@ -27,8 +27,8 @@ ROOT = Path(__file__).resolve().parents[2] / 'data/editions'
 
 
 def source_signature():
-    names = ('edition_manual.py', 'edition_read_selection.py', 'edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
-             'model_usage.py', 'web_research.py', 'article_metadata.py', 'primary_material_quality.py', 'material_roles.py', 'spoken_fidelity.py',
+    names = ('edition_manual.py', 'edition_continuation.py', 'edition_read_selection.py', 'edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
+             'model_usage.py', 'web_research.py', 'article_metadata.py', 'primary_material_quality.py', 'reading_acceptance.py', 'material_roles.py', 'spoken_fidelity.py',
              'podcast_generator.py', 'podcast_script_cache.py', 'editorial_policy.py', 'research_desk.py')
     return digest({name: digest((Path(__file__).parent / name).read_text()) for name in names})
 
@@ -359,57 +359,7 @@ class EditionPipeline:
                 self.save(); return None
             assessment = await self.call('assessment', contract.ASSESS, self.packet('assessment'))
             assessment, missing = self.validate_assessment(assessment, events, stocks)
-            extra = assessment.get('missed_major_events', [])
-            for event in extra:
-                contract.event(event, self.state['candidates'], stocks)
-                if event['importance'] != 'major' or event['id'] in events: raise ValueError('edition_new_event_invalid')
-                events[event['id']] = event; a['events'].append(event); missing.append(event['id'])
-            self.state.update(assessment=assessment, missing=missing); self.save()
-            jobs = assessment.get('additional_searches', [])
-            reads = assessment.get('additional_reads', [])
-            for job in jobs:
-                if job.get('event_id') not in events or not isinstance(job.get('query'), str) or not 2 <= len(job['query']) <= 120:
-                    raise ValueError('edition_patch_search_invalid')
-                validate_increment(job)
-            for job in reads:
-                if job.get('event_id') not in events or job.get('candidate_id') not in self.state['candidates']:
-                    raise ValueError('edition_patch_read_invalid')
-                validate_increment(job)
-            if jobs or reads or extra:
-                before = {i: dict(text=digest(s['text']), event_ids=set(s['event_ids']))
-                          for i, s in self.state['sources'].items()}
-                if not jobs:
-                    await self.check()
-                    self.budget.check_search_batch(0)
-                await self.searches(jobs)
-                selected, trace = patch_plan(self.state, events, assessment, extra)
-                await self.selected_reads(selected, events, trace)
-                changed = [i for i, source in self.state['sources'].items()
-                           if i not in before or digest(source['text']) != before[i]['text']]
-                links = [dict(source_id=i, event_id=eid)
-                         for i, source in self.state['sources'].items() for eid in source['event_ids']
-                         if i in before and eid in events and eid not in before[i]['event_ids']]
-                self.state['patch_progress'] = dict(new_or_changed_body_ids=changed,
-                    reused_body_event_links=links,
-                    limitation='新增关联不是新增事实或独立来源；仍须逐事件评估证据，不能直接判定已覆盖。')
-                if not changed and not links:
-                    self.state.update(status='partial_materials', stop_reason='patch_no_new_body')
-                    self.save(); return None
-                assessment = await self.call('patch_assessment', contract.ASSESS,
-                    self.packet('patch_assessment'))
-                assessment, missing = self.validate_assessment(assessment, events, stocks)
-                if (assessment.get('additional_searches') or assessment.get('additional_reads')
-                        or assessment.get('missed_major_events')):
-                    missing.append('unresolved_additional_research')
-                self.state.update(assessment=assessment, missing=missing); self.save()
-            if missing or not self.state['sources']:
-                self.state['status'] = 'partial_materials'; self.save(); return None
-            self.state['editorial_source_ids'] = editorial_source_ids(self.state)
-            editorial = self.packet('writing')
-            written = await self.call('writing', contract.WRITE, editorial)
-            self.state['draft'] = written; self.save()
-            contract.draft(written, events, editorial['sources']); self.save()
-            return await self.review_and_finish(events)
+            return await self.finish_materials(assessment, events, stocks)
         except asyncio.CancelledError:
             self.state.update(status='interrupted', resume_allowed=False)
             self.save(); raise
@@ -421,6 +371,62 @@ class EditionPipeline:
                 self.state['error_http_status'] = self.state['usage'][-1].get('http_status')
             self.save()
             raise
+
+    async def finish_materials(self, assessment, events, stocks, *, research_tasks=None, recovered_ids=()):
+        """One patch assessment, writing and review; reused by same-ledger continuation."""
+        missing = contract.assess(assessment, events, self.state['sources'], stocks)
+        extra = assessment.get('missed_major_events', [])
+        for event in extra:
+            contract.event(event, self.state['candidates'], stocks)
+            if event['importance'] != 'major' or event['id'] in events: raise ValueError('edition_new_event_invalid')
+            events[event['id']] = event; self.state['agenda']['events'].append(event); missing.append(event['id'])
+        self.state.update(assessment=assessment, missing=missing); self.save()
+        research_events = dict(events, **(research_tasks or {}))
+        jobs = assessment.get('additional_searches', [])
+        reads = assessment.get('additional_reads', [])
+        for job in jobs:
+            if job.get('event_id') not in research_events or not isinstance(job.get('query'), str) or not 2 <= len(job['query']) <= 120:
+                raise ValueError('edition_patch_search_invalid')
+            validate_increment(job)
+        for job in reads:
+            if job.get('event_id') not in research_events or job.get('candidate_id') not in self.state['candidates']:
+                raise ValueError('edition_patch_read_invalid')
+            validate_increment(job)
+        if jobs or reads or extra or recovered_ids:
+            before = {i: dict(text=digest(s['text']), event_ids=set(s['event_ids']))
+                      for i, s in self.state['sources'].items()}
+            if not jobs:
+                await self.check()
+                self.budget.check_search_batch(0)
+            await self.searches(jobs)
+            selected, trace = patch_plan(self.state, research_events, assessment, extra)
+            await self.selected_reads(selected, research_events, trace)
+            changed = [i for i, source in self.state['sources'].items()
+                       if i not in before or digest(source['text']) != before[i]['text'] or i in recovered_ids]
+            links = [dict(source_id=i, event_id=eid)
+                     for i, source in self.state['sources'].items() for eid in source['event_ids']
+                     if i in before and eid in events and eid not in before[i]['event_ids']]
+            self.state['patch_progress'] = dict(new_or_changed_body_ids=changed,
+                reused_body_event_links=links,
+                limitation='新增关联不是新增事实或独立来源；仍须逐事件评估证据，不能直接判定已覆盖。')
+            if not changed and not links:
+                self.state.update(status='partial_materials', stop_reason='patch_no_new_body')
+                self.save(); return None
+            assessment = await self.call('patch_assessment', contract.ASSESS,
+                self.packet('patch_assessment'))
+            assessment, missing = self.validate_assessment(assessment, events, stocks)
+            if (assessment.get('additional_searches') or assessment.get('additional_reads')
+                    or assessment.get('missed_major_events')):
+                missing.append('unresolved_additional_research')
+            self.state.update(assessment=assessment, missing=missing); self.save()
+        if missing or not self.state['sources']:
+            self.state['status'] = 'partial_materials'; self.save(); return None
+        self.state['editorial_source_ids'] = editorial_source_ids(self.state)
+        editorial = self.packet('writing')
+        written = await self.call('writing', contract.WRITE, editorial)
+        self.state['draft'] = written; self.save()
+        contract.draft(written, events, editorial['sources']); self.save()
+        return await self.review_and_finish(events)
 
     async def review_and_finish(self, events):
         from .spoken_fidelity import CONTRACT

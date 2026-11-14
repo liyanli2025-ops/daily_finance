@@ -40,7 +40,8 @@ def editorial_forecast(state, now):
         ('events', 'watchlist_checks', 'missed_major_events') if k in assessment}
     # Forecast all known bodies, including contrary/unselected bodies, without
     # inventing ready evidence. This is only planning, never a research verdict.
-    value['sources'] = {sid: source_packet(s) for sid, s in state.get('sources', {}).items()}
+    from .edition_context import editorial_source_packet
+    value['sources'] = {sid: editorial_source_packet(s, state) for sid, s in state.get('sources', {}).items()}
     result = []
     for stage, prompt in [('writing', contract.WRITE), ('review', contract.REVIEW + CONTRACT)]:
         payload = deepcopy(value)

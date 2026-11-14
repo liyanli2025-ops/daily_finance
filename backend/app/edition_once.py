@@ -186,9 +186,20 @@ async def main():
     parser.add_argument('--max-usd', required=True)
     parser.add_argument('--report-type', choices=('morning', 'evening'), default='morning')
     parser.add_argument('--run', action='store_true')
+    parser.add_argument('--continue-id', help='复用同一期失败材料和预算；不重新开期')
     parser.add_argument('--export', type=Path, help='导出本次文字、完整来源、缺口及用量，不联网')
     args = parser.parse_args()
     config = accepted_config(json.loads(args.prices.read_text()), args.max_usd)
+    if args.continue_id:
+        from .services.edition_continuation import continue_once
+        state, directory, reused = await continue_once(config, args.continue_id, run=args.run)
+        if directory is None:
+            print(json.dumps(state, ensure_ascii=False, indent=2)); return
+        result = summary(state, directory)
+        result['existing_continuation_reused_no_new_requests'] = reused
+        if args.export:
+            result['review_zip'] = str(export_review(directory, args.export))
+        print(json.dumps(result, ensure_ascii=False, indent=2)); return
     if not args.run:
         print(json.dumps(await preview(config, args.report_type), ensure_ascii=False, indent=2))
         return
