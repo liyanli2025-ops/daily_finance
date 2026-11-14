@@ -306,9 +306,15 @@ class PipelineWiring(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as root:
             s=state();p=EditionPipeline(s,root,SimpleNamespace(path=Path(root),now=NOW),check=AsyncMock())
             s.update(phase='assessment',delivered_sources={'assessment':{}})
-            with patch('app.services.edition_contract.prepare_assessment',return_value=({}, {}, {'missing':[]})):
-                with self.assertRaisesRegex(ValueError,'checks_missing'):
-                    p.validate_assessment({}, {}, set())
+            s['agenda']={'events':[]}
+            value,missing=p.validate_assessment({}, {}, set())
+            p.call=AsyncMock();p.searches=AsyncMock();p.selected_reads=AsyncMock()
+            await p.finish_materials(value,{},set())
+            self.assertEqual(s['status'],'partial_materials')
+            self.assertIn('protocol:assessment_incomplete',missing)
+            self.assertFalse(s['assessment_protocol']['complete'])
+            self.assertTrue(all(r['status']=='missing' for r in value['change_checks']))
+            p.call.assert_not_called();p.searches.assert_not_called();p.selected_reads.assert_not_called()
 
 
 class AgendaRepair(unittest.TestCase):

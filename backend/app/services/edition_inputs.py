@@ -29,7 +29,9 @@ def messages_for(stage, prompt, value, now, report_type):
     brief += requirements(stage, value)
     if 'candidate_columns' in value:
         brief += '\n输入候选表按candidate_columns列顺序读取；attributes中单独的{"$ref":n}引用candidate_shared[n]，可嵌套。标题/链接/摘要/时点按原列解释，不能遗漏候选。'
-    return [dict(role='system', content=contract.SYSTEM + '\n' + brief + '\n' + prompt),
+    from .edition_assessment_protocol import instruction
+    output_contract=instruction(stage,value)
+    return [dict(role='system', content=contract.SYSTEM + '\n' + brief + '\n' + prompt + output_contract),
             dict(role='user', content=json.dumps(value, ensure_ascii=False, separators=(',', ':')))]
 
 

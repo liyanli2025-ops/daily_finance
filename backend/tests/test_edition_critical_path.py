@@ -567,3 +567,106 @@ class EvidenceScreening(unittest.TestCase):
         v=view(source);self.assertEqual(v['text'],'');self.assertEqual(v['provided_original_ranges'],[])
         self.assertIn('Jensen Huang',report({'source':source}))
         self.assertEqual(v['title'],source['title']);self.assertTrue(v['evidence_view']['reasons'])
+
+
+class AssessmentProtocolRegression(unittest.IsolatedAsyncioTestCase):
+    def sample(self,root):
+        from app.services.edition_assessment_replay import load
+        directory=Path(root)/'original';directory.mkdir()
+        with zipfile.ZipFile(FIX/'v49_assessment_failure.zip') as z:z.extractall(directory)
+        return directory,load(directory)
+
+    async def test_real_paid_v49_reply_recovers_once_without_a_provider_call(self):
+        from app.services.edition_assessment_replay import recover
+        with tempfile.TemporaryDirectory() as root:
+            directory,(old,reply,proof)=self.sample(root)
+            frozen=copy.deepcopy(old)
+            s,path,reused=recover(directory)
+            self.assertFalse(reused);self.assertEqual(s['status'],'partial_materials')
+            self.assertEqual([r['id'] for r in s['assessment']['events'] if r['status']=='ready'],['E6','E7'])
+            self.assertEqual(len(s['assessment']['events']),9)
+            self.assertEqual(len(s['assessment']['change_checks']),13)
+            self.assertTrue(all(r['status']=='missing' and r['origin']=='local_missing_marker_not_model_conclusion'
+                for r in s['assessment']['change_checks']))
+            self.assertEqual(len(s['assessment']['change_topic_checks']),2)
+            self.assertEqual(len(s['assessment_protocol']['rejected_research_actions']),2)
+            self.assertEqual(s['assessment_received'],reply)
+            for key in ('reservations','usage','cutoff','sources','model_http_attempts','search_http_attempts','public_fetch_attempts'):
+                self.assertEqual(s[key],frozen[key])
+            saved=copy.deepcopy(s)
+            p=core.EditionPipeline.__new__(core.EditionPipeline);p.state=s;p.directory=path;p.save=lambda:None
+            p.call=AsyncMock();p.searches=AsyncMock();p.selected_reads=AsyncMock()
+            await p.finish_materials(s['assessment'],{r['id']:r for r in s['agenda']['events']},set())
+            p.call.assert_not_called();p.searches.assert_not_called();p.selected_reads.assert_not_called()
+            again,_,reused=recover(directory);self.assertTrue(reused);self.assertEqual(saved,again)
+            for name,sha in proof.items():self.assertEqual(hashlib.sha256((directory/name).read_bytes()).hexdigest(),sha)
+            from app.services.edition_budget import accounted
+            cost=str(sum((accounted(r) for r in s['reservations']),start=__import__('decimal').Decimal('0')))
+            self.assertEqual(cost,'0.272476')
+            EVIDENCE['cases']['real_v49_assessment']=dict(outcome='partial_materials',assertions_passed=True,
+                ready_events=['E6','E7'],missing_change_tasks=13,missing_topics=2,rejected_searches=2,
+                new_model_requests=0,new_search_requests=0,new_public_requests=0,old_files_unchanged=True,
+                accounted_estimate_usd=cost)
+
+    def test_final_protocol_lists_all_real_ids_and_legal_search_purposes(self):
+        from app.services.edition_assessment_protocol import instruction,specification
+        from app.services.edition_inputs import assemble_request
+        with tempfile.TemporaryDirectory() as root:
+            _,(s,reply,_)=self.sample(root)
+            packet=core.packet(s,'assessment')
+            text=instruction('assessment',packet);spec=specification(packet)
+            self.assertEqual(len(spec['required_change_task_ids']),13)
+            self.assertEqual(len(spec['required_topic_keys']),2)
+            for name in spec['required_arrays']:self.assertIn('"'+name+'"',text)
+            for key in spec['required_change_task_ids']:self.assertIn(key,text)
+            _,_,capacity=assemble_request('assessment',contract.ASSESS,packet,
+                datetime.fromisoformat(s['cutoff']),s['report_type'],65000)
+            self.assertTrue(capacity['fits_input']);self.assertLess(capacity['request_characters'],65000)
+
+    def test_complete_empty_optional_expectations_remain_compatible(self):
+        from app.services.edition_assessment_protocol import prepare
+        from test_unified_edition import EVENT
+        a={'events':[EVENT]};s=empty_state();s['agenda']=a
+        _,_,assessment,_=fixtures()
+        # Generic pre-daily-change tests do not acquire new required fields.
+        value,protocol=prepare(s,assessment,{r['id']:r for r in a['events']},set())
+        self.assertTrue(protocol['complete'],protocol['issues'])
+
+    def test_malformed_nested_values_cannot_crash_or_authorize_research(self):
+        from app.services.edition_assessment_protocol import prepare
+        with tempfile.TemporaryDirectory() as root:
+            _,(s,reply,_)=self.sample(root)
+            reply['events'][0]['status']=[]
+            reply['events'][1]['evidence']=[dict(source_id=[],quote='bad')];reply['events'][1]['status']='ready'
+            reply['change_topic_checks']=[dict(candidate_id=[],topic={})]
+            reply['additional_reads']=[dict(event_id=[],candidate_id=[],increment=[],reason='x'*15)]
+            value,protocol=prepare(s,reply)
+            self.assertFalse(protocol['complete']);self.assertEqual(value['additional_reads'],[])
+            self.assertEqual(value['events'][0]['status'],'missing');self.assertEqual(value['events'][1]['status'],'missing')
+
+    def test_duplicate_and_unknown_rows_never_count_as_checked(self):
+        from app.services.edition_assessment_protocol import prepare
+        with tempfile.TemporaryDirectory() as root:
+            _,(s,reply,_)=self.sample(root)
+            reply['events'].append(copy.deepcopy(reply['events'][5]))
+            reply['missed_major_events']=[dict(id='E99')]
+            value,protocol=prepare(s,reply)
+            self.assertFalse(protocol['complete']);self.assertEqual(value['events'][5]['status'],'missing')
+            self.assertEqual(value['missed_major_events'],[])
+
+    def test_replay_rejects_tampered_source_and_preserves_original_failure(self):
+        from app.services.edition_assessment_replay import recover
+        with tempfile.TemporaryDirectory() as root:
+            directory,(s,_,_)=self.sample(root)
+            s['sources'][next(k for k,v in s['sources'].items() if v.get('candidate_id'))]['text']+='changed'
+            (directory/'result.json').write_text(json.dumps(s))
+            with self.assertRaisesRegex(ValueError,'body_changed'):recover(directory)
+            self.assertFalse((directory/'assessment-recovery-v50').exists())
+
+    def test_replay_rejects_new_charge_or_changed_reply_on_repeat(self):
+        from app.services.edition_assessment_replay import recover
+        with tempfile.TemporaryDirectory() as root:
+            directory,(_,_,_)=self.sample(root);recover(directory)
+            response=json.loads((directory/'response-2.json').read_text());response['text']+=' '
+            (directory/'response-2.json').write_text(json.dumps(response))
+            with self.assertRaisesRegex(ValueError,'history_changed'):recover(directory)

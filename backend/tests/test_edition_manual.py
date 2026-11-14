@@ -198,8 +198,11 @@ class ManualExecutionTests(unittest.IsolatedAsyncioTestCase):
     async def test_missing_change_checks_still_stops_before_writing(self):
         with tempfile.TemporaryDirectory() as temporary:
             result,path,stages=await self.run_fake(Path(temporary),missing_change_checks=True)
-            self.assertEqual(result['status'],'failed')
-            self.assertEqual(result['error_code'],'edition_change_checks_missing')
+            self.assertEqual(result['status'],'partial_materials')
+            self.assertEqual(result['stop_reason'],'assessment_protocol_incomplete')
+            self.assertFalse(result['assessment_protocol']['complete'])
+            self.assertTrue(all(r['status']=='missing' for r in result['assessment']['change_checks']))
+            self.assertIn('assessment_received',result)
             self.assertNotIn('draft',result)
             self.assertEqual(len(stages),2)
             self.assertEqual(len([r for r in result['reservations'] if r['kind']=='model']),2)

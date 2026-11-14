@@ -5,6 +5,7 @@ from pathlib import Path
 
 OWNER = 'finance-critical-path-acceptance-v1'
 CASES = {
+    'real_v49_assessment': 'partial_materials',
     'issuer_full_path': 'reviewed_text',
     'real_v45_partial': 'partial_materials',
     'real_v47_input': 'partial_materials',
@@ -53,6 +54,13 @@ def validate_evidence(value):
             or quality.get('pending_verification')!=2 or quality.get('commentary')!=1
             or quality.get('issuer_bodies_unchanged') is not True or quality.get('unsafe_quotes_blocked') is not True):
         raise ValueError('edition_release_evidence_screening_not_exercised')
+    protocol=cases['real_v49_assessment']
+    if (protocol.get('new_model_requests')!=0 or protocol.get('new_search_requests')!=0
+            or protocol.get('new_public_requests')!=0 or protocol.get('ready_events')!=['E6','E7']
+            or protocol.get('missing_change_tasks')!=13 or protocol.get('missing_topics')!=2
+            or protocol.get('rejected_searches')!=2 or protocol.get('old_files_unchanged') is not True
+            or protocol.get('accounted_estimate_usd')!='0.272476'):
+        raise ValueError('edition_release_real_protocol_failure_not_exercised')
     return value
 
 

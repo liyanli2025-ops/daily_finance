@@ -455,7 +455,10 @@ class PipelineRegression(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_increment_stops_before_patch_search(self):
         with tempfile.TemporaryDirectory() as temporary:
             pipeline, calls, reads, searches = await self.selection_scenario(Path(temporary), patch_search=True, invalid=True)
-            with self.assertRaisesRegex(ValueError, 'increment_required'): await pipeline.execute()
+            await pipeline.execute()
+            self.assertEqual(pipeline.state['status'],'partial_materials')
+            self.assertEqual(pipeline.state['stop_reason'],'assessment_protocol_incomplete')
+            self.assertEqual(len(pipeline.state['assessment_protocol']['rejected_research_actions']),1)
             self.assertEqual(len(searches), 1)
             self.assertEqual(calls, ['agenda', 'assessment'])
 

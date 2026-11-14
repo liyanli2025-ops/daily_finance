@@ -181,6 +181,10 @@ class EditionPipeline:
             (accounted(r) for r in self.state.get('reservations', [])), number(0))) + '；非账户账单，原预留记录保留')
         if self.state.get('budget_forecast'):
             lines.append('后续阶段费用规划：' + json.dumps(self.state['budget_forecast'], ensure_ascii=False))
+        if self.state.get('assessment_protocol'):
+            lines.append('模型输出完整性：'+json.dumps(self.state['assessment_protocol'],ensure_ascii=False))
+        if self.state.get('assessment'):
+            lines.append('已保留的逐项评估（未等于事实核实）：'+json.dumps(self.state['assessment'],ensure_ascii=False))
         if self.state.get('patch_progress'):
             lines.append('补查进展：' + json.dumps(self.state['patch_progress'], ensure_ascii=False))
         for row in self.state.get('read_selection', []):
@@ -487,22 +491,8 @@ class EditionPipeline:
 
     def validate_assessment(self, assessment, events, stocks):
         stage = self.state['phase']
-        delivered = self.state.get('delivered_sources', {}).get(stage, {})
-        provided = {sid for sid, source in self.state['sources'].items()
-                    if delivered.get(sid) == digest(source['text'])}
-        if self.state.get('research_protocol') == PROTOCOL:
-            from .listener_research import restrict_baselines
-            assessment = restrict_baselines(assessment, events, self.state['sources'])
-        accepted, sources, validation = contract.prepare_assessment(
-            assessment, events, self.state['sources'], stocks, provided,
-            self.state.get('delivered_source_ranges',{}).get(stage))
-        self.state['sources'] = sources
-        from .daily_changes import enabled, validate_checks, validate_expectations, validate_topics
-        if enabled(self.state):
-            self.state['change_missing'] = (validate_checks(self.state, accepted, provided)
-                + validate_topics(self.state, accepted, events))
-            validate_expectations(self.state, accepted, provided)
-            validation['missing'].extend(self.state['change_missing'])
+        from .edition_assessment_protocol import validate
+        accepted,validation=validate(self.state,assessment,stage,events,stocks)
         self.state.setdefault('flow_trace', []).append('assessment_validated')
         self.state.setdefault('assessment_validation', []).append(dict(stage=stage, **validation))
         self.save()
@@ -570,6 +560,9 @@ class EditionPipeline:
     async def finish_materials(self, assessment, events, stocks, *, research_tasks=None, recovered_ids=()):
         """One patch assessment, writing and review; reused by same-ledger continuation."""
         self.state.setdefault('flow_trace', []).append('materials_decision')
+        if self.state.get('assessment_protocol',{}).get('complete') is False:
+            self.state.update(status='partial_materials',stop_reason='assessment_protocol_incomplete')
+            self.save();return None
         missing = contract.assess(assessment, events, self.state['sources'], stocks)
         missing.extend(self.state.get('change_missing', []))
         extra = assessment.get('missed_major_events', [])

@@ -98,6 +98,7 @@ def summary(state, directory):
                      fact_verified=False)
                 for e in state.get('agenda', {}).get('events', [])],
         missing=state.get('missing'), missing_assessed='assessment' in state,
+        assessment_protocol=state.get('assessment_protocol'),stop_reason=state.get('stop_reason'),
         error_type=state.get('error_type'),
         error_code=state.get('error_code'), error_http_status=state.get('error_http_status'),
         draft_saved=bool(state.get('draft')), text_accepted=state['status'] == 'reviewed_text',
