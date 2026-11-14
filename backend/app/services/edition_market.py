@@ -25,7 +25,7 @@ def allowed_endpoint(url):
             and all(SYMBOL.fullmatch(s) for s in url[len(QUOTE_BASE):].split(',')))
 
 
-def collect(state, desk, *, observed=None):
+def collect(state, desk, *, observed=None, include_breadth=False):
     from .timed_market import INDICES, parse_quotes
     from .market_breadth import BreadthRadar
     observed = observed or china_now()
@@ -50,6 +50,13 @@ def collect(state, desk, *, observed=None):
     except Exception as error:
         result['index_status'] = 'unavailable'
         result['index_error_type'] = type(error).__name__
+    if not include_breadth:
+        result['breadth'] = dict(status='not_requested',
+            reason='daily_flow_prioritizes_article_evidence_no_unconditional_universe_scan')
+        result['gaps'].append('本期未自动抓取全市场涨跌分布；指数涨跌不能替代市场宽度或资金流')
+        result['public_fetch_attempts'] = getattr(desk.workspace, 'public_fetch_attempts', 0)-before
+        result['status'] = 'observations_pending_review' if result['indices'] else 'unavailable'
+        return result
     try:
         radar = BreadthRadar(mapper=lambda items, callback:[callback(item) for item in items])
         count_checked = False
@@ -97,7 +104,7 @@ def evidence(result):
         return None
     text = json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2)
     sid = 'market-' + digest(result)[:24]
-    return dict(id=sid, title='本期带日期指数报价与A股覆盖样本涨跌分布',
+    return dict(id=sid, title='本期带日期行情观察（实际取得范围见正文）',
         url=QUOTE_BASE + 'sh000001', text=text, event_ids=[], candidate_id=None,
         metadata=dict(kind='market_observation', observed_at=result['observed_at'],
             derivation='既有指数及宽度适配器；原始API响应另存issuer-responses；并非媒体原文'),

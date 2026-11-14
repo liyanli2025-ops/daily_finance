@@ -11,7 +11,7 @@ CATEGORIES = {
     'market': ('市场变化', '汇率、利率、成交结构、涨跌分布和预期变化；价格反应不等于因果或已定价'),
 }
 SIGNALS = {
-    'politics': r'选举|大选|中期选举|关税|制裁|央行|战争|空袭|election|tariff|sanction|central bank|war\b',
+    'politics': r'选举|大选|中期选举|关税|制裁|央行|美联储|联储|fed\b|federal reserve|战争|空袭|election|tariff|sanction|central bank|war\b',
     'industry': r'技术突破|量产|商业化|竞争|市场份额|库存|供需|breakthrough|commercialization|market share|inventory',
     'operations': r'订单|客户|供应商|停产|事故|召回|新产品|扩产|order|customer|supplier|outage|recall',
     'governance': r'董事长|辞职|换帅|调查|诉讼|减持|增持|融资|违约|investigation|lawsuit|resign|default',
@@ -114,6 +114,9 @@ def brief(state):
         if s.get('metadata', {}).get('kind') == 'market_observation']
     return dict(change_protocol=PROTOCOL, change_coverage=coverage(state),
         change_signals=[r for r in signals if r['categories']],
+        change_topic_pending=deepcopy(state.get('change_topic_pending', [])),
+        change_signal_decisions=deepcopy(state.get('change_signal_decisions', [])),
+        change_topic_missing=deepcopy(state.get('change_topic_missing')),
         market_observations=market_note,
         change_limit='标题标记仅帮助逐事件查漏，未命中仍可能重要；检索完成不等于覆盖充分、没有新闻或事实已核实。')
 
@@ -133,6 +136,11 @@ evidence:[{source_id,quote:"已提供正文逐字引文"}]}。
 supported只能用本任务候选的已读正文，公司项还须匹配直接公司主体；不以财务背景代替今日变化。
 screened_no_material_event仅表示本次已执行的有限检索中未选出相关实质变化，不声称全网或公司没有事件。
 存在尚待核实的重大事件须missing，并在现有additional_searches/reads提出具体缺口，不要无限改写。
+若change_topic_pending非空，额外返回change_topic_checks，每个待处理candidate_id/topic恰好一项：
+{candidate_id,topic,status:"assigned或excluded或missing",event_id:"assigned时为对应已有事件ID",reason:"12至400字，明确说出该议题及取舍"}。
+assigned仅表示标题线索明确归到哪个事件，不表示事实已核实；事件仍须实际正文评估，不能把选举塞进只谈利率的事件。
+excluded须针对这个具体线索说明排除理由；missing保留缺口并在既有补查项提出解决方式。不再单独调用模型修选题。
+
 如要下“超预期/低于预期/未定价/空头回补/资金流入驱动”结论，新增expectation_checks数组：
 {claim_quote:"拟用于稿件的完整短句",event_id,
 actual:{source_id,quote,as_of:"ISO时点含时区",metric,unit,period},
@@ -148,24 +156,64 @@ baseline_before_actual:true,comparable:true,reason:"逐字依据中的时点、�
     return common
 
 
+TOPICS = (
+    ('选举', r'选举|大选|election'), ('关税', r'关税|tariff'),
+    ('央行', r'央行|美联储|联储|central bank|\bfed\b|federal reserve'),
+    ('冲突', r'战争|空袭|冲突|\bwar\b|conflict'),
+)
+
+
 def audit_agenda(state, agenda):
+    """Keep unresolved leads for the already budgeted assessment, before any claims."""
     if not enabled(state):
-        return
-    decisions = []
+        return []
+    decisions, pending = [], []
     groups = list(agenda.get('events', [])) + list(agenda.get('excluded_candidates', []))
-    for cid,c in state.get('candidates', {}).items():
-        for topic, pattern in (('选举',r'选举|大选|election'), ('关税',r'关税|tariff'),
-                               ('央行',r'央行|central bank|fed\b|federal reserve'),
-                               ('冲突',r'战争|空袭|冲突|war\b|conflict')):
-            if not re.search(pattern, str(c.get('title','')), re.I):
+    for cid, candidate in state.get('candidates', {}).items():
+        for topic, pattern in TOPICS:
+            if not re.search(pattern, str(candidate.get('title', '')), re.I):
                 continue
-            matches = [r for r in groups if cid in r.get('candidate_ids', [])]
-            if not matches or any(not re.search(pattern, r.get('title','')+' '+r.get('reason',''), re.I)
-                                  for r in matches):
-                raise ValueError('edition_change_concrete_event_lost')
-            decisions.append(dict(candidate_id=cid, topic=topic,
-                decisions=[dict(event_id=r.get('id'), reason=r.get('reason')) for r in matches]))
+            matches = [r for r in groups if cid in r.get('candidate_ids', [])
+                and re.search(pattern, r.get('title', '')+' '+r.get('reason', ''), re.I)]
+            if matches:
+                decisions.append(dict(candidate_id=cid, topic=topic,
+                    decisions=[dict(event_id=r.get('id'), reason=r.get('reason')) for r in matches]))
+            else:
+                pending.append(dict(candidate_id=cid, topic=topic, title=candidate.get('title'),
+                    assigned_event_ids=[r['id'] for r in agenda.get('events', [])
+                        if cid in r.get('candidate_ids', [])],
+                    status='pending_assessment_not_covered'))
     state['change_signal_decisions'] = decisions
+    state['change_topic_pending'] = pending
+    return pending
+
+
+def validate_topics(state, assessment, events):
+    """An absent/ambiguous disposition remains a gap; never auto-assign a title."""
+    pending = state.get('change_topic_pending', [])
+    rows = assessment.get('change_topic_checks', [])
+    rows = rows if isinstance(rows, list) else []
+    missing = []
+    patterns = dict(TOPICS)
+    for task in pending:
+        key = task['candidate_id'], task['topic']
+        matches = [r for r in rows if isinstance(r, dict)
+            and (r.get('candidate_id'), r.get('topic')) == key]
+        valid = False
+        if len(matches) == 1:
+            row = matches[0]
+            reason = row.get('reason', '')
+            valid = (isinstance(reason, str) and 12 <= len(reason.strip()) <= 400
+                and re.search(patterns[task['topic']], reason, re.I)
+                and row.get('status') in {'assigned', 'excluded'})
+            if valid and row['status'] == 'assigned':
+                event = events.get(row.get('event_id'), {}) if isinstance(row.get('event_id'), str) else {}
+                valid = bool(re.search(patterns[task['topic']],
+                    event.get('title', '')+' '+event.get('reason', ''), re.I))
+        if not valid:
+            missing.append('topic:'+key[0]+':'+key[1])
+    state['change_topic_missing'] = missing
+    return missing
 
 
 def validate_checks(state, value, provided):

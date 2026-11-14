@@ -83,6 +83,12 @@ def summary(state, directory):
         search_http_attempts=state.get('search_http_attempts', 0),
         public_fetch_attempts=state.get('public_fetch_attempts', 0),
         candidates=len(state.get('candidates', {})), bodies=len(state.get('sources', {})),
+        source_counts=dict(total_records=len(state.get('sources', {})),
+            selected_article_records=sum(bool(s.get('candidate_id')) for s in state.get('sources', {}).values()),
+            derived_market_records=sum(s.get('metadata', {}).get('kind') == 'market_observation'
+                for s in state.get('sources', {}).values()),
+            background_records=sum(not s.get('candidate_id') and s.get('metadata', {}).get('kind') != 'market_observation'
+                for s in state.get('sources', {}).values())),
         accounted_estimate_usd=str(sum((accounted(r) for r in reservations), number(0))),
         original_reservations_usd=str(sum((number(r['estimated_usd']) for r in reservations), number(0))),
         events=[dict(id=e['id'], title=e['title'], importance=e['importance'],

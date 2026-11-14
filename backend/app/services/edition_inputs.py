@@ -41,7 +41,7 @@ def editorial_forecast(state, now):
     value.update(brief(state))
     assessment = state.get('assessment') or {}
     value['assessment'] = {k: deepcopy(assessment[k]) for k in
-        ('events', 'watchlist_checks', 'missed_major_events', 'change_checks', 'expectation_checks') if k in assessment}
+        ('events', 'watchlist_checks', 'missed_major_events', 'change_checks', 'change_topic_checks', 'expectation_checks') if k in assessment}
     # Forecast all known bodies, including contrary/unselected bodies, without
     # inventing ready evidence. This is only planning, never a research verdict.
     from .edition_context import editorial_source_packet

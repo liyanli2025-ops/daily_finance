@@ -132,14 +132,14 @@ class ChangeTasks(unittest.TestCase):
     def test_election_is_not_lost_inside_generic_macro_label(self):
         s=state();s['candidates']={'S1':dict(title='Election results announced')}
         a=dict(events=[dict(id='E1',title='国际宏观',reason='总体经济变化',candidate_ids=['S1'])])
-        with self.assertRaisesRegex(ValueError,'concrete_event_lost'):changes.audit_agenda(s,a)
+        self.assertEqual(len(changes.audit_agenda(s,a)),1)
         a['events'][0]['title']='Election results';changes.audit_agenda(s,a)
         self.assertEqual(s['change_signal_decisions'][0]['topic'],'选举')
 
     def test_exclusion_must_say_which_concrete_political_topic_was_not_selected(self):
         s=state();s['candidates']={'S1':dict(title='关税新进展')}
         a=dict(events=[],excluded_candidates=[dict(candidate_ids=['S1'],reason='重复资讯')])
-        with self.assertRaisesRegex(ValueError,'concrete_event_lost'):changes.audit_agenda(s,a)
+        self.assertEqual(len(changes.audit_agenda(s,a)),1)
         a['excluded_candidates'][0]['reason']='关税报道同源重复，原稿已归入E1';changes.audit_agenda(s,a)
 
     def test_writing_and_review_keep_checks_and_cited_evidence(self):
@@ -195,7 +195,7 @@ class MarketBoundary(unittest.TestCase):
         radar=Mock();radar.collect.side_effect=lambda **kwargs:callback(radar)
         with patch('app.services.timed_market.parse_quotes',return_value=[]), \
                 patch('app.services.market_breadth.BreadthRadar',return_value=radar):
-            return collect(s,desk,observed=NOW)
+            return collect(s,desk,observed=NOW,include_breadth=True)
 
     def test_market_allowlist_is_fixed_and_does_not_accept_arbitrary_hosts(self):
         self.assertTrue(allowed_endpoint(COUNT));self.assertTrue(allowed_endpoint(QUOTE_BASE+'sh000001,sz399001'))
@@ -309,3 +309,168 @@ class PipelineWiring(unittest.IsolatedAsyncioTestCase):
             with patch('app.services.edition_contract.prepare_assessment',return_value=({}, {}, {'missing':[]})):
                 with self.assertRaisesRegex(ValueError,'checks_missing'):
                     p.validate_assessment({}, {}, set())
+
+
+class AgendaRepair(unittest.TestCase):
+    def test_fed_and_chinese_federal_reserve_share_topic(self):
+        s=state();s['candidates']={'S1':dict(title='Fed holds rates')}
+        self.assertEqual(changes.audit_agenda(s,dict(events=[dict(id='E1',
+            title='美联储利率决定',reason='当前政策线索',candidate_ids=['S1'])])),[])
+
+    def test_multi_topic_candidate_needs_one_explicit_assignment_per_topic(self):
+        s=state();s['candidates']={'S1':dict(title='Election and Fed')}
+        a=dict(events=[dict(id='E1',title='美联储',reason='利率',candidate_ids=['S1']),
+            dict(id='E2',title='选举',reason='政治',candidate_ids=['S1'])])
+        self.assertEqual(changes.audit_agenda(s,a),[])
+
+    def test_unaccounted_election_survives_as_gap_until_assessment(self):
+        s=state();s['candidates']={'S1':dict(title='美国选举结果')}
+        a=dict(events=[dict(id='E1',title='美联储',reason='政策利率',candidate_ids=['S1'])])
+        changes.audit_agenda(s,a)
+        self.assertEqual(changes.validate_topics(s,{}, {'E1':a['events'][0]}),['topic:S1:选举'])
+        self.assertEqual(len(changes.brief(s)['change_topic_pending']),1)
+
+    def test_generic_macro_assignment_cannot_clear_concrete_election_gap(self):
+        s=state();s['change_topic_pending']=[dict(candidate_id='S1',topic='选举')]
+        row=dict(candidate_id='S1',topic='选举',status='assigned',event_id='E1',
+            reason='这条选举候选应该交给同一个国际宏观主题处理')
+        self.assertTrue(changes.validate_topics(s,dict(change_topic_checks=[row]),
+            {'E1':dict(title='国际宏观',reason='市场风险')}))
+
+    def test_explicit_election_assignment_does_not_claim_fact_verification(self):
+        s=state();s['change_topic_pending']=[dict(candidate_id='S1',topic='选举')]
+        row=dict(candidate_id='S1',topic='选举',status='assigned',event_id='E4',
+            reason='该选举报道仅是线索，归入选举事件，事实仍须实际正文核实')
+        self.assertEqual(changes.validate_topics(s,dict(change_topic_checks=[row]),
+            {'E4':dict(title='美国选举',reason='尚待核查')}),[])
+
+    def test_normal_day_only_requests_indices_and_keeps_breadth_missing(self):
+        s=state();desk=SimpleNamespace(workspace=SimpleNamespace(public_fetch_attempts=0),
+            request=Mock(return_value=''),deadline=time.monotonic()+90)
+        with patch('app.services.timed_market.parse_quotes',return_value=[]), \
+                patch('app.services.market_breadth.BreadthRadar') as radar:
+            result=collect(s,desk,observed=NOW)
+        self.assertEqual(desk.request.call_count,1)
+        radar.assert_not_called();self.assertEqual(result['breadth']['status'],'not_requested')
+
+    def test_real_saved_agenda_keeps_only_the_unaccounted_election_lead(self):
+        import json
+        fixture=json.loads((Path(__file__).parent/'fixtures/v45_agenda_failure.json').read_text())
+        s=dict(fixture,change_protocol=changes.PROTOCOL)
+        pending=changes.audit_agenda(s,fixture['agenda'])
+        self.assertEqual([(r['candidate_id'],r['topic']) for r in pending],[('S30','选举')])
+        self.assertTrue({'S25','S39'} <= {r['candidate_id'] for r in s['change_signal_decisions']})
+
+
+class SavedAgendaContinuation(unittest.IsolatedAsyncioTestCase):
+    def original(self, root):
+        import json
+        from app.services import edition_agenda_resume as resume
+        folder=Path(root)/'edition-11111111111111111111111111111111';folder.mkdir()
+        fixture=json.loads((Path(__file__).parent/'fixtures/v45_agenda_failure.json').read_text())
+        s=state();s.update(fixture)
+        s.update(id=folder.name,status='failed',phase='agenda',error_code='edition_change_concrete_event_lost',
+            model_http_attempts=1,usage=[dict(http_status=200,provider='fake',model='test')],
+            reservations=[dict(kind='model',stage='agenda',estimated_usd='0.17')],
+            sources={},search_http_attempts=16,public_fetch_attempts=113,active_seconds=106.5)
+        (folder/'result.json').write_text(json.dumps(s,ensure_ascii=False))
+        (folder/'response-1.json').write_text(json.dumps(dict(stage='agenda',text=json.dumps(s['agenda']))))
+        return resume,folder,s
+
+    async def test_saved_agenda_loading_never_mutates_original_or_ledger(self):
+        with tempfile.TemporaryDirectory() as root:
+            resume,folder,s=self.original(root)
+            raw=(folder/'result.json').read_bytes()
+            state_after,pending,proof,_,_=resume.load_original(folder)
+            self.assertEqual((folder/'result.json').read_bytes(),raw)
+            for key in ['reservations','search_http_attempts','public_fetch_attempts','cutoff']:
+                self.assertEqual(state_after[key],s[key])
+            self.assertEqual(pending[0]['candidate_id'],'S30')
+
+    async def test_a_body_read_or_second_model_makes_original_ineligible(self):
+        import json
+        with tempfile.TemporaryDirectory() as root:
+            resume,folder,s=self.original(root)
+            for key,value in [('read_receipts',[{}]),('model_http_attempts',2),('draft',{'body':'已写'})]:
+                changed=dict(s,**{key:value});(folder/'result.json').write_text(json.dumps(changed))
+                with self.assertRaisesRegex(ValueError,'not_eligible'):resume.load_original(folder)
+
+    async def test_default_preview_cannot_start_model_or_create_child(self):
+        with tempfile.TemporaryDirectory() as root:
+            resume,folder,s=self.original(root)
+            planned={'ready_to_run':True,'input_sha256':'proof'}
+            with patch.object(resume.core,'ROOT',Path(root)), \
+                    patch('app.edition_once.require_pause'), \
+                    patch.object(resume,'preview',AsyncMock(return_value=(planned,s,{},'identity'))), \
+                    patch.object(resume.core.EditionPipeline,'read_agenda',AsyncMock()) as read:
+                result,directory,reused=await resume.continue_once(None,folder.name,root=root)
+            self.assertEqual(result,planned);self.assertIsNone(directory)
+            read.assert_not_awaited();self.assertFalse((folder/resume.CHILD).exists())
+
+    async def test_changed_preview_blocks_before_marker_or_new_request(self):
+        with tempfile.TemporaryDirectory() as root:
+            resume,folder,s=self.original(root)
+            with patch.object(resume.core,'ROOT',Path(root)), patch('app.edition_once.require_pause'), \
+                    patch.object(resume,'preview',AsyncMock(return_value=(dict(ready_to_run=True,input_sha256='right'),s,{},'identity'))):
+                with self.assertRaisesRegex(ValueError,'preview_changed'):
+                    await resume.continue_once(None,folder.name,root=root,run=True,input_sha='wrong')
+            self.assertFalse((folder/resume.CHILD).exists())
+
+    async def test_failed_child_is_returned_without_retrying(self):
+        import json,hashlib
+        with tempfile.TemporaryDirectory() as root:
+            resume,folder,s=self.original(root)
+            child=folder/resume.CHILD;child.mkdir()
+            s['agenda_continuation']=dict(input_sha256='proof',original_sha256=hashlib.sha256((folder/'result.json').read_bytes()).hexdigest())
+            (child/'result.json').write_text(json.dumps(s));(child/'continuation.started').write_text('proof')
+            with patch.object(resume.core,'ROOT',Path(root)), patch('app.edition_once.require_pause'), \
+                    patch.object(resume,'preview',AsyncMock()) as preview:
+                result,directory,reused=await resume.continue_once(None,folder.name,root=root,run=True)
+            self.assertTrue(reused);self.assertEqual(result['status'],'failed');preview.assert_not_awaited()
+
+    async def test_missing_saved_capture_blocks_before_continuation(self):
+        with tempfile.TemporaryDirectory() as root:
+            resume,folder,s=self.original(root)
+            s['issuer_http_receipts']=[dict(status='received',key='abc',capture='abc.json',sha256='x')]
+            with self.assertRaisesRegex(ValueError,'capture_missing'):resume.capture_files(folder,s)
+
+    async def test_same_budget_resume_starts_with_saved_counts_not_another_agenda(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as root:
+            resume,folder,s=self.original(root)
+            proof=dict(original_sha256=hashlib.sha256((folder/'result.json').read_bytes()).hexdigest())
+            planned=dict(ready_to_run=True,input_sha256='proof')
+            raw=(folder/'result.json').read_bytes()
+            seen=[]
+            class Pipeline:
+                def __init__(self,state,directory,workspace,**kwargs):
+                    self.state=state;self.path=directory;self.workspace=workspace
+                    self.deadline=time.monotonic()+100
+                def save(self):
+                    from app.services.research_hub import save_json
+                    save_json(self.path/'result.json',self.state)
+                async def read_agenda(self):
+                    seen.append((self.workspace.public_fetch_attempts,self.workspace.web_search_attempts,
+                        len(self.state['reservations']),self.state['cutoff']))
+                    self.state['status']='partial_materials'
+            with patch.object(resume.core,'ROOT',Path(root)), patch('app.edition_once.require_pause'), \
+                    patch('app.edition_once.assert_watchlist_current',AsyncMock()), \
+                    patch('app.edition_once.identity',return_value='identity'), \
+                    patch('app.edition_once.manual_text_scope') as scope, \
+                    patch('app.edition_once.reviewed_search_permission',return_value=None), \
+                    patch.object(resume,'preview',AsyncMock(return_value=(planned,s,proof,'identity'))), \
+                    patch.object(resume.core,'EditionPipeline',Pipeline):
+                result,child,reused=await resume.continue_once(None,folder.name,root=root,run=True,input_sha='proof')
+            self.assertEqual(seen,[(113,16,1,s['cutoff'])]);self.assertFalse(reused)
+            self.assertEqual((folder/'result.json').read_bytes(),raw)
+            self.assertEqual(result['status'],'partial_materials');scope.assert_called_once()
+
+    async def test_unresolved_topic_stops_before_purchasing_writing(self):
+        with tempfile.TemporaryDirectory() as root:
+            s=state();s['change_missing']=['topic:S30:选举']
+            s['sources']={'B1':dict(text=FACT,event_ids=[])}
+            p=EditionPipeline(s,root,SimpleNamespace(path=Path(root),now=NOW),check=AsyncMock())
+            p.save=Mock();p.call=AsyncMock()
+            with patch('app.services.edition_contract.assess',return_value=[]):
+                await p.finish_materials(dict(additional_searches=[],additional_reads=[]),{},set())
+            self.assertEqual(s['status'],'partial_materials');p.call.assert_not_awaited()

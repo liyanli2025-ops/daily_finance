@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[2] / 'data/editions'
 
 
 def source_signature():
-    names = ('edition_manual.py', 'edition_continuation.py', 'edition_read_selection.py', 'edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
+    names = ('edition_agenda_resume.py', 'edition_manual.py', 'edition_continuation.py', 'edition_read_selection.py', 'edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
              'model_usage.py', 'web_research.py', 'article_metadata.py', 'primary_material_quality.py', 'reading_acceptance.py', 'search_objectives.py', 'material_roles.py', 'spoken_fidelity.py',
              'podcast_generator.py', 'podcast_script_cache.py', 'editorial_policy.py', 'research_desk.py',
              'edition_issuer_desk.py', 'listener_research.py', 'body_acquisition.py', 'daily_changes.py', 'edition_market.py', 'market_breadth.py', 'timed_market.py', 'research_hub.py', 'research_schema.py', 'watchlist_sources.py')
@@ -132,7 +132,7 @@ async def preflight(report_type='morning', config=settings):
         source_plan=dict(company_disclosures="A股先读公司披露列表，选题后读公告；空目录不代表没有事件",
             company_baseline="首次建立基线；财务遇新披露或每7天核对，业务遇相关变动或每30天核对，平日复用；仅事件需要时比较",
             daily_changes="五类逐项核对；每只自选股另查经营和治理风险，非只查业绩；标题后选一篇读",
-            market_structure="日期校验的指数与A股样本涨跌分布；共用请求上限、最多90秒/128次，至少保留24次正文请求；缺数据不推断资金意图",
+            market_structure="先用1次批量请求取得带日期指数；日报不自动遍历全市场，宽度缺口明示，不推断资金意图",
             expectation="有事前可比基线及实际值原文才允许预期差判断；无一致预期接口则留缺口",
             public_http_limit=config.research_body_max_urls * 3, paid_search_fallback="不自动回退；仅一次条件补查按缺口决定"),
         normal_model_requests=4, conditional_extra_requests=1, model_requests=0,
@@ -482,9 +482,10 @@ class EditionPipeline:
         accepted, sources, validation = contract.prepare_assessment(
             assessment, events, self.state['sources'], stocks, provided)
         self.state['sources'] = sources
-        from .daily_changes import enabled, validate_checks, validate_expectations
+        from .daily_changes import enabled, validate_checks, validate_expectations, validate_topics
         if enabled(self.state):
-            self.state['change_missing'] = validate_checks(self.state, accepted, provided)
+            self.state['change_missing'] = (validate_checks(self.state, accepted, provided)
+                + validate_topics(self.state, accepted, events))
             validate_expectations(self.state, accepted, provided)
             validation['missing'].extend(self.state['change_missing'])
         self.state.setdefault('assessment_validation', []).append(dict(stage=stage, **validation))
@@ -519,15 +520,8 @@ class EditionPipeline:
             self.state['agenda'] = contract.agenda(a, self.state['candidates'], stocks)
             from .daily_changes import audit_agenda
             audit_agenda(self.state, self.state['agenda'])
-            events = {r['id']: r for r in a['events']}; self.save()
-            selected, trace = primary_plan(a['events'])
-            await self.selected_reads(selected, events, trace)
-            if not self.state['sources']:
-                self.state.update(status='partial_materials', missing=list(events), stop_reason='no_readable_body')
-                self.save(); return None
-            assessment = await self.call('assessment', contract.ASSESS, self.packet('assessment'))
-            assessment, missing = self.validate_assessment(assessment, events, stocks)
-            return await self.finish_materials(assessment, events, stocks)
+            self.save()
+            return await self.read_agenda()
         except asyncio.CancelledError:
             self.state.update(status='interrupted', resume_allowed=False)
             self.save(); raise
@@ -539,6 +533,20 @@ class EditionPipeline:
                 self.state['error_http_status'] = self.state['usage'][-1].get('http_status')
             self.save()
             raise
+
+    async def read_agenda(self):
+        """Read a validated saved agenda; also used by same-budget repair continuation."""
+        events = {r['id']: r for r in self.state['agenda']['events']}
+        stocks = {r['market'] + ':' + r['code'] for r in self.state['watchlist']}
+        selected, trace = primary_plan(self.state['agenda']['events'])
+        await self.selected_reads(selected, events, trace)
+        if not self.state['sources'] or (self.state.get('research_protocol') == PROTOCOL
+                and not any(s.get('candidate_id') for s in self.state['sources'].values())):
+            self.state.update(status='partial_materials', missing=list(events), stop_reason='no_readable_article_body')
+            self.save(); return None
+        assessment = await self.call('assessment', contract.ASSESS, self.packet('assessment'))
+        assessment, missing = self.validate_assessment(assessment, events, stocks)
+        return await self.finish_materials(assessment, events, stocks)
 
     async def finish_materials(self, assessment, events, stocks, *, research_tasks=None, recovered_ids=()):
         """One patch assessment, writing and review; reused by same-ledger continuation."""

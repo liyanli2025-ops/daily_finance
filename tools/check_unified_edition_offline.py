@@ -112,6 +112,8 @@ def main():
             proof_files += ('backend/tests/test_listener_research.py',)
         if manifest.get('daily_changes_tests_required'):
             proof_files += ('backend/tests/test_daily_changes.py',)
+        if manifest.get('agenda_resume_required'):
+            proof_files += ('backend/tests/fixtures/v45_agenda_failure.json', 'tools/continue_saved_agenda.py')
         if manifest.get('issuer_chunk_join_required'):
             proof_files += ('backend/tests/fixtures/issuer_three_page_2.json',
                 'backend/tests/fixtures/issuer_three_page_3.json', 'tools/replay_issuer_text_chunks.py')
