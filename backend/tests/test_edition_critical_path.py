@@ -583,6 +583,7 @@ class AssessmentProtocolRegression(unittest.IsolatedAsyncioTestCase):
             frozen=copy.deepcopy(old)
             s,path,reused=recover(directory)
             self.assertFalse(reused);self.assertEqual(s['status'],'partial_materials')
+            self.assertEqual((path/'receipt.txt').read_text(),(path/'assessment-readable.txt').read_text())
             self.assertEqual([r['id'] for r in s['assessment']['events'] if r['status']=='ready'],['E6','E7'])
             self.assertEqual(len(s['assessment']['events']),9)
             self.assertEqual(len(s['assessment']['change_checks']),13)

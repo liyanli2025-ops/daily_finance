@@ -98,6 +98,6 @@ def recover(directory):
             target=child/name;target.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
             shutil.copyfile(regular(directory/name),target);target.chmod(0o600)
     save_json(child/'result.json',state)
-    for name,text in [('recovery.started',fingerprint),('assessment-readable.txt',readable(state))]:
+    for name,text in [('recovery.started',fingerprint),('assessment-readable.txt',readable(state)),('receipt.txt',readable(state))]:
         with os.fdopen(os.open(child/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'w') as f:f.write(text)
     return state,child,False
