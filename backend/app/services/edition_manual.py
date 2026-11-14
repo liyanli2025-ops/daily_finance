@@ -55,6 +55,7 @@ def reviewed_search_permission(config, backend=None, research_root=None):
             separators=(',', ':')).encode()).hexdigest()
         owner = 'finance-search-contract-diagnostic-v1'
         request = prepared['revised_request_parameters']
+        previous = dict(request, time_range='week')
         if (any(row.get('owner') != owner for row in (prepared, result, marker))
                 or result.get('status') != 'search_http_accepted_pending_review'
                 or result['diagnostics']['http_status'] != 200
@@ -65,12 +66,26 @@ def reviewed_search_permission(config, backend=None, research_root=None):
                 or prepared.get('credential_fingerprint') != credential
                 or failure.get('status') != 'paused' or failure.get('automatic_retest') is not False
                 or failure.get('detail_code') != 'http_400'
+                or prepared.get('previous_request_parameters') != previous
                 or datetime.fromisoformat(marker['started_at']) < datetime.fromisoformat(failure['at'])):
             return None
         from .web_research import search_request
-        expected, _ = search_request(request['query'], 'discovery',
+        # The reviewed repair removed time_range from an absolute date window.
+        # Discovery uses a relative window and cannot reconstruct that request.
+        if 'time_range' in request or not {'start_date', 'end_date'} <= set(request):
+            return None
+        expected, _ = search_request(request['query'], 'latest_close',
             datetime.fromisoformat(prepared['prepared_at']), topic='news')
-        if expected != request or 'time_range' in request:
+        approved_exclusions = request.get('exclude_domains')
+        if (not isinstance(approved_exclusions, list)
+                or not all(isinstance(host, str) for host in approved_exclusions)
+                or len(set(approved_exclusions)) != len(approved_exclusions)
+                or not set(approved_exclusions) <= set(expected['exclude_domains'])):
+            return None
+        # Later source filtering added social domains to the exclusion list.
+        # Permit only those additions; all other HTTP parameters remain exact.
+        expected['exclude_domains'] = approved_exclusions
+        if expected != request:
             return None
     except (ValueError, KeyError, TypeError):
         return None

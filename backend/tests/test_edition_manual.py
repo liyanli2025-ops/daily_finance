@@ -179,10 +179,13 @@ class ReviewedSearchProofTests(unittest.TestCase):
         cfg=config().model_copy(update=dict(research_web_search_api_key=SecretStr('offline-fake-key')))
         credential=hashlib.sha256(b'offline-fake-key').hexdigest()
         route='research-web-search:tavily:v1:'+credential[:12]
-        request,_=search_request('market policy','discovery',datetime(2026,11,1,11),topic='news')
+        request,_=search_request('market closing','latest_close',datetime(2026,11,1,11),topic='news')
+        # The actual successful historical probe predates three added exclusions.
+        request['exclude_domains'] = request['exclude_domains'][:6]
         owner='finance-search-contract-diagnostic-v1'
         prepared=dict(owner=owner,prepared_at='2026-11-01T11:00:00',credential_fingerprint=credential,
-                      revised_request_parameters=request)
+                      revised_request_parameters=request,
+                      previous_request_parameters=dict(request,time_range='week'))
         fingerprint=hashlib.sha256(json.dumps(prepared,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()).hexdigest()
         result=dict(owner=owner,status='search_http_accepted_pending_review',
             diagnostics=dict(http_status=200,request_parameters=request),search_http_attempts=1,
@@ -212,6 +215,7 @@ class ReviewedSearchProofTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary);cfg,key,blocked,folder=self.evidence(root)
             proof=manual.reviewed_search_permission(cfg,backend=root)
+            self.assertIsNotNone(proof)
             for target in (blocked,folder/'result.json'):
                 before=target.read_bytes();target.write_bytes(before+b' ')
                 with manual.manual_text_scope(IDENTIFIER,cfg,search_proof=proof):
@@ -222,8 +226,35 @@ class ReviewedSearchProofTests(unittest.TestCase):
         from pydantic import SecretStr
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary);cfg,key,blocked,folder=self.evidence(root)
+            self.assertIsNotNone(manual.reviewed_search_permission(cfg,backend=root))
             other=cfg.model_copy(update=dict(research_web_search_api_key=SecretStr('other-offline-key')))
             self.assertIsNone(manual.reviewed_search_permission(other,backend=root))
             value=json.loads(blocked.read_text());value['at']='2026-11-02T10:00:00'
             blocked.write_text(json.dumps(value))
+            self.assertIsNone(manual.reviewed_search_permission(cfg,backend=root))
+
+    def update_signed_request(self, folder, mutate):
+        prepared=json.loads((folder/'input.json').read_text())
+        request=prepared['revised_request_parameters'];mutate(request)
+        prepared['previous_request_parameters']=dict(request,time_range='week')
+        marker=json.loads((folder/'started.json').read_text())
+        marker['input_sha256']=hashlib.sha256(json.dumps(prepared,ensure_ascii=False,
+            sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        result=json.loads((folder/'result.json').read_text())
+        result['diagnostics']['request_parameters']=request
+        for name,value in [('input.json',prepared),('started.json',marker),('result.json',result)]:
+            (folder/name).write_text(json.dumps(value))
+
+    def test_relative_window_cannot_reuse_the_absolute_window_repair(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);cfg,key,blocked,folder=self.evidence(root)
+            def relative(request):
+                request.pop('start_date');request.pop('end_date');request['time_range']='week'
+            self.update_signed_request(folder,relative)
+            self.assertIsNone(manual.reviewed_search_permission(cfg,backend=root))
+
+    def test_other_request_parameters_cannot_be_relaxed_by_a_signed_proof(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);cfg,key,blocked,folder=self.evidence(root)
+            self.update_signed_request(folder,lambda request:request.update(search_depth='advanced'))
             self.assertIsNone(manual.reviewed_search_permission(cfg,backend=root))
