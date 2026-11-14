@@ -13,6 +13,8 @@ import uuid
 from ..config import settings
 from . import edition_contract as contract
 from .edition_context import packet, editorial_source_ids
+from .edition_issuer_desk import IssuerDesk, PROTOCOL, company_job
+from .listener_research import validate_draft as validate_listener_draft, validate_review as validate_listener_review
 from .edition_read_selection import primary_plan, patch_plan, fallback_plan, validate_increment
 from .edition_budget import Budget, OUTPUTS, digest, policy, protection, accounted, request_input_pricing, search_batch_plan
 from .edition_inputs import messages_for, editorial_forecast, edition_forecast
@@ -29,11 +31,12 @@ ROOT = Path(__file__).resolve().parents[2] / 'data/editions'
 def source_signature():
     names = ('edition_manual.py', 'edition_continuation.py', 'edition_read_selection.py', 'edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
              'model_usage.py', 'web_research.py', 'article_metadata.py', 'primary_material_quality.py', 'reading_acceptance.py', 'search_objectives.py', 'material_roles.py', 'spoken_fidelity.py',
-             'podcast_generator.py', 'podcast_script_cache.py', 'editorial_policy.py', 'research_desk.py')
+             'podcast_generator.py', 'podcast_script_cache.py', 'editorial_policy.py', 'research_desk.py',
+             'edition_issuer_desk.py', 'listener_research.py', 'research_hub.py', 'research_schema.py', 'watchlist_sources.py')
     return digest({name: digest((Path(__file__).parent / name).read_text()) for name in names})
 
 
-def initial_searches(stocks, now):
+def initial_searches(stocks, now, *, direct_issuers=False):
     jobs = search_agenda(stocks, now)
     jobs += [dict(lane='global_policy', purpose='discovery',
                   query=now.strftime('%Y-%m-%d') + ' major world political economic breaking developments financial markets'),
@@ -42,6 +45,10 @@ def initial_searches(stocks, now):
     for job in jobs:
         if job['lane'] == 'us_market':
             job['query'] = now.strftime('%Y-%m-%d') + ' US stocks latest completed session closing market report'
+    if direct_issuers:
+        for job in jobs:
+            if company_job(job, stocks):
+                job['retrieval'] = 'issuer_catalogue'
     return jobs
 
 
@@ -105,8 +112,8 @@ async def preflight(report_type='morning', config=settings):
     try:
         p, fingerprint, routes = environment(stocks, report_type, config)
         plan = search_batch_plan(p, edition_forecast(dict(cutoff=now.isoformat(),
-            watchlist=stocks, report_type=report_type, sources={}), now),
-            len(initial_searches(stocks, now)))
+            watchlist=stocks, report_type=report_type, sources={}, research_protocol=PROTOCOL), now),
+            sum(j.get('retrieval') != 'issuer_catalogue' for j in initial_searches(stocks, now, direct_issuers=True)))
         if not plan['fits_money']:
             blockers.append('estimated_limit_below_initial_batch_and_model_plan')
         if not plan['fits_search_count']:
@@ -118,7 +125,10 @@ async def preflight(report_type='morning', config=settings):
         prepared_at=now.isoformat(), watchlist=stocks, policy=p, environment_sha256=fingerprint,
         budget_forecast=plan,
         routes=routes, extractor=extractor, ready_to_run=not blockers, blockers=blockers,
-        base_search_jobs=initial_searches(stocks, now),
+        base_search_jobs=initial_searches(stocks, now, direct_issuers=True),
+        source_plan=dict(company_disclosures="A股先读公司披露列表，选题后读公告；空目录不代表没有事件",
+            company_baseline="每只A股最多另查1次业务归类、1次财务指标；原始报表仍待核",
+            public_http_limit=config.research_body_max_urls * 3, paid_search_fallback="不自动回退；仅一次条件补查按缺口决定"),
         normal_model_requests=4, conditional_extra_requests=1, model_requests=0,
         search_requests=0, public_fetch_attempts=0, tts_requests=0,
         limitation='免费本地预检；价格由配置提供，本地金额为已接受估算，不是服务商硬账单上限。尚未联网或证明覆盖充分。')
@@ -138,6 +148,8 @@ class EditionPipeline:
         self.started = time.monotonic()
         self.prior_seconds = state.get('active_seconds', 0)
         self.deadline = self.started + settings.research_max_seconds - self.prior_seconds
+        self.issuer_desk = (IssuerDesk(state, workspace, self.save, self.deadline)
+            if state.get('research_protocol') == PROTOCOL else None)
 
     def save(self):
         self.state['active_seconds'] = self.prior_seconds + time.monotonic() - self.started
@@ -176,7 +188,13 @@ class EditionPipeline:
             lines.append(event['id'] + ' ' + event['importance'] + ' ' + event['title'])
         for source in self.state.get('sources', {}).values():
             lines.append('\n来源：' + source['title'] + '\n' + source['url'] + '\n' + source['text'])
+        if self.state.get('company_baselines'):
+            lines.append('公司研究基线：' + json.dumps(self.state['company_baselines'], ensure_ascii=False))
+        if self.state.get('issuer_catalogue_checks'):
+            lines.append('公司披露目录核对：' + json.dumps(self.state['issuer_catalogue_checks'], ensure_ascii=False))
         if self.state.get('draft'):
+            if self.state['draft'].get('stock_followups'):
+                lines.append('自选股后续观察：' + json.dumps(self.state['draft']['stock_followups'], ensure_ascii=False))
             lines.append('\n文字稿（是否已审以本期状态为准）：\n' + self.state['draft'].get('body', ''))
             lines.append('\n口播稿（未通过联合审阅不得合成）：\n' + self.state['draft'].get('script', ''))
         if self.state.get('review'):
@@ -184,6 +202,9 @@ class EditionPipeline:
         target = self.path / 'receipt.txt'
         fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, 'w') as stream: stream.write('\n'.join(lines))
+        from .listener_research import listening_receipt
+        fd = os.open(self.path / 'listener-receipt.txt', os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, 'w') as stream: stream.write(listening_receipt(self.state))
 
     async def _check_environment(self):
         ensure_models_enabled()
@@ -251,15 +272,31 @@ class EditionPipeline:
         if not pending:
             return
         await self.check()
-        self.budget.check_search_batch(len(pending))
+        direct = lambda j: (self.state.get('research_protocol') == PROTOCOL
+            and j.get('retrieval') == 'issuer_catalogue' and company_job(j, self.state['watchlist']))
+        self.budget.check_search_batch(sum(not direct(j) for j in pending))
         for job in pending:
             await self.check()
             if any(r['query'] == job['query'] for r in self.state.get('search_receipts', [])):
                 continue
-            self.budget.reserve('search')
-            result = await asyncio.to_thread(self.search, self.workspace, job['query'],
-                deadline=self.deadline, hours=168 if self.workspace.now.weekday() >= 5 else 72,
-                topic='news', purpose=job.get('purpose', 'discovery'))
+            stock = direct(job)
+            if stock:
+                try:
+                    result = await asyncio.to_thread(self.issuer_desk.catalogue, stock)
+                except Exception as error:
+                    result = dict(status='source_gap', results=[], error_type=type(error).__name__,
+                        limitation='披露通道未取得有效列表；不是公司没有事件，不自动切换付费搜索。')
+                self.state.setdefault('issuer_catalogue_checks', []).append(dict(
+                    key=stock['market'] + ':' + stock['code'], status=result['status'],
+                    results=len(result['results']), complete_history=False))
+                baseline, rows = await asyncio.to_thread(self.issuer_desk.baseline, stock)
+                result['results'].extend(rows)
+                self.state.setdefault('company_baselines', {})[baseline['key']] = baseline
+            else:
+                self.budget.reserve('search')
+                result = await asyncio.to_thread(self.search, self.workspace, job['query'],
+                    deadline=self.deadline, hours=168 if self.workspace.now.weekday() >= 5 else 72,
+                    topic='news', purpose=job.get('purpose', 'discovery'))
             self.state.setdefault('search_receipts', []).append(dict(query=job['query'], job=job, result=result))
             self.state['search_http_attempts'] = getattr(self.workspace, 'web_search_attempts', 0)
             for row in result.get('results', []):
@@ -299,8 +336,18 @@ class EditionPipeline:
             self.state.setdefault('read_receipts', []).append(receipt); self.save()
             from .collection_time import window
             hours = window(self.workspace.now, event['purpose'])['hours']
-            result = await asyncio.to_thread(self.read, self.workspace, url,
-                hours=hours, deadline=self.deadline, characters=6000)
+            candidate = self.state['candidates'][cid]
+            if (self.state.get('research_protocol') == PROTOCOL
+                    and (candidate.get('issuer_document') or candidate.get('baseline_document'))):
+                try:
+                    result = await asyncio.to_thread(self.issuer_desk.read, candidate)
+                except Exception as error:
+                    result = dict(status='failed', reason='issuer_body_unavailable:' + type(error).__name__)
+            else:
+                if getattr(self.workspace, 'public_fetch_attempts', 0) + 3 > self.state['policy']['max_body_urls'] * 3:
+                    raise ValueError('edition_public_http_budget_exhausted')
+                result = await asyncio.to_thread(self.read, self.workspace, url,
+                    hours=hours, deadline=self.deadline, characters=6000)
             receipt.update(status=result.get('status'), reason=result.get('reason'),
                            response_capture=result.get('response_capture'))
             self.state['public_fetch_attempts'] = getattr(self.workspace, 'public_fetch_attempts', 0)
@@ -316,14 +363,52 @@ class EditionPipeline:
                     from .news_quality import company_focus
                     from types import SimpleNamespace
                     role = assess_role(item)
+                    subject = SimpleNamespace(title=item.title, content=body(item), source=item.source,
+                        related_stocks=getattr(item, 'related_stocks', []))
+                    if candidate.get('issuer_document'):
+                        role.update(latest_close_allowed=False, commodity_settlement_allowed=False,
+                            original_policy_release_allowed=False, flags=['issuer_disclosure_mirror_not_market_close_or_government_policy'])
+                    if candidate.get('baseline_document'):
+                        role.update(latest_close_allowed=False, commodity_settlement_allowed=False,
+                            original_policy_release_allowed=False, flags=['financial_baseline_not_current_event'])
                     sources[identifier] = dict(id=identifier, event_ids=[eid], candidate_id=cid,
                         title=item.title, url=url, text=body(item), metadata=metadata,
                         purpose=event['purpose'], scope=event.get('scope'),
                         source_role=role,
                         direct_scopes=[s['market'] + ':' + s['code'] for s in self.state['watchlist']
-                                       if company_focus(item, SimpleNamespace(**s))],
+                                       if company_focus(subject, SimpleNamespace(**s))],
                         limitation='正文存在不代表独立核实、完整稿或最新交易时段；原文由后续证据评估和审稿核对。')
+                    self.attach_baselines(eid, sources[identifier])
             self.save()
+
+    def attach_baselines(self, event_id, current):
+        """Pair a company body with its period-labelled, already fetched baseline."""
+        if self.state.get('research_protocol') != PROTOCOL or current.get('metadata', {}).get('kind') == 'financial_baseline':
+            return
+        scopes = set(current.get('direct_scopes', []))
+        for cid, candidate in self.state['candidates'].items():
+            identifier = candidate.get('baseline_document')
+            if not identifier or candidate.get('scope') not in scopes:
+                continue
+            if identifier in self.state['sources']:
+                old = self.state['sources'][identifier]
+                if event_id not in old['event_ids']:
+                    old['event_ids'].append(event_id)
+                continue
+            item = self.workspace.documents.get(identifier)
+            if item is None:
+                continue
+            metadata = self.workspace.metadata(item)
+            if metadata['body_quality']['requires_editorial_review']:
+                continue
+            self.state['sources'][identifier] = dict(id=identifier, event_ids=[event_id], candidate_id=cid,
+                title=item.title, url=item.source_url, text=body(item), metadata=metadata,
+                purpose='commentary', scope=item.scope, direct_scopes=[item.scope],
+                source_role=dict(latest_close_allowed=False, commodity_settlement_allowed=False,
+                    original_policy_release_allowed=False, flags=['financial_baseline_not_current_event']),
+                limitation='带期间的经营比较背景；供应商结构化指标，未核原财报，不是本期新事件或独立佐证。')
+            self.state.setdefault('baseline_links', []).append(dict(source_id=identifier,
+                event_id=event_id, scope=item.scope, new_http_requests=0))
 
     async def selected_reads(self, jobs, events, trace):
         self.state.setdefault('read_selection', []).extend(trace); self.save()
@@ -343,6 +428,9 @@ class EditionPipeline:
         delivered = self.state.get('delivered_sources', {}).get(stage, {})
         provided = {sid for sid, source in self.state['sources'].items()
                     if delivered.get(sid) == digest(source['text'])}
+        if self.state.get('research_protocol') == PROTOCOL:
+            from .listener_research import restrict_baselines
+            assessment = restrict_baselines(assessment, events, self.state['sources'])
         accepted, sources, validation = contract.prepare_assessment(
             assessment, events, self.state['sources'], stocks, provided)
         self.state['sources'] = sources
@@ -353,8 +441,14 @@ class EditionPipeline:
     async def execute(self):
         stocks = {r['market'] + ':' + r['code'] for r in self.state['watchlist']}
         try:
-            jobs = initial_searches(self.state['watchlist'], self.workspace.now)
-            await self.searches(jobs)
+            jobs = initial_searches(self.state['watchlist'], self.workspace.now,
+                direct_issuers=self.state.get('research_protocol') == PROTOCOL)
+            if self.state.get('research_protocol') == PROTOCOL:
+                # Obtain free issuer context before reserving the paid batch.
+                await self.searches([j for j in jobs if j.get('retrieval') == 'issuer_catalogue'])
+                await self.searches([j for j in jobs if j.get('retrieval') != 'issuer_catalogue'])
+            else:
+                await self.searches(jobs)
             a = await self.call('agenda', contract.AGENDA, self.packet('agenda'))
             self.state['agenda'] = contract.agenda(a, self.state['candidates'], stocks)
             events = {r['id']: r for r in a['events']}; self.save()
@@ -431,7 +525,8 @@ class EditionPipeline:
         editorial = self.packet('writing')
         written = await self.call('writing', contract.WRITE, editorial)
         self.state['draft'] = written; self.save()
-        contract.draft(written, events, editorial['sources']); self.save()
+        contract.draft(written, events, editorial['sources'])
+        validate_listener_draft(self.state, written, editorial['sources']); self.save()
         return await self.review_and_finish(events)
 
     async def review_and_finish(self, events):
@@ -440,6 +535,7 @@ class EditionPipeline:
             self.packet('review'))
         self.state['review'] = value; self.save()
         contract.review(value, events, self.state['sources'], self.state['draft'])
+        validate_listener_review(self.state, value)
         await self.check()
         from ..models.report import Report, ReportType
         written = self.state['draft']
@@ -476,7 +572,7 @@ async def generate_edition(report_type='morning', root=ROOT, prior_report=None):
         state = dict(id=identifier, owner='finance-unified-edition-v1', status='prepared',
             cutoff=now.isoformat(), report_type=report_type, watchlist=preview['watchlist'],
             policy=preview['policy'], environment_sha256=preview['environment_sha256'],
-            reservations=[], usage=[], candidates={}, sources={}, app_written=False)
+            reservations=[], usage=[], candidates={}, sources={}, app_written=False, research_protocol=PROTOCOL)
         if prior_report is not None:
             state['prior_report'] = dict(id=prior_report.id, title=prior_report.title,
                 report_date=prior_report.report_date.isoformat(), content=prior_report.content,

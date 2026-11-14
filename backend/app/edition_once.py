@@ -147,7 +147,7 @@ async def run_once(config, report_type='morning', root=core.ROOT):
             cutoff=now.isoformat(), report_type=report_type, watchlist=planned['watchlist'],
             policy=planned['policy'], environment_sha256=planned['environment_sha256'],
             execution_sha256=planned['execution_sha256'], manual_text_only=True,
-            reservations=[], usage=[], candidates={}, sources={}, app_written=False)
+            reservations=[], usage=[], candidates={}, sources={}, app_written=False, research_protocol=core.PROTOCOL)
         save_json(directory / 'result.json', state)
         workspace = EpisodeWorkspace(root=directory / 'evidence', now=now)
         workspace.watchlist_signature = watchlist_signature(state['watchlist'])

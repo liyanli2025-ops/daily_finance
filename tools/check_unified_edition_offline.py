@@ -79,6 +79,9 @@ def main():
             if manifest.get('article_publication_tests_required'):
                 suite.addTests(unittest.defaultTestLoader.discover(str(package / 'backend/tests'),
                     pattern='test_article_publication.py'))
+            if manifest.get('listener_research_tests_required'):
+                suite.addTests(unittest.defaultTestLoader.discover(str(package / 'backend/tests'),
+                    pattern='test_listener_research.py'))
             result = unittest.TextTestRunner(verbosity=2).run(suite)
         os.chdir(package)
         print('生产源码、配置、数据库、暂停状态均未修改；临时源码副本将自动清理。')
@@ -99,6 +102,8 @@ def main():
             proof_files += ('backend/tests/test_edition_continuation.py',)
         if manifest.get('article_publication_tests_required'):
             proof_files += ('backend/tests/test_article_publication.py',)
+        if manifest.get('listener_research_tests_required'):
+            proof_files += ('backend/tests/test_listener_research.py',)
         proof = dict(owner='finance-unified-offline-acceptance-v1', passed=True,
             test_count=result.testsRun,
             file_sha256={name: hashlib.sha256((package / name).read_bytes()).hexdigest() for name in

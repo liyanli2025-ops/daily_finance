@@ -144,6 +144,8 @@ def packet(state, stage):
     if stage not in {'agenda', 'assessment', 'patch_assessment', 'writing', 'review'}:
         raise ValueError('edition_context_stage_invalid')
     result = {k: deepcopy(state.get(k)) for k in ('cutoff', 'watchlist', 'report_type')}
+    from .listener_research import brief
+    result.update(brief(state))
     if stage == 'agenda':
         result.update(candidate_packet(state.get('candidates', {})))
         return result
