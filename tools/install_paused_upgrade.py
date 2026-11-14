@@ -192,6 +192,9 @@ def main():
             expected += ('backend/tests/test_listener_research.py',)
         if manifest.get('daily_changes_tests_required'):
             expected += ('backend/tests/test_daily_changes.py',)
+        if manifest.get('issuer_chunk_join_required'):
+            expected += ('backend/tests/fixtures/issuer_three_page_2.json',
+                'backend/tests/fixtures/issuer_three_page_3.json', 'tools/replay_issuer_text_chunks.py')
         if manifest.get('issuer_pagination_required'):
             expected += ('backend/tests/fixtures/issuer_three_page_first.json',
                 'tools/complete_issuer_pagination.py')

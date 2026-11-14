@@ -293,15 +293,17 @@ class IssuerDesk:
             size += len(text.encode('utf-8'))
             if size > MAX_BYTES:
                 raise ValueError('edition_issuer_document_text_limit')
-            pages.append(text.strip())
+            pages.append(text)
             # request() shares the edition deadline/HTTP ledger and reuses
             # hash-verified captures. No second request for a received page.
             page += 1
-        if len(pages) != total or len(set(pages)) != total:
+        if len(pages) != total or len({text.strip() for text in pages}) != total:
             raise ValueError('edition_issuer_pages_incomplete')
         identifier = hashlib.sha256(('issuer:' + code + ':' + art).encode()).hexdigest()[:24]
         item = Material(identifier, candidate['title'], '东方财富上市公司披露镜像', candidate['url'],
-            'primary_notice', 'A:' + code, '\n'.join(pages),
+            # Supplier pages are fixed-length text chunks. A boundary may be
+            # inside a word, number, or table cell; preserve the original seam.
+            'primary_notice', 'A:' + code, ''.join(pages).strip(),
             datetime.fromisoformat(document['published_at']), datetime.now().astimezone().isoformat(),
             reading_status='完整供应商文本分页；未与交易所原始PDF独立核验')
         self.workspace.add([item])

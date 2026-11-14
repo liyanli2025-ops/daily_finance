@@ -481,7 +481,7 @@ class IssuerPaginationRegression(unittest.TestCase):
             self.assertEqual([c.args[1]['page_index'] for c in desk.request.call_args_list], [1,2,3])
             self.assertEqual(len(desk.workspace.documents), 1)
             self.assertEqual(next(iter(desk.workspace.documents.values())).body,
-                '\n'.join(p['data']['notice_content'].strip() for p in pages))
+                ''.join(p['data']['notice_content'] for p in pages).strip())
 
     def test_single_page_still_requires_one_request(self):
         with tempfile.TemporaryDirectory() as root:
@@ -653,3 +653,47 @@ class IssuerPaginationCompletion(unittest.TestCase):
             with patch('requests.get') as get:
                 with self.assertRaisesRegex(ValueError,'no_automatic_retry'):tool.complete(project,True)
             get.assert_not_called()
+
+
+class IssuerChunkSeams(unittest.TestCase):
+    def test_three_real_captures_keep_original_seams_and_recover_chapter_word(self):
+        with tempfile.TemporaryDirectory() as root:
+            helper=IssuerPaginationRegression()
+            desk,candidate,_=helper.setup_desk(root)
+            directory=Path(__file__).parent/'fixtures'
+            pages=[json.loads((directory/name).read_text()) for name in (
+                'issuer_three_page_first.json','issuer_three_page_2.json','issuer_three_page_3.json')]
+            desk.request=Mock(side_effect=pages)
+            value=desk.read(candidate)
+            text=desk.workspace.documents[value['material']['id']].body
+            self.assertEqual(text,''.join(p['data']['notice_content'] for p in pages).strip())
+            self.assertEqual(len(text),10318)
+            self.assertIn('第三章節',text)
+            self.assertNotIn('第\n三章節',text)
+            self.assertIn('69,964,683',text)
+            self.assertIn('290,900',text)
+            self.assertIn('於香港聯交所上市          否',text)
+
+    def test_boundary_inside_amount_or_date_does_not_add_characters(self):
+        with tempfile.TemporaryDirectory() as root:
+            desk,candidate,pages=IssuerPaginationRegression().setup_desk(root)
+            texts=['正文'*40+'69,964,','683'+'正文'*40+'2026年11月12','日'+'正文'*40]
+            for page,text in zip(pages,texts):page['data']['notice_content']=text
+            desk.request=Mock(side_effect=pages)
+            value=desk.read(candidate)
+            text=desk.workspace.documents[value['material']['id']].body
+            self.assertIn('69,964,683',text)
+            self.assertIn('2026年11月12日',text)
+            self.assertEqual(text,''.join(texts))
+
+    def test_boundary_whitespace_is_preserved_inside_document(self):
+        with tempfile.TemporaryDirectory() as root:
+            desk,candidate,pages=IssuerPaginationRegression().setup_desk(root)
+            texts=['開頭'*40+'保留空格  ','  下一段'+'內容'*40+'\n','\n末尾'+'內容'*40]
+            for page,text in zip(pages,texts):page['data']['notice_content']=text
+            desk.request=Mock(side_effect=pages)
+            value=desk.read(candidate)
+            text=desk.workspace.documents[value['material']['id']].body
+            self.assertEqual(text,''.join(texts))
+            self.assertIn('保留空格    下一段',text)
+            self.assertIn('\n\n末尾',text)
