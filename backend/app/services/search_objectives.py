@@ -59,13 +59,30 @@ def assess(row,purpose='discovery',lane=None):
         limitation='标题/域名启发式，不是重要性或真假裁决；滚动稿可能有后续更新，正文未核前不作结论。')
 
 
+def metadata_blockers(row):
+    """Reject obvious non-news/spam routes before HTTP, without deleting leads."""
+    title = str(row.get('title') or '')
+    parts = urlsplit(str(row.get('url') or ''))
+    host, path = (parts.hostname or '').lower(), parts.path.lower()
+    flags = []
+    if re.search(r'(?:调教|无码|成人视频|AV片|成人视频).{0,30}(?:免费|播放|资源|下载)|(?:av|成人视频).{0,20}(?:免费播放|资源分享)|(?:澳门|博彩).{0,15}(?:开户|投注)', title, re.I):
+        flags.append('spam_or_adult_promotion_metadata')
+    if re.search(r'/(?:knowledge/company|quotes)(?:/|$)', path):
+        flags.append('directory_or_quote_page_not_article')
+    if (host == 'kuku.baidu.com' or host.endswith('.kuku.baidu.com')) and re.match(r'/(?:landing|app)(?:/|$)', path):
+        flags.append('generated_document_app_not_original_news')
+    if re.search(r'/(?:screenshot[-_]?\d*|[^/]*(?:stocks|chart)\d+)(?:/|$)', path):
+        flags.append('attachment_or_chart_not_article')
+    return flags
+
+
 def primary_candidate(row,lane):
     """Suitability for a main-source menu, never news or source certification."""
     purpose='released_policy' if lane=='global_policy' else 'latest_close' if lane in {
         'a_market','hk_market','us_market','commodities'} else 'company_event' if lane=='company_event' else 'discovery'
     review=assess(row,purpose,lane);flags=list(review['flags']);title=str(row.get('title') or '')
-    blockers=set(flags)&{'social_or_video_needs_platform_reader','forecast_or_commentary_not_release_confirmation',
-                        'different_market_primary_subject_hint'}
+    blockers=set(metadata_blockers(row)) | (set(flags)&{'social_or_video_needs_platform_reader','forecast_or_commentary_not_release_confirmation',
+                        'different_market_primary_subject_hint'})
     if lane in {'a_market','hk_market','us_market','commodities'} and re.search(
             r'\bAM Report\b|\bmorning (?:report|brief|update)\b|晨报|早报',title,re.I):
         blockers.add('morning_report_not_completed_session')

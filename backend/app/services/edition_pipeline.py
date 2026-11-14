@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[2] / 'data/editions'
 
 def source_signature():
     names = ('edition_manual.py', 'edition_continuation.py', 'edition_read_selection.py', 'edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
-             'model_usage.py', 'web_research.py', 'article_metadata.py', 'primary_material_quality.py', 'reading_acceptance.py', 'material_roles.py', 'spoken_fidelity.py',
+             'model_usage.py', 'web_research.py', 'article_metadata.py', 'primary_material_quality.py', 'reading_acceptance.py', 'search_objectives.py', 'material_roles.py', 'spoken_fidelity.py',
              'podcast_generator.py', 'podcast_script_cache.py', 'editorial_policy.py', 'research_desk.py')
     return digest({name: digest((Path(__file__).parent / name).read_text()) for name in names})
 
@@ -281,6 +281,12 @@ class EditionPipeline:
             eid, cid = job['event_id'], job['candidate_id']
             event = events[eid]
             url = self.state['candidates'][cid]['url']
+            from .search_objectives import metadata_blockers
+            blocked = metadata_blockers(self.state['candidates'][cid])
+            if blocked:
+                self.state.setdefault('read_metadata_rejections', []).append(
+                    dict(candidate_id=cid, event_id=eid, flags=blocked, http_requests=0))
+                self.save(); continue
             old = next((s for s in sources.values() if s['url'] == url), None)
             if old:
                 if eid not in old['event_ids']: old['event_ids'].append(eid)
