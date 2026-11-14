@@ -215,8 +215,16 @@ def parse_visible_article(html,url,now=None,hours=72):
         params=parse_qs(parts.query);code=params.get('stockid',[''])[0]
         article=soup.select_one('#content');text=article.get_text('\n',strip=True) if article else ''
         date=re.search(r'公告日期\s*[:：]\s*(\d{4}-\d{2}-\d{2})',soup.get_text(' ',strip=True))
-        if (not re.fullmatch(r'\d{6}',code) or not re.fullmatch(r'\d+',params.get('id',[''])[0])
-            or not re.search(r'证券代码\s*[:：]?\s*'+code+r'(?!\d)',text)):
+        document_id=params.get('id',[''])[0]
+        page_title=soup.title.get_text(' ',strip=True) if soup.title else ''
+        named=re.match(r'(.{2,30})[（(]'+re.escape(code)+r'[）)]_公司公告_',page_title)
+        signed_codes=re.findall(r'证券代码\s*[:：]?\s*(\d{6})(?!\d)',text)
+        pdf_match=any(re.search(r'/'+re.escape(document_id)+r'\.PDF$',str(a.get('href') or ''),re.I)
+                      for a in soup.select('a[href]'))
+        mirror_identity=bool(named and named[1] in text[:300] and pdf_match)
+        if (not re.fullmatch(r'\d{6}',code) or not re.fullmatch(r'\d+',document_id)
+            or (signed_codes and set(signed_codes)!={code})
+            or not (signed_codes or mirror_identity)):
             raise ValueError('web_source_not_admitted')
         if not date:raise ValueError('web_source_time_missing')
         stamp=datetime.fromisoformat(date[1])
@@ -461,7 +469,8 @@ def read_public(workspace,url,hours=72,deadline=None,characters=6000):
     except RetiredSourceError:return dict(status='unavailable',reason='article_paused_no_auto_retest',url=url)
     capture=None
     try:
-        current=url
+        from .body_acquisition import read_target
+        current=read_target(url)
         for _ in range(3):
             if current in PAUSED_PUBLIC_ARTICLES:raise RetiredSourceError('public_article_paused')
             ensure_active(root,'research-public-url:'+current.split('#',1)[0])

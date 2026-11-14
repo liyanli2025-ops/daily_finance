@@ -1,0 +1,323 @@
+{
+  "cutoff": "2026-11-14T09:05:57.458929",
+  "rows": [
+    {
+      "candidate_id": "S73",
+      "candidate": {
+        "title": "美军中央司令部否认伊朗发动新袭击并摧毁美军在巴林境内雷达设施的宣称",
+        "url": "https://www.voachinese.com/a/centcom-denies-new-iran-attack-destroyed-us-military-radar-in-bahrain-20261113/8223392.html",
+        "snippet": "关注我们\n\n其他语言网站\n\n site logo site logo\n\n直播\n\nsite logo site logo\n\n上一页   下一页\n\n VOA快讯\n\n中国时间 4:59 2026年11月14日 星期六\n\n中东\n\n# 美军中央司令部否认伊朗发动新袭击并摧毁美军在巴林境内雷达设施的宣称\n\n 美国之音\n\n美军中央司令部否认伊朗发动新袭击并摧毁美军在巴林境内雷达设施的宣称\n\n评论\n\n资料照片：从阿曼穆桑代姆(Musandam)眺望霍尔木兹海峡中的船只。(2026年10月12日)\n\n资料照片：从阿曼穆桑代姆(Musandam)眺望霍尔木兹海峡中的船只。(2026年10月12日)\n\n美国军方星期",
+        "published_hint": "Fri, 13 Nov 2026 18:00:00 GMT",
+        "reading_status": "search_snippet_not_body",
+        "search_links": [
+          {
+            "lane": "global_policy",
+            "purpose": "discovery",
+            "query": "2026年11月14日 国内 国际 重大事件 最新进展 金融市场"
+          }
+        ]
+      },
+      "receipt": {
+        "candidate_id": "S73",
+        "event_id": "E3",
+        "status": "failed",
+        "increment": "original_source",
+        "selection_reason": "核对美军中央司令部否认伊朗新袭击及巴林雷达设施被毁说法的具体表述、时间与伊方依据，S39称伊朗官方消息人士称遭袭，两方说法需对照。",
+        "reason": "ConnectTimeoutError",
+        "response_capture": null
+      }
+    },
+    {
+      "candidate_id": "S20",
+      "candidate": {
+        "title": "2-Year Treasury Yield Jumps to 4.86%, Signaling a Prolonged Fed Hold | 24/7 Wall St.",
+        "url": "https://247wallst.com/cards/the-policy-sensitive-2-year-yield-added-13-basis-points-in-a-macro-release-01m7bnqp68snsj2fcshzmh4frx",
+        "snippet": "# 2-Year Treasury Yield Jumps to 4.86%, Signaling a Prolonged Fed Hold\n\nAs seen on the 24/7 Wall St. homepage on November 14, 2026.\n\nThe policy-sensitive 2-year yield added 13 basis points in a single session to 4.86%, pricing in a Fed that stays tight rather than easing. Anyone holding duration or ",
+        "published_hint": "Sat, 14 Nov 2026 00:00:28 GMT",
+        "reading_status": "search_snippet_not_body",
+        "search_links": [
+          {
+            "lane": "us_market",
+            "query": "2026-11-14 US stocks latest completed session closing market report"
+          }
+        ]
+      },
+      "receipt": {
+        "candidate_id": "S20",
+        "event_id": "E2",
+        "status": "failed",
+        "increment": "new_update",
+        "selection_reason": "S30读取失败，需补读周五美债2年期、10年期收益率及加息定价，核对是否与周四口径一致，并区分各来源2年期数据差异。",
+        "reason": "public_http_403",
+        "response_capture": null
+      }
+    },
+    {
+      "candidate_id": "S18",
+      "candidate": {
+        "title": "US markets end lower as Nvidia casts a pall - RTHK",
+        "url": "https://gbcode.rthk.hk/TuniS/news.rthk.hk/rthk/en/component/k2/1877774-20261114.htm?spTabChangeable=0",
+        "snippet": "+ facebook twitter\n\nA A A\n\n 繁\n 简\n Eng\n\nMenu \n\n News Homepage\n Latest News\n Video Gallery\n News Programmes\n Photo Gallery\n News Bulletins\n News Archive\n Send To RTHK News\n Error\n News Archive\n Live Video News\n\nTemperature Humidity\n\n Home\n\n## US markets end lower as Nvidia casts a pall\n\n2026-11-14 HKT",
+        "published_hint": "Fri, 13 Nov 2026 22:00:00 GMT",
+        "reading_status": "search_snippet_not_body",
+        "search_links": [
+          {
+            "lane": "us_market",
+            "query": "2026-11-14 US stocks latest completed session closing market report"
+          }
+        ]
+      },
+      "receipt": {
+        "candidate_id": "S18",
+        "event_id": "E1",
+        "status": "failed",
+        "increment": "independent_verification",
+        "selection_reason": "独立核对周五美股收盘（指数、英伟达、半导体指数跌幅），用于验证S66摘要中费城半导体指数跌3.43%的数字。",
+        "reason": "ConnectTimeoutError",
+        "response_capture": null
+      }
+    },
+    {
+      "candidate_id": "S75",
+      "candidate": {
+        "title": "牧原股份股票最新股价2026：基本面分析、投资风险全解读",
+        "url": "https://kuku.baidu.com/landing/tscp_doc/95977a5de48601f8ac5e7469e1f73407",
+        "snippet": "## 财务业绩与基本面分析牧原股份在2026年上半年遭遇了近年罕见的业绩低谷。财报显示，公司1-6月实现营业收入594.10亿元，同比减少22.30%；归母净利润为-60.78亿元，",
+        "published_hint": "Sat, 14 Nov 2026 01:00:00 GMT",
+        "reading_status": "search_snippet_not_body",
+        "search_links": [
+          {
+            "event_id": "E8",
+            "lane": "company_event",
+            "scope": "A:002714",
+            "purpose": "company_event",
+            "query": "2026-11-14 牧原股份 002714 公告 财报 重大事项 最新已披露",
+            "increment": "original_source",
+            "reason": "自选股仍缺直接资料，核对本公司原始披露；同业或市场综述不能代替本公司证据。"
+          }
+        ]
+      },
+      "receipt": {
+        "candidate_id": "S75",
+        "event_id": "E8",
+        "status": "needs_local_review",
+        "increment": "original_source",
+        "selection_reason": "自选股仍缺直接资料，核对本公司原始披露；同业或市场综述不能代替本公司证据。",
+        "reason": "web_source_article_structure_missing",
+        "response_capture": "public-responses/5b549083f7acd0db72ec96bc.json"
+      }
+    },
+    {
+      "candidate_id": "S76",
+      "candidate": {
+        "title": "调教av，精选免费播放路径分享全过程资源- 凤凰财经",
+        "url": "https://www.coinpensation.com/cn/fjnnews/338914_article302668.sHtML",
+        "snippet": "11月13日晚间沪深上市公司重大事项公告最新快递15:30 主力复盘：10.78亿 ... 300750 宁德时代157.42亿1.76亿沪深公司更多新型储能将加速走向市场化. 长时储能与",
+        "published_hint": "Fri, 13 Nov 2026 21:00:00 GMT",
+        "reading_status": "search_snippet_not_body",
+        "search_links": [
+          {
+            "event_id": "E9",
+            "lane": "company_event",
+            "scope": "A:300750",
+            "purpose": "company_event",
+            "query": "2026-11-14 宁德时代 300750 公告 财报 重大事项 最新已披露",
+            "increment": "original_source",
+            "reason": "自选股仍缺直接资料，核对本公司原始披露；同业或市场综述不能代替本公司证据。"
+          }
+        ]
+      },
+      "receipt": {
+        "candidate_id": "S76",
+        "event_id": "E9",
+        "status": "failed",
+        "increment": "original_source",
+        "selection_reason": "自选股仍缺直接资料，核对本公司原始披露；同业或市场综述不能代替本公司证据。",
+        "reason": "public_http_403",
+        "response_capture": null
+      }
+    },
+    {
+      "candidate_id": "S52",
+      "candidate": {
+        "title": "台积电 腾讯控股 阿里巴巴 字节跳动 华为 宁德时代 美团 蚂蚁科技 比亚迪 中国平安保险 拼多多 京东集团 农夫山泉 迈瑞生物医疗电子 隆基股份 美的集团 海天调味食品 网易 鸿海精密工业 长城汽车",
+        "url": "https://tavily.com/knowledge/company/DlV7kyGh1EXM",
+        "snippet": "# 台积电 腾讯控股 阿里巴巴 字节跳动 华为 宁德时代 美团 蚂蚁科技 比亚迪 中国平安保险 拼多多 京东集团 农夫山泉 迈瑞生物医疗电子 隆基股份 美的集团 海天调味食品 网易 鸿海精密工业 长城汽车\nID: DlV7kyGh1EXM\nWebsite: www.kdocs.cn\nHeadquarters: China [...] ## Products and services\nBusiness areas: Technology and Semiconductor Manufacturing, Consumer Electronics, Financial Services, E-com",
+        "published_hint": null,
+        "reading_status": "search_snippet_not_body",
+        "search_links": [
+          {
+            "lane": "company_event",
+            "scope": "A:300750",
+            "query": "2026年11月14日 宁德时代 300750 重要消息 行业 同业 客户 供应商 风险"
+          },
+          {
+            "event_id": "E9",
+            "lane": "company_event",
+            "scope": "A:300750",
+            "purpose": "company_event",
+            "query": "2026-11-14 宁德时代 300750 公告 财报 重大事项 最新已披露",
+            "increment": "original_source",
+            "reason": "自选股仍缺直接资料，核对本公司原始披露；同业或市场综述不能代替本公司证据。"
+          }
+        ]
+      },
+      "receipt": {
+        "candidate_id": "S52",
+        "event_id": "E9",
+        "status": "needs_local_review",
+        "increment": "original_source",
+        "selection_reason": "前一篇未取得合格正文，换一个来源；原问题：自选股仍缺直接资料，核对本公司原始披露；同业或市场综述不能代替本公司证据。",
+        "reason": "web_source_time_missing",
+        "response_capture": "public-responses/ea15bd51dfb6a1bfd38e5c5c.json"
+      }
+    },
+    {
+      "candidate_id": "S54",
+      "candidate": {
+        "title": "长江电力（sh600900）行情走势",
+        "url": "https://www.stcn.com/quotes/index.html?stock_code=sh600900",
+        "snippet": "资金动向\n\n- 暂无数据 -\n\nImage 5\n\n没有更多了...\n\nImage 6\n\n查询Image 7\n\n重置Image 8\n\n点击查看更多\n\n- 暂无数据 -\n\nImage 9\n\n没有更多了...\n\n点击查看更多\n\n- 暂无数据 -\n\nImage 10\n\n没有更多了...\n\n融资追击\n\n龙虎榜\n\n筹码动向\n\n北向资金\n\n主力资金\n\n融资余额\n\n融券余额\n\n融资净买入\n\nImage 11Image 12\n| 日期 | 两融余额 | 融资余额 | 环比 | 占流通市值比 | 融资净买入 | 占成交额比 | 融券余额 |\n ---  ---  ---  --- |\n\n加载更多\n\n- 暂无数据 ",
+        "published_hint": null,
+        "reading_status": "search_snippet_not_body",
+        "search_links": [
+          {
+            "lane": "company_event",
+            "scope": "A:600900",
+            "query": "2026年11月14日 长江电力 600900 重要消息 行业 同业 客户 供应商 风险"
+          },
+          {
+            "event_id": "company-check-A-600900",
+            "lane": "company_event",
+            "scope": "A:600900",
+            "purpose": "company_event",
+            "query": "2026-11-14 长江电力 600900 公告 财报 重大事项 最新已披露",
+            "increment": "original_source",
+            "reason": "自选股仍缺直接资料，核对本公司原始披露；同业或市场综述不能代替本公司证据。"
+          }
+        ]
+      },
+      "receipt": {
+        "candidate_id": "S54",
+        "event_id": "company-check-A-600900",
+        "status": "needs_local_review",
+        "increment": "original_source",
+        "selection_reason": "自选股仍缺直接资料，核对本公司原始披露；同业或市场综述不能代替本公司证据。",
+        "reason": "web_source_article_title_missing",
+        "response_capture": "public-responses/fa7df4982a4e0c98adcff56d.json"
+      }
+    },
+    {
+      "candidate_id": "S80",
+      "candidate": {
+        "title": "华海诚科(688535)_公司公告_华海诚科：关于2026年前三季度计提资产减值准备的公告新浪财经_新浪网",
+        "url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?stockid=688535&id=12676264",
+        "snippet": "| | 2 | 资产减值损失(损失以“-”号填列) | -3,258,023.89 | 存货跌价损失 | | 合计 | | -7,017,996.75   二、计提信用减值损失及资产减值损失的具体说明  （一）资产减值损失本报告期末，公司根据《企业会计准则第8号——资产减值》及公司会计政策的相关规定，资产负债表日，存货采用成本与可变现净值孰低计量，公司对成  本高于可变现净值的存货，计提存货跌价准备，并确认为资产减值损失。经测试，公司2026年前三季度计提资产减值损失金额共计  325.80万元。  （二）信用减值损失公司以预期信用损失为基础，对应收票据、应收账款、其他应收款进行减值测试并确认",
+        "published_hint": "Mon, 09 Nov 2026 01:00:00 GMT",
+        "reading_status": "search_snippet_not_body",
+        "search_links": [
+          {
+            "event_id": "company-check-A-688535",
+            "lane": "company_event",
+            "scope": "A:688535",
+            "purpose": "company_event",
+            "query": "2026-11-14 华海诚科 688535 公告 财报 重大事项 最新已披露",
+            "increment": "original_source",
+            "reason": "自选股仍缺直接资料，核对本公司原始披露；同业或市场综述不能代替本公司证据。"
+          }
+        ]
+      },
+      "receipt": {
+        "candidate_id": "S80",
+        "event_id": "company-check-A-688535",
+        "status": "needs_local_review",
+        "increment": "original_source",
+        "selection_reason": "自选股仍缺直接资料，核对本公司原始披露；同业或市场综述不能代替本公司证据。",
+        "reason": "web_source_not_admitted",
+        "response_capture": "public-responses/3df730b9d80f0d509c43611d.json"
+      }
+    },
+    {
+      "candidate_id": "S91",
+      "candidate": {
+        "title": "黄乐与华为关联引调查 深圳数据中心牵出供应链疑云",
+        "url": "https://mnewstv.com/view.php?id=49971",
+        "snippet": "美国2026年中期选举结束后，华盛顿的政治权力格局出现重大变化。民主党赢得众议院和参议院控制权，共和党仍然掌握白宫，美国由此进入新的分立政府时期。对于金...\n\n2026年11月4日 　 11823\n\n阅读全文 →\n\n#### 黄仁勋辞职冲击英伟达 AI资本融资网络面临重新审视\n\n发表：2026-11-12 20:24:00 | 更新：2026-11-12 21:47:53  人气: 1984\n\n黄仁勋辞职冲击英伟达 AI资本融资网络面临重新审视 [...] ### 更多新闻\n\n 川普爆料黄仁勋辞职前来电 揭两人谈话内容  2026-11-13\n 川普：不需与伊朗达协议 已让万斯重心放内政  ",
+        "published_hint": "Thu, 12 Nov 2026 21:47:53 GMT",
+        "reading_status": "search_snippet_not_body",
+        "search_links": [
+          {
+            "event_id": "E11",
+            "lane": "global_policy",
+            "scope": null,
+            "purpose": "commentary",
+            "query": "2026-11-14 美国中期选举结果及对政策、资产定价的影响 最新进展 原始来源",
+            "increment": "original_source",
+            "reason": "针对底稿中这一个未覆盖事件补查；保留原截止，核对实际发布日期与消息口径。"
+          }
+        ]
+      },
+      "receipt": {
+        "candidate_id": "S91",
+        "event_id": "E11",
+        "status": "failed",
+        "increment": "original_source",
+        "selection_reason": "针对底稿中这一个未覆盖事件补查；保留原截止，核对实际发布日期与消息口径。",
+        "reason": "ConnectTimeoutError",
+        "response_capture": null
+      }
+    },
+    {
+      "candidate_id": "S92",
+      "candidate": {
+        "title": "黄仁勋出轨引董事会调查 高盛CEO：AI生态不围绕单一个人运转 · 茉莉花新闻网",
+        "url": "https://molihua.org/mh-4747681",
+        "snippet": "Leslie Picker：这是中期选举之后我们第一次坐下来谈。选举期间出现不少反AI声音，也有人主张暂停建设数据中心。这是否会改变融资成本或继续投资数据中心的整体计算？会不会对你刚才说的发展路径造成重大风险？\n\nDavid Solomon：选举之前确实有很多相关讨论。往后看，需要分清政治噪声与最终会落实的政策和行动。首先，并非全国每个州都反对数据中心。一些州反对情绪强烈，另一些地方则明白基础设施投资能够带来经济收益，也明白它对经济的重要性。\n\n回头看约50年前，美国出于对核能的担忧作出了一些政策决定。站在今天，恐怕有些决定我们会希望当初采取不同做法。今天讨论的计算基础设施将为美国企业提供算力",
+        "published_hint": "Tue, 10 Nov 2026 19:43:23 GMT",
+        "reading_status": "search_snippet_not_body",
+        "search_links": [
+          {
+            "event_id": "E11",
+            "lane": "global_policy",
+            "scope": null,
+            "purpose": "commentary",
+            "query": "2026-11-14 美国中期选举结果及对政策、资产定价的影响 最新进展 原始来源",
+            "increment": "original_source",
+            "reason": "针对底稿中这一个未覆盖事件补查；保留原截止，核对实际发布日期与消息口径。"
+          }
+        ]
+      },
+      "receipt": {
+        "candidate_id": "S92",
+        "event_id": "E11",
+        "status": "failed",
+        "increment": "original_source",
+        "selection_reason": "前一篇未取得合格正文，换一个来源；原问题：针对底稿中这一个未覆盖事件补查；保留原截止，核对实际发布日期与消息口径。",
+        "reason": "ConnectTimeoutError",
+        "response_capture": null
+      }
+    }
+  ],
+  "watchlist": [
+    {
+      "code": "002714",
+      "name": "牧原股份",
+      "market": "A"
+    },
+    {
+      "code": "300750",
+      "name": "宁德时代",
+      "market": "A"
+    },
+    {
+      "code": "600900",
+      "name": "长江电力",
+      "market": "A"
+    },
+    {
+      "code": "688535",
+      "name": "华海诚科",
+      "market": "A"
+    }
+  ]
+}

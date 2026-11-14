@@ -192,6 +192,10 @@ def main():
             expected += ('backend/tests/test_listener_research.py',)
         if manifest.get('daily_changes_tests_required'):
             expected += ('backend/tests/test_daily_changes.py',)
+        if manifest.get('body_acquisition_tests_required'):
+            expected += ('backend/tests/test_body_acquisition.py',
+                'backend/tests/fixtures/body_acquisition_sample.json',
+                'backend/tests/fixtures/sina_announcement_identity.body', 'tools/check_body_acquisition.py')
         if (proof.get('owner') != 'finance-unified-offline-acceptance-v1' or proof.get('passed') is not True
                 or set(proof.get('file_sha256', {})) != set(expected)
                 or any(hashlib.sha256((bundle / name).read_bytes()).hexdigest() != proof['file_sha256'][name]

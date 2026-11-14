@@ -32,7 +32,7 @@ def source_signature():
     names = ('edition_manual.py', 'edition_continuation.py', 'edition_read_selection.py', 'edition_pipeline.py', 'edition_context.py', 'edition_inputs.py', 'edition_contract.py', 'edition_budget.py', 'model_gateway.py',
              'model_usage.py', 'web_research.py', 'article_metadata.py', 'primary_material_quality.py', 'reading_acceptance.py', 'search_objectives.py', 'material_roles.py', 'spoken_fidelity.py',
              'podcast_generator.py', 'podcast_script_cache.py', 'editorial_policy.py', 'research_desk.py',
-             'edition_issuer_desk.py', 'listener_research.py', 'daily_changes.py', 'edition_market.py', 'market_breadth.py', 'timed_market.py', 'research_hub.py', 'research_schema.py', 'watchlist_sources.py')
+             'edition_issuer_desk.py', 'listener_research.py', 'body_acquisition.py', 'daily_changes.py', 'edition_market.py', 'market_breadth.py', 'timed_market.py', 'research_hub.py', 'research_schema.py', 'watchlist_sources.py')
     return digest({name: digest((Path(__file__).parent / name).read_text()) for name in names})
 
 
@@ -147,6 +147,7 @@ class EditionPipeline:
         from .web_research import search as public_search, read_public
         self.search = search or public_search
         self.read = read or read_public
+        self.uses_public_reader = read is None or read is read_public
         self.check = check or self._check_environment
         self.budget = Budget(state, self.save, lambda: (edition_forecast(self.state, self.workspace.now)
             if self.state['policy'].get('edition_forecast') == 'remaining_stages_v1'
@@ -160,6 +161,8 @@ class EditionPipeline:
     def save(self):
         self.state['active_seconds'] = self.prior_seconds + time.monotonic() - self.started
         self.state['updated_at'] = china_now().isoformat()
+        from .body_acquisition import summary as acquisition_summary
+        self.state['body_acquisition'] = acquisition_summary(self.state)
         save_json(self.path / 'result.json', self.state)
         # A human-readable receipt is updated before/after every stage, even failure.
         lines = [self.state['id'], '状态：' + self.state['status'], '截止：' + self.state['cutoff'],
@@ -326,7 +329,15 @@ class EditionPipeline:
             event = events[eid]
             url = self.state['candidates'][cid]['url']
             from .search_objectives import metadata_blockers
-            blocked = metadata_blockers(self.state['candidates'][cid])
+            candidate = self.state['candidates'][cid]
+            blocked = metadata_blockers(candidate)
+            from .edition_read_selection import stale_hint
+            from .body_acquisition import paused_public
+            if not candidate.get('baseline_document') and stale_hint(self.state, event, candidate):
+                blocked.append('published_hint_outside_event_window')
+            if (self.uses_public_reader and not candidate.get('issuer_document')
+                    and not candidate.get('baseline_document') and paused_public(url)):
+                blocked.append('article_paused_no_auto_retest')
             if blocked:
                 self.state.setdefault('read_metadata_rejections', []).append(
                     dict(candidate_id=cid, event_id=eid, flags=blocked, http_requests=0))
@@ -352,6 +363,7 @@ class EditionPipeline:
             from .collection_time import window
             hours = window(self.workspace.now, event['purpose'])['hours']
             candidate = self.state['candidates'][cid]
+            before_http = getattr(self.workspace, 'public_fetch_attempts', 0)
             if (self.state.get('research_protocol') == PROTOCOL
                     and (candidate.get('issuer_document') or candidate.get('baseline_document'))):
                 try:
@@ -364,6 +376,8 @@ class EditionPipeline:
                 result = await asyncio.to_thread(self.read, self.workspace, url,
                     hours=hours, deadline=self.deadline, characters=6000)
             receipt.update(status=result.get('status'), reason=result.get('reason'),
+                           read_url=result.get('url', url),
+                           public_http_requests=getattr(self.workspace, 'public_fetch_attempts', 0) - before_http,
                            response_capture=result.get('response_capture'))
             self.state['public_fetch_attempts'] = getattr(self.workspace, 'public_fetch_attempts', 0)
             material = result.get('material', {})
@@ -394,6 +408,8 @@ class EditionPipeline:
                                        if company_focus(subject, SimpleNamespace(**s))],
                         limitation='正文存在不代表独立核实、完整稿或最新交易时段；原文由后续证据评估和审稿核对。')
                     self.attach_baselines(eid, sources[identifier], event)
+            elif result.get('status') == 'ok':
+                receipt.update(status='failed', reason='web_source_material_not_in_workspace')
             self.save()
 
     def attach_baselines(self, event_id, current, event=None):
@@ -430,13 +446,27 @@ class EditionPipeline:
 
     async def selected_reads(self, jobs, events, trace):
         self.state.setdefault('read_selection', []).extend(trace); self.save()
-        for job in jobs:
-            await self.reads([job], events)
-            alternate, record = fallback_plan(self.state, events, job)
-            if record:
-                self.state['read_selection'].append(record); self.save()
-            if alternate:
-                await self.reads([alternate], events)
+        for original in jobs:
+            job, charged, considered = dict(original), 0, set()
+            while job and job['candidate_id'] not in considered:
+                considered.add(job['candidate_id'])
+                before_http = getattr(self.workspace, 'public_fetch_attempts', 0)
+                before_receipts = len(self.state.get('read_receipts', []))
+                await self.reads([job], events)
+                # Metadata/paused/cache failures must not consume the second
+                # live-source opportunity. Still consider each candidate once.
+                if (getattr(self.workspace, 'public_fetch_attempts', 0) > before_http
+                        or not self.uses_public_reader and len(self.state.get('read_receipts', [])) > before_receipts):
+                    charged += 1
+                if charged >= 2 or not original.get('allow_fallback'):
+                    break
+                job['fallback_ids'] = [cid for cid in original.get('fallback_ids', []) if cid not in considered]
+                job['allow_fallback'] = True
+                alternate, record = fallback_plan(self.state, events, job)
+                if record:
+                    record['live_source_attempts'] = charged
+                    self.state['read_selection'].append(record); self.save()
+                job = alternate
 
     def packet(self, stage):
         return packet(self.state, stage)

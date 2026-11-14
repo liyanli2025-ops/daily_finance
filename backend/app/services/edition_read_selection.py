@@ -114,6 +114,8 @@ def candidate_admission(state, event, row, request):
 
 def select_candidate(state, event, candidate_ids, request):
     tried = {r['candidate_id'] for r in state.get('read_receipts', [])}
+    tried.update(r['candidate_id'] for r in state.get('read_metadata_rejections', [])
+                 if r.get('event_id') == event['id'])
     known = [state['candidates'][s['candidate_id']] for s in state.get('sources', {}).values()
              if s.get('candidate_id') in state['candidates'] and event['id'] in s.get('event_ids', [])]
     signatures = {_signature(row) for row in known} - {None}
@@ -140,7 +142,11 @@ def select_candidate(state, event, candidate_ids, request):
         similarity = len(questions & topic_words(str(row.get('title') or '') + ' ' + str(row.get('snippet') or ''), event.get('lane')))
         # Relevance is a metadata hint. Domain/time/title do not certify truth.
         old_hint = stale_hint(state, event, row)
-        rank = (old_hint, probable_reprint, hint['priority'], -similarity,
+        if old_hint and not row.get('baseline_document'):
+            skipped.append(dict(candidate_id=cid, reason='published_hint_outside_event_window'))
+            continue
+        from .body_acquisition import availability_penalty
+        rank = (availability_penalty(state, row['url']), old_hint, probable_reprint, hint['priority'], -similarity,
                 urlsplit(row['url']).hostname or '', row['url'], cid)
         ranked.append((rank, cid, dict(candidate_id=cid, likely_reprint=probable_reprint,
             relevance_terms=similarity, published_hint_outside_window=old_hint, purpose_flags=hint['flags'])))

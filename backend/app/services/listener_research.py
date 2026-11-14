@@ -218,4 +218,6 @@ def listening_receipt(state):
         market = state.get('market_observations') or {}
         lines.append('行情/结构数据：' + str(market.get('status', '未执行')) + '；新增公开请求=' + str(market.get('public_fetch_attempts', 0)))
         lines.extend('数据缺口：' + gap for gap in market.get('gaps', []))
+    from .body_acquisition import receipt_lines
+    lines += receipt_lines(state)
     return '\n'.join(lines) + '\n'
