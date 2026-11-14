@@ -1,4 +1,5 @@
 """Pure contracts for one edition. Structure/quotes are checked, never news truth."""
+from copy import deepcopy
 import json
 import re
 
@@ -14,7 +15,7 @@ importance仅major/context，purpose仅discovery/latest_close/released_policy/co
 ASSESS = '''核对事件单与实际全文，特别检查重要事件遗漏、事实依据、不同解释、条件、发布时间和交易时段。
 不要把一篇美债稿充作全部国际事件覆盖；失败来源不等于没有事件。逐项检查综述正文里新增的其他重大事件，不能只按标题归类。已存正文可关联多个事件并复用，不增加来源数、不当独立核实；每个事件仍需匹配的逐字依据和时点，媒体预测不升级为确定结果。评论不能当原披露，盘中/旧时段不能充最新收盘。
 返回：{"events":[{"id":"E1","status":"ready","reason":"证据及边界","evidence":[{"source_id":"正文ID","quote":"正文逐字依据，2至400字"}]}],"missed_major_events":[],"additional_searches":[],"additional_reads":[],"watchlist_checks":[{"key":"A:代码","status":"covered","reason":"实际查到或未查到什么"}]}
-events必须逐项包含原事件；status仅ready/missing/excluded。major缺正文或仍待核必须missing，不以改成excluded掩盖。ready至少一个实际正文逐字依据。
+events必须逐项包含原事件；status仅ready/missing/excluded。major缺正文或仍待核必须missing，不以改成excluded掩盖。ready至少一个实际正文逐字依据，保留原文换行。validation_issues为程序发现的引用/用途问题，必须以实际正文补查或明确missing，不能通过改写解释掩盖。
 missed_major_events可追加新发现的major事件，格式与选题单事件相同。补查搜索项为{event_id,query,purpose,increment,reason}，读取项为{event_id,candidate_id,increment,reason}。increment仅original_source/new_update/independent_verification/counterevidence/missing_context/access_failure；reason用12至400字说明要核对的具体事实或缺口，不能只说“补充资料”。每个事件同类缺口只选一篇；补搜结果程序按元数据筛一篇，不整批下载。不同网站转载同一稿不构成独立核实；新进展或反方来源可以另读。
 watchlist_checks逐项包含所有当前自选股，status为covered/missing/no_material_event；covered需附evidence=[{source_id,quote}]并引用主体匹配的正文。no_material_event说明已检查什么，不能凭搜索失败断言没有新闻。
 若提示last_assessment=true，不再提出补查；仍有重要缺口明确missing，交部分资料，禁止编事实。'''
@@ -146,6 +147,96 @@ def assess(value, events, sources, stocks):
                     raise ValueError('edition_company_subject_mismatch')
                 quote(item.get('quote'), source['text'])
     return missing
+
+
+
+def _source_quote(value, text):
+    """Restore only Chinese layout line breaks; never alter words or numbers."""
+    if not isinstance(value, str) or not 2 <= len(value) <= 400:
+        raise ValueError('edition_quote_not_found')
+    if value in text:
+        return value
+    # Chinese article extractors often put a layout newline after punctuation.
+    # Do not join Latin words or split numbers ("1\n00" must not become "100").
+    pattern = r'(?<=[\u3400-\u9fff，。；：！？、（）“”《》])[ \t]*\r?\n[ \t]*(?=[\u3400-\u9fff，。；：！？、（）“”《》])'
+    ignored = {i for match in re.finditer(pattern, text) for i in range(*match.span())}
+    positions = [i for i in range(len(text)) if i not in ignored]
+    compact = ''.join(text[i] for i in positions)
+    offset = compact.find(value)
+    if offset < 0:
+        raise ValueError('edition_quote_not_found')
+    original = text[positions[offset]:positions[offset + len(value) - 1] + 1]
+    quote(original, text)
+    return original
+
+
+def prepare_assessment(value, events, sources, stocks, provided_ids):
+    """Admit explicit citations from delivered bodies, or preserve a material gap.
+
+    Pure/transactional: original replies, bodies, roles and company scopes never
+    change. Cross-event reuse is a cited relationship, not independent proof.
+    """
+    result, materials = deepcopy(value), deepcopy(sources)
+    # Structural/protocol faults remain hard failures. Only individual evidence
+    # faults can become missing material; never erase an event or watchlist row.
+    shape = deepcopy(result)
+    for row in shape.get('events', []):
+        if row.get('status') == 'ready':
+            row['status'] = 'missing'
+    for row in shape.get('watchlist_checks', []):
+        if row.get('status') == 'covered':
+            row['status'] = 'missing'
+    assess(shape, events, materials, stocks)
+    issues, links, restored = [], [], []
+    for kind, rows, accepted in (('event', result['events'], 'ready'),
+                                 ('stock', result['watchlist_checks'], 'covered')):
+        for row in rows:
+            if row['status'] != accepted:
+                continue
+            key = row['id'] if kind == 'event' else row['key']
+            evidence = row.get('evidence')
+            failures, checked = [], []
+            if not isinstance(evidence, list) or not evidence:
+                failures.append(dict(code='edition_evidence_missing'))
+            else:
+                for item in evidence:
+                    sid = item.get('source_id') if isinstance(item, dict) else None
+                    source = materials.get(sid) if isinstance(sid, str) else None
+                    try:
+                        if not source or sid not in provided_ids:
+                            raise ValueError('edition_evidence_not_delivered')
+                        role = source.get('source_role', {})
+                        if kind == 'event':
+                            purpose = events[key]['purpose']
+                            if (purpose == 'released_policy' and role.get('original_policy_release_allowed') is False
+                                    or purpose == 'latest_close' and role.get('latest_close_allowed') is False):
+                                raise ValueError('edition_evidence_role_invalid')
+                        elif key not in source.get('direct_scopes', []):
+                            raise ValueError('edition_company_subject_mismatch')
+                        original = _source_quote(item.get('quote'), source['text'])
+                        checked.append((sid, item, original))
+                    except ValueError as error:
+                        failures.append(dict(code=str(error), source_id=sid))
+            if failures:
+                issues.append(dict(kind=kind, id=key, problems=failures))
+                row.update(status='missing', evidence=[],
+                    reason=row['reason'] + '；本地证据检查未通过：' +
+                        '、'.join(sorted({r['code'] for r in failures})) + '。保留缺口，不得作为已核实结论。')
+                continue
+            for sid, item, original in checked:
+                if item['quote'] != original:
+                    restored.append(dict(kind=kind, id=key, source_id=sid,
+                        model_quote=item['quote'], source_quote=original, action='restore_source_linebreaks'))
+                    item['quote'] = original
+                if kind == 'event' and key not in materials[sid]['event_ids']:
+                    materials[sid]['event_ids'].append(key)
+                    links.append(dict(event_id=key, source_id=sid,
+                        quote=original, independent_verification=False))
+    missing = assess(result, events, materials, stocks)
+    result['validation_issues'] = issues
+    return result, materials, dict(missing=missing, issues=issues,
+        reused_body_event_links=links, restored_source_quotes=restored,
+        limitation='只检查已送达正文的引用和用途，不证明消息属实、最新交易时段或覆盖充分；复用不增加独立来源。')
 
 
 def anchors(rows, sources, body, *, reviewed=False):

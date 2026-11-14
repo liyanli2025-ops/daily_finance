@@ -332,6 +332,18 @@ class EditionPipeline:
     def packet(self, stage):
         return packet(self.state, stage)
 
+    def validate_assessment(self, assessment, events, stocks):
+        stage = self.state['phase']
+        delivered = self.state.get('delivered_sources', {}).get(stage, {})
+        provided = {sid for sid, source in self.state['sources'].items()
+                    if delivered.get(sid) == digest(source['text'])}
+        accepted, sources, validation = contract.prepare_assessment(
+            assessment, events, self.state['sources'], stocks, provided)
+        self.state['sources'] = sources
+        self.state.setdefault('assessment_validation', []).append(dict(stage=stage, **validation))
+        self.save()
+        return accepted, validation['missing']
+
     async def execute(self):
         stocks = {r['market'] + ':' + r['code'] for r in self.state['watchlist']}
         try:
@@ -346,7 +358,7 @@ class EditionPipeline:
                 self.state.update(status='partial_materials', missing=list(events), stop_reason='no_readable_body')
                 self.save(); return None
             assessment = await self.call('assessment', contract.ASSESS, self.packet('assessment'))
-            missing = contract.assess(assessment, events, self.state['sources'], stocks)
+            assessment, missing = self.validate_assessment(assessment, events, stocks)
             extra = assessment.get('missed_major_events', [])
             for event in extra:
                 contract.event(event, self.state['candidates'], stocks)
@@ -385,7 +397,7 @@ class EditionPipeline:
                     self.save(); return None
                 assessment = await self.call('patch_assessment', contract.ASSESS,
                     self.packet('patch_assessment'))
-                missing = contract.assess(assessment, events, self.state['sources'], stocks)
+                assessment, missing = self.validate_assessment(assessment, events, stocks)
                 if (assessment.get('additional_searches') or assessment.get('additional_reads')
                         or assessment.get('missed_major_events')):
                     missing.append('unresolved_additional_research')

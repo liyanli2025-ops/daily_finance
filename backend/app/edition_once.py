@@ -85,9 +85,13 @@ def summary(state, directory):
         candidates=len(state.get('candidates', {})), bodies=len(state.get('sources', {})),
         accounted_estimate_usd=str(sum((accounted(r) for r in reservations), number(0))),
         original_reservations_usd=str(sum((number(r['estimated_usd']) for r in reservations), number(0))),
-        events=[dict(id=e['id'], title=e['title'], importance=e['importance'])
+        events=[dict(id=e['id'], title=e['title'], importance=e['importance'],
+                     evidence_status=next((r['status'] for r in state.get('assessment', {}).get('events', [])
+                         if r['id'] == e['id']), 'not_assessed'),
+                     fact_verified=False)
                 for e in state.get('agenda', {}).get('events', [])],
-        missing=state.get('missing', []), error_type=state.get('error_type'),
+        missing=state.get('missing'), missing_assessed='assessment' in state,
+        error_type=state.get('error_type'),
         error_code=state.get('error_code'), error_http_status=state.get('error_http_status'),
         draft_saved=bool(state.get('draft')), text_accepted=state['status'] == 'reviewed_text',
         tts_requests=0, app_written=False, pause_preserved=MODEL_PAUSE_FILE.is_file(),

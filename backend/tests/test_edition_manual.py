@@ -258,3 +258,140 @@ class ReviewedSearchProofTests(unittest.TestCase):
             root=Path(temporary);cfg,key,blocked,folder=self.evidence(root)
             self.update_signed_request(folder,lambda request:request.update(search_depth='advanced'))
             self.assertIsNone(manual.reviewed_search_permission(cfg,backend=root))
+
+
+class AssessmentEvidenceTests(unittest.TestCase):
+    """Reuse delivered text without bypassing quotes, roles or company checks."""
+    def sample(self):
+        from app.services import edition_contract as contract
+        source = dict(id='B1', event_ids=['E1'], text='政策已公布，\n实施仍有条件。\n行业价格回落。',
+                      direct_scopes=[], source_role={})
+        events = {eid: dict(purpose='discovery', importance='major') for eid in ('E1', 'E2')}
+        value = dict(events=[dict(id=eid, status='ready', reason='以对应正文及边界为准',
+            evidence=[dict(source_id='B1', quote='政策已公布，实施仍有条件。' if eid == 'E1' else '行业价格回落。')])
+            for eid in events], watchlist_checks=[], additional_reads=[], additional_searches=[],
+            missed_major_events=[])
+        return contract, value, events, {'B1': source}
+
+    def prepare(self, value=None, events=None, sources=None, provided=None, stocks=None):
+        c, v, e, s = self.sample()
+        return c.prepare_assessment(value if value is not None else v,
+            events if events is not None else e, sources if sources is not None else s,
+            stocks or set(), {'B1'} if provided is None else provided)
+
+    def test_explicit_other_event_quote_reuses_delivered_body_without_new_source(self):
+        accepted, sources, validation = self.prepare()
+        self.assertEqual(validation['missing'], [])
+        self.assertEqual(sources['B1']['event_ids'], ['E1', 'E2'])
+        self.assertEqual(len(sources), 1)
+        self.assertFalse(validation['reused_body_event_links'][0]['independent_verification'])
+
+    def test_layout_linebreak_restored_to_exact_original_substring(self):
+        c, _, _, _ = self.sample()
+        accepted, sources, validation = self.prepare()
+        evidence = accepted['events'][0]['evidence'][0]['quote']
+        self.assertEqual(evidence, '政策已公布，\n实施仍有条件。')
+        c.quote(evidence, sources['B1']['text'])
+        self.assertEqual(len(validation['restored_source_quotes']), 1)
+
+    def test_invalid_quote_is_missing_not_rewritten_or_silently_dropped(self):
+        _, value, _, _ = self.sample()
+        value['events'][1]['evidence'][0]['quote'] = '行业价格大涨。'
+        accepted, sources, validation = self.prepare(value=value)
+        self.assertEqual(validation['missing'], ['E2'])
+        self.assertEqual(accepted['events'][1]['status'], 'missing')
+        self.assertEqual(accepted['events'][1]['evidence'], [])
+        self.assertEqual(sources['B1']['event_ids'], ['E1'])
+        self.assertEqual(validation['issues'][0]['problems'][0]['code'], 'edition_quote_not_found')
+
+    def test_valid_part_of_invalid_event_does_not_attach_other_event(self):
+        _, value, _, _ = self.sample()
+        value['events'][1]['evidence'].append(dict(source_id='B1', quote='不存在的句子。'))
+        _, sources, validation = self.prepare(value=value)
+        self.assertEqual(sources['B1']['event_ids'], ['E1'])
+        self.assertEqual(validation['missing'], ['E2'])
+
+    def test_undelivered_body_cannot_be_evidence_even_with_exact_quote(self):
+        accepted, _, validation = self.prepare(provided=set())
+        self.assertEqual(validation['missing'], ['E1', 'E2'])
+        self.assertTrue(all(r['status'] == 'missing' for r in accepted['events']))
+
+    def test_unknown_source_is_a_material_gap(self):
+        _, value, _, _ = self.sample()
+        value['events'][1]['evidence'][0]['source_id'] = 'invented'
+        _, _, validation = self.prepare(value=value)
+        self.assertEqual(validation['missing'], ['E2'])
+        self.assertEqual(validation['issues'][0]['problems'][0]['code'], 'edition_evidence_not_delivered')
+
+    def test_commentary_reuse_does_not_become_original_policy(self):
+        _, _, events, sources = self.sample()
+        events['E2']['purpose'] = 'released_policy'
+        sources['B1']['source_role']['original_policy_release_allowed'] = False
+        _, sources, validation = self.prepare(events=events, sources=sources)
+        self.assertEqual(validation['missing'], ['E2'])
+        self.assertEqual(sources['B1']['event_ids'], ['E1'])
+
+    def test_peer_or_market_summary_cannot_become_direct_company_evidence(self):
+        _, value, _, _ = self.sample()
+        value['watchlist_checks'] = [dict(key='A:600900', status='covered', reason='标题仅为行业综述',
+            evidence=[dict(source_id='B1', quote='行业价格回落。')])]
+        accepted, sources, validation = self.prepare(value=value, stocks={'A:600900'})
+        self.assertEqual(accepted['watchlist_checks'][0]['status'], 'missing')
+        self.assertEqual(validation['missing'], ['A:600900'])
+        self.assertEqual(sources['B1']['direct_scopes'], [])
+
+    def test_split_number_and_english_word_are_not_joined(self):
+        c, _, _, _ = self.sample()
+        for candidate, raw in [('100', '1\n00'), ('interest', 'inter\nest'),
+                               ('10元', '10\n元')]:
+            with self.subTest(raw=raw), self.assertRaisesRegex(ValueError, 'quote_not_found'):
+                c._source_quote(candidate, raw)
+
+    def test_changed_negation_cannot_pass_layout_matching(self):
+        c, _, _, _ = self.sample()
+        with self.assertRaisesRegex(ValueError, 'quote_not_found'):
+            c._source_quote('政策已公布，实施没有条件。', '政策已公布，\n实施仍有条件。')
+
+    def test_original_response_and_sources_are_unchanged(self):
+        c, value, events, sources = self.sample()
+        before = copy.deepcopy((value, sources))
+        c.prepare_assessment(value, events, sources, set(), {'B1'})
+        self.assertEqual((value, sources), before)
+
+    def test_missing_event_is_still_a_hard_protocol_error(self):
+        _, value, _, sources = self.sample()
+        before = copy.deepcopy(sources)
+        value['events'].pop()
+        with self.assertRaisesRegex(ValueError, 'event_disappeared'):
+            self.prepare(value=value, sources=sources)
+        self.assertEqual(sources, before)
+
+    def test_second_validation_does_not_invent_more_links(self):
+        c, _, events, _ = self.sample()
+        accepted, sources, _ = self.prepare()
+        again, reused, validation = c.prepare_assessment(accepted, events, sources, set(), {'B1'})
+        self.assertEqual(again, accepted)
+        self.assertEqual(reused, sources)
+        self.assertEqual(validation['reused_body_event_links'], [])
+
+    def test_pipeline_rejects_changed_body_after_saved_delivery(self):
+        from app.services.edition_budget import digest
+        _, value, events, sources = self.sample()
+        pipeline = entry.core.EditionPipeline.__new__(entry.core.EditionPipeline)
+        pipeline.state = dict(phase='assessment', sources=sources,
+            delivered_sources={'assessment': {'B1': digest('other body')}})
+        pipeline.save = lambda: None
+        accepted, missing = pipeline.validate_assessment(value, events, set())
+        self.assertEqual(missing, ['E1', 'E2'])
+        self.assertEqual(pipeline.state['sources']['B1']['event_ids'], ['E1'])
+        self.assertEqual(accepted['events'][0]['status'], 'missing')
+
+    def test_summary_does_not_present_unfinished_missing_check_as_complete(self):
+        with patch.object(entry, 'MODEL_PAUSE_FILE', Path(__file__)):
+            result = entry.summary(dict(id=IDENTIFIER, status='failed', cutoff='2026-11-14',
+                policy={'estimated_limit_usd': '1'}, agenda={'events': [dict(id='E1', title='待核线索', importance='major')]}),
+                Path('unused'))
+        self.assertIsNone(result['missing'])
+        self.assertFalse(result['missing_assessed'])
+        self.assertEqual(result['events'][0]['evidence_status'], 'not_assessed')
+        self.assertFalse(result['events'][0]['fact_verified'])

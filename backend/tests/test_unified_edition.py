@@ -423,6 +423,11 @@ class PipelineRegression(unittest.IsolatedAsyncioTestCase):
                 pipeline.state['sources'][source['id']] = source
         async def call(stage, brief, payload):
             calls.append(stage)
+            # Match the real call boundary: record phase and delivered text.
+            from app.services.edition_budget import digest
+            pipeline.state['phase'] = stage
+            pipeline.state.setdefault('delivered_sources', {})[stage] = {
+                sid: digest(source['text']) for sid, source in payload.get('sources', {}).items()}
             result = copy.deepcopy(agenda if stage == 'agenda' else assessment)
             if stage == 'patch_assessment': result['additional_searches'] = []
             return result
