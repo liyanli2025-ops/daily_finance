@@ -19,6 +19,7 @@ from .edition_preflight import scenario_config
 from .services import edition_pipeline as core
 from .services.edition_budget import accounted, number
 from .services.edition_manual import manual_text_scope, reviewed_search_permission
+from .services.edition_news_focus import new_window
 from .services.episode_workspace import EpisodeWorkspace
 from .services.model_gateway import MODEL_PAUSE_FILE
 from .services.research_hub import save_json
@@ -154,7 +155,7 @@ async def run_once(config, report_type='morning', root=core.ROOT):
         state = dict(id=identifier, owner='finance-unified-edition-v1', status='prepared',
             cutoff=now.isoformat(), report_type=report_type, watchlist=planned['watchlist'],
             policy=planned['policy'], environment_sha256=planned['environment_sha256'],
-            execution_sha256=planned['execution_sha256'], manual_text_only=True,
+            execution_sha256=planned['execution_sha256'], manual_text_only=True, news_focus=new_window(now),
             reservations=[], usage=[], candidates={}, sources={}, app_written=False, research_protocol=core.PROTOCOL, change_protocol='daily_changes_v1')
         save_json(directory / 'result.json', state)
         workspace = EpisodeWorkspace(root=directory / 'evidence', now=now)

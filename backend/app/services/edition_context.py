@@ -148,7 +148,9 @@ def packet(state, stage):
         raise ValueError('edition_context_stage_invalid')
     result = {k: deepcopy(state.get(k)) for k in ('cutoff', 'watchlist', 'report_type')}
     from .listener_research import brief
+    from .edition_news_focus import packet as focus_packet
     result.update(brief(state))
+    result.update(focus_packet(state, stage))
     if stage == 'agenda':
         result.update(candidate_packet(state.get('candidates', {})))
         return result

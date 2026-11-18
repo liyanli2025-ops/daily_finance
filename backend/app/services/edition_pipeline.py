@@ -18,6 +18,7 @@ from .listener_research import validate_draft as validate_listener_draft, valida
 from .edition_read_selection import primary_plan, patch_plan, fallback_plan, validate_increment
 from .edition_budget import Budget, OUTPUTS, digest, policy, protection, accounted, request_input_pricing, search_batch_plan
 from .edition_inputs import messages_for, assemble_request, editorial_forecast, edition_forecast
+from .edition_news_focus import hours as news_focus_hours, new_window
 from .episode_workspace import EpisodeWorkspace, body
 from .model_gateway import MODEL_PAUSE_FILE, complete, ensure_models_enabled, resolve_route, request_for
 from .research_hub import save_json
@@ -40,10 +41,11 @@ def source_signature():
 
 def initial_searches(stocks, now, *, direct_issuers=False, daily_changes=False, baselines=None):
     jobs = search_agenda(stocks, now)
-    jobs += [dict(lane='global_policy', purpose='discovery',
-                  query=now.strftime('%Y-%m-%d') + ' major world political economic breaking developments financial markets'),
-             dict(lane='global_policy', purpose='discovery',
-                  query=now.strftime('%Y年%m月%d日') + ' 国内 国际 重大事件 最新进展 金融市场')]
+    if not daily_changes:
+        jobs += [dict(lane='global_policy', purpose='discovery',
+                      query=now.strftime('%Y-%m-%d') + ' major world political economic breaking developments financial markets'),
+                 dict(lane='global_policy', purpose='discovery',
+                      query=now.strftime('%Y年%m月%d日') + ' 国内 国际 重大事件 最新进展 金融市场')]
     for job in jobs:
         if job['lane'] == 'us_market':
             job['query'] = now.strftime('%Y-%m-%d') + ' US stocks latest completed session closing market report'
@@ -103,6 +105,7 @@ async def preflight(report_type='morning', config=settings):
         raise ValueError('edition_type_invalid')
     stocks = await read_app_watchlist()
     now = china_now()
+    news_focus = new_window(now)
     blockers = []
     if MODEL_PAUSE_FILE.exists(): blockers.append('maintenance_paused')
     if not config.edition_estimate_accepted: blockers.append('cost_estimate_not_accepted')
@@ -122,7 +125,8 @@ async def preflight(report_type='morning', config=settings):
         blockers.append(str(error) if isinstance(error, ValueError) else 'model_route_or_price_unavailable')
     else:
         forecast_state = dict(cutoff=now.isoformat(), watchlist=stocks, report_type=report_type,
-            policy=p, sources={}, research_protocol=PROTOCOL, change_protocol='daily_changes_v1')
+            policy=p, sources={}, research_protocol=PROTOCOL, change_protocol='daily_changes_v1',
+            news_focus=news_focus)
         try:
             plan = search_batch_plan(p, edition_forecast(forecast_state, now),
                 sum(job.get('retrieval') != 'issuer_catalogue' for job in jobs))
@@ -137,7 +141,7 @@ async def preflight(report_type='morning', config=settings):
         prepared_at=now.isoformat(), watchlist=stocks, policy=p, environment_sha256=fingerprint,
         budget_forecast=plan,
         routes=routes, extractor=extractor, ready_to_run=not blockers, blockers=blockers,
-        base_search_jobs=jobs,
+        base_search_jobs=jobs, news_focus=news_focus,
         source_plan=dict(company_disclosures="A股先读公司披露列表，选题后读公告；空目录不代表没有事件",
             company_baseline="首次建立基线；财务遇新披露或每7天核对，业务遇相关变动或每30天核对，平日复用；仅事件需要时比较",
             daily_changes="五类逐项核对；每只自选股另查经营和治理风险，非只查业绩；标题后选一篇读",
@@ -329,8 +333,10 @@ class EditionPipeline:
             else:
                 self.budget.reserve('search')
                 options = dict(max_results=5) if self.state.get('change_protocol') == 'daily_changes_v1' else {}
+                hours = (news_focus_hours(self.workspace.now) if job.get('discovery_scope') in {'open_en', 'open_zh'}
+                         else 168 if self.workspace.now.weekday() >= 5 else 72)
                 result = await asyncio.to_thread(self.search, self.workspace, job['query'],
-                    deadline=self.deadline, hours=168 if self.workspace.now.weekday() >= 5 else 72,
+                    deadline=self.deadline, hours=hours,
                     topic='news', purpose=job.get('purpose', 'discovery'), **options)
             self.state.setdefault('search_receipts', []).append(dict(query=job['query'], job=job, result=result))
             self.state['search_http_attempts'] = getattr(self.workspace, 'web_search_attempts', 0)
@@ -672,7 +678,8 @@ async def generate_edition(report_type='morning', root=ROOT, prior_report=None):
         state = dict(id=identifier, owner='finance-unified-edition-v1', status='prepared',
             cutoff=now.isoformat(), report_type=report_type, watchlist=preview['watchlist'],
             policy=preview['policy'], environment_sha256=preview['environment_sha256'],
-            reservations=[], usage=[], candidates={}, sources={}, app_written=False, research_protocol=PROTOCOL, change_protocol='daily_changes_v1')
+            reservations=[], usage=[], candidates={}, sources={}, app_written=False,
+            research_protocol=PROTOCOL, change_protocol='daily_changes_v1', news_focus=new_window(now))
         if prior_report is not None:
             state['prior_report'] = dict(id=prior_report.id, title=prior_report.title,
                 report_date=prior_report.report_date.isoformat(), content=prior_report.content,

@@ -27,6 +27,9 @@ def messages_for(stage, prompt, value, now, report_type):
         brief = RESEARCH_BRIEF
     from .listener_research import requirements
     brief += requirements(stage, value)
+    if value.get('news_focus'):
+        from .edition_news_focus import requirements as focus_requirements
+        brief += focus_requirements(stage)
     if 'candidate_columns' in value:
         brief += '\n输入候选表按candidate_columns列顺序读取；attributes中单独的{"$ref":n}引用candidate_shared[n]，可嵌套。标题/链接/摘要/时点按原列解释，不能遗漏候选。'
     from .edition_assessment_protocol import instruction
@@ -63,7 +66,9 @@ def editorial_forecast(state, now):
     value = {k: deepcopy(state.get(k)) for k in
              ('cutoff', 'watchlist', 'report_type', 'agenda', 'missing', 'prior_report')}
     from .listener_research import brief
+    from .edition_news_focus import packet as focus_packet
     value.update(brief(state))
+    value.update(focus_packet(state, 'writing'))
     assessment = state.get('assessment') or {}
     value['assessment'] = {k: deepcopy(assessment[k]) for k in
         ('events', 'watchlist_checks', 'missed_major_events', 'change_checks', 'change_topic_checks', 'expectation_checks') if k in assessment}

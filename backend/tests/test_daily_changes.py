@@ -13,8 +13,9 @@ from app.services.edition_market import collect, evidence, allowed_endpoint, COU
 from app.services.edition_pipeline import initial_searches, EditionPipeline
 from app.services.edition_issuer_desk import PROTOCOL as LISTENER
 from app.services.edition_budget import digest
+from app.services.edition_news_focus import hours as news_focus_hours, new_window
 from app.services.edition_context import packet
-from app.services.edition_inputs import editorial_forecast
+from app.services.edition_inputs import editorial_forecast, messages_for
 import test_unified_edition as reference
 
 NOW = datetime(2026,11,14,10)
@@ -64,10 +65,41 @@ class ChangeTasks(unittest.TestCase):
     def test_missing_profile_does_not_block_non_financial_incident_search(self):
         self.assertIn('事故',changes.targeted_jobs([STOCK],NOW)[0]['query'])
 
-    def test_industry_and_political_slots_explicitly_include_missing_topics(self):
+    def test_open_discovery_leaves_topics_open_in_both_languages(self):
         jobs=initial_searches([],NOW,daily_changes=True)
         self.assertIn('商业化',next(j['query'] for j in jobs if j['lane']=='industry'))
-        self.assertTrue(any('election' in j['query'] for j in jobs))
+        broad = {j['discovery_scope']:j for j in jobs if j.get('discovery_scope')}
+        self.assertEqual(set(broad), {'open_zh', 'open_en'})
+        self.assertTrue(all(j['purpose']=='discovery' for j in broad.values()))
+        for job in broad.values():
+            for fixed_topic in ('选举', '关税', '央行', 'election', 'tariff', 'central bank'):
+                self.assertNotIn(fixed_topic, job['query'])
+
+    def test_fresh_window_stops_old_headline_from_forcing_followup(self):
+        s = state()
+        cutoff = datetime(2026, 11, 18, 11)
+        s.update(cutoff=cutoff.isoformat(), news_focus=new_window(cutoff))
+        s['candidates'] = {
+            'old': dict(title='选举结果回顾', published_hint='Wed, 11 Nov 2026 11:08:12 GMT'),
+            'update': dict(title='选举后首次公布关键安排', published_hint='2026-11-18T08:00:00+08:00'),
+            'undated': dict(title='选举后争议得到回应', published_hint=None),
+        }
+        agenda = dict(events=[dict(id='E1', title='海外近期政策', candidate_ids=list(s['candidates']))])
+        self.assertEqual([r['candidate_id'] for r in changes.audit_agenda(s, agenda)], ['update', 'undated'])
+        self.assertEqual(list(s['candidates']), ['old', 'update', 'undated'])
+        del s['news_focus']
+        self.assertEqual([r['candidate_id'] for r in changes.audit_agenda(s, agenda)],
+            ['old', 'update', 'undated'])
+
+    def test_window_context_reaches_agenda_and_writing_without_claiming_event_date(self):
+        s = state()
+        s['news_focus'] = new_window(NOW)
+        self.assertEqual(news_focus_hours(NOW), 72)
+        self.assertEqual(news_focus_hours(NOW + timedelta(days=3)), 24)
+        payload = packet(s, 'agenda')
+        messages = messages_for('agenda', '', payload, NOW, 'morning')
+        self.assertIn('最新报道复述旧事不算新变化', messages[0]['content'])
+        self.assertEqual(packet(s, 'writing')['news_focus'], s['news_focus'])
 
     def test_business_specific_industry_search_can_find_peer_without_company_name(self):
         jobs=initial_searches([STOCK],NOW,direct_issuers=True,daily_changes=True,

@@ -48,24 +48,29 @@ def targeted_jobs(stocks, now, baselines=None):
 
 
 def decorate_jobs(jobs, now, baselines=None):
-    """Retain market session jobs; specialize the other existing slots, not extra loops."""
+    """Two open discovery slots and two industry slots within the existing batch."""
     result = deepcopy(jobs)
     for job in result:
-        lane, q = job.get('lane'), job['query']
+        lane = job.get('lane')
         category = {'a_market':'market', 'hk_market':'market', 'us_market':'market',
                     'commodities':'market', 'industry':'industry', 'global_policy':'politics',
                     'company_event':'operations'}.get(lane)
         job['change_categories'] = [category] if category else []
         if lane == 'industry':
             job['query'] = now.strftime('%Y-%m-%d') + ' 行业 供需 价格 库存 技术突破 商业化 竞争格局 市场份额 新进展'
-        elif lane == 'global_policy' and 'major world' in q:
-            job['query'] = now.strftime('%Y-%m-%d') + ' election tariff central bank conflict major developments financial markets'
-        elif lane == 'global_policy' and '国内 国际' in q:
-            industries = sorted({r.get('profile', {}).get('industry') for r in (baselines or {}).values()
-                if isinstance(r.get('profile'), dict) and isinstance(r['profile'].get('industry'), str)})
-            subjects = ' '.join(s[:12] for s in industries[:4])
-            job.update(lane='industry', change_categories=['industry'],
-                query=now.strftime('%Y-%m-%d') + ' ' + subjects + ' 产业链 客户 供应商 技术 商业化 竞争格局 最新变化')
+        elif lane == 'global_policy':
+            job.update(purpose='discovery', discovery_scope='open_zh',
+                query='国内外资本市场值得关注的重大新进展 最新通报 实质变化')
+    industries = sorted({r['profile']['industry'] for r in (baselines or {}).values()
+        if isinstance(r.get('profile'), dict) and isinstance(r['profile'].get('industry'), str)})
+    subjects = ' '.join(s[:12] for s in industries[:4])
+    result.extend([
+        dict(lane='global_policy', purpose='discovery', discovery_scope='open_en', change_categories=['politics'],
+             query='Major breaking developments across economies and industries with market impact'),
+        dict(lane='industry', purpose='discovery', change_categories=['industry'],
+             query=' '.join(filter(None, [now.strftime('%Y-%m-%d'), subjects,
+                                         '产业链 客户 供应商 技术 商业化 竞争格局 最新变化']))),
+    ])
     return result
 
 
@@ -121,14 +126,15 @@ def brief(state):
         change_limit='标题标记仅帮助逐事件查漏，未命中仍可能重要；检索完成不等于覆盖充分、没有新闻或事实已核实。')
 
 
-def requirements(stage):
+def requirements(stage, *, news_focus=False):
     common = '''\n启用daily_changes_v1。五类变化均属于日报，不限业绩；旧事件新进展、回应、修正也可能是新闻。
-change_coverage显示实际检索范围，change_signals只是标题线索。选举等具体事件不得用泛泛“宏观已覆盖”代替。
+change_coverage显示实际检索范围，change_signals只是标题线索。具体重大事件不得用泛泛“宏观已覆盖”代替。
 每个有信号的候选仍须在agenda中逐事件归类或明确排除理由；同一政治类别不代表同一事件。
-含选举/关税/央行/冲突线索的候选，事件标题或排除理由须明确指出相应议题，不允许只写“国际宏观”。
 客户/供应商/竞争关系、技术突破的商业化程度、管理层传闻、监管指控须读正文核实；转载不当独立佐证。
 market_observations只支持其中实际得到且标明范围/时点的数据，缺失不是零值；不得将样本扩为全市场。
 '''
+    if not news_focus:
+        common += '含选举/关税/央行/冲突线索的候选，事件标题或排除理由须明确指出相应议题，不允许只写“国际宏观”。\n'
     if stage in {'assessment', 'patch_assessment'}:
         return common + '''新增change_checks数组：change_coverage中每个id恰好一项
 {task_id,status:"supported或screened_no_material_event或missing",reason:"具体结论边界",
@@ -138,7 +144,7 @@ screened_no_material_event仅表示本次已执行的有限检索中未选出相
 存在尚待核实的重大事件须missing，并在现有additional_searches/reads提出具体缺口，不要无限改写。
 若change_topic_pending非空，额外返回change_topic_checks，每个待处理candidate_id/topic恰好一项：
 {candidate_id,topic,status:"assigned或excluded或missing",event_id:"assigned时为对应已有事件ID",reason:"12至400字，明确说出该议题及取舍"}。
-assigned仅表示标题线索明确归到哪个事件，不表示事实已核实；事件仍须实际正文评估，不能把选举塞进只谈利率的事件。
+assigned仅表示标题线索明确归到哪个事件，不表示事实已核实；事件仍须实际正文评估，不能归入只涉及另一事实的事件。
 excluded须针对这个具体线索说明排除理由；missing保留缺口并在既有补查项提出解决方式。不再单独调用模型修选题。
 
 如要下“超预期/低于预期/未定价/空头回补/资金流入驱动”结论，新增expectation_checks数组：
@@ -167,9 +173,15 @@ def audit_agenda(state, agenda):
     """Keep unresolved leads for the already budgeted assessment, before any claims."""
     if not enabled(state):
         return []
+    from .edition_news_focus import publication_hint
+    window = state.get('news_focus')
     decisions, pending = [], []
     groups = list(agenda.get('events', [])) + list(agenda.get('excluded_candidates', []))
     for cid, candidate in state.get('candidates', {}).items():
+        if window and publication_hint(candidate.get('published_hint'), window) == 'before_window':
+            # Retain the old link and the agenda's explicit disposition.
+            # Historical publication alone must not force keyword-driven follow-up.
+            continue
         for topic, pattern in TOPICS:
             if not re.search(pattern, str(candidate.get('title', '')), re.I):
                 continue

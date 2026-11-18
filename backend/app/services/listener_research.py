@@ -69,7 +69,8 @@ def requirements(stage, value):
     if value.get('research_protocol') != PROTOCOL:
         return ''
     from .daily_changes import requirements as change_requirements
-    changes = change_requirements(stage) if value.get('change_protocol') == 'daily_changes_v1' else ''
+    changes = (change_requirements(stage, news_focus=bool(value.get('news_focus')))
+               if value.get('change_protocol') == 'daily_changes_v1' else '')
     if stage == 'writing':
         return WRITE_REQUIREMENTS + changes
     if stage == 'review':
