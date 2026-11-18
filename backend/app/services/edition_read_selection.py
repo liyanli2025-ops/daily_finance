@@ -60,6 +60,9 @@ COMMODITY_TERMS = (
     (r'中东', {'middle', 'east'}), (r'伊朗', {'iran'}))
 TOPIC_FILLER = {'一个', '来源', '原文', '当前', '相关', '方面', '报道', '最新', '消息',
                 '原始', '核对', '具体', '说明', '影响', '公司', '资料'}
+CONCRETE_RESULT = re.compile(r'实际(?:成果|结果|进展|变化)|正式(?:结果|发布|声明)|是否(?:生效|举行|发布)|'
+                             r'\b(?:official outcome|entered into force|final decision)\b', re.I)
+OVERVIEW = re.compile(r'综述|半月|晨报|早餐|早评|前瞻|展望|投资信号|\b(?:roundup|outlook|preview)\b', re.I)
 
 
 def topic_words(text, lane):
@@ -105,6 +108,10 @@ def candidate_admission(state, event, row, request):
     event_title = event['title'] + ' ' + str(request.get('reason') or '')
     chinese = lambda text: len(re.findall(r'[\u4e00-\u9fff]', text)) >= 4
     lane = event.get('lane')
+    if (state.get('news_focus') and request.get('increment') in {'original_source', 'new_update', 'access_failure'}
+            and (event['purpose'] == 'released_policy' or CONCRETE_RESULT.search(event_title))
+            and OVERVIEW.search(title)):
+        flags.append('overview_cannot_fill_specific_result_gap')
     known_commodity_aliases = lane == 'commodities' and any(re.search(p, event_title) for p, _ in COMMODITY_TERMS)
     if chinese(event_title) and chinese(title) or known_commodity_aliases:
         if not (topic_words(event_title, lane) & topic_words(title, lane)):
@@ -146,10 +153,13 @@ def select_candidate(state, event, candidate_ids, request):
             skipped.append(dict(candidate_id=cid, reason='published_hint_outside_event_window'))
             continue
         from .body_acquisition import availability_penalty
-        rank = (availability_penalty(state, row['url']), old_hint, probable_reprint, hint['priority'], -similarity,
+        original_lead = bool(row.get('original_publisher') and len(
+            questions & topic_words(str(row.get('title') or ''), event.get('lane'))) >= 2)
+        rank = (availability_penalty(state, row['url']), old_hint, probable_reprint, not original_lead, hint['priority'], -similarity,
                 urlsplit(row['url']).hostname or '', row['url'], cid)
         ranked.append((rank, cid, dict(candidate_id=cid, likely_reprint=probable_reprint,
-            relevance_terms=similarity, published_hint_outside_window=old_hint, purpose_flags=hint['flags'])))
+            relevance_terms=similarity, original_publisher_lead=original_lead,
+            published_hint_outside_window=old_hint, purpose_flags=hint['flags'])))
     ranked.sort(key=lambda item: item[0])
     chosen = ranked[0][1] if ranked else None
     return chosen, dict(event_id=event['id'], increment=request.get('increment'), reason=request.get('reason'),

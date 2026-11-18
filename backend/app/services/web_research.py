@@ -265,12 +265,16 @@ def parse_visible_article(html,url,now=None,hours=72):
                 '；转载来源：'+row.get('upstream','未单列')+alias_note)
     host=urlsplit(url).hostname
     from .generic_extraction import reader_kind
+    from .publisher_releases import article_fields, article_publisher
     if reader_kind(url)!='article_candidate':raise ValueError('web_source_specialized_reader_required')
     # Verified DOM variants from saved public pages, not a whole-page text fallback.
     template_date=None
     heading=next((node for node in soup.select('h1') if 6<=len(node.get_text(' ',strip=True))<=300),None)
     article=soup.select_one('article,[itemprop="articleBody"]')
-    if host=='finance.eastmoney.com' and re.fullmatch(r'/a/\d+\.html',parts.path):
+    publisher=article_publisher(url)
+    if publisher:
+        heading,article,template_date=article_fields(soup,publisher)
+    elif host=='finance.eastmoney.com' and re.fullmatch(r'/a/\d+\.html',parts.path):
         heading=soup.select_one('h1,div.title');article=soup.select_one('#ContentBody')
         node=soup.select_one('.infos')
         match=re.search(r'(\d{4})年(\d{2})月(\d{2})日\s*(\d{2}:\d{2}(?::\d{2})?)',node.get_text(' ',strip=True) if node else '')
@@ -341,7 +345,7 @@ def parse_visible_article(html,url,now=None,hours=72):
     # explicitly as short text instead of padding it with navigation/footer.
     content='\n'.join(line for line in content.splitlines() if not re.fullmatch(r'\s*(?:海量资讯.{0,60}新浪财经APP|责任编辑\s*[:：].{0,20})\s*',line)).strip()
     if not 6<=len(title)<=300:raise ValueError('web_source_article_title_missing')
-    if len(content)<80:raise ValueError('web_source_article_text_too_short')
+    if len(content)<(32 if publisher else 80):raise ValueError('web_source_article_text_too_short')
     short_text=len(content)<160
     dates=[template_date] if template_date else []
     for node in soup.select('meta[property="article:published_time"],meta[itemprop="datePublished"],meta[name="PubDate"],meta[name="pubdate"],meta[name="datePublished"]')+(article.select('time[itemprop="datePublished"][datetime]') if article else []):
@@ -378,7 +382,8 @@ def parse_visible_article(html,url,now=None,hours=72):
     if stamp>now or end<now-timedelta(hours=hours):raise ValueError('web_source_time_outside_window')
     from ..models.news import News
     return News(id='web-'+hashlib.sha256((url+'\n'+content).encode()).hexdigest()[:24],
-        title=title,content=content,source=('公开网页快讯正文-' if short_text else '公开网页可见正文-')+urlsplit(url).hostname,
+        title=title,content=content,source=('公开网页快讯正文-' if short_text and not publisher else '公开网页可见正文-')+
+            (publisher['name'] if publisher else host),
         source_url=url,published_at=stamp,category='公开网页，作者及原始来源仍需核对',
         market_impact='原始来源时点：'+raw+('（来源未标时区，仅按日期，不用于盘前盘后或消息先后判断）' if timezone_unknown else '')+'；精度：'+('day' if date_only else 'minute' if re.search(r'T\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$',raw) else 'second')+'；'+('短讯文字，未取得扩展报道；' if short_text else '')+'公开可见正文，不宣称完整稿或独立核验'+extraction_note+
             ('；其他显式时间字段（未确认为同一口径）：'+json.dumps(list(dict.fromkeys(str(value) for value in dates if value and str(value)!=raw)),ensure_ascii=False) if any(value and str(value)!=raw for value in dates) else ''))
@@ -405,7 +410,8 @@ def archived_public_body(url,now,hours=72,root=None):
     for payload,observed in rows:
         try:
             item=News.model_validate_json(payload)
-            if (canonical(item.source_url)!=canonical(url) or len(item.content.strip())<100
+            from .publisher_releases import article_publisher
+            if (canonical(item.source_url)!=canonical(url) or len(item.content.strip())<(32 if article_publisher(url) else 100)
                 or not (reading_scope(item) in {'full_text','visible_body'} or item.source.startswith('公开网页快讯正文-')) or excluded_reason(item)
                 or not within_window(item,now,hours)):continue
             return item,observed
@@ -434,9 +440,11 @@ def read_public(workspace,url,hours=72,deadline=None,characters=6000):
     # own cache. A feed/search snippet at the same URL cannot satisfy this.
     from .news_quality import reading_scope
     from .news_selection import within_window
+    from .publisher_releases import article_publisher
+    minimum = 32 if article_publisher(url) else 100
     reusable=[item for item in workspace.documents.values()
         if canonical(item.source_url)==url and hasattr(item,'content')
-        and len(item.content.strip())>=100
+        and len(item.content.strip())>=minimum
         and (reading_scope(item) in {'full_text','visible_body'} or item.source.startswith('公开网页快讯正文-'))
         and within_window(item,workspace.now,hours)]
     if reusable:

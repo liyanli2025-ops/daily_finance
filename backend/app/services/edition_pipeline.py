@@ -143,6 +143,7 @@ async def preflight(report_type='morning', config=settings):
         routes=routes, extractor=extractor, ready_to_run=not blockers, blockers=blockers,
         base_search_jobs=jobs, news_focus=news_focus,
         source_plan=dict(company_disclosures="A股先读公司披露列表，选题后读公告；空目录不代表没有事件",
+            publisher_catalogues="并行的线索入口。先读公开发布清单，按问题再读原文；发布者目录巡查不代表已读正文",
             company_baseline="首次建立基线；财务遇新披露或每7天核对，业务遇相关变动或每30天核对，平日复用；仅事件需要时比较",
             daily_changes="五类逐项核对；每只自选股另查经营和治理风险，非只查业绩；标题后选一篇读",
             market_structure="先用1次批量请求取得带日期指数；日报不自动遍历全市场，宽度缺口明示，不推断资金意图",
@@ -224,6 +225,8 @@ class EditionPipeline:
             lines.append('公司研究基线：' + json.dumps(self.state['company_baselines'], ensure_ascii=False))
         if self.state.get('issuer_catalogue_checks'):
             lines.append('公司披露目录核对：' + json.dumps(self.state['issuer_catalogue_checks'], ensure_ascii=False))
+        if self.state.get('publisher_catalogue_checks'):
+            lines.append('机构发布目录核对：' + json.dumps(self.state['publisher_catalogue_checks'], ensure_ascii=False))
         if self.state.get('draft'):
             if self.state['draft'].get('stock_followups'):
                 lines.append('自选股后续观察：' + json.dumps(self.state['draft']['stock_followups'], ensure_ascii=False))
@@ -296,7 +299,7 @@ class EditionPipeline:
         return contract.decode(raw)
 
     async def searches(self, jobs):
-        candidates = self.state.setdefault('candidates', {})
+        self.state.setdefault('candidates', {})
         for job in jobs:
             if (not isinstance(job, dict) or not isinstance(job.get('query'), str)
                     or not 2 <= len(job['query']) <= 120
@@ -340,17 +343,56 @@ class EditionPipeline:
                     topic='news', purpose=job.get('purpose', 'discovery'), **options)
             self.state.setdefault('search_receipts', []).append(dict(query=job['query'], job=job, result=result))
             self.state['search_http_attempts'] = getattr(self.workspace, 'web_search_attempts', 0)
-            for row in result.get('results', []):
-                from .event_observations import canonical
-                url = canonical(row['url'])
-                old = next((i for i, r in candidates.items() if r['url'] == url), None)
-                if old is None:
-                    old = 'S' + str(len(candidates) + 1)
-                    candidates[old] = dict(row, url=url, search_links=[])
-                candidates[old].setdefault('search_links', []).append(job)
+            self.add_candidates(job, result.get('results', []))
             self.save()
             if result.get('status') in {'failed', 'unavailable', 'disabled'}:
                 raise RuntimeError('edition_search_unavailable_no_retry')
+
+    def add_candidates(self, job, rows):
+        from .event_observations import canonical
+        candidates = self.state.setdefault('candidates', {})
+        by_url = {row['url']: cid for cid, row in candidates.items()}
+        for row in rows:
+            url = canonical(row['url'])
+            cid = by_url.get(url)
+            if cid is None:
+                cid = 'S' + str(len(candidates) + 1)
+                by_url[url] = cid
+                candidates[cid] = dict(row, url=url, search_links=[])
+            candidates[cid].setdefault('search_links', []).append(job)
+
+    async def publisher_catalogues(self):
+        from .publisher_releases import PUBLISHERS, catalogue
+        from .web_research import failure_reason, fetch_html_once
+        receipts = self.state.setdefault('publisher_catalogue_checks', [])
+        for publisher in PUBLISHERS.values():
+            url = publisher['directory']
+            if any(r['url'] == url for r in receipts):
+                continue
+            await self.check()
+            receipt = dict(publisher=publisher['name'], url=url, status='not_checked', articles=0)
+            receipts.append(receipt)
+            attempts = getattr(self.workspace, 'public_fetch_attempts', 0)
+            # A directory costs one request; preserve room for the next article's redirect chain.
+            if attempts + 4 > self.state['policy']['max_body_urls'] * 3 or time.monotonic() >= self.deadline:
+                receipt['reason'] = 'public_budget_reserved_for_bodies'
+                self.save()
+                continue
+            self.workspace.public_fetch_attempts = self.state['public_fetch_attempts'] = attempts + 1
+            receipt.update(status='started', public_http_requests=1)
+            self.save()
+            try:
+                status, _, raw = await asyncio.to_thread(fetch_html_once, url, self.deadline)
+                if status != 200:
+                    raise ValueError('public_http_' + str(status))
+                rows = catalogue(raw, publisher, self.workspace.now)
+            except Exception as error:
+                receipt.update(status='unavailable', reason=failure_reason(error))
+            else:
+                self.add_candidates(dict(lane='global_policy', purpose='discovery',
+                    retrieval='publisher_directory', publisher=publisher['name'], change_categories=['politics']), rows)
+                receipt.update(status='ok' if rows else 'no_dated_entries_in_sample', articles=len(rows))
+            self.save()
 
     async def reads(self, jobs, events):
         sources = self.state.setdefault('sources', {})
@@ -523,6 +565,8 @@ class EditionPipeline:
                 if self.state.get('change_protocol') == 'daily_changes_v1':
                     jobs = initial_searches(self.state['watchlist'], self.workspace.now,
                         direct_issuers=True, daily_changes=True, baselines=self.state.get('company_baselines'))
+                if self.state.get('news_focus') and self.uses_public_reader:
+                    await self.publisher_catalogues()
                 # Reserve the COMPLETE paid batch before spending on any search.
                 await self.searches([j for j in jobs if j.get('retrieval') != 'issuer_catalogue'])
                 if self.state.get('change_protocol') == 'daily_changes_v1':
