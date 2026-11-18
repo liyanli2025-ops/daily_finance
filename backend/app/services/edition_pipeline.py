@@ -113,24 +113,31 @@ async def preflight(report_type='morning', config=settings):
     from .generic_extraction import runtime_status
     extractor = runtime_status()
     if not extractor['ready']: blockers.append('body_extractor_unavailable')
+    jobs = initial_searches(stocks, now, direct_issuers=True, daily_changes=True)
     plan = None
     try:
         p, fingerprint, routes = environment(stocks, report_type, config)
-        plan = search_batch_plan(p, edition_forecast(dict(cutoff=now.isoformat(),
-            watchlist=stocks, report_type=report_type, sources={}, research_protocol=PROTOCOL, change_protocol='daily_changes_v1'), now),
-            sum(j.get('retrieval') != 'issuer_catalogue' for j in initial_searches(stocks, now, direct_issuers=True, daily_changes=True)))
-        if not plan['fits_money']:
-            blockers.append('estimated_limit_below_initial_batch_and_model_plan')
-        if not plan['fits_search_count']:
-            blockers.append('search_budget_cannot_cover_base_agenda')
     except (ValueError, RuntimeError, KeyError, TypeError) as error:
         p, fingerprint, routes = None, None, None
         blockers.append(str(error) if isinstance(error, ValueError) else 'model_route_or_price_unavailable')
+    else:
+        forecast_state = dict(cutoff=now.isoformat(), watchlist=stocks, report_type=report_type,
+            policy=p, sources={}, research_protocol=PROTOCOL, change_protocol='daily_changes_v1')
+        try:
+            plan = search_batch_plan(p, edition_forecast(forecast_state, now),
+                sum(job.get('retrieval') != 'issuer_catalogue' for job in jobs))
+        except (ValueError, RuntimeError, KeyError, TypeError) as error:
+            blockers.append(str(error) if isinstance(error, ValueError) else 'edition_budget_forecast_unavailable')
+        else:
+            if not plan['fits_money']:
+                blockers.append('estimated_limit_below_initial_batch_and_model_plan')
+            if not plan['fits_search_count']:
+                blockers.append('search_budget_cannot_cover_base_agenda')
     return dict(owner='finance-unified-edition-v1', mode='free_preflight', report_type=report_type,
         prepared_at=now.isoformat(), watchlist=stocks, policy=p, environment_sha256=fingerprint,
         budget_forecast=plan,
         routes=routes, extractor=extractor, ready_to_run=not blockers, blockers=blockers,
-        base_search_jobs=initial_searches(stocks, now, direct_issuers=True, daily_changes=True),
+        base_search_jobs=jobs,
         source_plan=dict(company_disclosures="A股先读公司披露列表，选题后读公告；空目录不代表没有事件",
             company_baseline="首次建立基线；财务遇新披露或每7天核对，业务遇相关变动或每30天核对，平日复用；仅事件需要时比较",
             daily_changes="五类逐项核对；每只自选股另查经营和治理风险，非只查业绩；标题后选一篇读",

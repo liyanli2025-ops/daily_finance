@@ -192,6 +192,47 @@ class Harness:
 
 
 class CriticalPath(unittest.IsolatedAsyncioTestCase):
+    async def test_fresh_manual_preview_prices_four_stages_and_initial_searches(self):
+        with tempfile.TemporaryDirectory() as temporary, Harness(temporary) as h:
+            watchlist = h.original['watchlist']
+            with patch.object(core, 'read_app_watchlist', AsyncMock(return_value=watchlist)):
+                result = await entry.preview(h.config)
+                low_budget = h.config.model_copy(update=dict(edition_estimated_limit_usd='0.10'))
+                blocked = await entry.preview(low_budget)
+            self.assertEqual(len(watchlist), 4)
+            self.assertTrue(result['ready_to_run'], result['blockers'])
+            self.assertTrue(result['search_route']['available'])
+            self.assertEqual(result['policy']['estimated_limit_usd'], '1')
+            self.assertFalse(result['policy']['audio_enabled'])
+            self.assertEqual(result['routes']['analysis']['provider'], 'ofox_anthropic')
+            plan = result['budget_forecast']
+            self.assertEqual({row['stage'] for row in plan['model_stages']},
+                {'agenda', 'assessment', 'writing', 'review'})
+            self.assertEqual(plan['search_batch_count'], 16)
+            self.assertEqual(plan['search_batch_estimate_usd'], '0.128')
+            self.assertTrue(plan['fits_money'])
+            self.assertFalse(blocked['ready_to_run'])
+            self.assertEqual(blocked['blockers'], ['estimated_limit_below_initial_batch_and_model_plan'])
+            self.assertFalse(blocked['budget_forecast']['fits_money'])
+            for field in ('model_requests', 'search_requests', 'public_fetch_attempts', 'tts_requests'):
+                self.assertEqual(result[field], 0)
+                self.assertEqual(blocked[field], 0)
+            self.assertEqual(h.model_calls, [])
+            self.assertEqual(h.get_calls, [])
+            self.assertTrue(h.pause.is_file())
+
+    async def test_forecast_error_preserves_valid_route_and_price_information(self):
+        with tempfile.TemporaryDirectory() as temporary, Harness(temporary) as h:
+            with patch.object(core, 'read_app_watchlist', AsyncMock(return_value=h.original['watchlist'])), \
+                    patch.object(core, 'edition_forecast', side_effect=KeyError('offline_forecast_fault')):
+                result = await entry.preview(h.config)
+            self.assertFalse(result['ready_to_run'])
+            self.assertEqual(result['blockers'], ['edition_budget_forecast_unavailable'])
+            self.assertIsNone(result['budget_forecast'])
+            self.assertEqual(result['policy']['estimated_limit_usd'], '1')
+            self.assertEqual(result['routes']['review']['provider'], 'ofox_anthropic')
+            self.assertTrue(result['environment_sha256'])
+
     async def normal(self,fault=None):
         root=tempfile.TemporaryDirectory();self.addCleanup(root.cleanup)
         h=Harness(root.name,fault);h.__enter__();self.addCleanup(h.__exit__,None,None,None)
