@@ -325,22 +325,40 @@ def parse_visible_article(html,url,now=None,hours=72):
             stamp=datetime.strptime(match.group(4)+' '+match.group(1)+' '+('AM' if match.group(2)=='a.m.' else 'PM'),'%B %d, %Y %I:%M %p')
             template_date=stamp.replace(tzinfo=timezone(timedelta(hours=-4 if match.group(3)=='EDT' else -5))).isoformat(timespec='minutes')
     from .article_metadata import article_title,visible_publication_fields,publication_value
+    # Article tags are also used for comments and recommendations. When the
+    # headline is inside the page's main landmark and the chosen generic
+    # article is a separate block, prefer visible main-text extraction.
+    if (not publisher and template_date is None and article is not None
+            and article.name=='article' and not article.get('itemprop') and heading is not None
+            and heading.find_parent('main') is not None
+            and article.find_parent('main') is not heading.find_parent('main')):
+        article=None
     title=article_title(soup,article,heading)
     visible_dates=visible_publication_fields(soup)
     extraction_note=''
-    if article is None:
+    content=''
+    if article is not None:
+        for node in article.select('script,style,nav,aside,footer,form,[hidden],[aria-hidden="true"]'):
+            if node.parent is not None:node.decompose()
+        content=article.get_text('\n',strip=True)
+    # Some public pages wrap only a teaser in <article>. Recover the visible
+    # article from the same bytes when the result contains that teaser.
+    teaser=' '.join(content.split())
+    generic_teaser=not publisher and bool(title) and 16<=len(teaser)<80
+    if article is None or generic_teaser:
         from .generic_extraction import extract_main_text
         candidate=extract_main_text(html,url)
-        if candidate.get('status')=='unavailable':raise ValueError('web_source_generic_extractor_unavailable')
-        if candidate.get('status')!='text_candidate':raise ValueError('web_source_article_structure_missing')
-        content=candidate['text']
-        if not title:
-            from .article_metadata import extracted_article_title
-            title=extracted_article_title(soup,content)
-        extraction_note='；正文算法：'+candidate['method']+' '+candidate['version']+'；未确认完整稿；'+','.join(candidate['warnings'])
-    else:
-        for node in article.select('script,style,nav,aside,footer,form'):node.decompose()
-        content=article.get_text('\n',strip=True)
+        if article is None and candidate.get('status')!='text_candidate':
+            reason=('web_source_generic_extractor_unavailable' if candidate.get('status')=='unavailable'
+                    else 'web_source_article_structure_missing')
+            raise ValueError(reason)
+        if candidate.get('status')=='text_candidate' and (article is None or
+                teaser in ' '.join(candidate['text'].split())):
+            content=candidate['text']
+            if not title:
+                from .article_metadata import extracted_article_title
+                title=extracted_article_title(soup,content)
+            extraction_note='；正文算法：'+candidate['method']+' '+candidate['version']+'；未确认完整稿；'+','.join(candidate['warnings'])
     # A short, actually retrieved news item is not a missing article. Keep it
     # explicitly as short text instead of padding it with navigation/footer.
     content='\n'.join(line for line in content.splitlines() if not re.fullmatch(r'\s*(?:海量资讯.{0,60}新浪财经APP|责任编辑\s*[:：].{0,20})\s*',line)).strip()

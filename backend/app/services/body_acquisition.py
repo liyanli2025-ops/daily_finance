@@ -25,9 +25,11 @@ def failure_class(reason):
     if value == 'article_paused_no_auto_retest': return 'paused'
     if re.search(r'timeout|connection|tls|ssl|dns|gaierror|NewConnectionError|MaxRetryError', value, re.I):
         return 'network'
-    if value in {'public_http_401','public_http_403','http_401','http_403',
+    if value in {'public_http_401','public_http_403','public_http_429','http_401','http_403','http_429',
                  'web_source_access_restricted'}: return 'access'
     if value in {'public_http_404','public_http_410','http_404','http_410'}: return 'missing_url'
+    if value == 'web_source_response_too_large': return 'response_size'
+    if value == 'web_source_non_html': return 'response_format'
     if value in {'published_hint_outside_event_window','web_source_time_outside_window',
                  'web_source_day_window_boundary_requires_review'}: return 'time_window'
     if value.startswith('body_quality') or value == 'web_source_disclosed_ai_generated_article': return 'quality'
@@ -96,6 +98,7 @@ def receipt_lines(state):
     result = summary(state)
     labels = dict(network='连接或超时', access='访问受限', missing_url='链接失效',
         paused='已停用且未重试', time_window='不在本次时窗', quality='正文质量不合格',
+        response_size='页面超过读取上限', response_format='返回内容非 HTML',
         parse_or_identity='正文结构、时间或身份未通过', other='其他未完成')
     lines = ['', '从标题到正文的实际转化：',
         '尝试链接=' + str(result['attempted_urls']) + '；读取前拦截=' + str(result['metadata_skipped'])

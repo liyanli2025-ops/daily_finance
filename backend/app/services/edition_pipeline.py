@@ -1,4 +1,4 @@
-"""Single production edition path. No maintenance override, paid retry or fallback."""
+"""Single production edition path with budgeted research and no paid retries."""
 import asyncio
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -148,7 +148,8 @@ async def preflight(report_type='morning', config=settings):
             daily_changes="五类逐项核对；每只自选股另查经营和治理风险，非只查业绩；标题后选一篇读",
             market_structure="先用1次批量请求取得带日期指数；日报不自动遍历全市场，宽度缺口明示，不推断资金意图",
             expectation="有事前可比基线及实际值原文才允许预期差判断；无一致预期接口则留缺口",
-            public_http_limit=config.research_body_max_urls * 3, paid_search_fallback="不自动回退；仅一次条件补查按缺口决定"),
+            public_http_limit=config.research_body_max_urls * 3,
+            paid_search_fallback="关键正文缺口可在评估前定向搜索最多2次，共用单期预算；评估后仍按缺口最多一次补查"),
         normal_model_requests=4, conditional_extra_requests=1, model_requests=0,
         search_requests=0, public_fetch_attempts=0, tts_requests=0,
         limitation='免费本地预检；价格由配置提供，本地金额为已接受估算，不是服务商硬账单上限。尚未联网或证明覆盖充分。')
@@ -199,6 +200,8 @@ class EditionPipeline:
             lines.append('已保留的逐项评估（未等于事实核实）：'+json.dumps(self.state['assessment'],ensure_ascii=False))
         if self.state.get('patch_progress'):
             lines.append('补查进展：' + json.dumps(self.state['patch_progress'], ensure_ascii=False))
+        for row in self.state.get('acquisition_recovery', []):
+            lines.append('正文缺口处理：' + json.dumps(row, ensure_ascii=False))
         for row in self.state.get('read_selection', []):
             selection = {k: v for k, v in row.items() if k not in {'ranked', 'skipped'}}
             selection['selected_articles'] = [dict(id=cid,
@@ -606,6 +609,9 @@ class EditionPipeline:
         stocks = {r['market'] + ':' + r['code'] for r in self.state['watchlist']}
         selected, trace = primary_plan(self.state['agenda']['events'])
         await self.selected_reads(selected, events, trace)
+        if self.state.get('news_focus'):
+            from .edition_acquisition import recover
+            await recover(self, events)
         if not self.state['sources'] or (self.state.get('research_protocol') == PROTOCOL
                 and not any(s.get('candidate_id') for s in self.state['sources'].values())):
             self.state.update(status='partial_materials', missing=list(events), stop_reason='no_readable_article_body')
